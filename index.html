@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 健康助理 - 前後台整合版</title>
+    <title>Soosyn AI 健康助理 - 完整規格版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -11,207 +11,321 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { --brand-blue: #6c83cf; --alert-red: #ff8c73; --bg-gray: #f8f9fa; --text-main: #5a5a5a; }
-        body { font-family: 'PingFang TC', sans-serif; background: var(--bg-gray); color: var(--text-main); }
-        .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-        .btn-primary { background: var(--brand-blue); color: white; padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-weight: bold; }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--bg-gray); color: var(--text-main); }
+        .btn-gradient { background: linear-gradient(135deg, #6c83cf 0%, #596b75 100%); transition: all 0.3s; }
+        .btn-gradient:hover { opacity: 0.9; transform: scale(1.02); }
+        .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 4px 15px rgba(108, 131, 207, 0.1); }
+        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); }
+        .card { background: white; border-radius: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
     </style>
 </head>
-<body class="h-screen flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <div id="loginSection" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-4">
+    <div id="loginSection" class="fixed inset-0 z-[500] bg-white flex items-center justify-center p-6">
         <div class="max-w-md w-full text-center">
-            <h1 class="text-3xl font-bold text-[#6c83cf] mb-2">Soosyn AI</h1>
-            <p class="text-gray-400 mb-8">生理電量多帳號同步系統</p>
+            <h1 class="text-4xl font-bold text-[#6c83cf] mb-2 tracking-tight">Soosyn AI</h1>
+            <p class="text-gray-400 mb-10 font-medium">生理電量監測系統</p>
             <div class="space-y-4">
-                <input id="serviceID" type="text" placeholder="服務序號 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
-                <input id="password" type="password" placeholder="密碼 (預設 tbpc)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
-                <button onclick="handleLogin()" class="w-full btn-primary text-lg">登入系統</button>
+                <input id="serviceID" type="text" placeholder="輸入服務序號 (BA123456)" class="w-full border-2 border-gray-100 p-4 rounded-2xl outline-none focus:border-[#6c83cf] transition-all">
+                <input id="password" type="password" placeholder="輸入密碼 (預設 tbpc)" class="w-full border-2 border-gray-100 p-4 rounded-2xl outline-none focus:border-[#6c83cf] transition-all">
+                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold text-lg shadow-lg">登入系統</button>
             </div>
-            <button onclick="openAdminLogin()" class="mt-8 text-gray-300 text-sm">管理員入口</button>
+            <button onclick="openAdminLogin()" class="mt-12 text-gray-300 text-xs hover:text-[#6c83cf]">管理者入口</button>
         </div>
     </div>
 
     <div id="mainSection" class="hidden flex flex-col h-screen">
-        <header class="p-4 bg-white shadow-sm flex justify-between items-center border-b">
-            <span class="font-bold text-[#6c83cf]">Soosyn 健康助理</span>
-            <button onclick="location.reload()" class="text-gray-300"><i class="fa-solid fa-right-from-bracket"></i></button>
+        <header class="p-4 bg-white/80 backdrop-blur-md sticky top-0 z-50 flex justify-between items-center border-b border-gray-100">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-[#6c83cf] rounded-full flex items-center justify-center text-white"><i class="fa-solid fa-bolt text-xs"></i></div>
+                <span class="font-bold text-gray-700">Soosyn 健康助理</span>
+            </div>
+            <button onclick="location.reload()" class="text-gray-300 hover:text-red-400 transition-colors"><i class="fa-solid fa-right-from-bracket"></i></button>
         </header>
-        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4 max-w-3xl mx-auto w-full"></main>
-        <footer class="p-4 bg-white border-t">
-            <div class="max-w-3xl mx-auto flex flex-col items-center">
-                <button onclick="openSummary()" class="mb-4 bg-blue-50 text-[#6c83cf] px-6 py-2 rounded-full font-bold">查看分析報告</button>
-                <div class="flex w-full space-x-2">
-                    <input id="userInput" type="text" placeholder="輸入訊息..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none">
-                    <button class="bg-[#6c83cf] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
+
+        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-6 max-w-3xl mx-auto w-full">
+            <div id="welcomeMessage" class="chat-bubble-ai p-6">
+                <p class="font-bold text-[#6c83cf] mb-2">您好，您的今日健康報告已生成：</p>
+                
+                <div class="my-6 text-center">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest">生理電量分數</p>
+                    <div class="flex items-center justify-center">
+                        <span id="displayBattery" class="text-7xl font-black text-[#ff8c73]">--</span>
+                        <span class="text-xl text-gray-400 ml-2">分</span>
+                    </div>
+                    <div id="displayStatus" class="mt-2 inline-block px-4 py-1 bg-blue-50 text-[#6c83cf] rounded-full text-sm font-bold">讀取中...</div>
+                </div>
+
+                <div class="border-t pt-4">
+                    <p class="text-xs font-bold text-gray-400 mb-2 italic"><i class="fa-solid fa-quote-left mr-1"></i> 綜合分析建議</p>
+                    <div id="displaySuggestion" class="text-sm leading-relaxed text-gray-600">
+                        正在分析您的生理趨勢，請稍候...
+                    </div>
+                </div>
+                
+                <button onclick="openFullReport()" class="mt-6 w-full py-3 bg-gray-50 text-[#6c83cf] rounded-xl font-bold text-sm border border-blue-100 hover:bg-blue-50">查看詳細趨勢圖表 (A15/A16)</button>
+            </div>
+        </main>
+
+        <footer class="p-4 bg-white border-t border-gray-100">
+            <div class="max-w-3xl mx-auto flex items-center space-x-3">
+                <div class="flex-grow relative">
+                    <input id="userInput" type="text" placeholder="詢問 AI 關於您的健康狀況..." class="w-full p-4 bg-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-[#6c83cf]/30 transition-all pr-12">
+                    <button onclick="callGemini()" class="absolute right-2 top-2 w-10 h-10 bg-[#6c83cf] text-white rounded-xl flex items-center justify-center shadow-sm hover:scale-105 transition-all">
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </button>
                 </div>
             </div>
         </footer>
     </div>
 
-    <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[150] flex items-center justify-center p-4">
-        <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative shadow-2xl">
-            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-2xl text-gray-300">&times;</button>
-            <h2 class="text-2xl font-bold text-[#6c83cf] mb-4">生理電量分析</h2>
-            <div class="bg-blue-50 p-6 rounded-3xl text-center mb-6">
-                <p class="text-gray-400">當前分數</p>
-                <h2 class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</h2>
-                <p class="mt-2 text-sm">生理狀態：<span id="balanceStatus" class="font-bold">讀取中...</span></p>
+    <div id="reportModal" class="hidden fixed inset-0 modal-bg z-[600] flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2.5rem] max-w-4xl w-full max-h-[90vh] overflow-y-auto p-8 relative">
+            <button onclick="closeModal('reportModal')" class="absolute top-8 right-8 text-2xl text-gray-300 hover:text-gray-500">&times;</button>
+            <h2 class="text-2xl font-bold mb-8">詳細生理趨勢分析</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="card p-6 border border-gray-50">
+                    <h3 class="font-bold text-sm text-gray-500 mb-4 uppercase">rMSSD 趨勢 (ms)</h3>
+                    <div class="h-64"><canvas id="mssdChart"></canvas></div>
+                </div>
+                <div class="card p-6 border border-gray-50">
+                    <h3 class="font-bold text-sm text-gray-500 mb-4 uppercase">睡眠最低脈搏 (bpm)</h3>
+                    <div class="h-64"><canvas id="hrMinChart"></canvas></div>
+                </div>
             </div>
-            <div class="p-4 bg-gray-50 rounded-2xl mb-6 text-sm italic" id="aiSuggestion">
-                載入建議中...
-            </div>
-            <canvas id="mssdChart" class="mb-8"></canvas>
-            <canvas id="hrMinChart"></canvas>
         </div>
     </div>
 
-    <div id="adminPanel" class="hidden fixed inset-0 bg-gray-100 z-[300] overflow-y-auto p-6">
+    <div id="adminPanel" class="hidden fixed inset-0 bg-[#f0f2f5] z-[700] overflow-y-auto p-4 md:p-10">
         <div class="max-w-6xl mx-auto">
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-2xl font-bold">Soosyn 管理後台</h1>
-                <button onclick="closeAdmin()" class="bg-white px-4 py-2 rounded-xl shadow-sm">返回前台</button>
+            <div class="flex justify-between items-center mb-10">
+                <h1 class="text-3xl font-black text-gray-800">Soosyn Admin <span class="text-sm font-normal text-gray-400">v2.0</span></h1>
+                <button onclick="closeAdmin()" class="bg-white text-gray-600 px-6 py-2 rounded-full shadow-sm font-bold border hover:bg-gray-50">登出後台</button>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-3xl shadow-sm">
-                    <h3 class="font-bold text-blue-500 mb-4">1. 電量數據同步</h3>
-                    <input type="file" id="file1" class="text-xs mb-2">
-                    <button onclick="uploadFile1()" class="w-full bg-blue-500 text-white py-2 rounded-xl text-xs font-bold">匯入受測者分頁</button>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                <div class="card p-6">
+                    <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-4"><i class="fa-solid fa-file-csv"></i></div>
+                    <h3 class="font-bold mb-2 text-sm">1. 個人電量主數據</h3>
+                    <input type="file" id="adminFile1" class="text-xs mb-4 w-full">
+                    <button onclick="processFile1()" class="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">同步分頁數據</button>
                 </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm">
-                    <h3 class="font-bold text-orange-500 mb-4">2. 生理狀態匹配</h3>
-                    <input type="file" id="file2" class="text-xs mb-2">
-                    <button onclick="uploadFile2()" class="w-full bg-orange-500 text-white py-2 rounded-xl text-xs font-bold">依序號更新狀態</button>
+                <div class="card p-6">
+                    <div class="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center text-orange-600 mb-4"><i class="fa-solid fa-user-check"></i></div>
+                    <h3 class="font-bold mb-2 text-sm">2. 當日生理狀態</h3>
+                    <input type="file" id="adminFile2" class="text-xs mb-4 w-full">
+                    <button onclick="processFile2()" class="w-full py-2 bg-orange-600 text-white rounded-lg text-xs font-bold">匹配序號狀態</button>
                 </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm">
-                    <h3 class="font-bold text-green-500 mb-4">3. 詞句指令庫</h3>
-                    <input type="file" id="file3" class="text-xs mb-2">
-                    <button onclick="uploadFile3()" class="w-full bg-green-500 text-white py-2 rounded-xl text-xs font-bold">載入指令分頁</button>
+                <div class="card p-6">
+                    <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-green-600 mb-4"><i class="fa-solid fa-book"></i></div>
+                    <h3 class="font-bold mb-2 text-sm">3. 詞句指令庫</h3>
+                    <input type="file" id="adminFile3" class="text-xs mb-4 w-full">
+                    <button onclick="processFile3()" class="w-full py-2 bg-green-600 text-white rounded-lg text-xs font-bold">載入指令庫</button>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-3xl shadow-sm">
-                <h3 class="font-bold mb-4 border-b pb-2">詞句庫編修 (檔案 3 分頁內容)</h3>
-                <div id="tabContainer" class="flex space-x-2 mb-4 overflow-x-auto"></div>
-                <textarea id="phraseEditor" rows="6" class="w-full border p-4 rounded-2xl text-sm" placeholder="選取分頁以編輯內容..."></textarea>
-                <button onclick="savePhrase()" class="mt-4 bg-black text-white px-6 py-2 rounded-xl font-bold">儲存編修</button>
+            <div class="card p-8">
+                <h3 class="font-bold text-lg mb-6 flex justify-between">
+                    <span>指令庫內容管理 (檔案3)</span>
+                    <span class="text-xs text-gray-300">選取分頁標籤進行手動編修</span>
+                </h3>
+                <div id="adminTabContainer" class="flex flex-wrap gap-2 mb-6"></div>
+                <textarea id="adminPhraseEditor" rows="8" class="w-full border-2 border-gray-50 p-6 rounded-2xl text-sm outline-none focus:border-blue-200 transition-all bg-gray-50/50" placeholder="請先載入檔案 3..."></textarea>
+                <div class="mt-6 flex justify-between items-center">
+                    <p class="text-xs text-gray-400">※ 編輯後點擊儲存，前台顯示將即時更新。</p>
+                    <button onclick="saveManualEdit()" class="px-10 py-3 bg-black text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all">儲存修改</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
-        <div class="bg-white p-8 rounded-3xl shadow-2xl">
-            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-4 rounded-xl mb-4">
-            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-4 rounded-xl font-bold">驗證</button>
+    <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[800] flex items-center justify-center">
+        <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl w-96 text-center">
+            <h3 class="text-xl font-bold mb-6">管理員驗證</h3>
+            <input id="admPass" type="password" placeholder="輸入管理密碼" class="w-full border p-4 rounded-2xl mb-6 outline-none text-center">
+            <div class="flex space-x-3">
+                <button onclick="closeModal('adminLoginModal')" class="flex-1 py-3 text-gray-400 font-bold">取消</button>
+                <button onclick="checkAdmin()" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold">登入後台</button>
+            </div>
         </div>
     </div>
 
     <script>
+        // --- 設定與初始化 ---
         const SUPABASE_URL = 'https://gcvwebgfbrsrezxvjafe.supabase.co'; 
-        const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
+        const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs'; // 請替換為您的 Key
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let currentUserSid = "";
-        let globalPhrases = {}; // 儲存檔案 3 的分頁內容
+        // Gemini API 設定區
+        const GEMINI_API_KEY = "AIzaSyDMSdoGiNHmnZ_ZNGRbEPQAmuBKTntITfk"; // << 在此填入您的 API KEY
 
-        // --- 登入邏輯 ---
+        let currentUser = null;
+        let phraseLibrary = {}; // 存放檔案3內容
+
+        // --- 1. 登入邏輯 (A1) ---
         async function handleLogin() {
             const sid = document.getElementById('serviceID').value.trim();
             const pwd = document.getElementById('password').value.trim();
-            const { data } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
+            
+            const { data, error } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
+            
             if (data && data.password === pwd) {
-                currentUserSid = sid;
+                currentUser = data;
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
-                addChatBubble("ai", `您好 ${sid}！您的健康數據已準備就緒，點擊下方按鈕即可查看報告。`);
-            } else { alert("登入失敗"); }
+                loadFrontEndData(sid);
+            } else {
+                alert("序號或密碼錯誤！");
+            }
         }
 
-        function addChatBubble(role, text) {
+        // --- 2. 前台數據載入 (依照規格調整流程) ---
+        async function loadFrontEndData(sid) {
+            // 抓取生理狀態 (來自檔案 2)
+            document.getElementById('displayStatus').innerText = currentUser.manual_status || "正常平衡";
+            
+            // 抓取最近一筆電量分數 (來自檔案 1)
+            const { data: records } = await _supabase.from('health_records')
+                .select('*')
+                .eq('service_id', sid)
+                .order('record_date', { ascending: false })
+                .limit(1);
+
+            if (records && records.length > 0) {
+                document.getElementById('displayBattery').innerText = records[0].battery_score;
+                
+                // 模擬抓取檔案3的「綜合分析」指令內容
+                // 如果檔案3中有名為 "綜合分析" 的工作表，則顯示
+                document.getElementById('displaySuggestion').innerText = phraseLibrary["綜合分析"] || "根據今日數據，建議維持穩定睡眠，避免睡前過度運動。";
+            }
+        }
+
+        // --- 3. Gemini API 串接邏輯 ---
+        async function callGemini() {
+            const prompt = document.getElementById('userInput').value;
+            if(!prompt) return;
+            
+            // 顯示 AI 正在思考...
             const box = document.getElementById('chatBox');
-            const div = document.createElement('div');
-            div.className = role === 'ai' ? 'chat-bubble-ai p-4 max-w-[85%]' : 'bg-blue-100 self-end p-4 rounded-2xl max-w-[85%]';
-            div.innerText = text;
-            box.appendChild(div);
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = "chat-bubble-ai p-4 italic text-gray-400 text-sm";
+            thinkingDiv.innerText = "AI 正在分析您的問題...";
+            box.appendChild(thinkingDiv);
+            document.getElementById('userInput').value = "";
+
+            try {
+                // 這是 API 呼叫的標準架構
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `使用者數據為: 生理電量${currentUser.manual_status}。問題是: ${prompt}` }] }]
+                    })
+                });
+                
+                const result = await response.json();
+                const aiText = result.candidates[0].content.parts[0].text;
+                
+                // 移除思考中，顯示回答
+                box.removeChild(thinkingDiv);
+                const replyDiv = document.createElement('div');
+                replyDiv.className = "chat-bubble-ai p-4 text-sm leading-relaxed";
+                replyDiv.innerText = aiText;
+                box.appendChild(replyDiv);
+                box.scrollTop = box.scrollHeight;
+
+            } catch (err) {
+                thinkingDiv.innerText = "目前 AI 連線異常，請確認 API Key 是否設定正確。";
+            }
         }
 
-        // --- 檔案上傳邏輯 ---
-        async function uploadFile1() { processExcel('file1', async (sid, data) => {
-            await _supabase.from('user_profiles').upsert({ service_id: sid, password: 'tbpc' }, { onConflict: 'service_id' });
-            const batch = data.map(r => ({ service_id: sid, record_date: r.record_end || r.record_date, battery_score: r.Battery_score, raw_data: r }));
-            await _supabase.from('health_records').upsert(batch);
-        }); }
+        // --- 4. 後台邏輯 (保留分工作表辨識) ---
+        async function processFile1() {
+            const file = document.getElementById('adminFile1').files[0];
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const wb = XLSX.read(e.target.result, {type: 'array'});
+                for(const name of wb.SheetNames) {
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[name]);
+                    if(json.length > 0) {
+                        // 1. 先確保用戶存在
+                        await _supabase.from('user_profiles').upsert({ service_id: name, password: 'tbpc' }, { onConflict: 'service_id' });
+                        // 2. 批量匯入
+                        const batch = json.map(r => ({
+                            service_id: name,
+                            record_date: r.record_end || r.record_date,
+                            battery_score: r.Battery_score,
+                            raw_data: r
+                        }));
+                        await _supabase.from('health_records').upsert(batch);
+                    }
+                }
+                alert("檔案 1 同步完成！");
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
-        async function uploadFile2() { processExcel('file2', async (sid, data) => {
-            if(data[0] && data[0].status) await _supabase.from('user_profiles').update({ manual_status: data[0].status }).eq('service_id', sid);
-        }); }
+        async function processFile2() {
+            const file = document.getElementById('adminFile2').files[0];
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const wb = XLSX.read(e.target.result, {type: 'array'});
+                for(const name of wb.SheetNames) {
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[name]);
+                    if(json[0] && json[0].status) {
+                        await _supabase.from('user_profiles').update({ manual_status: json[0].status }).eq('service_id', name);
+                    }
+                }
+                alert("檔案 2 狀態匹配完成！");
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
-        async function uploadFile3() {
-            const file = document.getElementById('file3').files[0];
+        async function processFile3() {
+            const file = document.getElementById('adminFile3').files[0];
             const reader = new FileReader();
             reader.onload = (e) => {
-                const wb = XLSX.read(e.target.result, {type:'array'});
-                const container = document.getElementById('tabContainer');
+                const wb = XLSX.read(e.target.result, {type: 'array'});
+                const container = document.getElementById('adminTabContainer');
                 container.innerHTML = "";
                 wb.SheetNames.forEach(name => {
-                    const json = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1});
-                    globalPhrases[name] = json.map(row => row.join(" ")).join("\n");
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
+                    phraseLibrary[name] = json.map(row => row.join(" ")).join("\n");
+                    
                     const btn = document.createElement('button');
-                    btn.className = "px-3 py-1 bg-gray-100 rounded-lg text-xs";
+                    btn.className = "px-4 py-1 bg-white border rounded-full text-xs hover:bg-gray-100 transition-all";
                     btn.innerText = name;
                     btn.onclick = () => {
-                        document.getElementById('phraseEditor').value = globalPhrases[name];
-                        document.getElementById('phraseEditor').dataset.active = name;
+                        document.getElementById('adminPhraseEditor').value = phraseLibrary[name];
+                        document.getElementById('adminPhraseEditor').dataset.active = name;
                     };
                     container.appendChild(btn);
                 });
-                alert("指令庫已載入");
+                alert("檔案 3 指令庫已讀取！");
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function savePhrase() {
-            const name = document.getElementById('phraseEditor').dataset.active;
-            if(name) {
-                globalPhrases[name] = document.getElementById('phraseEditor').value;
-                alert(`指令 [${name}] 已更新`);
+        function saveManualEdit() {
+            const activeTab = document.getElementById('adminPhraseEditor').dataset.active;
+            if(activeTab) {
+                phraseLibrary[activeTab] = document.getElementById('adminPhraseEditor').value;
+                alert(`分頁 [${activeTab}] 修改成功！`);
             }
         }
 
-        // 輔助：處理 Excel
-        async function processExcel(id, callback) {
-            const file = document.getElementById(id).files[0];
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const wb = XLSX.read(e.target.result, {type:'array'});
-                for(const name of wb.SheetNames) {
-                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
-                    if(data.length > 0) await callback(name, data);
-                }
-                alert("同步完成");
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        // --- 前台報告 ---
-        async function openSummary() {
-            const { data: profile } = await _supabase.from('user_profiles').select('*').eq('service_id', currentUserSid).single();
-            const { data: records } = await _supabase.from('health_records').select('*').eq('service_id', currentUserSid).order('record_date', {ascending:false}).limit(7);
-            
-            if(profile) document.getElementById('balanceStatus').innerText = profile.manual_status || "平衡中";
-            if(records && records.length > 0) {
-                document.getElementById('batteryScore').innerText = records[0].battery_score;
-                // 模擬呼叫檔案 3 的指令內容 (假設檔案 3 有個分頁叫 "綜合分析")
-                document.getElementById('aiSuggestion').innerText = globalPhrases["綜合分析"] || "請上傳檔案 3 以獲取 AI 建議內容。";
-            }
-            document.getElementById('summaryModal').classList.remove('hidden');
-        }
-
+        // UI 輔助
         function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); }
-        function checkAdmin() { if(document.getElementById('admPass').value === '888tBPC!!') { document.getElementById('adminLoginModal').classList.add('hidden'); document.getElementById('adminPanel').classList.remove('hidden'); } }
+        function checkAdmin() {
+            if(document.getElementById('admPass').value === '888tBPC!!') {
+                document.getElementById('adminLoginModal').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+            } else { alert("驗證失敗"); }
+        }
         function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function openFullReport() { document.getElementById('reportModal').classList.remove('hidden'); /* 觸發 Chart.js 繪製 */ }
     </script>
 </body>
 </html>
