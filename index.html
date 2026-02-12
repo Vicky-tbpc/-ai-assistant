@@ -6,151 +6,264 @@
     <title>Soosyn AI 健康助理</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
     <style>
         :root {
-            --primary-text: #5a5a5a;
             --brand-blue: #6c83cf;
             --alert-red: #ff8c73;
-            --standard-gray: #a79d8c;
-            --good-blue: #a0adb7;
-            --excellent-dark: #596b75;
+            --bg-gray: #f8f9fa;
         }
-        body { color: var(--primary-text); font-family: 'PingFang TC', sans-serif; }
-        .bg-capsule { background-color: #f0f0f0; border-radius: 50px; }
-        .modal-bg { background: rgba(0,0,0,0.5); }
+        body { font-family: 'PingFang TC', sans-serif; color: #5a5a5a; background: var(--bg-gray); }
+        .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .chat-bubble-user { background: #e2e8f0; border-radius: 20px 20px 0 20px; }
+        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .btn-gradient { background: linear-gradient(135deg, #6c83cf 0%, #596b75 100%); }
     </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col">
+<body class="h-screen flex flex-col">
 
-    <div id="loginSection" class="flex-grow flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-            <h1 class="text-2xl font-bold mb-6 text-blue-600">Soosyn AI 健康助理</h1>
-            <p class="mb-6 text-gray-500">歡迎使用，請輸入您的服務序號與密碼以完成身分驗證 [cite: 315]</p>
-            <input id="serviceID" type="text" placeholder="服務序號 (BA123456)" class="w-full border p-3 rounded-lg mb-4 outline-none focus:ring-2 focus:ring-blue-400">
-            <input id="password" type="password" placeholder="密碼" class="w-full border p-3 rounded-lg mb-6 outline-none focus:ring-2 focus:ring-blue-400">
-            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">登入驗證</button>
+    <div id="loginSection" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-4">
+        <div class="max-w-md w-full text-center">
+            <h1 class="text-3xl font-bold text-[#6c83cf] mb-2">Soosyn AI</h1>
+            <p class="text-gray-400 mb-8">您的專屬健康數據分析助理</p>
+            <div class="space-y-4">
+                <input id="serviceID" type="text" placeholder="服務序號 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <input id="password" type="password" placeholder="密碼" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold text-lg shadow-lg">登入系統</button>
+            </div>
+            <p class="mt-6 text-xs text-gray-400">登入即代表您同意健康資訊處理條款</p>
         </div>
     </div>
 
-    <div id="mainSection" class="hidden h-screen flex flex-col">
-        <header class="p-4 bg-white shadow-sm flex justify-between items-center">
-            <div class="font-bold text-lg text-blue-600">Soosyn AI</div>
-            <button id="profileBtn" class="text-gray-500 hover:text-blue-600"><i class="fa-solid fa-user-circle text-2xl"></i></button>
+    <div id="mainSection" class="hidden flex flex-col h-screen">
+        <header class="p-4 bg-white shadow-sm flex justify-between items-center border-b">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-[#6c83cf] rounded-full flex items-center justify-center text-white text-xs">AI</div>
+                <span class="font-bold">Soosyn 健康助理</span>
+            </div>
+            <button onclick="openAdminLogin()" class="text-gray-300 hover:text-gray-500"><i class="fa-solid fa-gear"></i></button>
         </header>
 
-        <main class="flex-grow overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full" id="chatHistory">
-            </main>
+        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-6 max-w-3xl mx-auto w-full">
+            <div class="chat-bubble-ai p-4 max-w-[85%]">
+                您好！我是您的健康助理。今天想了解您的生理電量趨勢嗎？
+            </div>
+        </main>
 
         <footer class="p-4 bg-white border-t">
-            <div class="max-w-4xl mx-auto relative">
-                <input type="text" placeholder="詢問您的健康狀況..." class="w-full border rounded-full py-3 px-6 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-300 shadow-sm">
-                <button class="absolute right-4 top-3 text-blue-500"><i class="fa-solid fa-paper-plane"></i></button>
+            <div class="max-w-3xl mx-auto flex items-center space-x-2">
+                <input id="userInput" type="text" placeholder="詢問關於您的健康數據..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none focus:ring-2 focus:ring-blue-200">
+                <button onclick="sendMessage()" class="bg-[#6c83cf] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
         </footer>
     </div>
 
-    <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 relative">
-            <button onclick="closeModal('summaryModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[150] flex items-center justify-center p-4">
+        <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative shadow-2xl">
+            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-gray-300 text-2xl">&times;</button>
             
-            <div class="flex items-center space-x-2 mb-6">
-                <i class="fa-solid fa-calendar text-[#8699a3]"></i>
-                <span class="font-regular text-[#5a5a5a]" id="displayDate">2026/01/01</span>
-            </div>
+            <div class="flex items-center text-gray-400 mb-6"><i class="fa-solid fa-calendar-day mr-2"></i> <span id="displayDate">2026/02/12</span></div>
+            
+            <h2 class="text-2xl font-bold text-[#6c83cf] mb-1">生理電量分析</h2>
+            <p class="text-sm text-gray-400 mb-6">依據您的穿戴裝置數據生成</p>
 
-            <div class="mb-6">
-                <h3 class="text-[#6c83cf] font-bold mb-2">生理電量</h3>
-                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-xl">
-                    <div id="batteryScore" class="text-4xl font-bold text-[#ff8c73]">85</div>
-                    <div class="text-sm">超過 <span id="percentRank">50%</span> 的使用者 [cite: 337]</div>
+            <div class="flex items-end justify-between mb-8 bg-blue-50 p-6 rounded-3xl">
+                <div>
+                    <span class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</span>
+                    <span class="text-gray-400 ml-2">分</span>
+                </div>
+                <div class="text-right text-sm text-[#596b75]">
+                    超過 <span class="font-bold" id="rankPercent">--</span>% 的使用者<br>生理電量平衡度：<span id="balanceStatus">良好</span>
                 </div>
             </div>
 
-            <div class="space-y-3 mb-6">
-                <div class="bg-capsule p-3 flex items-center space-x-3">
-                    <i class="fa-regular fa-face-smile text-[#a0afb7] text-xl"></i>
-                    <p class="text-sm">這是您表現最棒的項目摘要...</p>
+            <div class="space-y-8">
+                <div>
+                    <h3 class="font-bold mb-4 flex justify-between items-center">
+                        <span>MSSD 趨勢 (單位: ms)</span>
+                        <span class="text-xs text-gray-400">7日移動平均</span>
+                    </h3>
+                    <canvas id="mssdChart" height="200"></canvas>
                 </div>
-                <div class="bg-capsule p-3 flex items-center space-x-3">
-                    <i class="fa-regular fa-face-frown text-[#ffb4a3] text-xl"></i>
-                    <p class="text-sm">這是需要注意的項目摘要...</p>
+                <hr>
+                <div>
+                    <h3 class="font-bold mb-4">最低脈搏 (HR_min)</h3>
+                    <canvas id="hrMinChart" height="200"></canvas>
                 </div>
             </div>
 
-            <div class="mb-6">
-                <canvas id="radarChart"></canvas>
-            </div>
-
-            <button onclick="closeModal('summaryModal')" class="w-full bg-gray-100 py-3 rounded-xl font-bold">關閉並繼續</button>
+            <button onclick="closeModal('summaryModal')" class="w-full mt-8 bg-gray-100 py-4 rounded-2xl font-bold text-gray-500">關閉摘要</button>
         </div>
     </div>
 
-    <div id="profileModal" class="hidden fixed inset-0 modal-bg z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-8 max-w-md w-full">
-            <h2 class="text-xl font-bold mb-4">完善個人資料 [cite: 318]</h2>
-            <p class="text-sm text-gray-500 mb-6">接下來請花一點時間填寫您的個人資料，幫助我們更了解您。</p>
-            <div class="space-y-4">
-                <input type="text" placeholder="暱稱" class="w-full border p-2 rounded">
-                <select class="w-full border p-2 rounded">
-                    <option>男</option>
-                    <option>女</option>
-                </select>
-                <input type="date" class="w-full border p-2 rounded">
+    <div id="adminPanel" class="hidden fixed inset-0 bg-white z-[300] p-6 overflow-y-auto">
+        <div class="max-w-2xl mx-auto">
+            <div class="flex justify-between items-center mb-8 border-b pb-4">
+                <h1 class="text-2xl font-bold text-red-500">管理員後台</h1>
+                <button onclick="closeAdmin()" class="text-gray-400">關閉</button>
             </div>
-            <div class="mt-8 flex flex-col space-y-2">
-                <button onclick="showSummary()" class="bg-blue-600 text-white py-3 rounded-lg">立即完善檔案</button>
-                <button onclick="showSummary()" class="text-gray-400 text-sm italic underline">暫時跳過，稍後再自行設定</button>
-                <p class="text-[10px] text-red-400 mt-2">**若選擇暫時跳過，AI 將以成人平均數值為基準...** [cite: 320]</p>
+            
+            <div class="space-y-6">
+                <div class="p-4 border rounded-2xl">
+                    <label class="block font-bold mb-2">上傳健康數據 Excel (Personal_Battery)</label>
+                    <input type="file" id="excelMain" accept=".xlsx" class="block w-full text-sm">
+                </div>
+                <button onclick="uploadToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold">同步數據至雲端</button>
             </div>
+        </div>
+    </div>
+
+    <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
+        <div class="bg-white p-6 rounded-2xl w-80">
+            <h3 class="font-bold mb-4">管理者驗證</h3>
+            <input id="admPass" type="password" placeholder="輸入管理者密碼" class="w-full border p-2 rounded mb-4">
+            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-2 rounded">驗證</button>
         </div>
     </div>
 
     <script>
-        // 模擬邏輯
-        function handleLogin() {
-            const sid = document.getElementById('serviceID').value;
-            if (sid === 'BA123456') {
+        // --- 1. Supabase 初始化 (請替換為您的正確資訊) ---
+        const SUPABASE_URL = 'https://gcvwebgfbrsrezxvjafe.supabase.co'; 
+        const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let currentUser = null;
+
+        // --- 2. 登入邏輯 ---
+        async function handleLogin() {
+            const sid = document.getElementById('serviceID').value.trim();
+            const pwd = document.getElementById('password').value.trim();
+
+            if (!sid || !pwd) return alert("請輸入序號與密碼");
+
+            // 查詢雲端使用者
+            const { data, error } = await _supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('service_id', sid)
+                .single();
+
+            if (data && data.password === pwd) {
+                currentUser = sid;
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
-                // 觸發第一次登入的個人資料視窗
-                document.getElementById('profileModal').classList.remove('hidden');
+                fetchDataAndDraw(sid); // 抓數據並畫圖
             } else {
-                alert('驗證失敗，請檢查序號或密碼');
+                alert("序號或密碼錯誤 (預設 BA123456 / tbpc)");
             }
         }
 
-        function showSummary() {
-            closeModal('profileModal');
+        // --- 3. 抓取數據與圖表渲染 (A15-A16) ---
+        async function fetchDataAndDraw(sid) {
+            // 從雲端抓取最近 7 筆數據
+            const { data, error } = await _supabase
+                .from('health_records')
+                .select('*')
+                .eq('service_id', sid)
+                .order('record_date', { ascending: false })
+                .limit(7);
+
+            if (error || !data.length) return;
+
+            // 模擬顯示數據 (A3)
+            const latest = data[0];
+            document.getElementById('batteryScore').innerText = latest.battery_score || 0;
+            document.getElementById('rankPercent').innerText = "68"; // 模擬排名
+            
             document.getElementById('summaryModal').classList.remove('hidden');
-            initRadarChart();
+
+            renderCharts(data.reverse()); // 繪製圖表
         }
 
-        function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-        }
+        function renderCharts(dataList) {
+            const labels = dataList.map(d => new Date(d.record_date).toLocaleDateString());
+            const mssdValues = dataList.map(d => d.raw_data.MSSD || 0);
+            const hrMinValues = dataList.map(d => d.raw_data.HR_min || 0);
 
-        // 初始化雷達圖 (A9)
-        function initRadarChart() {
-            const ctx = document.getElementById('radarChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'radar',
+            // MSSD 圖表 (A15)
+            new Chart(document.getElementById('mssdChart'), {
+                type: 'line',
                 data: {
-                    labels: ['修復時間', '核心修復', '放鬆指數', '脈搏穩定度', '血氧穩定度', '睡眠連續性', '睡眠規律性'],
+                    labels: labels,
                     datasets: [{
-                        label: '生理電量平衡度',
-                        data: [80, 70, 90, 65, 85, 75, 80],
-                        backgroundColor: 'rgba(108, 131, 207, 0.2)',
-                        borderColor: '#6c83cf',
-                        pointBackgroundColor: '#596b75'
+                        label: '當日數值',
+                        data: mssdValues,
+                        borderColor: '#999999',
+                        pointBackgroundColor: '#596b75',
+                        fill: false
                     }]
-                },
-                options: {
-                    scales: {
-                        r: { beginAtZero: true, max: 110 }
-                    }
                 }
             });
+
+            // HR_min 圖表 (A16)
+            new Chart(document.getElementById('hrMinChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '最低脈搏',
+                        data: hrMinValues,
+                        backgroundColor: '#c1cdd3'
+                    }]
+                }
+            });
+        }
+
+        // --- 4. 後台邏輯 ---
+        function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); }
+        function checkAdmin() {
+            if (document.getElementById('admPass').value === '888tBPC!!') {
+                document.getElementById('adminLoginModal').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+            } else { alert("密碼錯誤"); }
+        }
+        function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        async function uploadToSupabase() {
+            const file = document.getElementById('excelMain').files[0];
+            if (!file) return alert("請選取檔案");
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const workbook = XLSX.read(e.target.result, { type: 'array' });
+                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                
+                // 格式化後批次上傳
+                const { error } = await _supabase.from('health_records').upsert(
+                    json.map(row => ({
+                        service_id: row.service_id,
+                        record_date: row.record_end,
+                        battery_score: row.Battery_score,
+                        raw_data: row
+                    }))
+                );
+                
+                if (error) alert("失敗: " + error.message);
+                else alert("雲端數據已更新！");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- 5. 對話功能 ---
+        function sendMessage() {
+            const input = document.getElementById('userInput');
+            if (!input.value) return;
+            const chatBox = document.getElementById('chatBox');
+            
+            // 使用者泡泡
+            chatBox.innerHTML += `<div class="flex justify-end"><div class="chat-bubble-user p-4 max-w-[85%]">${input.value}</div></div>`;
+            
+            // 模擬 AI 思考
+            setTimeout(() => {
+                chatBox.innerHTML += `<div class="chat-bubble-ai p-4 max-w-[85%]">正在分析您的健康趨勢... (目前尚未串接 Gemini API Key)</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 1000);
+
+            input.value = "";
         }
     </script>
 </body>
