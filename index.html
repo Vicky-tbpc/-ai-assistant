@@ -3,96 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 管理員後台 - 指令化詞句庫版</title>
+    <title>Soosyn AI 健康助理 - 前後台整合版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --brand-blue: #6c83cf; --text-main: #5a5a5a; --bg-gray: #f8f9fa; }
+        :root { --brand-blue: #6c83cf; --alert-red: #ff8c73; --bg-gray: #f8f9fa; --text-main: #5a5a5a; }
         body { font-family: 'PingFang TC', sans-serif; background: var(--bg-gray); color: var(--text-main); }
-        .admin-card { background: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .btn-action { background: var(--brand-blue); color: white; padding: 0.6rem 1.2rem; border-radius: 0.75rem; font-weight: bold; }
-        .tab-active { border-bottom: 3px solid var(--brand-blue); color: var(--brand-blue); }
+        .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .btn-primary { background: var(--brand-blue); color: white; padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-weight: bold; }
     </style>
 </head>
-<body>
+<body class="h-screen flex flex-col">
 
-    <div class="p-6 max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-10 border-b pb-4">
-            <div>
-                <h1 class="text-2xl font-bold">Soosyn AI 管理後台</h1>
-                <p class="text-sm text-gray-400">支援多分頁匹配與指令化詞句庫</p>
+    <div id="loginSection" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-4">
+        <div class="max-w-md w-full text-center">
+            <h1 class="text-3xl font-bold text-[#6c83cf] mb-2">Soosyn AI</h1>
+            <p class="text-gray-400 mb-8">生理電量多帳號同步系統</p>
+            <div class="space-y-4">
+                <input id="serviceID" type="text" placeholder="服務序號 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <input id="password" type="password" placeholder="密碼 (預設 tbpc)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <button onclick="handleLogin()" class="w-full btn-primary text-lg">登入系統</button>
             </div>
-            <button onclick="window.open('index.html', '_blank')" class="border border-blue-500 text-blue-500 px-4 py-2 rounded-xl font-bold">預覽前台視窗</button>
+            <button onclick="openAdminLogin()" class="mt-8 text-gray-300 text-sm">管理員入口</button>
+        </div>
+    </div>
+
+    <div id="mainSection" class="hidden flex flex-col h-screen">
+        <header class="p-4 bg-white shadow-sm flex justify-between items-center border-b">
+            <span class="font-bold text-[#6c83cf]">Soosyn 健康助理</span>
+            <button onclick="location.reload()" class="text-gray-300"><i class="fa-solid fa-right-from-bracket"></i></button>
         </header>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            <div class="lg:col-span-1 space-y-6">
-                <div class="admin-card">
-                    <h3 class="font-bold mb-4 text-blue-600"><i class="fa-solid fa-file-import mr-2"></i>數據匯入中心</h3>
-                    
-                    <div class="space-y-6">
-                        <div class="p-4 bg-gray-50 rounded-xl border">
-                            <label class="text-xs font-bold block mb-2">1. 七日電量 (Personal_Battery...)</label>
-                            <input type="file" id="file1" class="text-xs w-full mb-2">
-                            <button onclick="importHealthData()" class="text-xs btn-action w-full">同步受測者分頁</button>
-                        </div>
-
-                        <div class="p-4 bg-gray-50 rounded-xl border">
-                            <label class="text-xs font-bold block mb-2">2. 生理狀態 (當日電量VS自評...)</label>
-                            <input type="file" id="file2" class="text-xs w-full mb-2">
-                            <button onclick="importStatusData()" class="text-xs btn-action w-full">匹配序號生理狀態</button>
-                        </div>
-
-                        <div class="p-4 bg-gray-50 rounded-xl border">
-                            <label class="text-xs font-bold block mb-2">3. 詞句庫 (詞句庫_web_...)</label>
-                            <input type="file" id="file3" class="text-xs w-full mb-2">
-                            <button onclick="importPhraseLibrary()" class="text-xs btn-action w-full">載入全域指令分頁</button>
-                        </div>
-                    </div>
+        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4 max-w-3xl mx-auto w-full"></main>
+        <footer class="p-4 bg-white border-t">
+            <div class="max-w-3xl mx-auto flex flex-col items-center">
+                <button onclick="openSummary()" class="mb-4 bg-blue-50 text-[#6c83cf] px-6 py-2 rounded-full font-bold">查看分析報告</button>
+                <div class="flex w-full space-x-2">
+                    <input id="userInput" type="text" placeholder="輸入訊息..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none">
+                    <button class="bg-[#6c83cf] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
+            </div>
+        </footer>
+    </div>
 
-                <div class="admin-card">
-                    <h3 class="font-bold mb-4 text-red-500">帳號管理</h3>
-                    <input id="resetSid" type="text" placeholder="輸入序號" class="w-full border p-2 rounded-lg text-sm mb-2">
-                    <button onclick="resetPassword()" class="w-full bg-red-100 text-red-600 py-2 rounded-lg text-sm font-bold">重設為預設密碼 (tbpc)</button>
+    <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[150] flex items-center justify-center p-4">
+        <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative shadow-2xl">
+            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-2xl text-gray-300">&times;</button>
+            <h2 class="text-2xl font-bold text-[#6c83cf] mb-4">生理電量分析</h2>
+            <div class="bg-blue-50 p-6 rounded-3xl text-center mb-6">
+                <p class="text-gray-400">當前分數</p>
+                <h2 class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</h2>
+                <p class="mt-2 text-sm">生理狀態：<span id="balanceStatus" class="font-bold">讀取中...</span></p>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-2xl mb-6 text-sm italic" id="aiSuggestion">
+                載入建議中...
+            </div>
+            <canvas id="mssdChart" class="mb-8"></canvas>
+            <canvas id="hrMinChart"></canvas>
+        </div>
+    </div>
+
+    <div id="adminPanel" class="hidden fixed inset-0 bg-gray-100 z-[300] overflow-y-auto p-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-2xl font-bold">Soosyn 管理後台</h1>
+                <button onclick="closeAdmin()" class="bg-white px-4 py-2 rounded-xl shadow-sm">返回前台</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-3xl shadow-sm">
+                    <h3 class="font-bold text-blue-500 mb-4">1. 電量數據同步</h3>
+                    <input type="file" id="file1" class="text-xs mb-2">
+                    <button onclick="uploadFile1()" class="w-full bg-blue-500 text-white py-2 rounded-xl text-xs font-bold">匯入受測者分頁</button>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm">
+                    <h3 class="font-bold text-orange-500 mb-4">2. 生理狀態匹配</h3>
+                    <input type="file" id="file2" class="text-xs mb-2">
+                    <button onclick="uploadFile2()" class="w-full bg-orange-500 text-white py-2 rounded-xl text-xs font-bold">依序號更新狀態</button>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm">
+                    <h3 class="font-bold text-green-500 mb-4">3. 詞句指令庫</h3>
+                    <input type="file" id="file3" class="text-xs mb-2">
+                    <button onclick="uploadFile3()" class="w-full bg-green-500 text-white py-2 rounded-xl text-xs font-bold">載入指令分頁</button>
                 </div>
             </div>
 
-            <div class="lg:col-span-2 space-y-6">
-                <div class="admin-card">
-                    <div class="flex justify-between items-center mb-6 border-b pb-2">
-                        <h3 class="font-bold">詞句庫內容預覽與編修 (檔案 3)</h3>
-                        <span class="text-xs text-gray-400">由 HTML 指令直接呼叫分頁名稱</span>
-                    </div>
-                    
-                    <div id="phraseTabs" class="flex space-x-4 mb-4 overflow-x-auto pb-2">
-                        <span class="text-gray-300 text-sm">請先上傳檔案 3...</span>
-                    </div>
-
-                    <div class="bg-blue-50 p-4 rounded-2xl">
-                        <label id="activeTabName" class="text-sm font-bold text-blue-700 block mb-2">選取的分頁內容</label>
-                        <textarea id="phraseEditor" rows="8" class="w-full border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-300" placeholder="此處內容將依指令顯示在前台系統..."></textarea>
-                        <button onclick="savePhraseEdit()" class="mt-4 bg-black text-white px-6 py-2 rounded-xl text-sm font-bold">儲存此分頁修改</button>
-                    </div>
-                </div>
-
-                <div class="admin-card">
-                    <h3 class="font-bold mb-4">個別受測者狀態手動覆寫 (檔案 2)</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <input id="targetSid" type="text" placeholder="受測者序號" class="border p-3 rounded-xl text-sm">
-                        <select id="targetStatus" class="border p-3 rounded-xl text-sm bg-gray-50">
-                            <option value="電量充足">電量充足</option>
-                            <option value="中度平衡">中度平衡</option>
-                            <option value="電力耗盡">電力耗盡</option>
-                        </select>
-                    </div>
-                    <button onclick="manualOverrideStatus()" class="mt-4 w-full bg-gray-800 text-white py-3 rounded-xl font-bold">手動更新生理狀態</button>
-                </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm">
+                <h3 class="font-bold mb-4 border-b pb-2">詞句庫編修 (檔案 3 分頁內容)</h3>
+                <div id="tabContainer" class="flex space-x-2 mb-4 overflow-x-auto"></div>
+                <textarea id="phraseEditor" rows="6" class="w-full border p-4 rounded-2xl text-sm" placeholder="選取分頁以編輯內容..."></textarea>
+                <button onclick="savePhrase()" class="mt-4 bg-black text-white px-6 py-2 rounded-xl font-bold">儲存編修</button>
             </div>
+        </div>
+    </div>
+
+    <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl">
+            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-4 rounded-xl mb-4">
+            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-4 rounded-xl font-bold">驗證</button>
         </div>
     </div>
 
@@ -100,103 +111,107 @@
         const SUPABASE_URL = 'https://gcvwebgfbrsrezxvjafe.supabase.co'; 
         const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        let currentUserSid = "";
+        let globalPhrases = {}; // 儲存檔案 3 的分頁內容
 
-        let phraseLibrary = {}; // 存放檔案3的資料：{ "分頁名": "內容" }
-
-        // --- 檔案 1: 數據同步 ---
-        async function importHealthData() {
-            const file = document.getElementById('file1').files[0];
-            if (!file) return alert("請選取檔案 1");
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const wb = XLSX.read(e.target.result, {type: 'array'});
-                for(const name of wb.SheetNames) {
-                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
-                    if(data.length > 0) {
-                        await _supabase.from('user_profiles').upsert({ service_id: name, password: 'tbpc' }, { onConflict: 'service_id' });
-                        const batch = data.map(r => ({ service_id: name, record_date: r.record_end || r.record_date, battery_score: r.Battery_score, raw_data: r }));
-                        await _supabase.from('health_records').upsert(batch);
-                    }
-                }
-                alert("檔案 1 分頁同步完成！");
-            };
-            reader.readAsArrayBuffer(file);
+        // --- 登入邏輯 ---
+        async function handleLogin() {
+            const sid = document.getElementById('serviceID').value.trim();
+            const pwd = document.getElementById('password').value.trim();
+            const { data } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
+            if (data && data.password === pwd) {
+                currentUserSid = sid;
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('mainSection').classList.remove('hidden');
+                addChatBubble("ai", `您好 ${sid}！您的健康數據已準備就緒，點擊下方按鈕即可查看報告。`);
+            } else { alert("登入失敗"); }
         }
 
-        // --- 檔案 2: 生理狀態匹配 ---
-        async function importStatusData() {
-            const file = document.getElementById('file2').files[0];
-            if (!file) return alert("請選取檔案 2");
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const wb = XLSX.read(e.target.result, {type: 'array'});
-                for(const name of wb.SheetNames) {
-                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
-                    if(data[0] && data[0].status) {
-                        await _supabase.from('user_profiles').update({ manual_status: data[0].status }).eq('service_id', name);
-                    }
-                }
-                alert("檔案 2 生理狀態匹配完成！");
-            };
-            reader.readAsArrayBuffer(file);
+        function addChatBubble(role, text) {
+            const box = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.className = role === 'ai' ? 'chat-bubble-ai p-4 max-w-[85%]' : 'bg-blue-100 self-end p-4 rounded-2xl max-w-[85%]';
+            div.innerText = text;
+            box.appendChild(div);
         }
 
-        // --- 檔案 3: 詞句庫 (指令化呼叫模式) ---
-        async function importPhraseLibrary() {
+        // --- 檔案上傳邏輯 ---
+        async function uploadFile1() { processExcel('file1', async (sid, data) => {
+            await _supabase.from('user_profiles').upsert({ service_id: sid, password: 'tbpc' }, { onConflict: 'service_id' });
+            const batch = data.map(r => ({ service_id: sid, record_date: r.record_end || r.record_date, battery_score: r.Battery_score, raw_data: r }));
+            await _supabase.from('health_records').upsert(batch);
+        }); }
+
+        async function uploadFile2() { processExcel('file2', async (sid, data) => {
+            if(data[0] && data[0].status) await _supabase.from('user_profiles').update({ manual_status: data[0].status }).eq('service_id', sid);
+        }); }
+
+        async function uploadFile3() {
             const file = document.getElementById('file3').files[0];
-            if (!file) return alert("請選取檔案 3");
             const reader = new FileReader();
             reader.onload = (e) => {
-                const wb = XLSX.read(e.target.result, {type: 'array'});
-                const tabContainer = document.getElementById('phraseTabs');
-                tabContainer.innerHTML = "";
-                phraseLibrary = {};
-
-                wb.SheetNames.forEach((name, index) => {
-                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
-                    // 將該分頁的所有文字合併為一段話供編輯
-                    phraseLibrary[name] = data.map(row => row.join(" ")).join("\n");
-                    
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                const container = document.getElementById('tabContainer');
+                container.innerHTML = "";
+                wb.SheetNames.forEach(name => {
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1});
+                    globalPhrases[name] = json.map(row => row.join(" ")).join("\n");
                     const btn = document.createElement('button');
-                    btn.className = "px-4 py-1 text-sm font-bold border-b-2 transition-all " + (index === 0 ? 'tab-active' : 'border-transparent text-gray-400');
+                    btn.className = "px-3 py-1 bg-gray-100 rounded-lg text-xs";
                     btn.innerText = name;
-                    btn.onclick = () => selectPhraseTab(name, btn);
-                    tabContainer.appendChild(btn);
-                    if(index === 0) selectPhraseTab(name, btn);
+                    btn.onclick = () => {
+                        document.getElementById('phraseEditor').value = globalPhrases[name];
+                        document.getElementById('phraseEditor').dataset.active = name;
+                    };
+                    container.appendChild(btn);
                 });
-                alert("檔案 3 詞句庫指令載入完成，請於右側編修。");
+                alert("指令庫已載入");
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function selectPhraseTab(name, element) {
-            document.querySelectorAll('#phraseTabs button').forEach(b => b.classList.remove('tab-active', 'text-blue-600'));
-            element.classList.add('tab-active');
-            document.getElementById('activeTabName').innerText = "呼叫指令：[" + name + "]";
-            document.getElementById('phraseEditor').value = phraseLibrary[name];
+        function savePhrase() {
+            const name = document.getElementById('phraseEditor').dataset.active;
+            if(name) {
+                globalPhrases[name] = document.getElementById('phraseEditor').value;
+                alert(`指令 [${name}] 已更新`);
+            }
         }
 
-        async function savePhraseEdit() {
-            const name = document.getElementById('activeTabName').innerText.replace("呼叫指令：[", "").replace("]", "");
-            const content = document.getElementById('phraseEditor').value;
-            phraseLibrary[name] = content;
-            // 此處實務上會同步回資料庫的建議欄位
-            alert(`分頁 [${name}] 的詞句已成功儲存！`);
+        // 輔助：處理 Excel
+        async function processExcel(id, callback) {
+            const file = document.getElementById(id).files[0];
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                for(const name of wb.SheetNames) {
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
+                    if(data.length > 0) await callback(name, data);
+                }
+                alert("同步完成");
+            };
+            reader.readAsArrayBuffer(file);
         }
 
-        // --- 密碼與手動管理 ---
-        async function resetPassword() {
-            const sid = document.getElementById('resetSid').value;
-            await _supabase.from('user_profiles').update({ password: 'tbpc' }).eq('service_id', sid);
-            alert("密碼已重置為 tbpc");
+        // --- 前台報告 ---
+        async function openSummary() {
+            const { data: profile } = await _supabase.from('user_profiles').select('*').eq('service_id', currentUserSid).single();
+            const { data: records } = await _supabase.from('health_records').select('*').eq('service_id', currentUserSid).order('record_date', {ascending:false}).limit(7);
+            
+            if(profile) document.getElementById('balanceStatus').innerText = profile.manual_status || "平衡中";
+            if(records && records.length > 0) {
+                document.getElementById('batteryScore').innerText = records[0].battery_score;
+                // 模擬呼叫檔案 3 的指令內容 (假設檔案 3 有個分頁叫 "綜合分析")
+                document.getElementById('aiSuggestion').innerText = globalPhrases["綜合分析"] || "請上傳檔案 3 以獲取 AI 建議內容。";
+            }
+            document.getElementById('summaryModal').classList.remove('hidden');
         }
 
-        async function manualOverrideStatus() {
-            const sid = document.getElementById('targetSid').value;
-            const status = document.getElementById('targetStatus').value;
-            await _supabase.from('user_profiles').update({ manual_status: status }).eq('service_id', sid);
-            alert("生理狀態手動更新完成");
-        }
+        function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); }
+        function checkAdmin() { if(document.getElementById('admPass').value === '888tBPC!!') { document.getElementById('adminLoginModal').classList.add('hidden'); document.getElementById('adminPanel').classList.remove('hidden'); } }
+        function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
     </script>
 </body>
 </html>
