@@ -177,11 +177,28 @@
 
             renderCharts(data.reverse()); // 繪製圖表
         }
+        async function fetchDataAndDraw(sid) {
+    const { data, error } = await _supabase
+        .from('health_records')
+        .select('*')
+        .eq('service_id', sid)
+        .order('record_date', { ascending: false })
+        .limit(7);
 
-        function renderCharts(dataList) {
-            const labels = dataList.map(d => new Date(d.record_date).toLocaleDateString());
-            const mssdValues = dataList.map(d => d.raw_data.MSSD || 0);
-            const hrMinValues = dataList.map(d => d.raw_data.HR_min || 0);
+    console.log("從雲端抓到的數據：", data); // <--- 加入這行
+
+    if (error || !data || data.length === 0) {
+        console.error("抓取失敗或無數據", error);
+        return;
+    }
+    // ...
+}
+
+       function renderCharts(dataList) {
+    // 1. 修正日期解析：如果 record_date 抓不到，改抓 raw_data 裡的原始欄位
+    const labels = dataList.map(d => {
+        const dateStr = d.record_date || d.raw_data.record_end || d.raw_data.日期;
+        return new Date(dateStr).toLocaleDateString();
 
             // MSSD 圖表 (A15)
             new Chart(document.getElementById('mssdChart'), {
