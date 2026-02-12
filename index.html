@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 健康助理 - 多分頁修復版</title>
+    <title>Soosyn AI 健康助理 - 多分頁同步版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --brand-blue: #6c83cf; --alert-red: #ff8c73; --bg-gray: #f8f9fa; }
-        body { font-family: 'PingFang TC', sans-serif; background: var(--bg-gray); }
-        .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        :root { --brand-blue: #6c83cf; --alert-red: #ff8c73; --bg-gray: #f8f9fa; --text-main: #5a5a5a; }
+        body { font-family: 'PingFang TC', sans-serif; color: var(--text-main); background: var(--bg-gray); }
         .btn-gradient { background: linear-gradient(135deg, #6c83cf 0%, #596b75 100%); }
+        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .capsule-bg { background: #f0f0f0; border-radius: 50px; padding: 10px 20px; }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -22,57 +22,86 @@
     <div id="loginSection" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-4">
         <div class="max-w-md w-full text-center">
             <h1 class="text-3xl font-bold text-[#6c83cf] mb-2">Soosyn AI</h1>
-            <p class="text-gray-400 mb-8">生理電量多帳號同步系統</p>
+            <p class="text-gray-400 mb-8">歡迎使用Soosyn AI 健康助理，請輸入您的服務序號與密碼以完成身分驗證</p>
             <div class="space-y-4">
-                <input id="serviceID" type="text" placeholder="輸入分頁名稱 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
-                <input id="password" type="password" placeholder="密碼 (預設 tbpc)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
-                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold">登入</button>
+                <input id="serviceID" type="text" placeholder="服務序號 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <input id="password" type="password" placeholder="密碼" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold shadow-lg">登入</button>
             </div>
-            <button onclick="openAdminLogin()" class="mt-8 text-gray-300 text-sm">管理員入口</button>
+            <button onclick="openAdminLogin()" class="mt-8 text-xs text-gray-300">管理者入口</button>
         </div>
     </div>
 
     <div id="mainSection" class="hidden flex flex-col h-screen">
         <header class="p-4 bg-white shadow-sm flex justify-between items-center border-b">
-            <span class="font-bold text-[#6c83cf]">健康助理</span>
-            <button onclick="document.getElementById('summaryModal').classList.remove('hidden')" class="text-blue-500 font-bold">查看最新報告</button>
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-[#6c83cf] rounded-full flex items-center justify-center text-white text-xs">AI</div>
+                <span class="font-bold">Soosyn 健康助理</span>
+            </div>
+            <button onclick="location.reload()" class="text-gray-300"><i class="fa-solid fa-right-from-bracket"></i></button>
         </header>
-        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4"></main>
+        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-6 max-w-3xl mx-auto w-full"></main>
+        <footer class="p-4 bg-white border-t">
+            <div class="max-w-3xl mx-auto flex items-center space-x-2">
+                <input id="userInput" type="text" placeholder="請輸入訊息..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none">
+                <button onclick="sendMessage()" class="bg-[#6c83cf] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </footer>
     </div>
 
     <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[150] flex items-center justify-center p-4">
         <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative">
             <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-2xl text-gray-300">&times;</button>
-            <div class="mb-6 bg-blue-50 p-6 rounded-3xl text-center">
-                <p class="text-gray-400">當前生理電量</p>
-                <h2 class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</h2>
+            
+            <div class="flex items-center text-[#5a5a5a] mb-6">
+                <i class="fa-solid fa-calendar-day mr-2 text-[#8699a3]"></i> 
+                <span id="displayDate" class="font-normal">----/--/--</span>
             </div>
-            <canvas id="mssdChart" class="mb-8"></canvas>
-            <canvas id="hrMinChart"></canvas>
+
+            <h2 class="text-2xl font-bold text-[#6c83cf] mb-4">生理電量分析</h2>
+            <div class="flex items-end justify-between mb-8 bg-blue-50 p-6 rounded-3xl">
+                <div>
+                    <span id="batteryScore" class="text-6xl font-black">--</span>
+                    <span class="text-gray-400 ml-2">分</span>
+                </div>
+                <div class="text-right text-sm text-[#5a5a5a]">
+                    超過 <span id="rankPercent">--</span>% 的使用者<br>
+                    生理狀態：<span id="balanceStatus">--</span>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="h-48"><canvas id="mssdChart"></canvas></div>
+                <div class="h-48"><canvas id="hrMinChart"></canvas></div>
+            </div>
+            
+            <button onclick="closeModal('summaryModal')" class="w-full mt-8 bg-gray-100 py-4 rounded-2xl font-bold text-gray-500">關閉摘要</button>
         </div>
     </div>
 
     <div id="adminPanel" class="hidden fixed inset-0 bg-white z-[300] p-6 overflow-y-auto">
-        <div class="max-w-xl mx-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-red-500">多分頁資料同步</h2>
+        <div class="max-w-2xl mx-auto">
+            <div class="flex justify-between items-center mb-8 pb-4 border-b">
+                <h1 class="text-2xl font-bold text-red-500">管理者分頁同步系統</h1>
                 <button onclick="closeAdmin()" class="text-gray-400">關閉</button>
             </div>
-            <div class="border-4 border-dashed p-10 rounded-3xl mb-6 text-center">
-                <input type="file" id="excelMain" accept=".xlsx" class="w-full">
-                <p class="text-xs text-gray-400 mt-2">系統將讀取每一個分頁名稱作為序號</p>
+            
+            <div class="p-8 border-4 border-dashed rounded-[32px] bg-gray-50 mb-6 text-center">
+                <i class="fa-solid fa-file-excel text-5xl text-green-500 mb-4"></i>
+                <input type="file" id="excelMain" accept=".xlsx" class="block w-full text-sm">
+                <p class="text-xs text-gray-400 mt-4">請確保分頁名稱(Sheet Name)為服務序號</p>
             </div>
-            <button id="uploadBtn" onclick="uploadAllSheetsToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold shadow-xl">
-                開始掃描所有分頁並同步
-            </button>
-            <div id="uploadStatus" class="mt-6 text-sm text-gray-500 space-y-1"></div>
+            
+            <button id="uploadBtn" onclick="uploadAllSheets()" class="w-full bg-black text-white py-4 rounded-2xl font-bold shadow-xl">同步所有分頁資料</button>
+            
+            <div id="uploadStatus" class="mt-8 space-y-2 text-sm"></div>
         </div>
     </div>
 
     <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
-        <div class="bg-white p-6 rounded-2xl w-80 shadow-2xl">
-            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-3 rounded-xl mb-4">
-            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-3 rounded-xl font-bold">驗證</button>
+        <div class="bg-white p-8 rounded-3xl w-80">
+            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-4 rounded-2xl mb-4">
+            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-4 rounded-2xl font-bold">驗證</button>
         </div>
     </div>
 
@@ -81,94 +110,104 @@
         const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // --- 登入與資料獲取 ---
         async function handleLogin() {
             const sid = document.getElementById('serviceID').value.trim();
             const pwd = document.getElementById('password').value.trim();
             const { data } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
+            
             if (data && data.password === pwd) {
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
-                fetchDataAndDraw(sid);
-            } else { alert("查無序號或密碼錯誤"); }
+                fetchData(sid);
+            } else { alert("查無序號或密碼錯誤 (預設 BA123456 / tbpc)"); }
         }
 
-        async function fetchDataAndDraw(sid) {
+        async function fetchData(sid) {
             const { data } = await _supabase.from('health_records').select('*').eq('service_id', sid).order('record_date', { ascending: false }).limit(7);
-            if (!data || data.length === 0) return alert("尚無數據");
-            document.getElementById('batteryScore').innerText = data[0].raw_data.Battery_score || 0;
-            renderCharts(data.reverse());
+            if (data && data.length > 0) {
+                const latest = data[0];
+                const date = new Date(latest.record_date);
+                document.getElementById('displayDate').innerText = date.toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit'});
+                
+                // 生理電量顏色邏輯 [cite: 284]
+                const score = latest.battery_score || 0;
+                const scoreEl = document.getElementById('batteryScore');
+                scoreEl.innerText = score;
+                if(score < 60) scoreEl.style.color = '#ff8c73';
+                else if(score < 80) scoreEl.style.color = '#a79d8c';
+                else scoreEl.style.color = '#596b75';
+
+                document.getElementById('summaryModal').classList.remove('hidden');
+                renderCharts(data.reverse());
+            }
         }
 
-        function renderCharts(dataList) {
-            const labels = dataList.map(d => new Date(d.record_date).toLocaleDateString());
-            const mssd = dataList.map(d => d.raw_data.rMSSD || d.raw_data.MSSD || 0);
-            const hr = dataList.map(d => d.raw_data.HR_min || 0);
-            ['mssdChart', 'hrMinChart'].forEach(id => { if(Chart.getChart(id)) Chart.getChart(id).destroy(); });
-            new Chart(document.getElementById('mssdChart'), { type: 'line', data: { labels, datasets: [{ label: 'rMSSD', data: mssd, borderColor: '#6c83cf' }] } });
-            new Chart(document.getElementById('hrMinChart'), { type: 'bar', data: { labels, datasets: [{ label: 'HR_min', data: hr, backgroundColor: '#ff8c73' }] } });
-        }
-
-        // --- 核心修改：徹底讀取所有分頁 ---
-        async function uploadAllSheetsToSupabase() {
-            const file = document.getElementById('excelMain').files[0];
-            if (!file) return alert("請選取 Excel");
+        function renderCharts(list) {
+            const labels = list.map(d => new Date(d.record_date).toLocaleDateString());
+            const mssd = list.map(d => d.raw_data.rMSSD || 0);
+            const hr = list.map(d => d.raw_data.HR_min || 0);
             
+            ['mssdChart', 'hrMinChart'].forEach(id => { if(Chart.getChart(id)) Chart.getChart(id).destroy(); });
+
+            new Chart(document.getElementById('mssdChart'), { type: 'line', data: { labels, datasets: [{ label: 'rMSSD', data: mssd, borderColor: '#6c83cf' }] } });
+            new Chart(document.getElementById('hrMinChart'), { type: 'bar', data: { labels, datasets: [{ label: 'HR_min', data: hr, backgroundColor: '#c1cdd3' }] } });
+        }
+
+        // --- 多分頁上傳核心邏輯 ---
+        async function uploadAllSheets() {
+            const file = document.getElementById('excelMain').files[0];
+            if (!file) return alert("請選擇檔案");
+
             const btn = document.getElementById('uploadBtn');
             const statusBox = document.getElementById('uploadStatus');
-            btn.innerText = "讀取中..."; btn.disabled = true;
+            btn.innerText = "正在同步多個工作表..."; btn.disabled = true;
             statusBox.innerHTML = "";
 
             const reader = new FileReader();
             reader.onload = async (e) => {
-                try {
-                    const workbook = XLSX.read(e.target.result, { type: 'array' });
-                    const sheetNames = workbook.SheetNames;
+                const workbook = XLSX.read(e.target.result, { type: 'array' });
+                const sheetNames = workbook.SheetNames;
+                
+                statusBox.innerHTML += `<p class="font-bold">✅ 偵測到 ${sheetNames.length} 個分頁: ${sheetNames.join(', ')}</p>`;
+
+                for (const name of sheetNames) {
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
+                    if (json.length === 0) continue;
+
+                    // 1. 自動建立帳號 (upsert)
+                    await _supabase.from('user_profiles').upsert({ service_id: name, password: 'tbpc' }, { onConflict: 'service_id' });
+
+                    // 2. 轉換格式
+                    const batch = json.map(row => ({
+                        service_id: name,
+                        record_date: row.record_end || row.record_date,
+                        battery_score: parseInt(row.Battery_score || 0),
+                        raw_data: row
+                    }));
+
+                    // 3. 上傳健康數據
+                    const { error } = await _supabase.from('health_records').upsert(batch);
                     
-                    statusBox.innerHTML += `<p>✅ 偵測到 ${sheetNames.length} 個分頁: ${sheetNames.join(', ')}</p>`;
-
-                    for (const name of sheetNames) {
-                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
-                        if (json.length === 0) {
-                            statusBox.innerHTML += `<p class="text-orange-400">⚠️ 分頁 [${name}] 是空的，跳過。</p>`;
-                            continue;
-                        }
-
-                        // 1. 確保帳號存在
-                        await _supabase.from('user_profiles').upsert({ service_id: name, password: 'tbpc' }, { onConflict: 'service_id' });
-
-                        // 2. 格式化該分頁數據
-                        const formatted = json.map(row => ({
-                            service_id: name,
-                            record_date: row.record_end || row.record_date || new Date().toISOString(),
-                            battery_score: parseInt(row.Battery_score || 0),
-                            raw_data: row
-                        }));
-
-                        // 3. 上傳健康數據
-                        const { error } = await _supabase.from('health_records').upsert(formatted);
-                        
-                        if (error) {
-                            statusBox.innerHTML += `<p class="text-red-500">❌ 分頁 [${name}] 同步失敗: ${error.message}</p>`;
-                        } else {
-                            statusBox.innerHTML += `<p class="text-green-500">✨ 分頁 [${name}] 同步成功 (${json.length} 筆資料)</p>`;
-                        }
-                    }
-                    alert("同步程序執行完畢，請查看狀態列表。");
-                } catch (err) { alert("錯誤: " + err.message); }
-                finally { btn.innerText = "開始掃描所有分頁並同步"; btn.disabled = false; }
+                    if (error) statusBox.innerHTML += `<p class="text-red-500">❌ 分頁 [${name}] 失敗: ${error.message}</p>`;
+                    else statusBox.innerHTML += `<p class="text-green-600">✨ 分頁 [${name}] 同步成功 (${json.length} 筆)</p>`;
+                }
+                btn.innerText = "同步完成"; btn.disabled = false;
             };
             reader.readAsArrayBuffer(file);
         }
 
+        // --- UI 控制 ---
         function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); }
         function checkAdmin() {
-            if (document.getElementById('admPass').value === '888tBPC!!') {
+            if (document.getElementById('admPass').value === '888tBPC!!') { [cite: 253]
                 document.getElementById('adminLoginModal').classList.add('hidden');
                 document.getElementById('adminPanel').classList.remove('hidden');
-            } else { alert("驗證失敗"); }
+            } else { alert("密碼錯誤"); }
         }
         function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function sendMessage() { alert("Gemini API 分析功能將根據文件 6.3 邏輯開發"); }
     </script>
 </body>
 </html>
