@@ -11,11 +11,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        :root {
-            --brand-blue: #6c83cf;
-            --alert-red: #ff8c73;
-            --bg-gray: #f8f9fa;
-        }
+        :root { --brand-blue: #6c83cf; --alert-red: #ff8c73; --bg-gray: #f8f9fa; }
         body { font-family: 'PingFang TC', sans-serif; color: #5a5a5a; background: var(--bg-gray); }
         .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .chat-bubble-user { background: #e2e8f0; border-radius: 20px 20px 0 20px; }
@@ -32,7 +28,7 @@
             <div class="space-y-4">
                 <input id="serviceID" type="text" placeholder="服務序號 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
                 <input id="password" type="password" placeholder="密碼" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
-                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold text-lg shadow-lg">登入系統</button>
+                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-all">登入系統</button>
             </div>
             <p class="mt-6 text-xs text-gray-400">登入即代表您同意健康資訊處理條款</p>
         </div>
@@ -55,7 +51,7 @@
 
         <footer class="p-4 bg-white border-t">
             <div class="max-w-3xl mx-auto flex items-center space-x-2">
-                <input id="userInput" type="text" placeholder="詢問關於您的健康數據..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none focus:ring-2 focus:ring-blue-200">
+                <input id="userInput" type="text" placeholder="詢問您的健康建議..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none focus:ring-2 focus:ring-blue-200">
                 <button onclick="sendMessage()" class="bg-[#6c83cf] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
         </footer>
@@ -63,210 +59,136 @@
 
     <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[150] flex items-center justify-center p-4">
         <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative shadow-2xl">
-            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-gray-300 text-2xl">&times;</button>
-            
-            <div class="flex items-center text-gray-400 mb-6"><i class="fa-solid fa-calendar-day mr-2"></i> <span id="displayDate">健康摘要報告</span></div>
-            
+            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-gray-300 text-2xl hover:text-gray-500">&times;</button>
             <h2 class="text-2xl font-bold text-[#6c83cf] mb-1">生理電量分析</h2>
-            <p class="text-sm text-gray-400 mb-6">依據最新數據生成</p>
-
-            <div class="flex items-end justify-between mb-8 bg-blue-50 p-6 rounded-3xl">
+            <div class="flex items-end justify-between my-8 bg-blue-50 p-6 rounded-3xl">
                 <div>
                     <span class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</span>
                     <span class="text-gray-400 ml-2">分</span>
                 </div>
                 <div class="text-right text-sm text-[#596b75]">
-                    超過 <span class="font-bold text-blue-500" id="rankPercent">--</span>% 的使用者<br>生理電量平衡度：<span id="balanceStatus">良好</span>
+                    電量狀態：<span class="font-bold text-blue-500" id="balanceStatus">計算中</span>
                 </div>
             </div>
-
             <div class="space-y-8">
-                <div>
-                    <h3 class="font-bold mb-4 flex justify-between items-center">
-                        <span>rMSSD 趨勢 (ms)</span>
-                        <span class="text-xs text-gray-400">最新 7 日趨勢</span>
-                    </h3>
-                    <canvas id="mssdChart" height="200"></canvas>
-                </div>
-                <hr>
-                <div>
-                    <h3 class="font-bold mb-4">最低脈搏 (HR_min)</h3>
-                    <canvas id="hrMinChart" height="200"></canvas>
-                </div>
+                <div><canvas id="mssdChart" height="180"></canvas></div>
+                <div><canvas id="hrMinChart" height="180"></canvas></div>
             </div>
-
-            <button onclick="closeModal('summaryModal')" class="w-full mt-8 bg-gray-100 py-4 rounded-2xl font-bold text-gray-500">關閉摘要</button>
+            <button onclick="closeModal('summaryModal')" class="w-full mt-8 bg-gray-100 py-4 rounded-2xl font-bold text-gray-500">關閉</button>
         </div>
     </div>
 
     <div id="adminPanel" class="hidden fixed inset-0 bg-white z-[300] p-6 overflow-y-auto">
         <div class="max-w-2xl mx-auto">
-            <div class="flex justify-between items-center mb-8 border-b pb-4">
-                <h1 class="text-2xl font-bold text-red-500">管理員後台</h1>
-                <button onclick="closeAdmin()" class="text-gray-400">關閉</button>
-            </div>
-            
+            <h1 class="text-2xl font-bold text-red-500 mb-8 border-b pb-4">管理者數據同步</h1>
             <div class="space-y-6">
-                <div class="p-4 border rounded-2xl bg-gray-50">
-                    <label class="block font-bold mb-2">上傳數據 Excel (標題請務必包含：service_id, Battery_score, rMSSD, HR_min)</label>
-                    <input type="file" id="excelMain" accept=".xlsx" class="block w-full text-sm">
+                <div class="p-6 border-2 border-dashed rounded-2xl bg-gray-50 text-center">
+                    <input type="file" id="excelMain" accept=".xlsx" class="mb-4 block w-full text-sm">
+                    <p class="text-xs text-gray-400">請確保 Excel 包含 service_id, record_end, Battery_score, rMSSD, HR_min</p>
                 </div>
-                <button onclick="uploadToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold shadow-lg">同步數據至雲端</button>
+                <button id="uploadBtn" onclick="uploadToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold">同步數據至雲端 (方法 C)</button>
+                <button onclick="closeAdmin()" class="w-full py-4 text-gray-400">離開後台</button>
             </div>
         </div>
     </div>
 
     <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
         <div class="bg-white p-6 rounded-2xl w-80">
-            <h3 class="font-bold mb-4">管理者驗證</h3>
-            <input id="admPass" type="password" placeholder="輸入管理者密碼" class="w-full border p-2 rounded mb-4 outline-none">
-            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-2 rounded">驗證</button>
+            <h3 class="font-bold mb-4 text-center">後台權限驗證</h3>
+            <input id="admPass" type="password" placeholder="管理者密碼" class="w-full border p-3 rounded-xl mb-4 outline-none">
+            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-3 rounded-xl font-bold">確認</button>
         </div>
     </div>
 
     <script>
-        // --- 1. Supabase 初始化 ---
         const SUPABASE_URL = 'https://gcvwebgfbrsrezxvjafe.supabase.co'; 
         const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let currentUser = null;
-
-        // --- 2. 登入邏輯 ---
         async function handleLogin() {
             const sid = document.getElementById('serviceID').value.trim();
             const pwd = document.getElementById('password').value.trim();
+            if (!sid || !pwd) return;
 
-            if (!sid || !pwd) return alert("請輸入序號與密碼");
-
-            const { data, error } = await _supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('service_id', sid)
-                .single();
-
+            const { data } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
             if (data && data.password === pwd) {
-                currentUser = sid;
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
-                fetchDataAndDraw(sid); 
-            } else {
-                alert("序號或密碼錯誤 (預設 BA123456 / tbpc)");
-            }
+                fetchDataAndDraw(sid);
+            } else { alert("帳號或密碼錯誤"); }
         }
 
-        // --- 3. 數據抓取與渲染 ---
         async function fetchDataAndDraw(sid) {
-            const { data, error } = await _supabase
-                .from('health_records')
-                .select('*')
-                .eq('service_id', sid)
-                .order('record_date', { ascending: false })
-                .limit(7);
+            const { data } = await _supabase.from('health_records').select('*').eq('service_id', sid).order('record_date', { ascending: false }).limit(7);
+            if (!data || data.length === 0) return;
 
-            if (error || !data.length) {
-                alert("目前雲端尚無您的健康數據。");
-                return;
-            }
-
-            const latest = data[0];
-            // 抓取 battery_score 或從 raw_data 中抓取 Battery_score
-            const score = latest.battery_score || latest.raw_data.Battery_score || 0;
-            document.getElementById('batteryScore').innerText = score;
-            document.getElementById('rankPercent').innerText = score > 50 ? "82" : "45"; 
-            
+            const latest = data[0].raw_data;
+            document.getElementById('batteryScore').innerText = latest.Battery_score || latest.battery_score || 0;
             document.getElementById('summaryModal').classList.remove('hidden');
-            renderCharts(data.reverse()); 
+            renderCharts(data.reverse());
         }
 
         function renderCharts(dataList) {
             const labels = dataList.map(d => new Date(d.record_date).toLocaleDateString());
-            // 比對截圖：使用 rMSSD 作為 key
-            const mssdValues = dataList.map(d => d.raw_data.rMSSD || d.raw_data.MSSD || 0);
-            const hrMinValues = dataList.map(d => d.raw_data.HR_min || 0);
+            const mssd = dataList.map(d => d.raw_data.rMSSD || d.raw_data.MSSD || 0);
+            const hr = dataList.map(d => d.raw_data.HR_min || 0);
 
-            // 清除舊圖表防止重複渲染
-            ['mssdChart', 'hrMinChart'].forEach(id => {
-                const chart = Chart.getChart(id);
-                if (chart) chart.destroy();
-            });
+            ['mssdChart', 'hrMinChart'].forEach(id => { if(Chart.getChart(id)) Chart.getChart(id).destroy(); });
 
-            new Chart(document.getElementById('mssdChart'), {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'rMSSD (ms)',
-                        data: mssdValues,
-                        borderColor: '#6c83cf',
-                        tension: 0.3,
-                        fill: false
-                    }]
-                }
-            });
-
-            new Chart(document.getElementById('hrMinChart'), {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '最低脈搏 (bpm)',
-                        data: hrMinValues,
-                        backgroundColor: '#ff8c73'
-                    }]
-                }
-            });
+            new Chart(document.getElementById('mssdChart'), { type: 'line', data: { labels, datasets: [{ label: 'rMSSD', data: mssd, borderColor: '#6c83cf', tension: 0.3 }] } });
+            new Chart(document.getElementById('hrMinChart'), { type: 'bar', data: { labels, datasets: [{ label: 'HR_min', data: hr, backgroundColor: '#ff8c73' }] } });
         }
 
-        // --- 4. 後台邏輯 ---
+        // --- 方法 C: 自動解決外鍵錯誤的上傳邏輯 ---
+        async function uploadToSupabase() {
+            const file = document.getElementById('excelMain').files[0];
+            if (!file) return alert("請選取 Excel");
+            const btn = document.getElementById('uploadBtn');
+            btn.innerText = "同步中..."; btn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    
+                    // 1. 提取所有 service_id (排除空的)
+                    const sids = [...new Set(json.map(row => String(row.service_id || row.ID || 'BA123456')))];
+                    
+                    // 2. 先 upsert 使用者表，確保外鍵存在
+                    const { error: uErr } = await _supabase.from('user_profiles').upsert(
+                        sids.map(sid => ({ service_id: sid, password: 'tbpc' })),
+                        { onConflict: 'service_id' }
+                    );
+                    if (uErr) throw uErr;
+
+                    // 3. 上傳健康數據
+                    const { error: hErr } = await _supabase.from('health_records').upsert(
+                        json.map(row => ({
+                            service_id: String(row.service_id || row.ID || 'BA123456'),
+                            record_date: row.record_end || row.record_date || new Date().toISOString(),
+                            battery_score: parseInt(row.Battery_score || 0),
+                            raw_data: row
+                        }))
+                    );
+                    if (hErr) throw hErr;
+                    alert("同步成功！已自動校準帳號權限。");
+                } catch (err) { alert("上傳失敗: " + err.message); }
+                finally { btn.innerText = "同步數據至雲端 (方法 C)"; btn.disabled = false; }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); }
         function checkAdmin() {
             if (document.getElementById('admPass').value === '888tBPC!!') {
                 document.getElementById('adminLoginModal').classList.add('hidden');
                 document.getElementById('adminPanel').classList.remove('hidden');
-            } else { alert("密碼錯誤"); }
+            } else { alert("驗證失敗"); }
         }
         function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        async function uploadToSupabase() {
-            const file = document.getElementById('excelMain').files[0];
-            if (!file) return alert("請選取檔案");
-
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const workbook = XLSX.read(e.target.result, { type: 'array' });
-                const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                
-                // 比對截圖：確保對應 service_id 與 battery_score 到正確的欄位
-                const { error } = await _supabase.from('health_records').upsert(
-                    json.map(row => ({
-                        service_id: row.service_id || row.ID || "BA123456", // 優先抓取 Excel 裡的 ID
-                        record_date: row.record_end || row.record_date || new Date().toISOString(),
-                        battery_score: row.Battery_score || row.score || null,
-                        raw_data: row
-                    }))
-                );
-                
-                if (error) alert("上傳失敗: " + error.message);
-                else alert("數據已更新至雲端！");
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        // --- 5. 對話功能 ---
-        function sendMessage() {
-            const input = document.getElementById('userInput');
-            if (!input.value) return;
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML += `<div class="flex justify-end"><div class="chat-bubble-user p-4 max-w-[85%]">${input.value}</div></div>`;
-            
-            setTimeout(() => {
-                chatBox.innerHTML += `<div class="chat-bubble-ai p-4 max-w-[85%]">正在根據您的歷史數據進行分析...</div>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }, 800);
-            input.value = "";
-        }
+        function sendMessage() { alert("Gemini API 串接準備中..."); }
     </script>
 </body>
 </html>
