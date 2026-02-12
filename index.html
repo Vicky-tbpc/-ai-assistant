@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 健康助理 (多分頁支援版)</title>
+    <title>Soosyn AI 健康助理 - 多分頁修復版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
     <style>
         :root { --brand-blue: #6c83cf; --alert-red: #ff8c73; --bg-gray: #f8f9fa; }
-        body { font-family: 'PingFang TC', sans-serif; color: #5a5a5a; background: var(--bg-gray); }
+        body { font-family: 'PingFang TC', sans-serif; background: var(--bg-gray); }
         .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .chat-bubble-user { background: #e2e8f0; border-radius: 20px 20px 0 20px; }
         .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
         .btn-gradient { background: linear-gradient(135deg, #6c83cf 0%, #596b75 100%); }
     </style>
@@ -24,72 +22,57 @@
     <div id="loginSection" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-4">
         <div class="max-w-md w-full text-center">
             <h1 class="text-3xl font-bold text-[#6c83cf] mb-2">Soosyn AI</h1>
-            <p class="text-gray-400 mb-8">支援多序號分頁同步系統</p>
+            <p class="text-gray-400 mb-8">生理電量多帳號同步系統</p>
             <div class="space-y-4">
-                <input id="serviceID" type="text" placeholder="輸入您的服務序號 (分頁名稱)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
+                <input id="serviceID" type="text" placeholder="輸入分頁名稱 (如: BA123456)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
                 <input id="password" type="password" placeholder="密碼 (預設 tbpc)" class="w-full border p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-300">
-                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-all">登入查看報告</button>
+                <button onclick="handleLogin()" class="w-full btn-gradient text-white py-4 rounded-2xl font-bold">登入</button>
             </div>
-            <button onclick="openAdminLogin()" class="mt-8 text-gray-300 text-sm hover:underline">管理員入口</button>
+            <button onclick="openAdminLogin()" class="mt-8 text-gray-300 text-sm">管理員入口</button>
         </div>
     </div>
 
     <div id="mainSection" class="hidden flex flex-col h-screen">
         <header class="p-4 bg-white shadow-sm flex justify-between items-center border-b">
-            <div class="flex items-center space-x-2">
-                <div class="w-8 h-8 bg-[#6c83cf] rounded-full flex items-center justify-center text-white text-xs">AI</div>
-                <span class="font-bold">健康助理</span>
-            </div>
-            <button onclick="location.reload()" class="text-gray-300"><i class="fa-solid fa-right-from-bracket"></i></button>
+            <span class="font-bold text-[#6c83cf]">健康助理</span>
+            <button onclick="document.getElementById('summaryModal').classList.remove('hidden')" class="text-blue-500 font-bold">查看最新報告</button>
         </header>
-        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-6 max-w-3xl mx-auto w-full">
-            <div class="chat-bubble-ai p-4 max-w-[85%]">歡迎回來！已載入您的專屬數據，點擊下方「查看分析報告」了解更多。</div>
-        </main>
-        <footer class="p-4 bg-white border-t text-center">
-            <button onclick="document.getElementById('summaryModal').classList.remove('hidden')" class="bg-blue-50 text-blue-600 px-6 py-2 rounded-full font-bold mb-4">查看分析報告</button>
-            <div class="max-w-3xl mx-auto flex items-center space-x-2">
-                <input id="userInput" type="text" placeholder="詢問 AI..." class="flex-grow p-3 bg-gray-100 rounded-full outline-none">
-                <button onclick="sendMessage()" class="bg-[#6c83cf] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md"><i class="fa-solid fa-paper-plane"></i></button>
-            </div>
-        </footer>
+        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4"></main>
     </div>
 
     <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[150] flex items-center justify-center p-4">
         <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative">
-            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-gray-300 text-2xl">&times;</button>
-            <h2 class="text-2xl font-bold text-[#6c83cf] mb-1">生理電量分析</h2>
-            <div class="flex items-end justify-between my-8 bg-blue-50 p-6 rounded-3xl">
-                <div><span class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</span><span class="text-gray-400 ml-2">分</span></div>
-                <div class="text-right text-sm text-[#596b75]">狀態：<span class="font-bold text-blue-500" id="balanceStatus">穩定</span></div>
+            <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-2xl text-gray-300">&times;</button>
+            <div class="mb-6 bg-blue-50 p-6 rounded-3xl text-center">
+                <p class="text-gray-400">當前生理電量</p>
+                <h2 class="text-6xl font-black text-[#ff8c73]" id="batteryScore">--</h2>
             </div>
-            <div class="space-y-8">
-                <div class="h-[200px]"><canvas id="mssdChart"></canvas></div>
-                <div class="h-[200px]"><canvas id="hrMinChart"></canvas></div>
-            </div>
-            <button onclick="closeModal('summaryModal')" class="w-full mt-8 bg-gray-100 py-4 rounded-2xl font-bold text-gray-500">關閉</button>
+            <canvas id="mssdChart" class="mb-8"></canvas>
+            <canvas id="hrMinChart"></canvas>
         </div>
     </div>
 
     <div id="adminPanel" class="hidden fixed inset-0 bg-white z-[300] p-6 overflow-y-auto">
-        <div class="max-w-2xl mx-auto text-center">
-            <h1 class="text-2xl font-bold text-red-500 mb-8 pb-4 border-b">管理者分頁同步系統</h1>
-            <div class="p-10 border-4 border-dashed rounded-[40px] bg-gray-50 mb-6">
-                <i class="fa-solid fa-file-excel text-5xl text-green-500 mb-4"></i>
-                <input type="file" id="excelMain" accept=".xlsx" class="block w-full text-sm text-center">
-                <p class="text-gray-400 mt-4 text-sm font-medium">系統將自動抓取所有分頁名稱作為服務序號</p>
+        <div class="max-w-xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-red-500">多分頁資料同步</h2>
+                <button onclick="closeAdmin()" class="text-gray-400">關閉</button>
             </div>
-            <button id="uploadBtn" onclick="uploadAllSheetsToSupabase()" class="w-full bg-black text-white py-5 rounded-3xl font-bold text-lg shadow-xl active:scale-95 transition-all">
-                同步所有工作表數據
+            <div class="border-4 border-dashed p-10 rounded-3xl mb-6 text-center">
+                <input type="file" id="excelMain" accept=".xlsx" class="w-full">
+                <p class="text-xs text-gray-400 mt-2">系統將讀取每一個分頁名稱作為序號</p>
+            </div>
+            <button id="uploadBtn" onclick="uploadAllSheetsToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold shadow-xl">
+                開始掃描所有分頁並同步
             </button>
-            <button onclick="closeAdmin()" class="mt-6 text-gray-400">關閉後台</button>
+            <div id="uploadStatus" class="mt-6 text-sm text-gray-500 space-y-1"></div>
         </div>
     </div>
 
     <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
-        <div class="bg-white p-8 rounded-3xl w-80">
-            <h3 class="font-bold mb-4 text-center">管理者身分</h3>
-            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-4 rounded-2xl mb-4 outline-none">
-            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-4 rounded-2xl font-bold">確認登入</button>
+        <div class="bg-white p-6 rounded-2xl w-80 shadow-2xl">
+            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-3 rounded-xl mb-4">
+            <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-3 rounded-xl font-bold">驗證</button>
         </div>
     </div>
 
@@ -98,26 +81,21 @@
         const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- 登入與抓取邏輯 ---
         async function handleLogin() {
             const sid = document.getElementById('serviceID').value.trim();
             const pwd = document.getElementById('password').value.trim();
-            if (!sid || !pwd) return;
-
             const { data } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
             if (data && data.password === pwd) {
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
                 fetchDataAndDraw(sid);
-            } else { alert("查無此序號或密碼錯誤"); }
+            } else { alert("查無序號或密碼錯誤"); }
         }
 
         async function fetchDataAndDraw(sid) {
             const { data } = await _supabase.from('health_records').select('*').eq('service_id', sid).order('record_date', { ascending: false }).limit(7);
-            if (!data || data.length === 0) { alert("此序號尚未同步數據"); return; }
-
-            const latest = data[0].raw_data;
-            document.getElementById('batteryScore').innerText = latest.Battery_score || latest.battery_score || 0;
+            if (!data || data.length === 0) return alert("尚無數據");
+            document.getElementById('batteryScore').innerText = data[0].raw_data.Battery_score || 0;
             renderCharts(data.reverse());
         }
 
@@ -125,60 +103,59 @@
             const labels = dataList.map(d => new Date(d.record_date).toLocaleDateString());
             const mssd = dataList.map(d => d.raw_data.rMSSD || d.raw_data.MSSD || 0);
             const hr = dataList.map(d => d.raw_data.HR_min || 0);
-
             ['mssdChart', 'hrMinChart'].forEach(id => { if(Chart.getChart(id)) Chart.getChart(id).destroy(); });
-
-            const opt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
-            new Chart(document.getElementById('mssdChart'), { type: 'line', data: { labels, datasets: [{ label: 'rMSSD', data: mssd, borderColor: '#6c83cf', tension: 0.3 }] }, options: opt });
-            new Chart(document.getElementById('hrMinChart'), { type: 'bar', data: { labels, datasets: [{ label: 'HR_min', data: hr, backgroundColor: '#ff8c73' }] }, options: opt });
+            new Chart(document.getElementById('mssdChart'), { type: 'line', data: { labels, datasets: [{ label: 'rMSSD', data: mssd, borderColor: '#6c83cf' }] } });
+            new Chart(document.getElementById('hrMinChart'), { type: 'bar', data: { labels, datasets: [{ label: 'HR_min', data: hr, backgroundColor: '#ff8c73' }] } });
         }
 
-        // --- 多分頁上傳核心邏輯 ---
+        // --- 核心修改：徹底讀取所有分頁 ---
         async function uploadAllSheetsToSupabase() {
             const file = document.getElementById('excelMain').files[0];
-            if (!file) return alert("請選取 Excel 檔案");
+            if (!file) return alert("請選取 Excel");
             
             const btn = document.getElementById('uploadBtn');
-            btn.innerText = "正在掃描全部分頁並同步..."; btn.disabled = true;
+            const statusBox = document.getElementById('uploadStatus');
+            btn.innerText = "讀取中..."; btn.disabled = true;
+            statusBox.innerHTML = "";
 
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
                     const workbook = XLSX.read(e.target.result, { type: 'array' });
-                    let allHealthData = [];
-                    let allServiceIDs = [];
+                    const sheetNames = workbook.SheetNames;
+                    
+                    statusBox.innerHTML += `<p>✅ 偵測到 ${sheetNames.length} 個分頁: ${sheetNames.join(', ')}</p>`;
 
-                    // 1. 遍歷所有工作表
-                    workbook.SheetNames.forEach(sheetName => {
-                        const sheetJson = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                        if (sheetJson.length > 0) {
-                            allServiceIDs.push(sheetName); // 分頁名稱即為序號
-                            
-                            sheetJson.forEach(row => {
-                                allHealthData.push({
-                                    service_id: sheetName, // 強制使用分頁名稱作為序號
-                                    record_date: row.record_end || row.record_date || new Date().toISOString(),
-                                    battery_score: parseInt(row.Battery_score || row.battery_score || 0),
-                                    raw_data: row
-                                });
-                            });
+                    for (const name of sheetNames) {
+                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
+                        if (json.length === 0) {
+                            statusBox.innerHTML += `<p class="text-orange-400">⚠️ 分頁 [${name}] 是空的，跳過。</p>`;
+                            continue;
                         }
-                    });
 
-                    // 2. 自動建立所有序號的帳號 (user_profiles)
-                    const { error: uErr } = await _supabase.from('user_profiles').upsert(
-                        allServiceIDs.map(id => ({ service_id: id, password: 'tbpc' })),
-                        { onConflict: 'service_id' }
-                    );
-                    if (uErr) throw uErr;
+                        // 1. 確保帳號存在
+                        await _supabase.from('user_profiles').upsert({ service_id: name, password: 'tbpc' }, { onConflict: 'service_id' });
 
-                    // 3. 批次同步健康數據 (health_records)
-                    const { error: hErr } = await _supabase.from('health_records').upsert(allHealthData);
-                    if (hErr) throw hErr;
+                        // 2. 格式化該分頁數據
+                        const formatted = json.map(row => ({
+                            service_id: name,
+                            record_date: row.record_end || row.record_date || new Date().toISOString(),
+                            battery_score: parseInt(row.Battery_score || 0),
+                            raw_data: row
+                        }));
 
-                    alert(`成功！共掃描 ${workbook.SheetNames.length} 個分頁，並更新了數據。`);
-                } catch (err) { alert("失敗: " + err.message); }
-                finally { btn.innerText = "同步所有工作表數據"; btn.disabled = false; }
+                        // 3. 上傳健康數據
+                        const { error } = await _supabase.from('health_records').upsert(formatted);
+                        
+                        if (error) {
+                            statusBox.innerHTML += `<p class="text-red-500">❌ 分頁 [${name}] 同步失敗: ${error.message}</p>`;
+                        } else {
+                            statusBox.innerHTML += `<p class="text-green-500">✨ 分頁 [${name}] 同步成功 (${json.length} 筆資料)</p>`;
+                        }
+                    }
+                    alert("同步程序執行完畢，請查看狀態列表。");
+                } catch (err) { alert("錯誤: " + err.message); }
+                finally { btn.innerText = "開始掃描所有分頁並同步"; btn.disabled = false; }
             };
             reader.readAsArrayBuffer(file);
         }
@@ -188,11 +165,10 @@
             if (document.getElementById('admPass').value === '888tBPC!!') {
                 document.getElementById('adminLoginModal').classList.add('hidden');
                 document.getElementById('adminPanel').classList.remove('hidden');
-            } else { alert("驗證碼錯誤"); }
+            } else { alert("驗證失敗"); }
         }
         function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-        function sendMessage() { alert("AI 分析功能即將上線"); }
     </script>
 </body>
 </html>
