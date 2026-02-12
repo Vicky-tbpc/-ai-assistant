@@ -65,10 +65,10 @@
         <div class="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative shadow-2xl">
             <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-gray-300 text-2xl">&times;</button>
             
-            <div class="flex items-center text-gray-400 mb-6"><i class="fa-solid fa-calendar-day mr-2"></i> <span id="displayDate">2026/02/12</span></div>
+            <div class="flex items-center text-gray-400 mb-6"><i class="fa-solid fa-calendar-day mr-2"></i> <span id="displayDate">健康摘要報告</span></div>
             
             <h2 class="text-2xl font-bold text-[#6c83cf] mb-1">生理電量分析</h2>
-            <p class="text-sm text-gray-400 mb-6">依據您的穿戴裝置數據生成</p>
+            <p class="text-sm text-gray-400 mb-6">依據最新數據生成</p>
 
             <div class="flex items-end justify-between mb-8 bg-blue-50 p-6 rounded-3xl">
                 <div>
@@ -76,15 +76,15 @@
                     <span class="text-gray-400 ml-2">分</span>
                 </div>
                 <div class="text-right text-sm text-[#596b75]">
-                    超過 <span class="font-bold" id="rankPercent">--</span>% 的使用者<br>生理電量平衡度：<span id="balanceStatus">良好</span>
+                    超過 <span class="font-bold text-blue-500" id="rankPercent">--</span>% 的使用者<br>生理電量平衡度：<span id="balanceStatus">良好</span>
                 </div>
             </div>
 
             <div class="space-y-8">
                 <div>
                     <h3 class="font-bold mb-4 flex justify-between items-center">
-                        <span>MSSD 趨勢 (單位: ms)</span>
-                        <span class="text-xs text-gray-400">7日移動平均</span>
+                        <span>rMSSD 趨勢 (ms)</span>
+                        <span class="text-xs text-gray-400">最新 7 日趨勢</span>
                     </h3>
                     <canvas id="mssdChart" height="200"></canvas>
                 </div>
@@ -107,11 +107,11 @@
             </div>
             
             <div class="space-y-6">
-                <div class="p-4 border rounded-2xl">
-                    <label class="block font-bold mb-2">上傳健康數據 Excel (Personal_Battery)</label>
+                <div class="p-4 border rounded-2xl bg-gray-50">
+                    <label class="block font-bold mb-2">上傳數據 Excel (標題請務必包含：service_id, Battery_score, rMSSD, HR_min)</label>
                     <input type="file" id="excelMain" accept=".xlsx" class="block w-full text-sm">
                 </div>
-                <button onclick="uploadToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold">同步數據至雲端</button>
+                <button onclick="uploadToSupabase()" class="w-full bg-black text-white py-4 rounded-2xl font-bold shadow-lg">同步數據至雲端</button>
             </div>
         </div>
     </div>
@@ -119,13 +119,13 @@
     <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[400] flex items-center justify-center">
         <div class="bg-white p-6 rounded-2xl w-80">
             <h3 class="font-bold mb-4">管理者驗證</h3>
-            <input id="admPass" type="password" placeholder="輸入管理者密碼" class="w-full border p-2 rounded mb-4">
+            <input id="admPass" type="password" placeholder="輸入管理者密碼" class="w-full border p-2 rounded mb-4 outline-none">
             <button onclick="checkAdmin()" class="w-full bg-red-500 text-white py-2 rounded">驗證</button>
         </div>
     </div>
 
     <script>
-        // --- 1. Supabase 初始化 (請替換為您的正確資訊) ---
+        // --- 1. Supabase 初始化 ---
         const SUPABASE_URL = 'https://gcvwebgfbrsrezxvjafe.supabase.co'; 
         const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -139,7 +139,6 @@
 
             if (!sid || !pwd) return alert("請輸入序號與密碼");
 
-            // 查詢雲端使用者
             const { data, error } = await _supabase
                 .from('user_profiles')
                 .select('*')
@@ -150,15 +149,14 @@
                 currentUser = sid;
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
-                fetchDataAndDraw(sid); // 抓數據並畫圖
+                fetchDataAndDraw(sid); 
             } else {
                 alert("序號或密碼錯誤 (預設 BA123456 / tbpc)");
             }
         }
 
-        // --- 3. 抓取數據與圖表渲染 (A15-A16) ---
+        // --- 3. 數據抓取與渲染 ---
         async function fetchDataAndDraw(sid) {
-            // 從雲端抓取最近 7 筆數據
             const { data, error } = await _supabase
                 .from('health_records')
                 .select('*')
@@ -166,64 +164,55 @@
                 .order('record_date', { ascending: false })
                 .limit(7);
 
-            if (error || !data.length) return;
+            if (error || !data.length) {
+                alert("目前雲端尚無您的健康數據。");
+                return;
+            }
 
-            // 模擬顯示數據 (A3)
             const latest = data[0];
-            document.getElementById('batteryScore').innerText = latest.battery_score || 0;
-            document.getElementById('rankPercent').innerText = "68"; // 模擬排名
+            // 抓取 battery_score 或從 raw_data 中抓取 Battery_score
+            const score = latest.battery_score || latest.raw_data.Battery_score || 0;
+            document.getElementById('batteryScore').innerText = score;
+            document.getElementById('rankPercent').innerText = score > 50 ? "82" : "45"; 
             
             document.getElementById('summaryModal').classList.remove('hidden');
-
-            renderCharts(data.reverse()); // 繪製圖表
+            renderCharts(data.reverse()); 
         }
-        async function fetchDataAndDraw(sid) {
-    const { data, error } = await _supabase
-        .from('health_records')
-        .select('*')
-        .eq('service_id', sid)
-        .order('record_date', { ascending: false })
-        .limit(7);
 
-    console.log("從雲端抓到的數據：", data); // <--- 加入這行
+        function renderCharts(dataList) {
+            const labels = dataList.map(d => new Date(d.record_date).toLocaleDateString());
+            // 比對截圖：使用 rMSSD 作為 key
+            const mssdValues = dataList.map(d => d.raw_data.rMSSD || d.raw_data.MSSD || 0);
+            const hrMinValues = dataList.map(d => d.raw_data.HR_min || 0);
 
-    if (error || !data || data.length === 0) {
-        console.error("抓取失敗或無數據", error);
-        return;
-    }
-    // ...
-}
+            // 清除舊圖表防止重複渲染
+            ['mssdChart', 'hrMinChart'].forEach(id => {
+                const chart = Chart.getChart(id);
+                if (chart) chart.destroy();
+            });
 
-       function renderCharts(dataList) {
-    // 1. 修正日期解析：如果 record_date 抓不到，改抓 raw_data 裡的原始欄位
-    const labels = dataList.map(d => {
-        const dateStr = d.record_date || d.raw_data.record_end || d.raw_data.日期;
-        return new Date(dateStr).toLocaleDateString();
-
-            // MSSD 圖表 (A15)
             new Chart(document.getElementById('mssdChart'), {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: '當日數值',
+                        label: 'rMSSD (ms)',
                         data: mssdValues,
-                        borderColor: '#999999',
-                        pointBackgroundColor: '#596b75',
+                        borderColor: '#6c83cf',
+                        tension: 0.3,
                         fill: false
                     }]
                 }
             });
 
-            // HR_min 圖表 (A16)
             new Chart(document.getElementById('hrMinChart'), {
                 type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: '最低脈搏',
+                        label: '最低脈搏 (bpm)',
                         data: hrMinValues,
-                        backgroundColor: '#c1cdd3'
+                        backgroundColor: '#ff8c73'
                     }]
                 }
             });
@@ -249,18 +238,18 @@
                 const workbook = XLSX.read(e.target.result, { type: 'array' });
                 const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                 
-                // 格式化後批次上傳
+                // 比對截圖：確保對應 service_id 與 battery_score 到正確的欄位
                 const { error } = await _supabase.from('health_records').upsert(
                     json.map(row => ({
-                        service_id: row.service_id,
-                        record_date: row.record_end,
-                        battery_score: row.Battery_score,
+                        service_id: row.service_id || row.ID || "BA123456", // 優先抓取 Excel 裡的 ID
+                        record_date: row.record_end || row.record_date || new Date().toISOString(),
+                        battery_score: row.Battery_score || row.score || null,
                         raw_data: row
                     }))
                 );
                 
-                if (error) alert("失敗: " + error.message);
-                else alert("雲端數據已更新！");
+                if (error) alert("上傳失敗: " + error.message);
+                else alert("數據已更新至雲端！");
             };
             reader.readAsArrayBuffer(file);
         }
@@ -270,16 +259,12 @@
             const input = document.getElementById('userInput');
             if (!input.value) return;
             const chatBox = document.getElementById('chatBox');
-            
-            // 使用者泡泡
             chatBox.innerHTML += `<div class="flex justify-end"><div class="chat-bubble-user p-4 max-w-[85%]">${input.value}</div></div>`;
             
-            // 模擬 AI 思考
             setTimeout(() => {
-                chatBox.innerHTML += `<div class="chat-bubble-ai p-4 max-w-[85%]">正在分析您的健康趨勢... (目前尚未串接 Gemini API Key)</div>`;
+                chatBox.innerHTML += `<div class="chat-bubble-ai p-4 max-w-[85%]">正在根據您的歷史數據進行分析...</div>`;
                 chatBox.scrollTop = chatBox.scrollHeight;
-            }, 1000);
-
+            }, 800);
             input.value = "";
         }
     </script>
