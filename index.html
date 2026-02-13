@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 健康助理 14</title>
+    <title>Soosyn AI 健康助理 15</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -181,7 +181,7 @@
             }
         }
 
-        // --- 後台上傳邏輯 (整合更新版本) ---
+// --- 後台上傳邏輯 (強效修正版) ---
         async function uploadFile1() {
             const file = document.getElementById('file1').files[0];
             if (!file) return alert("請先選擇 Excel 檔案");
@@ -189,41 +189,102 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const wb = XLSX.read(e.target.result, { type: 'array' });
-                let totalCount = 0;
+                
+                let report = []; // 用來記錄每一張工作表的處理狀況
+                let successTotal = 0;
 
-                for (const name of wb.SheetNames) {
-                    // 只處理 BA 開頭的工作表，跳過「工作表1」
-                    if (!name.startsWith('BA')) continue; 
+                // 迴圈遍歷所有工作表
+                for (const originalName of wb.SheetNames) {
+                    // 1. 去除名稱前後空格，並轉大寫以防萬一
+                    const sheetName = originalName.trim(); 
+                    
+                    // 2. 寬鬆判定：只要名稱包含 "BA" 且後面跟著數字，或者使用者強制要求處理
+                    // 這裡先維持您的規則：以 BA 開頭 (忽略大小寫)
+                    if (!sheetName.toUpperCase().startsWith('BA')) {
+                        console.log(`跳過工作表: ${sheetName} (非 BA 開頭)`);
+                        continue;
+                    }
 
-                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
-                    const batch = data.map(r => {
-                        let rawDate = r.record_end; // 抓取 Excel 的 record_end 欄位
-                        if (!rawDate) return null;
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[originalName], { defval: "" }); // defval 避免空值造成的 key 遺失
+                    
+                    if (data.length === 0) {
+                        report.push(`❌ ${sheetName}: 空白工作表`);
+                        continue;
+                    }
+
+                    // 檢查第一筆資料的欄位，用來 debug
+                    const firstRow = data[0];
+                    // 自動去除欄位名稱的空格 (例如 " record_end " -> "record_end")
+                    const cleanData = data.map(row => {
+                        const newRow = {};
+                        for (let key in row) {
+                            newRow[key.trim()] = row[key];
+                        }
+                        return newRow;
+                    });
+
+                    const batch = cleanData.map(r => {
+                        // 3. 彈性抓取日期欄位 (優先找 record_end，沒有則找 record_date)
+                        let rawDate = r['record_end'] || r['record_date'] || r['Record_End'] || r['Record_Date'];
                         
-                        // 修正：將 "2026/2/10 5:31" 轉為 ISO 日期格式 "2026-02-10"
-                        const d = new Date(rawDate);
-                        if (isNaN(d.getTime())) return null;
-                        const dateOnly = d.toISOString().split('T')[0];
+                        if (!rawDate) return null; // 該行沒有日期，跳過
+
+                        // 嘗試解析日期
+                        let dateOnly = null;
+                        try {
+                            // 處理 Excel 數字日期 (例如 45321)
+                            if (typeof rawDate === 'number') {
+                                const excelDate = XLSX.SSF.parse_date_code(rawDate);
+                                dateOnly = `${excelDate.y}-${String(excelDate.m).padStart(2,'0')}-${String(excelDate.d).padStart(2,'0')}`;
+                            } 
+                            // 處理字串日期 "2026/2/10 5:31" 或 "2026-02-10"
+                            else {
+                                const d = new Date(rawDate);
+                                if (isNaN(d.getTime())) return null;
+                                dateOnly = d.toISOString().split('T')[0];
+                            }
+                        } catch (err) {
+                            return null;
+                        }
 
                         return {
-                            service_id: name, 
+                            service_id: sheetName, // 使用去空格後的名稱
                             record_date: dateOnly,
-                            battery_score: r.Personal_Battery_weighted_round || r.Personal_Battery_A_round || 0,
-                            raw_data: r // 完整保存以供 A4-A8 分析
+                            // 4. 彈性抓取分數欄位
+                            battery_score: r['Personal_Battery_weighted_round'] || r['Personal_Battery_A_round'] || 0,
+                            raw_data: r // 存入完整原始資料
                         };
                     }).filter(item => item !== null);
 
                     if (batch.length > 0) {
+                        // 上傳至 Supabase
                         const { error } = await _supabase.from('health_records').upsert(batch, { 
                             onConflict: 'service_id, record_date' 
                         });
-                        if (!error) totalCount += batch.length;
+
+                        if (error) {
+                            report.push(`❌ ${sheetName}: 上傳錯誤 (${error.message})`);
+                        } else {
+                            report.push(`✅ ${sheetName}: 成功 ${batch.length} 筆`);
+                            successTotal += batch.length;
+                        }
+                    } else {
+                        report.push(`⚠️ ${sheetName}: 有資料但無有效日期`);
                     }
                 }
-                alert(`成功同步 ${totalCount} 筆數據！`);
+
+                // 顯示詳細結果
+                if (report.length === 0) {
+                    alert("⚠️ 未找到任何以 'BA' 開頭的工作表，請確認 Excel 檔案。");
+                } else {
+                    alert(`處理完成！總計匯入 ${successTotal} 筆資料。\n\n詳細報告:\n${report.join('\n')}`);
+                    // 重新整理前台畫面
+                    if (currentUser) initUserData();
+                }
             };
             reader.readAsArrayBuffer(file);
-        }
+        }        
+
 
         async function uploadFile2() {
             const file = document.getElementById('file2').files[0];
