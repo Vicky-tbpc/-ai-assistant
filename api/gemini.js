@@ -16,15 +16,15 @@ export default async function handler(req, res) {
 
   try {
     const { prompt } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // 使用 v1beta 與 gemini-1.5-flash-latest 是目前最穩定的組合
+    if (!apiKey) {
+      return res.status(500).json({ text: "伺服器配置錯誤：缺少 API Key" });
+    }
+
+    // 修正：確保 fetch 語句完整且 URL 與參數連接正確
     const response = await fetch(
-
-
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
-
-      
-
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -36,8 +36,9 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // 檢查 Google API 是否回傳錯誤訊息
+    // 檢查 Google API 是否回傳錯誤
     if (data.error) {
+      console.error("Google API Error:", data.error);
       return res.status(data.error.code || 500).json({ 
         text: `Google API 錯誤 (${data.error.code}): ${data.error.message}` 
       });
