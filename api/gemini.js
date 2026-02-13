@@ -18,10 +18,10 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ text: "伺服器錯誤：缺少 API Key" });
+      return res.status(500).json({ text: "伺服器錯誤：找不到 API Key，請確認 Vercel 環境變數。" });
     }
 
-    // 更新點：改用 v1 穩定版端點與標準模型名稱
+    // 關鍵修正：改用 v1 穩定版路徑，並使用標準模型名稱 gemini-1.5-flash
     const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
@@ -34,13 +34,14 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // 檢查 Google API 是否回傳錯誤
     if (data.error) {
       return res.status(data.error.code || 500).json({ 
         text: `Google API 錯誤 (${data.error.code}): ${data.error.message}` 
       });
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Google 回傳內容為空";
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI 回傳內容為空";
     res.status(200).json({ text });
 
   } catch (error) {
