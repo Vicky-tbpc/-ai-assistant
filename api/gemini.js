@@ -1,5 +1,6 @@
 // api/gemini.js
 export default async function handler(req, res) {
+  // 1. 設定 CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,22 +21,20 @@ export default async function handler(req, res) {
       return res.status(500).json({ text: "伺服器錯誤：缺少 API Key" });
     }
 
-    // 修正點：使用 gemini-1.5-flash-latest 並確保 fetch 語法連貫
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      }
-    );
+    // 更新點：改用 v1 穩定版端點與標準模型名稱
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    });
 
     const data = await response.json();
 
     if (data.error) {
-      // 這裡會抓到 Google 回傳的詳細錯誤
       return res.status(data.error.code || 500).json({ 
         text: `Google API 錯誤 (${data.error.code}): ${data.error.message}` 
       });
