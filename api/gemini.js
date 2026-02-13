@@ -1,11 +1,10 @@
 // api/gemini.js
 export default async function handler(req, res) {
-  // 設定 CORS，允許前端網頁存取
+  // 設定 CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // 處理瀏覽器預檢請求 (Preflight)
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -19,10 +18,10 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ text: "伺服器配置錯誤：缺少 API Key" });
+      return res.status(500).json({ text: "伺服器錯誤：缺少 API Key" });
     }
 
-    // 修正：確保 fetch 語句完整且 URL 與參數連接正確
+    // 呼叫 Google API，確保 fetch 語法連貫
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -36,11 +35,9 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // 檢查 Google API 是否回傳錯誤
     if (data.error) {
-      console.error("Google API Error:", data.error);
       return res.status(data.error.code || 500).json({ 
-        text: `Google API 錯誤 (${data.error.code}): ${data.error.message}` 
+        text: `Google API 錯誤: ${data.error.message}` 
       });
     }
 
