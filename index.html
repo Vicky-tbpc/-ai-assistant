@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 健康助理 10</title>
+    <title>Soosyn AI 健康助理 09</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -16,12 +16,11 @@
             --bg-gray: #f8f9fa; --calendar-gray: #8699a3;
         }
         body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--bg-gray); color: var(--text-main); }
-        .score-navy { color: var(--excellent-navy); }
+        .score-red { color: var(--alert-red); } .score-tan { color: var(--standard-tan); }
+        .score-gray { color: var(--good-gray); } .score-navy { color: var(--excellent-navy); }
         .chat-bubble-ai { background: white; border-radius: 20px 20px 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
         .summary-pill { background: #f0f0f0; border-radius: 30px; padding: 12px 20px; font-size: 13px; display: flex; align-items: center; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 10px; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -30,7 +29,7 @@
         <div class="max-w-xs w-full text-center">
             <h1 class="text-3xl font-bold text-[#6c83cf] mb-8">Soosyn AI</h1>
             <div class="space-y-4">
-                <input id="serviceID" type="text" placeholder="服務序號 (例如: BA123456)" class="w-full border-2 p-3 rounded-xl outline-none focus:border-[#6c83cf]">
+                <input id="serviceID" type="text" placeholder="服務序號 (BA123456)" class="w-full border-2 p-3 rounded-xl outline-none focus:border-[#6c83cf]">
                 <input id="password" type="password" placeholder="密碼" class="w-full border-2 p-3 rounded-xl outline-none focus:border-[#6c83cf]">
                 <button onclick="handleLogin()" class="w-full bg-[#6c83cf] text-white py-3 rounded-xl font-bold shadow-lg">登入助理</button>
             </div>
@@ -40,8 +39,8 @@
 
     <div id="mainSection" class="hidden flex flex-col h-screen">
         <header class="p-4 bg-white border-b flex justify-between items-center shadow-sm">
-            <span class="font-bold text-[#6c83cf] flex items-center"><i class="fa-solid fa-robot mr-2"></i>Soosyn AI 助理</span>
-            <button onclick="openSummaryModal()" class="text-xs bg-blue-50 text-[#6c83cf] px-4 py-2 rounded-full font-bold">查看今日數據</button>
+            <span class="font-bold text-[#6c83cf]"><i class="fa-solid fa-robot mr-2"></i>Soosyn AI 助理</span>
+            <button onclick="openSummaryModal()" class="text-xs bg-blue-50 text-[#6c83cf] px-4 py-2 rounded-full font-bold">查看今日摘要</button>
         </header>
 
         <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full">
@@ -49,7 +48,7 @@
 
         <footer class="p-4 bg-white border-t">
             <div class="max-w-2xl mx-auto flex items-center bg-gray-100 rounded-2xl px-4 py-2">
-                <input id="userInput" type="text" placeholder="詢問關於您的健康狀態..." class="flex-grow bg-transparent outline-none p-2 text-sm" onkeypress="if(event.keyCode==13) askGemini()">
+                <input id="userInput" type="text" placeholder="詢問關於您的健康趨勢..." class="flex-grow bg-transparent outline-none p-2 text-sm" onkeypress="if(event.keyCode==13) askGemini()">
                 <button onclick="askGemini()" class="text-[#6c83cf] p-2 hover:scale-110 transition-transform"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
         </footer>
@@ -58,65 +57,69 @@
     <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[500] flex items-center justify-center p-4">
         <div class="bg-white rounded-[2.5rem] max-w-md w-full max-h-[90vh] overflow-y-auto p-8 relative">
             <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-2xl text-gray-300">&times;</button>
-            <div class="flex items-center text-[#8699a3] mb-6 space-x-2"><i class="fa-solid fa-calendar-days"></i><span id="currDate" class="font-bold">--</span></div>
+            <div class="flex items-center text-[#8699a3] mb-6 space-x-2"><i class="fa-solid fa-calendar-days"></i><span id="currDate" class="font-bold">2026/01/01</span></div>
             <div class="text-center mb-6">
-                <p class="text-xs font-bold text-[#6c83cf] mb-2 uppercase tracking-widest">今日生理電量</p>
+                <p class="text-xs font-bold text-[#6c83cf] mb-2 uppercase tracking-widest">生理電量分數</p>
                 <div id="mainScore" class="text-7xl font-black score-navy">--</div>
+                <p class="text-[10px] text-gray-400 mt-2">優於 <span id="percentile">--</span>% 的使用者</p>
                 <div class="flex items-center justify-center mt-3 space-x-2">
                     <span id="statusIcon" class="w-3 h-3 rounded-full bg-green-500"></span>
                     <span id="statusLabel" class="text-xs font-bold">讀取中...</span>
                 </div>
             </div>
-            <div class="space-y-3 mb-6">
-                <div class="summary-pill"><i class="fa-solid fa-bolt text-[#6c83cf] mr-3"></i>當前狀態：<span id="textA4" class="ml-1 font-bold">載入中</span></div>
-                <div class="summary-pill"><i class="fa-solid fa-circle-info text-gray-400 mr-3"></i>生理提示：<span id="textA5" class="ml-1">正在同步數據...</span></div>
+            <div class="space-y-3 mb-6" id="summaryTexts">
+                <div class="summary-pill"><i class="fa-solid fa-face-smile text-[#a0adb7] mr-3 text-xl"></i><span id="textA4">資料讀取中</span></div>
+                <div class="summary-pill"><i class="fa-solid fa-face-frown text-[#ff8c73] mr-3 text-xl"></i><span id="textA5">資料讀取中</span></div>
+                <div class="summary-pill bg-gray-50"><span id="textA6" class="text-xs">正在分析您的整體趨勢...</span></div>
             </div>
-            <button onclick="closeModal('summaryModal')" class="w-full py-3 bg-gray-800 text-white rounded-xl font-bold text-xs shadow-lg">確認並返回</button>
+            <button onclick="openChartModal()" class="w-full py-3 bg-gray-800 text-white rounded-xl font-bold text-xs shadow-lg">查看詳細趨勢圖表</button>
         </div>
     </div>
 
     <div id="adminPanel" class="hidden fixed inset-0 bg-white z-[2000] overflow-y-auto p-8">
         <div class="max-w-4xl mx-auto">
-            <div class="flex justify-between items-center mb-8 border-b pb-4">
-                <h1 class="text-2xl font-bold">助理管理後台</h1>
-                <button onclick="closeAdmin()" class="text-gray-400 hover:text-black">關閉</button>
+            <div class="flex justify-between items-center mb-10 border-b pb-4">
+                <h1 class="text-2xl font-bold text-gray-800">Soosyn 管理後台</h1>
+                <button onclick="closeAdmin()" class="bg-gray-100 px-6 py-2 rounded-full font-bold">返回前台</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="p-6 border rounded-2xl bg-blue-50/50">
-                    <h4 class="text-sm font-bold mb-4">1. 批次同步電量</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div class="border p-6 rounded-2xl bg-blue-50/30">
+                    <h4 class="text-sm font-bold mb-4">1. 個人電量數據</h4>
                     <input type="file" id="file1" class="text-xs mb-4 w-full">
-                    <button onclick="importFile1()" class="w-full bg-[#6c83cf] text-white py-2 rounded-lg text-xs">同步</button>
+                    <button onclick="importFile1()" class="w-full bg-[#6c83cf] text-white py-2 rounded-lg text-xs font-bold">同步所有分頁</button>
                 </div>
-                <div class="p-6 border rounded-2xl bg-orange-50/50">
-                    <h4 class="text-sm font-bold mb-4">2. 匹配狀態碼</h4>
+                <div class="border p-6 rounded-2xl bg-orange-50/30">
+                    <h4 class="text-sm font-bold mb-4">2. 生理狀態匹配</h4>
                     <input type="file" id="file2" class="text-xs mb-4 w-full">
-                    <button onclick="importFile2()" class="w-full bg-orange-500 text-white py-2 rounded-lg text-xs">匹配</button>
+                    <button onclick="importFile2()" class="w-full bg-orange-500 text-white py-2 rounded-lg text-xs font-bold">匹配序號狀態</button>
                 </div>
-                <div class="p-6 border rounded-2xl bg-green-50/50">
-                    <h4 class="text-sm font-bold mb-4">3. 編輯指令庫</h4>
+                <div class="border p-6 rounded-2xl bg-green-50/30">
+                    <h4 class="text-sm font-bold mb-4">3. 詞句指令庫</h4>
                     <input type="file" id="file3" class="text-xs mb-4 w-full">
-                    <button onclick="importFile3()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs">載入</button>
+                    <button onclick="importFile3()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold">載入分頁指令</button>
                 </div>
             </div>
-            <div class="border p-6 rounded-2xl bg-white">
-                <h3 class="font-bold mb-4 border-l-4 border-black pl-3">A11 指令庫預覽與編輯</h3>
-                <div id="adminTabs" class="flex flex-wrap gap-2 mb-4"></div>
-                <textarea id="adminEditor" rows="8" class="w-full border p-4 rounded-xl text-sm" placeholder="指令內容會顯示於此..."></textarea>
-                <button onclick="saveAdminContent()" class="mt-4 bg-black text-white px-8 py-2 rounded-lg font-bold text-xs">儲存變更</button>
+            <div class="border p-8 rounded-3xl bg-white shadow-sm">
+                <h3 class="font-bold text-gray-500 mb-6 border-l-4 border-black pl-4">A11 指令庫內容編輯區</h3>
+                <div id="adminTabs" class="flex flex-wrap gap-2 mb-6"></div>
+                <textarea id="adminEditor" rows="10" class="w-full border p-6 rounded-2xl text-sm focus:ring-2 focus:ring-blue-100 outline-none" placeholder="請先載入檔案 3..."></textarea>
+                <div class="mt-6 flex justify-end">
+                    <button onclick="saveAdminContent()" class="bg-black text-white px-10 py-3 rounded-xl font-bold">儲存變更內容</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 初始化 Supabase ---
+        // --- 基本設定 (請保留您原有的 Supabase Key) ---
         const SUPABASE_URL = 'https://gcvwebgfbrsrezxvjafe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentUser = null;
-        let phraseLibrary = {};
+        let phraseLibrary = {}; 
 
-        // --- A1: 登入功能 ---
+        // --- A1: 登入邏輯 ---
         async function handleLogin() {
             const sid = document.getElementById('serviceID').value.trim();
             const pwd = document.getElementById('password').value.trim();
@@ -126,86 +129,77 @@
                 currentUser = data;
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('mainSection').classList.remove('hidden');
-                initDashboard();
+                initUserDashboard(sid);
             } else {
-                alert("序號或密碼有誤，請再試一次。");
+                alert("登入失敗：序號或密碼錯誤");
             }
         }
 
-        async function initDashboard() {
+        async function initUserDashboard(sid) {
             document.getElementById('currDate').innerText = new Date().toLocaleDateString();
+            document.getElementById('mainScore').innerText = "88"; // 範例值，可依據檔案1同步後讀取
             document.getElementById('statusLabel').innerText = currentUser.manual_status || "平衡中";
-            document.getElementById('textA4').innerText = currentUser.manual_status || "正常";
-            document.getElementById('mainScore').innerText = "88"; // 這裡可依實際資料庫動態抓取
-            appendMessage('ai', `您好 ${currentUser.service_id}，我是您的健康助理 Soosyn。您的今日電量分數為 88 分，屬於優異等級。有什麼我可以幫您的嗎？`);
+            openSummaryModal();
+            appendMessage('ai', `您好！您的最新健康報告已備妥。生理電量為 ${document.getElementById('mainScore').innerText} 分，還有什麼想了解的嗎？`);
         }
 
-        // --- 核心更新：Gemini AI 轉接功能 ---
+        // --- 核心更新：整合 Gemini 轉接器 ---
         async function askGemini() {
             const inputField = document.getElementById('userInput');
-            const userMsg = inputField.value.trim();
-            if (!userMsg) return;
+            const promptValue = inputField.value.trim();
+            if (!promptValue) return;
 
-            // 1. 介面顯示使用者訊息
-            appendMessage('user', userMsg);
+            // 1. 顯示使用者問題
+            appendMessage('user', promptValue);
             inputField.value = "";
 
-            // 2. 建立載入狀態氣泡
-            const chatBox = document.getElementById('chatBox');
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = "chat-bubble-ai p-4 text-sm text-gray-400 italic";
-            loadingDiv.innerText = "Soosyn AI 正在整理建議...";
-            chatBox.appendChild(loadingDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            // 2. 顯示思考中氣泡
+            const box = document.getElementById('chatBox');
+            const loadingBubble = document.createElement('div');
+            loadingBubble.className = "chat-bubble-ai p-4 text-sm text-gray-400 italic";
+            loadingBubble.innerText = "Soosyn AI 正在思考中...";
+            box.appendChild(loadingBubble);
+            box.scrollTop = box.scrollHeight;
 
             try {
-                // 3. 呼叫 Vercel 後端 API
+                // 3. 呼叫 Vercel 後端路徑 /api/gemini
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        prompt: `使用者狀態: ${currentUser.manual_status || '未知'}。問題: ${userMsg}` 
+                        prompt: `使用者資料：序號 ${currentUser.service_id}, 狀態 ${currentUser.manual_status}。問題是：${promptValue}` 
                     })
                 });
 
                 const data = await response.json();
-                chatBox.removeChild(loadingDiv); // 移除載入動畫
+                box.removeChild(loadingBubble); // 移除載入動畫
 
-                // 4. 顯示 AI 回覆 (對應 gemini.js 中的 { text: "..." })
+                // 4. 顯示結果 (對應 gemini.js 回傳的 { text: "..." })
                 if (data.text) {
                     appendMessage('ai', data.text);
-                } else if (data.error) {
-                    appendMessage('ai', `系統異常：${data.error}`);
                 } else {
-                    appendMessage('ai', "目前無法取得回應，請稍後再試。");
+                    appendMessage('ai', "目前無法取得回應，請確認 API Key 設定是否正確。");
                 }
             } catch (err) {
-                if (chatBox.contains(loadingDiv)) chatBox.removeChild(loadingDiv);
-                appendMessage('ai', "連線至轉接器失敗，請檢查 Vercel 部署。");
-                console.error("Fetch Error:", err);
+                if (box.contains(loadingBubble)) box.removeChild(loadingBubble);
+                appendMessage('ai', "連線後端轉接失敗，請檢查網路或 Vercel 狀態。");
             }
         }
 
         function appendMessage(role, text) {
-            const chatBox = document.getElementById('chatBox');
-            const msgWrapper = document.createElement('div');
+            const box = document.getElementById('chatBox');
+            const div = document.createElement('div');
             if (role === 'ai') {
-                msgWrapper.className = "chat-bubble-ai p-4 text-sm max-w-[85%] leading-relaxed";
+                div.className = "chat-bubble-ai p-4 text-sm max-w-[85%] leading-relaxed";
             } else {
-                msgWrapper.className = "bg-[#6c83cf] text-white self-end p-4 rounded-2xl rounded-tr-none text-sm max-w-[85%] flex ml-auto shadow-md";
+                div.className = "bg-[#6c83cf] text-white self-end p-4 rounded-2xl rounded-tr-none text-sm max-w-[85%] flex ml-auto shadow-md";
             }
-            msgWrapper.innerText = text;
-            chatBox.appendChild(msgWrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            div.innerText = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
         }
 
-        // --- 後台管理邏輯 (保留原功能) ---
-        function openAdminLogin() { if(prompt("管理員驗證") === "888tBPC!!") document.getElementById('adminPanel').classList.remove('hidden'); }
-        function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
-        function openSummaryModal() { document.getElementById('summaryModal').classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        // 檔案3：指令庫辨識
+        // --- 原本 08_最終整合版 的後台邏輯 (檔案辨識) ---
         async function importFile3() {
             const file = document.getElementById('file3').files[0];
             const reader = new FileReader();
@@ -217,7 +211,7 @@
                     const data = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1});
                     phraseLibrary[name] = data.map(row => row.join(" ")).join("\n");
                     const btn = document.createElement('button');
-                    btn.className = "px-3 py-1 bg-gray-100 rounded-full text-xs hover:bg-gray-200 transition-colors";
+                    btn.className = "px-4 py-1 bg-gray-100 rounded-full text-xs hover:bg-gray-200 transition-colors";
                     btn.innerText = name;
                     btn.onclick = () => {
                         document.getElementById('adminEditor').value = phraseLibrary[name];
@@ -225,7 +219,7 @@
                     };
                     tabs.appendChild(btn);
                 });
-                alert("指令庫分頁載入成功");
+                alert("檔案3 分頁辨識完成！您可以開始編輯指令內容。");
             };
             reader.readAsArrayBuffer(file);
         }
@@ -234,19 +228,18 @@
             const active = document.getElementById('adminEditor').dataset.active;
             if(active) {
                 phraseLibrary[active] = document.getElementById('adminEditor').value;
-                alert(`分頁 [${active}] 已儲存於本次工作階段`);
+                alert(`分頁 [${active}] 內容已暫存至本地，前台建議將即時更新。`);
             }
         }
 
-        // 檔案1與2的同步邏輯 (簡化示意)
         async function importFile1() { processExcel('file1', async (sid, json) => {
-            console.log("正在為序號同步電量數據...", sid);
-            // 這裡撰寫 upsert 至 supabase health_records 的 logic
+            // 保留原本的多分頁辨識 logic
+            await _supabase.from('health_records').upsert(json.map(r => ({ service_id: sid, battery_score: r.Battery_score, record_date: r.record_date })));
         }); }
 
         async function processExcel(id, callback) {
             const file = document.getElementById(id).files[0];
-            if(!file) return alert("請先選取檔案");
+            if(!file) return alert("請先選擇檔案");
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const wb = XLSX.read(e.target.result, {type:'array'});
@@ -254,10 +247,16 @@
                     const json = XLSX.utils.sheet_to_json(wb.Sheets[name]);
                     if(json.length > 0) await callback(name, json);
                 }
-                alert("批次同步作業已啟動");
+                alert("數據同步完成！");
             };
             reader.readAsArrayBuffer(file);
         }
+
+        // 彈窗與後台 UI 輔助
+        function openSummaryModal() { document.getElementById('summaryModal').classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function openAdminLogin() { if(prompt("請輸入管理員驗證碼") === "888tBPC!!") document.getElementById('adminPanel').classList.remove('hidden'); }
+        function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
     </script>
 </body>
 </html>
