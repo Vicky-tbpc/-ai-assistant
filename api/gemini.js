@@ -5,7 +5,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -19,10 +21,11 @@ export default async function handler(req, res) {
       return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
     }
 
-    // 關鍵修正：
-    // 1. 改用 v1beta (通常新模型如 2.0 都先在 beta 版開放)
-    // 2. 模型名稱改為您清單中確認有的 'gemini-2.0-flash'
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    // 修正點：
+    // 1. 改回 'gemini-1.5-flash' (免費版最穩定)
+    // 2. 使用 'v1beta' 端點 (支援度最高)
+    // 3. 保持 fetch 語法緊湊，不要斷行
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -34,6 +37,7 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // 捕捉額度不足或其他 API 錯誤
     if (data.error) {
       return res.status(data.error.code || 500).json({ 
         text: `Google API 錯誤 (${data.error.code}): ${data.error.message}` 
@@ -44,7 +48,7 @@ export default async function handler(req, res) {
     res.status(200).json({ text });
 
   } catch (error) {
-    console.error("Backend Error:", error);
+    console.error("Internal Error:", error);
     res.status(500).json({ text: "伺服器內部錯誤，請檢查 Vercel Logs。" });
   }
 }
