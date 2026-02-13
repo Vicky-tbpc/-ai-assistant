@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soosyn AI 健康助理 11-2 </title>
+    <title>Soosyn AI 健康助理 12</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -20,6 +20,7 @@
         .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
         .summary-pill { background: #f0f0f0; border-radius: 30px; padding: 12px 20px; font-size: 13px; display: flex; align-items: center; }
         .score-navy { color: var(--excellent-navy); }
+        .admin-panel { background: #f3f4f6; z-index: 2000; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -42,8 +43,7 @@
             <button onclick="openSummaryModal()" class="text-xs bg-blue-50 text-[#6c83cf] px-4 py-2 rounded-full font-bold">查看今日摘要</button>
         </header>
 
-        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full">
-            </main>
+        <main id="chatBox" class="flex-grow overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full"></main>
 
         <footer class="p-4 bg-white border-t">
             <div class="max-w-2xl mx-auto flex items-center bg-gray-100 rounded-2xl px-4 py-2">
@@ -53,20 +53,65 @@
         </footer>
     </div>
 
+    <div id="adminLoginModal" class="hidden fixed inset-0 modal-bg z-[1500] flex items-center justify-center">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl w-80">
+            <h3 class="font-bold mb-4">管理員驗證</h3>
+            <input id="admPass" type="password" placeholder="管理密碼" class="w-full border p-4 rounded-xl mb-4 outline-none">
+            <div class="flex space-x-2">
+                <button onclick="closeModal('adminLoginModal')" class="flex-1 bg-gray-200 py-3 rounded-xl">取消</button>
+                <button onclick="checkAdmin()" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold">驗證</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminPanel" class="hidden fixed inset-0 admin-panel overflow-y-auto p-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-2xl font-bold">Soosyn 管理後台</h1>
+                <button onclick="closeAdmin()" class="bg-white px-4 py-2 rounded-xl shadow-sm">返回前台</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border">
+                    <h3 class="font-bold text-blue-500 mb-4">1. 電量數據同步 (由序號工作表辨識)</h3>
+                    <input type="file" id="file1" class="text-xs mb-2 w-full">
+                    <button onclick="uploadFile1()" class="w-full bg-blue-500 text-white py-2 rounded-xl text-xs font-bold">匯入資料</button>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border">
+                    <h3 class="font-bold text-orange-500 mb-4">2. 生理狀態匹配 (由序號工作表辨識)</h3>
+                    <input type="file" id="file2" class="text-xs mb-2 w-full">
+                    <button onclick="uploadFile2()" class="w-full bg-orange-500 text-white py-2 rounded-xl text-xs font-bold">更新狀態</button>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border">
+                    <h3 class="font-bold text-green-500 mb-4">3. 詞句指令庫載入</h3>
+                    <input type="file" id="file3" class="text-xs mb-2 w-full">
+                    <button onclick="uploadFile3()" class="w-full bg-green-500 text-white py-2 rounded-xl text-xs font-bold">載入分頁內容</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl shadow-sm border">
+                <h3 class="font-bold mb-4 border-b pb-2">詞句庫編修 (當前載入內容)</h3>
+                <div id="tabContainer" class="flex space-x-2 mb-4 overflow-x-auto"></div>
+                <textarea id="phraseEditor" rows="6" class="w-full border p-4 rounded-2xl text-sm" placeholder="上傳檔案 3 後，點擊上方分頁標籤進行預覽或編輯..."></textarea>
+                <button onclick="savePhrase()" class="mt-4 bg-black text-white px-6 py-2 rounded-xl font-bold">儲存暫存修改</button>
+            </div>
+        </div>
+    </div>
+
     <div id="summaryModal" class="hidden fixed inset-0 modal-bg z-[500] flex items-center justify-center p-4">
         <div class="bg-white rounded-[2.5rem] max-w-md w-full max-h-[90vh] overflow-y-auto p-8 relative">
             <button onclick="closeModal('summaryModal')" class="absolute top-6 right-6 text-2xl text-gray-300">&times;</button>
             <div class="flex items-center text-[#8699a3] mb-6 space-x-2"><i class="fa-solid fa-calendar-days"></i><span id="currDate" class="font-bold">2026/01/01</span></div>
             <div class="text-center mb-6">
                 <p class="text-xs font-bold text-[#6c83cf] mb-2 uppercase tracking-widest">生理電量分數</p>
-                <div id="mainScore" class="text-7xl font-black score-navy">88</div>
+                <div id="mainScore" class="text-7xl font-black score-navy">--</div>
                 <div class="flex items-center justify-center mt-3 space-x-2">
                     <span id="statusIcon" class="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span id="statusLabel" class="text-xs font-bold">平衡中</span>
+                    <span id="statusLabel" class="text-xs font-bold">讀取中...</span>
                 </div>
             </div>
             <div class="space-y-3 mb-6">
-                <div class="summary-pill"><i class="fa-solid fa-face-smile text-[#a0adb7] mr-3 text-xl"></i><span>目前狀態穩定</span></div>
+                <div class="summary-pill"><i class="fa-solid fa-face-smile text-[#a0adb7] mr-3 text-xl"></i><span id="summaryStatus">狀態讀取中</span></div>
                 <div class="summary-pill bg-gray-50"><span class="text-xs">您可以試著詢問 AI 更多健康建議。</span></div>
             </div>
             <button onclick="closeModal('summaryModal')" class="w-full py-3 bg-gray-800 text-white rounded-xl font-bold text-xs shadow-lg">開始對話</button>
@@ -80,6 +125,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentUser = null;
+        let globalPhrases = {}; // 儲存檔案 3 的詞句庫內容
 
         // --- 登入邏輯 ---
         async function handleLogin() {
@@ -88,7 +134,6 @@
             
             try {
                 const { data, error } = await _supabase.from('user_profiles').select('*').eq('service_id', sid).single();
-                
                 if (data && data.password === pwd) {
                     currentUser = data;
                     document.getElementById('loginSection').classList.add('hidden');
@@ -102,24 +147,122 @@
             }
         }
 
-        function initUserDashboard() {
+        async function initUserDashboard() {
             document.getElementById('currDate').innerText = new Date().toLocaleDateString();
             document.getElementById('statusLabel').innerText = currentUser.manual_status || "平衡中";
+            document.getElementById('summaryStatus').innerText = currentUser.manual_status || "目前狀態穩定";
+            
+            // 抓取最新分數
+            const { data: records } = await _supabase.from('health_records').select('battery_score').eq('service_id', currentUser.service_id).order('record_date', {ascending:false}).limit(1);
+            if(records && records.length > 0) {
+                document.getElementById('mainScore').innerText = records[0].battery_score;
+            }
+
             openSummaryModal();
             appendMessage('ai', `您好！我是您的 Soosyn AI 助理。已載入您的資料，請問今天有什麼可以幫您的？`);
         }
 
-        // --- Gemini AI 串接 ---
+        // --- 後台管理邏輯 (移植 05 版) ---
+        function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); }
+        function checkAdmin() { 
+            if(document.getElementById('admPass').value === '888tBPC!!') { 
+                document.getElementById('adminLoginModal').classList.add('hidden'); 
+                document.getElementById('adminPanel').classList.remove('hidden'); 
+            } else { alert("密碼錯誤"); }
+        }
+        function closeAdmin() { document.getElementById('adminPanel').classList.add('hidden'); }
+
+        // 1. 上傳檔案 1 (辨識工作表序號)
+        async function uploadFile1() { 
+            await processExcel('file1', async (sid, data) => {
+                // 建立/更新用戶
+                await _supabase.from('user_profiles').upsert({ service_id: sid, password: 'tbpc' }, { onConflict: 'service_id' });
+                // 批次匯入數據
+                const batch = data.map(r => ({ 
+                    service_id: sid, 
+                    record_date: r.record_end || r.record_date || new Date().toISOString(), 
+                    battery_score: r.Battery_score || r.score || 0, 
+                    raw_data: r 
+                }));
+                await _supabase.from('health_records').upsert(batch);
+            }); 
+        }
+
+        // 2. 上傳檔案 2 (辨識工作表序號)
+        async function uploadFile2() { 
+            await processExcel('file2', async (sid, data) => {
+                if(data[0] && (data[0].status || data[0].狀態)) {
+                    await _supabase.from('user_profiles').update({ 
+                        manual_status: data[0].status || data[0].狀態 
+                    }).eq('service_id', sid);
+                }
+            }); 
+        }
+
+        // 3. 上傳檔案 3 (辨識詞句庫)
+        async function uploadFile3() {
+            const file = document.getElementById('file3').files[0];
+            if(!file) return alert("請選擇檔案");
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                const container = document.getElementById('tabContainer');
+                container.innerHTML = "";
+                wb.SheetNames.forEach(name => {
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1});
+                    globalPhrases[name] = json.map(row => row.join(" ")).join("\n");
+                    const btn = document.createElement('button');
+                    btn.className = "px-3 py-1 bg-gray-100 rounded-lg text-xs whitespace-nowrap";
+                    btn.innerText = name;
+                    btn.onclick = () => {
+                        document.getElementById('phraseEditor').value = globalPhrases[name];
+                        document.getElementById('phraseEditor').dataset.active = name;
+                    };
+                    container.appendChild(btn);
+                });
+                alert("詞句指令庫已成功載入分頁內容");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function savePhrase() {
+            const name = document.getElementById('phraseEditor').dataset.active;
+            if(name) {
+                globalPhrases[name] = document.getElementById('phraseEditor').value;
+                alert(`暫存區 [${name}] 已更新，將於對話時參考。`);
+            }
+        }
+
+        // 輔助：Excel 處理
+        async function processExcel(inputId, callback) {
+            const file = document.getElementById(inputId).files[0];
+            if(!file) return alert("請先選取檔案");
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                for(const name of wb.SheetNames) {
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name]);
+                    if(data.length > 0) await callback(name, data);
+                }
+                alert("數據同步完成！");
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- Gemini AI 串接 (完全保留原始 fetch 結構) ---
         async function askGemini() {
             const inputField = document.getElementById('userInput');
             const promptValue = inputField.value.trim();
             if (!promptValue) return;
 
-            // 1. 顯示使用者問題
+            // 整合檔案 3 詞句庫作為背景資料
+            const phraseContext = Object.keys(globalPhrases).length > 0 
+                ? `\n參考詞句庫內容：${JSON.stringify(globalPhrases)}` 
+                : "";
+
             appendMessage('user', promptValue);
             inputField.value = "";
 
-            // 2. 顯示思考中氣泡
             const box = document.getElementById('chatBox');
             const loadingId = 'loading-' + Date.now();
             const loadingBubble = document.createElement('div');
@@ -130,12 +273,12 @@
             box.scrollTop = box.scrollHeight;
 
             try {
-                // 3. 呼叫 Vercel 後端 API
+                // --- 這裡完全保留您要求的 Gemini 呼叫程式碼 ---
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        prompt: `使用者序號: ${currentUser?.service_id || '未知'}, 狀態: ${currentUser?.manual_status || '未知'}。問題: ${promptValue}` 
+                        prompt: `使用者序號: ${currentUser?.service_id || '未知'}, 狀態: ${currentUser?.manual_status || '未知'}。${phraseContext}\n使用者問題: ${promptValue}` 
                     })
                 });
 
@@ -149,16 +292,15 @@
 
                 const data = await response.json();
 
-                // 4. 顯示結果
                 if (data.text) {
                     appendMessage('ai', data.text);
                 } else {
                     appendMessage('ai', "無法取得有效的回應內容。");
                 }
+                // ----------------------------------------------
             } catch (err) {
                 const currentLoading = document.getElementById(loadingId);
                 if (currentLoading) currentLoading.remove();
-                
                 console.error("API Error:", err);
                 appendMessage('ai', `抱歉，系統連線失敗：${err.message}`);
             }
@@ -177,10 +319,8 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        // 輔助功能
         function openSummaryModal() { document.getElementById('summaryModal').classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-        function openAdminLogin() { if(prompt("管理員驗證") === "888tBPC!!") alert("後台功能開發中"); }
     </script>
 </body>
 </html>
