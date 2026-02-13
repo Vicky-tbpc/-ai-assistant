@@ -1,16 +1,28 @@
 // api/gemini.js
 export default async function handler(req, res) {
+  // 1. 設定 CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === "OPTIONS") return res.status(200).end();
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
     const { prompt } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // 使用 v1 穩定版端點搭配 gemini-1.5-flash，這是免費版最不可能報錯的組合
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    if (!apiKey) {
+      return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
+    }
+
+    // 關鍵修正：
+    // 1. 改用 v1beta (通常新模型如 2.0 都先在 beta 版開放)
+    // 2. 模型名稱改為您清單中確認有的 'gemini-2.0-flash'
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -23,16 +35,16 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (data.error) {
-      // 這裡會抓到具體的錯誤原因
       return res.status(data.error.code || 500).json({ 
-        text: `Google 服務訊息 (${data.error.code}): ${data.error.message}` 
+        text: `Google API 錯誤 (${data.error.code}): ${data.error.message}` 
       });
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI 目前沒有回傳內容。";
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI 回傳內容為空";
     res.status(200).json({ text });
 
   } catch (error) {
-    res.status(500).json({ text: "系統內部異常，請檢查 Vercel Logs。" });
+    console.error("Backend Error:", error);
+    res.status(500).json({ text: "伺服器內部錯誤，請檢查 Vercel Logs。" });
   }
 }
