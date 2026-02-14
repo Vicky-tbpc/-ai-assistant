@@ -3,50 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 健康助理-n01</title>
+    <title>AI 健康助理</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
-        #login-container, #chat-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        .hidden { display: none; }
-        input, button { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        #chat-box { height: 300px; border: 1px solid #eee; overflow-y: auto; margin-bottom: 10px; padding: 10px; background: #fafafa; }
-        .logout-btn { background: #dc3545; }
-        .change-pw-btn { background: #6c757d; margin-top: 5px; }
-        .modal { background: rgba(0,0,0,0.5); position: fixed; top:0; left:0; width:100%; height:100%; display: flex; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; }
+        :root { --primary-color: #007bff; --danger-color: #dc3545; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        /* 容器樣式 */
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 90%; max-width: 450px; position: relative; }
+        .hidden { display: none !important; }
+        
+        /* 表單元素 */
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        button { background: var(--primary-color); color: white; border: none; cursor: pointer; transition: 0.3s; }
+        button:hover { opacity: 0.9; }
+
+        /* 右上角設定按鈕 */
+        .header-actions { position: absolute; top: 15px; right: 15px; }
+        .settings-btn { background: none; color: #666; padding: 5px; border: none; font-size: 1.5rem; width: auto; cursor: pointer; }
+        .dropdown-menu { position: absolute; top: 40px; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 120px; }
+        .dropdown-menu button { background: none; color: #333; text-align: left; margin: 0; border-radius: 0; border: none; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        .dropdown-menu button:last-child { border-bottom: none; color: var(--danger-color); }
+        .dropdown-menu button:hover { background: #f8f9fa; }
+
+        /* 對話框 */
+        #chat-box { height: 350px; border: 1px solid #eee; overflow-y: auto; margin: 15px 0; padding: 10px; background: #fafafa; border-radius: 6px; display: flex; flex-direction: column; }
+        .msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 15px; max-width: 80%; }
+        .user-msg { align-self: flex-end; background: var(--primary-color); color: white; }
+        .ai-msg { align-self: flex-start; background: #e9ecef; color: #333; }
+
+        /* 彈窗樣式 */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 200; }
+        .modal { background: white; padding: 20px; border-radius: 8px; width: 320px; }
     </style>
 </head>
 <body>
 
-    <div id="login-container">
-        <h2>AI 健康助理 登入</h2>
-        <input type="text" id="serial" placeholder="請輸入序號">
-        <input type="password" id="pw" placeholder="請輸入密碼">
-        <button onclick="login()">登入</button>
+    <div id="login-container" class="card">
+        <h2 style="text-align: center;">AI 健康助理</h2>
+        <p style="text-align: center; color: #666;">請輸入您的專屬序號登入</p>
+        <input type="text" id="serial" placeholder="序號">
+        <input type="password" id="pw" placeholder="密碼">
+        <button onclick="login()">登入系統</button>
     </div>
 
-    <div id="chat-container" class="hidden">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>您好, <span id="user-display"></span></h3>
-            <div>
-                <button onclick="logout()" class="logout-btn" style="width: auto; padding: 5px 10px;">登出</button>
+    <div id="chat-container" class="card hidden">
+        <div class="header-actions">
+            <button class="settings-btn" onclick="toggleDropdown()">⚙️</button>
+            <div id="settings-menu" class="dropdown-menu hidden">
+                <button onclick="openPwModal()">修改密碼</button>
+                <button onclick="logout()">登出</button>
             </div>
         </div>
-        <div id="chat-box">系統：您好！有什麼健康問題想諮詢嗎？</div>
-        <input type="text" id="user-input" placeholder="輸入訊息...">
-        <button onclick="sendMessage()">發送</button>
-        <button onclick="togglePwModal()" class="change-pw-btn">修改密碼</button>
+        
+        <h3>您好, <span id="user-display"></span></h3>
+        <div id="chat-box">
+            <div class="msg ai-msg">系統：您好！我是您的 AI 健康助理，請問今天有什麼我可以幫您的嗎？</div>
+        </div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="user-input" placeholder="詢問關於健康的問題...">
+            <button onclick="sendMessage()" style="width: 80px;">發送</button>
+        </div>
     </div>
 
-    <div id="pw-modal" class="modal hidden">
-        <div class="modal-content">
-            <h4>修改密碼</h4>
-            <input type="password" id="new-pw" placeholder="請輸入新密碼">
-            <button onclick="updatePassword()">確認修改</button>
-            <button onclick="togglePwModal()" style="background:#ccc; color:black;">取消</button>
+    <div id="pw-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <h4>安全中心 - 修改密碼</h4>
+            <input type="password" id="old-pw-input" placeholder="請輸入舊密碼">
+            <input type="password" id="new-pw-input" placeholder="請輸入新密碼">
+            <button onclick="updatePassword()">確認更改</button>
+            <button onclick="closePwModal()" style="background:#ccc; color:#333;">取消</button>
         </div>
     </div>
 
@@ -55,20 +81,24 @@
         const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // 頁面載入檢查
         window.onload = () => {
             const user = localStorage.getItem('health_ai_user');
             if (user) showChat(user);
         };
 
+        // 登入邏輯
         async function login() {
             const serial = document.getElementById('serial').value;
             const pw = document.getElementById('pw').value;
-            const { data, error } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+            const { data, error } = await _supabase.from('user_credentials')
+                .select('*').eq('serial_number', serial).eq('password', pw).single();
+            
             if (data) {
                 localStorage.setItem('health_ai_user', serial);
                 showChat(serial);
             } else {
-                alert('序號或密碼錯誤');
+                alert('序號或密碼錯誤，請重新輸入。');
             }
         }
 
@@ -78,39 +108,70 @@
             document.getElementById('user-display').innerText = user;
         }
 
+        // 下拉選單控制
+        function toggleDropdown() {
+            document.getElementById('settings-menu').classList.toggle('hidden');
+        }
+
+        // 點擊頁面其他地方關閉選單
+        window.onclick = function(event) {
+            if (!event.target.matches('.settings-btn')) {
+                const dropdown = document.getElementById('settings-menu');
+                if (!dropdown.classList.contains('hidden')) dropdown.classList.add('hidden');
+            }
+        }
+
         function logout() {
             localStorage.removeItem('health_ai_user');
             location.reload();
         }
 
-        function togglePwModal() {
-            document.getElementById('pw-modal').classList.toggle('hidden');
-        }
+        // 修改密碼相關
+        function openPwModal() { document.getElementById('pw-modal').classList.remove('hidden'); }
+        function closePwModal() { document.getElementById('pw-modal').classList.add('hidden'); }
 
         async function updatePassword() {
             const user = localStorage.getItem('health_ai_user');
-            const newPw = document.getElementById('new-pw').value;
-            if (!newPw) return alert("請輸入新密碼");
+            const oldPw = document.getElementById('old-pw-input').value;
+            const newPw = document.getElementById('new-pw-input').value;
 
-            const { error } = await _supabase
-                .from('user_credentials')
-                .update({ password: newPw })
-                .eq('serial_number', user);
+            if (!oldPw || !newPw) return alert("請填寫完整資訊");
+
+            // 1. 先驗證舊密碼是否正確
+            const { data, error: authError } = await _supabase.from('user_credentials')
+                .select('*').eq('serial_number', user).eq('password', oldPw).single();
+
+            if (!data) {
+                alert("舊密碼驗證失敗！");
+                return;
+            }
+
+            // 2. 更新為新密碼
+            const { error } = await _supabase.from('user_credentials')
+                .update({ password: newPw }).eq('serial_number', user);
 
             if (error) {
                 alert("修改失敗: " + error.message);
             } else {
-                alert("密碼修改成功！下次請使用新密碼登入。");
-                togglePwModal();
+                alert("密碼修改成功！");
+                closePwModal();
+                document.getElementById('old-pw-input').value = "";
+                document.getElementById('new-pw-input').value = "";
             }
         }
 
+        // 模擬對話
         function sendMessage() {
             const input = document.getElementById('user-input');
             const box = document.getElementById('chat-box');
             if (!input.value) return;
-            box.innerHTML += `<div><b>你:</b> ${input.value}</div>`;
-            box.innerHTML += `<div><b>AI:</b> 收到您的問題，我正在分析中...</div>`;
+            
+            box.innerHTML += `<div class="msg user-msg">${input.value}</div>`;
+            setTimeout(() => {
+                box.innerHTML += `<div class="msg ai-msg">AI：這是一個模擬回覆。當您準備好串接 Gemini API 時，我會幫您把這裡換成真實的 AI 回答。</div>`;
+                box.scrollTop = box.scrollHeight;
+            }, 1000);
+            
             input.value = '';
             box.scrollTop = box.scrollHeight;
         }
