@@ -2,154 +2,160 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 健康助理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 健康助理 | TBPCHC Style</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --bg-color: #171717;
-            --card-bg: #212121;
-            --input-bg: #2f2f2f;
-            --text-main: #ececec;
-            --text-dim: #b4b4b4;
-            --accent-color: #3d7dff;
-            --user-msg-bg: #303030;
+            --tbp-blue: #005bac; /* TBPCHC 主題藍 */
+            --tbp-light-blue: #e6f0f9;
+            --bg-color: #f8f9fa;
+            --text-dark: #333333;
+            --user-msg-bg: #005bac;
+            --ai-msg-bg: #ffffff;
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg-color);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--text-dark);
+            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+            overflow: hidden; /* 防止整體滾動 */
         }
 
         .hidden { display: none !important; }
 
-        /* 登入與暱稱彈窗 */
+        /* --- 登入與彈窗 (相容手機) --- */
         .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-            display: flex; justify-content: center; align-items: center; z-index: 1000;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px;
         }
         .modal-card {
-            background: var(--card-bg); padding: 40px; border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px; text-align: center;
+            background: white; padding: 30px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center;
         }
         input {
             width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
-            border: 1px solid #444; background: #2a2a2a; color: white; box-sizing: border-box;
+            border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; /* 防止 iOS 放大 */
         }
         .primary-btn {
             width: 100%; padding: 12px; border-radius: 8px; border: none;
-            background: var(--accent-color); color: white; cursor: pointer; font-weight: bold;
+            background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px;
         }
 
-        /* 主頁面佈局 */
-        #chat-container { display: flex; flex-direction: column; height: 100vh; }
+        /* --- 主頁面佈局 --- */
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
 
         header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 25px; position: fixed; top: 0; width: 100%; box-sizing: border-box; z-index: 50;
+            height: 60px; display: flex; justify-content: space-between; align-items: center;
+            padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100;
         }
-        .user-profile {
-            display: flex; align-items: center; gap: 10px; cursor: pointer;
-            padding: 8px 15px; border-radius: 20px;
-        }
-        .avatar { width: 32px; height: 32px; background: #555; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
+        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
+        /* --- 對話區域 --- */
         main {
-            flex: 1; display: flex; flex-direction: column; align-items: center;
-            padding-top: 80px; padding-bottom: 120px; overflow-y: auto; width: 100%;
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
         }
+        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 20px; }
         
-        .welcome-screen { margin-top: 20vh; text-align: center; font-size: 1.5rem; color: var(--text-main); }
+        .welcome-hint { margin-top: 30vh; color: #888; text-align: center; font-size: 1.2rem; }
 
-        /* 對話呈現 (參考 004.png) */
-        #chat-history { width: 90%; max-width: 700px; display: flex; flex-direction: column; gap: 24px; }
-        
-        .msg-row { display: flex; flex-direction: column; width: 100%; }
-        
-        /* 使用者訊息：右側氣泡 */
-        .user-row { align-items: flex-end; }
+        /* 對話氣泡樣式 */
+        .msg-row { display: flex; width: 100%; margin: 5px 0; }
+        .user-row { justify-content: flex-end; }
         .user-bubble {
-            background: var(--user-msg-bg); padding: 10px 18px; border-radius: 20px;
-            max-width: 80%; color: var(--text-main); word-wrap: break-word;
+            background: var(--user-msg-bg); color: white; padding: 10px 15px;
+            border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        /* AI 訊息：左側純文字 */
-        .ai-row { align-items: flex-start; }
-        .ai-content { max-width: 90%; line-height: 1.6; }
-        .ai-header { font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-        .copy-icon { font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; cursor: pointer; }
-
-        /* 底部輸入框 (刪除模擬圖標) */
-        .input-area {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 700px;
-        }
-        .input-pill {
-            background: var(--input-bg); border-radius: 24px; padding: 6px 15px;
-            display: flex; align-items: center; gap: 10px;
-        }
-        #user-input { flex: 1; background: transparent; border: none; outline: none; padding: 12px; font-size: 1rem; }
-        .send-btn {
-            width: 32px; height: 32px; background: white; color: black; 
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-weight: bold; border: none;
+        .ai-row { justify-content: flex-start; }
+        .ai-bubble {
+            background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px;
+            border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        /* 下拉選單 */
+        /* --- 底部輸入框 --- */
+        .footer-input {
+            padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center;
+        }
+        .input-box {
+            width: 100%; max-width: 800px; background: white; border-radius: 25px;
+            padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd;
+        }
+        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        /* --- 選單與響應式調整 --- */
         .dropdown {
-            position: absolute; top: 60px; right: 25px; background: var(--card-bg);
-            border: 1px solid #444; border-radius: 12px; padding: 8px; min-width: 140px; z-index: 100;
+            position: absolute; top: 55px; right: 20px; background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500;
         }
-        .dropdown button {
-            width: 100%; text-align: left; background: transparent; border: none;
-            color: white; padding: 10px; cursor: pointer; border-radius: 6px;
+        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
+        .dropdown button:hover { background: #f9f9f9; }
+
+        @media (max-width: 600px) {
+            header { padding: 0 15px; }
+            .logo-text { font-size: 0.9rem; }
+            main { padding: 15px; }
+            .user-bubble, .ai-bubble { max-width: 90%; }
+            .footer-input { padding: 10px 10px 20px 10px; }
         }
-        .dropdown button:hover { background: #333; }
     </style>
 </head>
 <body>
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2>健康助理登入</h2>
-            <input type="text" id="serial" placeholder="請輸入序號">
-            <input type="password" id="pw" placeholder="請輸入密碼">
-            <button class="primary-btn" onclick="login()">登入</button>
+            <h2 style="color: var(--tbp-blue);">健康助理登入</h2>
+            <input type="text" id="serial" placeholder="序號">
+            <input type="password" id="pw" placeholder="密碼">
+            <button class="primary-btn" onclick="login()">登入系統</button>
         </div>
     </div>
 
     <div id="nickname-overlay" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3>歡迎！</h3>
-            <p style="color: var(--text-dim); font-size: 0.9rem;">這是您第一次登入，請給自己一個暱稱：</p>
-            <input type="text" id="new-nickname" placeholder="例如：小明">
-            <button class="primary-btn" onclick="saveNickname()">開始使用</button>
+            <h3>您好！請問該如何稱呼您？</h3>
+            <input type="text" id="new-nickname" placeholder="您的暱稱">
+            <button class="primary-btn" onclick="saveNickname()">進入助理</button>
         </div>
     </div>
 
-    <div id="chat-container" class="hidden">
+    <div id="pw-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>修改密碼</h3>
+            <input type="password" id="old-pw" placeholder="舊密碼">
+            <input type="password" id="new-pw" placeholder="新密碼">
+            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
+            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
         <header>
-            <div style="font-weight: bold; color: var(--text-dim);">Health Assistant</div>
-            <div class="user-profile" onclick="toggleDropdown()">
-                <div class="avatar" id="avatar-initial">?</div>
-                <div id="display-name">Loading...</div>
+            <div class="logo-text">HEALTH ASSISTANT</div>
+            <div class="user-info" onclick="toggleDropdown()">
+                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
+                <div class="avatar" id="avatar-char">U</div>
             </div>
             <div id="settings-menu" class="dropdown hidden">
-                <button onclick="logout()">📤 登出</button>
+                <button onclick="openPwModal()">🔒 修改密碼</button>
+                <button onclick="logout()" style="color: #d9534f;">📤 登出系統</button>
             </div>
         </header>
 
-        <main id="main-content">
-            <div id="welcome-screen" class="welcome-screen">隨時準備好就可以開始了。</div>
+        <main id="main-area">
+            <div id="welcome-text" class="welcome-hint">隨時準備好就可以開始了。</div>
             <div id="chat-history"></div>
         </main>
 
-        <div class="input-area">
-            <div class="input-pill">
-                <input type="text" id="user-input" placeholder="想問就問" onkeypress="if(event.key==='Enter') sendMessage()">
-                <button class="send-btn" onclick="sendMessage()">↑</button>
+        <div class="footer-input">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="請輸入您的健康諮詢內容..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         </div>
     </div>
@@ -161,75 +167,73 @@
 
         let currentSerial = "";
 
-        // 登入邏輯
+        // 登入
         async function login() {
             const serial = document.getElementById('serial').value;
             const pw = document.getElementById('pw').value;
-
-            const { data, error } = await _supabase.from('user_credentials')
-                .select('*').eq('serial_number', serial).eq('password', pw).single();
-
+            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+            
             if (data) {
                 currentSerial = serial;
                 document.getElementById('login-overlay').classList.add('hidden');
-                
                 if (!data.nickname) {
                     document.getElementById('nickname-overlay').classList.remove('hidden');
                 } else {
-                    enterApp(data.nickname);
+                    initApp(data.nickname);
                 }
-            } else {
-                alert('序號或密碼錯誤');
-            }
+            } else { alert("驗證失敗"); }
         }
 
         // 儲存暱稱
         async function saveNickname() {
-            const nickname = document.getElementById('new-nickname').value.trim();
-            if (!nickname) return alert("請輸入暱稱");
-
-            const { error } = await _supabase.from('user_credentials')
-                .update({ nickname: nickname })
-                .eq('serial_number', currentSerial);
-
-            if (!error) {
-                document.getElementById('nickname-overlay').classList.add('hidden');
-                enterApp(nickname);
-            }
+            const nick = document.getElementById('new-nickname').value;
+            if(!nick) return;
+            await _supabase.from('user_credentials').update({ nickname: nick }).eq('serial_number', currentSerial);
+            document.getElementById('nickname-overlay').classList.add('hidden');
+            initApp(nick);
         }
 
-        function enterApp(name) {
-            document.getElementById('chat-container').classList.remove('hidden');
+        function initApp(name) {
+            document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('display-name').innerText = name;
-            document.getElementById('avatar-initial').innerText = name.charAt(0);
+            document.getElementById('avatar-char').innerText = name.charAt(0);
         }
 
+        // 修改密碼
+        function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
+        function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
+        async function updatePassword() {
+            const oldP = document.getElementById('old-pw').value;
+            const newP = document.getElementById('new-pw').value;
+            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
+            if(!data) return alert("舊密碼錯誤");
+            await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
+            alert("修改成功！"); closePwModal();
+        }
+
+        // 發送訊息
         function sendMessage() {
             const input = document.getElementById('user-input');
             const history = document.getElementById('chat-history');
-            const welcome = document.getElementById('welcome-screen');
+            const welcome = document.getElementById('welcome-text');
             if (!input.value.trim()) return;
 
             if (welcome) welcome.classList.add('hidden');
 
-            // 使用者訊息 (氣泡)
             history.innerHTML += `
                 <div class="msg-row user-row">
                     <div class="user-bubble">${input.value}</div>
                 </div>`;
-
-            const userText = input.value;
+            
             input.value = '';
-
-            // AI 訊息 (純文字)
+            
             setTimeout(() => {
                 history.innerHTML += `
                     <div class="msg-row ai-row">
-                        <div class="ai-header">Assistant</div>
-                        <div class="ai-content">這是一個參考 004.png 設計的對話呈現。訊息左對齊，且不使用背景氣泡，保持閱讀的流暢感。</div>
-                        <div class="copy-icon">❐ 複製</div>
+                        <div class="ai-bubble">這是一個 TBPCHC 風格的對話呈現。我們刪除了標籤與複製功能，並針對手機版進行了佈局優化。</div>
                     </div>`;
-                window.scrollTo(0, document.body.scrollHeight);
+                const main = document.getElementById('main-area');
+                main.scrollTop = main.scrollHeight;
             }, 600);
         }
 
