@@ -88,13 +88,23 @@
         }
 
         async function loadUsers() {
-            const { data } = await _supabase.from('user_credentials').select('*');
-            const tbody = document.querySelector('#user-list tbody');
-            tbody.innerHTML = ""; // 清空舊內容
-            data.forEach(u => {
-                tbody.innerHTML += `<tr><td>${u.serial_number}</td><td>${u.password}</td></tr>`;
-            });
-        }
+        const { data } = await _supabase.from('user_credentials').select('*');
+        const tbody = document.querySelector('#user-list tbody');
+        tbody.innerHTML = ""; 
+        
+        // 更新表格標頭 (如果是靜態 HTML 請手動加一個 <th>暱稱</th>)
+        document.querySelector('#user-list thead tr').innerHTML = "<th>序號</th><th>密碼</th><th>暱稱</th>";
+
+        data.forEach(u => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${u.serial_number}</td>
+                    <td>${u.password}</td>
+                    <td>${u.nickname || '<span style="color:#999">尚未設定</span>'}</td>
+                </tr>`;
+        });
+    }
     </script>
 </body>
 </html>
+
