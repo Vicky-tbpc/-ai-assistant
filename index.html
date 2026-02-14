@@ -13,148 +13,144 @@
             --text-main: #ececec;
             --text-dim: #b4b4b4;
             --accent-color: #3d7dff;
+            --user-msg-bg: #303030;
         }
 
         body, html {
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg-color);
             color: var(--text-main);
-            font-family: "Saira", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
-        /* 登入介面樣式 (置中) */
-        #login-container {
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            height: 100vh; gap: 20px;
+        .hidden { display: none !important; }
+
+        /* 登入與暱稱彈窗 */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: flex; justify-content: center; align-items: center; z-index: 1000;
         }
-        .login-card {
+        .modal-card {
             background: var(--card-bg); padding: 40px; border-radius: 16px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px; text-align: center;
         }
-        .login-card input {
+        input {
             width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
             border: 1px solid #444; background: #2a2a2a; color: white; box-sizing: border-box;
         }
-        .login-card button {
+        .primary-btn {
             width: 100%; padding: 12px; border-radius: 8px; border: none;
             background: var(--accent-color); color: white; cursor: pointer; font-weight: bold;
         }
 
-        /* 主對話介面 (GPT/Gemini 風格) */
-        #chat-container {
-            display: flex; flex-direction: column; height: 100vh; position: relative;
-        }
+        /* 主頁面佈局 */
+        #chat-container { display: flex; flex-direction: column; height: 100vh; }
 
-        /* 頂部 Header */
         header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 25px; background: transparent; position: absolute; top: 0; width: 100%; box-sizing: border-box;
+            padding: 15px 25px; position: fixed; top: 0; width: 100%; box-sizing: border-box; z-index: 50;
         }
         .user-profile {
             display: flex; align-items: center; gap: 10px; cursor: pointer;
-            padding: 8px 15px; border-radius: 20px; transition: 0.3s;
+            padding: 8px 15px; border-radius: 20px;
         }
-        .user-profile:hover { background: rgba(255,255,255,0.1); }
         .avatar { width: 32px; height: 32px; background: #555; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; }
 
-        /* 中央區域 */
         main {
             flex: 1; display: flex; flex-direction: column; align-items: center;
-            justify-content: center; padding-bottom: 150px; /* 留給輸入框 */
-            overflow-y: auto; width: 100%;
+            padding-top: 80px; padding-bottom: 120px; overflow-y: auto; width: 100%;
         }
-        .welcome-text { font-size: 2rem; font-weight: 500; margin-bottom: 20px; text-align: center; color: var(--text-main); }
-        #chat-history { width: 100%; max-width: 800px; padding: 20px; }
+        
+        .welcome-screen { margin-top: 20vh; text-align: center; font-size: 1.5rem; color: var(--text-main); }
 
-        /* 底部輸入列 */
-        .input-wrapper {
+        /* 對話呈現 (參考 004.png) */
+        #chat-history { width: 90%; max-width: 700px; display: flex; flex-direction: column; gap: 24px; }
+        
+        .msg-row { display: flex; flex-direction: column; width: 100%; }
+        
+        /* 使用者訊息：右側氣泡 */
+        .user-row { align-items: flex-end; }
+        .user-bubble {
+            background: var(--user-msg-bg); padding: 10px 18px; border-radius: 20px;
+            max-width: 80%; color: var(--text-main); word-wrap: break-word;
+        }
+
+        /* AI 訊息：左側純文字 */
+        .ai-row { align-items: flex-start; }
+        .ai-content { max-width: 90%; line-height: 1.6; }
+        .ai-header { font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .copy-icon { font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; cursor: pointer; }
+
+        /* 底部輸入框 (刪除模擬圖標) */
+        .input-area {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 800px; z-index: 10;
+            width: 90%; max-width: 700px;
         }
         .input-pill {
-            background: var(--input-bg); border-radius: 28px; padding: 10px 20px;
-            display: flex; align-items: center; gap: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            background: var(--input-bg); border-radius: 24px; padding: 6px 15px;
+            display: flex; align-items: center; gap: 10px;
         }
-        .input-pill input {
-            flex: 1; background: transparent; border: none; color: white;
-            font-size: 1rem; outline: none; padding: 10px 0;
+        #user-input { flex: 1; background: transparent; border: none; outline: none; padding: 12px; font-size: 1rem; }
+        .send-btn {
+            width: 32px; height: 32px; background: white; color: black; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-weight: bold; border: none;
         }
-        .icon-btn { color: var(--text-dim); cursor: pointer; font-size: 1.2rem; transition: 0.2s; text-decoration: none; }
-        .icon-btn:hover { color: white; }
 
-        /* 下拉選單與彈窗 */
+        /* 下拉選單 */
         .dropdown {
             position: absolute; top: 60px; right: 25px; background: var(--card-bg);
-            border: 1px solid #444; border-radius: 12px; padding: 10px; min-width: 150px; z-index: 100;
+            border: 1px solid #444; border-radius: 12px; padding: 8px; min-width: 140px; z-index: 100;
         }
         .dropdown button {
             width: 100%; text-align: left; background: transparent; border: none;
             color: white; padding: 10px; cursor: pointer; border-radius: 6px;
         }
         .dropdown button:hover { background: #333; }
-
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-            display: flex; justify-content: center; align-items: center; z-index: 1000;
-        }
-        .modal { background: var(--card-bg); padding: 30px; border-radius: 16px; width: 300px; }
-
-        .hidden { display: none !important; }
-
-        /* 訊息樣式 */
-        .msg-line { margin: 20px 0; line-height: 1.6; }
-        .msg-role { font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; color: var(--accent-color); }
     </style>
 </head>
 <body>
 
-    <div id="login-container">
-        <div class="login-card">
-            <h2 style="margin-bottom: 20px;">健康助理登入</h2>
+    <div id="login-overlay" class="modal-overlay">
+        <div class="modal-card">
+            <h2>健康助理登入</h2>
             <input type="text" id="serial" placeholder="請輸入序號">
             <input type="password" id="pw" placeholder="請輸入密碼">
-            <button onclick="login()">登入</button>
+            <button class="primary-btn" onclick="login()">登入</button>
+        </div>
+    </div>
+
+    <div id="nickname-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>歡迎！</h3>
+            <p style="color: var(--text-dim); font-size: 0.9rem;">這是您第一次登入，請給自己一個暱稱：</p>
+            <input type="text" id="new-nickname" placeholder="例如：小明">
+            <button class="primary-btn" onclick="saveNickname()">開始使用</button>
         </div>
     </div>
 
     <div id="chat-container" class="hidden">
         <header>
-            <div style="font-weight: bold; font-size: 1.2rem; color: var(--text-dim);">Health Assistant</div>
+            <div style="font-weight: bold; color: var(--text-dim);">Health Assistant</div>
             <div class="user-profile" onclick="toggleDropdown()">
-                <div class="avatar" id="avatar-initial">U</div>
-                <div id="user-display">User</div>
+                <div class="avatar" id="avatar-initial">?</div>
+                <div id="display-name">Loading...</div>
             </div>
             <div id="settings-menu" class="dropdown hidden">
-                <button onclick="openPwModal()">🔒 修改密碼</button>
-                <button onclick="logout()" style="color: #ff4d4d;">📤 登出</button>
+                <button onclick="logout()">📤 登出</button>
             </div>
         </header>
 
         <main id="main-content">
-            <div id="welcome-msg" class="welcome-text">隨時準備好就可以開始了。</div>
+            <div id="welcome-screen" class="welcome-screen">隨時準備好就可以開始了。</div>
             <div id="chat-history"></div>
         </main>
 
-        <div class="input-wrapper">
+        <div class="input-area">
             <div class="input-pill">
-                <span class="icon-btn" title="附加檔案">📎</span>
-                <span class="icon-btn" title="搜尋">🌐</span>
-                <input type="text" id="user-input" placeholder="想問就問" onkeypress="handleKeyPress(event)">
-                <span class="icon-btn" title="學習">📖</span>
-                <span class="icon-btn" title="創作圖像">🎨</span>
-                <span class="icon-btn" title="語音" onclick="sendMessage()" style="color: var(--accent-color); font-weight: bold;">↑</span>
+                <input type="text" id="user-input" placeholder="想問就問" onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">↑</button>
             </div>
-        </div>
-    </div>
-
-    <div id="pw-modal" class="modal-overlay hidden">
-        <div class="modal">
-            <h3 style="margin-top: 0;">安全設定</h3>
-            <p style="font-size: 0.8rem; color: #888;">請驗證身分以修改密碼</p>
-            <input type="password" id="old-pw-input" placeholder="輸入舊密碼" style="width:100%; padding:10px; margin:5px 0; border-radius:5px; border:1px solid #444; background:#111; color:white;">
-            <input type="password" id="new-pw-input" placeholder="輸入新密碼" style="width:100%; padding:10px; margin:5px 0; border-radius:5px; border:1px solid #444; background:#111; color:white;">
-            <button onclick="updatePassword()" style="width:100%; padding:10px; margin-top:10px; background:var(--accent-color); color:white; border:none; border-radius:5px; cursor:pointer;">確認修改</button>
-            <button onclick="closePwModal()" style="width:100%; padding:10px; margin-top:5px; background:transparent; color:#888; border:none; cursor:pointer;">取消</button>
         </div>
     </div>
 
@@ -163,72 +159,82 @@
         const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        window.onload = () => {
-            const user = localStorage.getItem('health_ai_user');
-            if (user) showChat(user);
-        };
+        let currentSerial = "";
 
+        // 登入邏輯
         async function login() {
             const serial = document.getElementById('serial').value;
             const pw = document.getElementById('pw').value;
-            const { data, error } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+
+            const { data, error } = await _supabase.from('user_credentials')
+                .select('*').eq('serial_number', serial).eq('password', pw).single();
+
             if (data) {
-                localStorage.setItem('health_ai_user', serial);
-                showChat(serial);
-            } else { alert('登入失敗'); }
+                currentSerial = serial;
+                document.getElementById('login-overlay').classList.add('hidden');
+                
+                if (!data.nickname) {
+                    document.getElementById('nickname-overlay').classList.remove('hidden');
+                } else {
+                    enterApp(data.nickname);
+                }
+            } else {
+                alert('序號或密碼錯誤');
+            }
         }
 
-        function showChat(user) {
-            document.getElementById('login-container').classList.add('hidden');
+        // 儲存暱稱
+        async function saveNickname() {
+            const nickname = document.getElementById('new-nickname').value.trim();
+            if (!nickname) return alert("請輸入暱稱");
+
+            const { error } = await _supabase.from('user_credentials')
+                .update({ nickname: nickname })
+                .eq('serial_number', currentSerial);
+
+            if (!error) {
+                document.getElementById('nickname-overlay').classList.add('hidden');
+                enterApp(nickname);
+            }
+        }
+
+        function enterApp(name) {
             document.getElementById('chat-container').classList.remove('hidden');
-            document.getElementById('user-display').innerText = user;
-            document.getElementById('avatar-initial').innerText = user.charAt(0).toUpperCase();
+            document.getElementById('display-name').innerText = name;
+            document.getElementById('avatar-initial').innerText = name.charAt(0);
         }
-
-        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-        
-        function logout() { localStorage.removeItem('health_ai_user'); location.reload(); }
-
-        function openPwModal() { document.getElementById('pw-modal').classList.remove('hidden'); toggleDropdown(); }
-        function closePwModal() { document.getElementById('pw-modal').classList.add('hidden'); }
-
-        async function updatePassword() {
-            const user = localStorage.getItem('health_ai_user');
-            const oldPw = document.getElementById('old-pw-input').value;
-            const newPw = document.getElementById('new-pw-input').value;
-
-            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', user).eq('password', oldPw).single();
-            if (!data) return alert("舊密碼錯誤");
-
-            const { error } = await _supabase.from('user_credentials').update({ password: newPw }).eq('serial_number', user);
-            if (!error) { alert("更新成功"); closePwModal(); }
-        }
-
-        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
 
         function sendMessage() {
             const input = document.getElementById('user-input');
             const history = document.getElementById('chat-history');
-            const welcome = document.getElementById('welcome-msg');
-            
+            const welcome = document.getElementById('welcome-screen');
             if (!input.value.trim()) return;
 
-            // 隱藏歡迎詞
             if (welcome) welcome.classList.add('hidden');
-            document.getElementById('main-content').style.justifyContent = 'flex-start';
 
-            // 顯示使用者訊息
-            history.innerHTML += `<div class="msg-line"><div class="msg-role">You</div><div>${input.value}</div></div>`;
-            
-            // 模擬 AI 回覆
-            const userInput = input.value;
+            // 使用者訊息 (氣泡)
+            history.innerHTML += `
+                <div class="msg-row user-row">
+                    <div class="user-bubble">${input.value}</div>
+                </div>`;
+
+            const userText = input.value;
             input.value = '';
-            
+
+            // AI 訊息 (純文字)
             setTimeout(() => {
-                history.innerHTML += `<div class="msg-line"><div class="msg-role" style="color:#10a37f;">Assistant</div><div>這是一個 GPT 介面風格的模擬回覆。當我們串接 Gemini API 後，這裡會顯示真實的健康建議。</div></div>`;
+                history.innerHTML += `
+                    <div class="msg-row ai-row">
+                        <div class="ai-header">Assistant</div>
+                        <div class="ai-content">這是一個參考 004.png 設計的對話呈現。訊息左對齊，且不使用背景氣泡，保持閱讀的流暢感。</div>
+                        <div class="copy-icon">❐ 複製</div>
+                    </div>`;
                 window.scrollTo(0, document.body.scrollHeight);
             }, 600);
         }
+
+        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+        function logout() { location.reload(); }
     </script>
 </body>
 </html>
