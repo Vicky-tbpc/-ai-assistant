@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>管理後台 - 權限驗證</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #e9ecef; }
+        .card { background: white; padding: 20px; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .hidden { display: none; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; cursor: pointer; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .logout-btn { background: #dc3545; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="admin-login" class="card">
+        <h2>管理者登入</h2>
+        <input type="password" id="admin-password" placeholder="請輸入管理密碼">
+        <button onclick="checkAdmin()">進入後台</button>
+    </div>
+
+    <div id="admin-content" class="card hidden">
+        <h2>管理者控制台</h2>
+        <p>建立新使用者：</p>
+        <input type="text" id="new-serial" placeholder="設定序號 (如: USER001)">
+        <input type="text" id="new-pw" placeholder="設定密碼">
+        <button onclick="createUser()">新增序號</button>
+
+        <h3>現有序號清單</h3>
+        <table id="user-list">
+            <thead><tr><th>序號</th><th>密碼</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <button onclick="adminLogout()" class="logout-btn">退出管理介面</button>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const MASTER_PW = "888tBPC!!";
+
+        // 檢查 Session 是否已登入過
+        if (sessionStorage.getItem('admin_auth') === 'true') {
+            showAdmin();
+        }
+
+        function checkAdmin() {
+            const input = document.getElementById('admin-password').value;
+            if (input === MASTER_PW) {
+                sessionStorage.setItem('admin_auth', 'true');
+                showAdmin();
+            } else {
+                alert('管理密碼錯誤！');
+            }
+        }
+
+        function showAdmin() {
+            document.getElementById('admin-login').classList.add('hidden');
+            document.getElementById('admin-content').classList.remove('hidden');
+            loadUsers();
+        }
+
+        function adminLogout() {
+            sessionStorage.removeItem('admin_auth');
+            location.reload();
+        }
+
+        async function createUser() {
+            const serial = document.getElementById('new-serial').value;
+            const pw = document.getElementById('new-pw').value;
+            if(!serial || !pw) return alert("請填寫完整資訊");
+
+            const { error } = await _supabase
+                .from('user_credentials')
+                .insert([{ serial_number: serial, password: pw }]);
+
+            if (error) {
+                alert("建立失敗: " + error.message);
+            } else {
+                alert("建立成功！");
+                location.reload();
+            }
+        }
+
+        async function loadUsers() {
+            const { data } = await _supabase.from('user_credentials').select('*');
+            const tbody = document.querySelector('#user-list tbody');
+            tbody.innerHTML = ""; // 清空舊內容
+            data.forEach(u => {
+                tbody.innerHTML += `<tr><td>${u.serial_number}</td><td>${u.password}</td></tr>`;
+            });
+        }
+    </script>
+</body>
+</html>
