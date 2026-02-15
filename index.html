@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴n04</title>
+    <title>AI 健康夥伴 - 完整修正版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -25,7 +25,7 @@
 
         .hidden { display: none !important; }
 
-        /* --- 登入與彈窗 --- */
+        /* --- 登入介面 --- */
         .modal-overlay {
             position: fixed; inset: 0; background: #f5f1eb;
             display: flex; justify-content: center; align-items: center; z-index: 2000;
@@ -34,11 +34,14 @@
             background: white; padding: 30px; border-radius: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; width: 85%; max-width: 320px;
         }
+        .login-card h2 { color: var(--tbp-blue); margin-top: 0; }
         .login-card input {
-            width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box;
+            width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box;
+            font-size: 16px;
         }
         .btn-primary {
-            background: var(--tbp-blue); color: white; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; width: 100%;
+            background: var(--tbp-blue); color: white; border: none; padding: 12px 30px; border-radius: 25px; 
+            cursor: pointer; width: 100%; margin-top: 15px; font-size: 16px;
         }
 
         /* --- 主畫面佈局 --- */
@@ -58,7 +61,7 @@
         .user-bubble { background: var(--user-msg-bg); padding: 10px 15px; border-radius: 15px 15px 2px 15px; max-width: 75%; }
         .ai-bubble { background: var(--ai-msg-bg); padding: 10px 15px; border-radius: 15px 15px 15px 2px; max-width: 75%; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
 
-        /* --- 健康摘要卡片 (重點修正區域) --- */
+        /* --- 健康摘要卡片 --- */
         .summary-card {
             background: white; border-radius: 15px; padding: 20px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin: 10px 0;
@@ -75,10 +78,10 @@
             background: white; padding: 10px 15px; display: flex; gap: 10px; align-items: center;
             padding-bottom: env(safe-area-inset-bottom);
         }
-        #user-input { flex: 1; border: 1px solid #ddd; padding: 10px; border-radius: 20px; outline: none; }
+        #user-input { flex: 1; border: 1px solid #ddd; padding: 10px; border-radius: 20px; outline: none; font-size: 16px; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
 
-        /* 漢堡選單 */
+        /* 選單 */
         .settings-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--tbp-blue); }
         .dropdown {
             position: absolute; right: 15px; top: 60px; background: white; 
@@ -91,9 +94,9 @@
 
     <div id="login-overlay" class="modal-overlay">
         <div class="login-card">
-            <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
-            <p>請輸入你的裝置序號</p>
-            <input type="text" id="serial-input" placeholder="例如: BA000001">
+            <h2>健康夥伴登入</h2>
+            <input type="text" id="serial-input" placeholder="請輸入裝置序號 (如: BA000001)">
+            <input type="password" id="password-input" placeholder="請輸入密碼">
             <button class="btn-primary" onclick="handleLogin()">進入系統</button>
         </div>
     </div>
@@ -108,8 +111,7 @@
         </header>
 
         <main id="main-area">
-            <div id="chat-history">
-                </div>
+            <div id="chat-history"></div>
 
             <div id="summary-card" class="summary-card hidden">
                 <div class="summary-date">今日健康摘要 (<span id="display-date">--/--/--</span>)</div>
@@ -118,11 +120,9 @@
                     <div id="battery-value" class="battery-score">--</div>
                 </div>
                 <div class="percentile-box">
-                    你的狀態超過了 <span id="percentile-text" style="font-weight: bold; color: var(--tbp-blue);">--%</span> 的使用者
+                    您的狀態超過了 <span id="percentile-text" style="font-weight: bold; color: var(--tbp-blue);">--%</span> 的使用者
                 </div>
-                <p style="font-size: 0.85em; color: #888; margin-top: 15px;">
-                    ※ 電量依據前一晚的睡眠分析估算
-                </p>
+                <p style="font-size: 0.85em; color: #888; margin-top: 15px;">※ 電量依據前一晚的睡眠分析估算</p>
             </div>
         </main>
 
@@ -133,45 +133,49 @@
     </div>
 
     <script>
-        // --- 初始化 Supabase (請更換為你的金鑰) ---
-        const SUPABASE_URL = 'https://你的專案網址.supabase.co';
-        const SUPABASE_KEY = '你的公開金鑰';
+        // --- 初始化 Supabase ---
+        const SUPABASE_URL = 'https://您的專案網址.supabase.co';
+        const SUPABASE_KEY = '您的公開金鑰';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentSerial = "";
         let isNamingPhase = false;
 
-        // 登入邏輯
+        // --- 登入邏輯 (同時驗證序號與密碼) ---
         async function handleLogin() {
             const sn = document.getElementById('serial-input').value.trim().toUpperCase();
-            if (!sn) return;
+            const pw = document.getElementById('password-input').value.trim();
+
+            if (!sn || !pw) {
+                alert("請輸入完整的序號與密碼");
+                return;
+            }
 
             const { data, error } = await _supabase
                 .from('user_credentials')
                 .select('*')
                 .eq('serial_number', sn)
+                .eq('password', pw) // 這裡會檢查資料庫中的 password 欄位
                 .single();
 
             if (error || !data) {
-                alert("序號錯誤，請重新輸入");
+                alert("序號或密碼錯誤，請重新輸入");
                 return;
             }
 
             currentSerial = sn;
             document.getElementById('login-overlay').classList.add('hidden');
 
-            // 檢查是否已命名
             if (!data.ai_name) {
                 isNamingPhase = true;
-                appendAiMessage("你好！我是你的健康夥伴。在開始之前，請幫我取個名字吧？");
+                appendAiMessage("你好！我是你的健康夥伴。在開始之前，請先幫我取個名字吧？");
             } else {
                 document.getElementById('ai-display-name').innerText = data.ai_name;
                 appendAiMessage(`歡迎回來！我是 ${data.ai_name}，今天也一起關注健康吧。`);
-                showHealthSummary(); // 已命名者直接顯示摘要
+                showHealthSummary(); 
             }
         }
 
-        // 發送訊息邏輯
         async function handleSend() {
             const input = document.getElementById('user-input');
             const msg = input.value.trim();
@@ -182,7 +186,6 @@
 
             if (isNamingPhase) {
                 try {
-                    // 更新名字到資料庫
                     await _supabase
                         .from('user_credentials')
                         .update({ ai_name: msg })
@@ -192,30 +195,18 @@
                     isNamingPhase = false;
 
                     setTimeout(() => {
-                        appendAiMessage(`謝謝你！從現在起我的名字就是「${msg}」了。讓我們來看看你今天的健康摘要吧！`);
-                        // --- 關鍵修正：命名後立即顯示摘要 ---
+                        appendAiMessage(`謝謝你！以後請叫我「${msg}」。我們來看看今天的健康數據：`);
                         showHealthSummary();
                     }, 800);
-                } catch (err) {
-                    console.error(err);
-                }
+                } catch (err) { console.error(err); }
             } else {
-                // 一般對話測試邏輯
-                setTimeout(() => {
-                    appendAiMessage("收到！我會隨時為你監控生理數據。");
-                }, 800);
+                setTimeout(() => { appendAiMessage("收到！我會隨時監控您的生理數據。"); }, 800);
             }
         }
 
-        // 顯示健康摘要 (抓取資料庫)
         async function showHealthSummary() {
-            console.log("正在載入健康數據...");
-            
-            // 1. 顯示卡片容器
-            const card = document.getElementById('summary-card');
-            card.classList.remove('hidden');
+            document.getElementById('summary-card').classList.remove('hidden');
 
-            // 2. 抓取該序號最新的數據
             const { data, error } = await _supabase
                 .from('health_data')
                 .select('*')
@@ -223,47 +214,38 @@
                 .order('record_date', { ascending: false })
                 .limit(1);
 
-            if (error || !data || data.length === 0) {
-                console.log("尚無資料");
-                return;
-            }
+            if (error || !data || data.length === 0) return;
 
             const latest = data[0];
             const batteryVal = latest.raw_json.Personal_Battery_weighted_round || 0;
-            const targetDate = latest.record_date;
-
-            // 設定日期顯示
-            const d = new Date(targetDate);
+            
+            const d = new Date(latest.record_date);
             document.getElementById('display-date').innerText = 
                 `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
 
-            // 判定電量顏色
-            let color = "#ff8c73"; // 0-59 (紅橘)
-            if (batteryVal >= 100) color = "#596b75";      // 100+ (灰藍)
-            else if (batteryVal >= 80) color = "#a0adb7";  // 80-99 (淺灰)
-            else if (batteryVal >= 60) color = "#a79d8c";  // 60-79 (大地)
+            let color = "#ff8c73";
+            if (batteryVal >= 100) color = "#596b75";
+            else if (batteryVal >= 80) color = "#a0adb7";
+            else if (batteryVal >= 60) color = "#a79d8c";
 
             const valEl = document.getElementById('battery-value');
             valEl.innerText = batteryVal;
             valEl.style.color = color;
 
-            // 計算當日百分比 (排名)
             const { data: dayAll } = await _supabase
                 .from('health_data')
                 .select('raw_json')
-                .eq('record_date', targetDate);
+                .eq('record_date', latest.record_date);
 
-            if (dayAll && dayAll.length > 0) {
+            if (dayAll) {
                 const allScores = dayAll.map(r => r.raw_json.Personal_Battery_weighted_round || 0);
                 const belowCount = allScores.filter(s => s < batteryVal).length;
                 const percentile = Math.round((belowCount / allScores.length) * 100);
                 document.getElementById('percentile-text').innerText = percentile;
             }
-
             scrollToBottom();
         }
 
-        // 輔助函式
         function appendUserMessage(msg) {
             const chat = document.getElementById('chat-history');
             chat.innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`;
@@ -281,16 +263,10 @@
             main.scrollTop = main.scrollHeight;
         }
 
-        function toggleDropdown() {
-            document.getElementById('settings-menu').classList.toggle('hidden');
-        }
+        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+        function logout() { location.reload(); }
 
-        function logout() {
-            location.reload();
-        }
-
-        // 監聽 Enter 鍵
-        document.getElementById('user-input').addEventListener('keypress', function(e) {
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleSend();
         });
     </script>
