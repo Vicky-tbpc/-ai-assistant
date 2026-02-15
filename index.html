@@ -1,244 +1,96 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 Style</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root {
-            --tbp-blue: #8699a3; /* TBPCHC 主題藍 */
-            --tbp-light-blue: #e6f0f9;
-            --bg-color: #e2ddd4;
-            --text-dark: #333;
-            --user-msg-bg: #f5f1eb;
-            --ai-msg-bg: #ffffff;
-        }
+<script>
+    // ... (前段初始化保持不變) ...
 
-        body, html {
-            margin: 0; padding: 0; height: 100%;
-            background-color: var(--bg-color);
-            color: var(--text-dark);
-            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
-            overflow: hidden; /* 防止整體滾動 */
-        }
+    let isNamingPhase = false; // 紀錄是否正在「取名字」的階段
 
-        .hidden { display: none !important; }
-
-        /* --- 登入與彈窗 (相容手機) --- */
-        .modal-overlay {
-            position: fixed; inset: 0; background: #e2ddd4;
-            display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px;
-        }
-        .modal-card {
-            background: white; padding: 30px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center;
-        }
-        input {
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
-            border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; /* 防止 iOS 放大 */
-        }
-        .primary-btn {
-            width: 100%; padding: 12px; border-radius: 8px; border: none;
-            background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px;
-        }
-
-        /* --- 主頁面佈局 --- */
-        #app-container { display: flex; flex-direction: column; height: 100vh; }
-
-        header {
-            height: 60px; display: flex; justify-content: space-between; align-items: center;
-            padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100;
-        }
-        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
-        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
-
-        /* --- 對話區域 --- */
-        main {
-            flex: 1; overflow-y: auto; padding: 20px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 20px; }
+    async function login() {
+        const serial = document.getElementById('serial').value;
+        const pw = document.getElementById('pw').value;
+        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
         
-        .welcome-hint { margin-top: 30vh; color: #5a5a5a; text-align: center; font-size: 2rem; font-weight：Bold; }
+        if (data) {
+            currentSerial = serial;
+            document.getElementById('login-overlay').classList.add('hidden');
+            if (!data.nickname) {
+                document.getElementById('nickname-overlay').classList.remove('hidden');
+            } else {
+                initApp(data.nickname, data.ai_name); // 傳入 ai_name 判斷
+            }
+        } else { alert("驗證失敗"); }
+    }
 
-        /* 對話氣泡樣式 */
-        .msg-row { display: flex; width: 100%; margin: 5px 0; }
-        .user-row { justify-content: flex-end; }
-        .user-bubble {
-            background: var(--user-msg-bg); color: #333; padding: 10px 15px;
-            border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    async function saveNickname() {
+        const nick = document.getElementById('new-nickname').value;
+        if(!nick) return;
+        await _supabase.from('user_credentials').update({ nickname: nick }).eq('serial_number', currentSerial);
+        document.getElementById('nickname-overlay').classList.add('hidden');
+        initApp(nick, null); // 剛寫好暱稱，ai_name 必為空
+    }
+
+    function initApp(nickname, aiName) {
+        document.getElementById('app-container').classList.remove('hidden');
+        document.getElementById('display-name').innerText = nickname;
+        document.getElementById('avatar-char').innerText = nickname.charAt(0);
+        
+        // 隱藏原本的靜態文字
+        document.getElementById('welcome-text').classList.add('hidden');
+
+        if (!aiName) {
+            // 進入命名階段
+            isNamingPhase = true;
+            appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
+        } else {
+            appendAiMessage(`歡迎回來，我是你的健康夥伴 ${aiName}。`);
         }
+    }
 
-        .ai-row { justify-content: flex-start; }
-        .ai-bubble {
-            background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px;
-            border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
+    async function sendMessage() {
+        const input = document.getElementById('user-input');
+        const text = input.value.trim();
+        if (!text) return;
 
-        /* --- 底部輸入框 --- */
-        .footer-input {
-            padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center;
-        }
-        .input-box {
-            width: 100%; max-width: 800px; background: white; border-radius: 25px;
-            padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd;
-        }
-        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        // 1. 顯示使用者訊息
+        appendUserMessage(text);
+        input.value = '';
 
-        /* --- 選單與響應式調整 --- */
-        .dropdown {
-            position: absolute; top: 55px; right: 20px; background: white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500;
-        }
-        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-        .dropdown button:hover { background: #f9f9f9; }
+        if (isNamingPhase) {
+            // 2. 處理取名邏輯
+            const { error } = await _supabase.from('user_credentials')
+                .update({ ai_name: text })
+                .eq('serial_number', currentSerial);
 
-        @media (max-width: 600px) {
-            header { padding: 0 15px; }
-            .logo-text { font-size: 0.9rem; }
-            main { padding: 15px; }
-            .user-bubble, .ai-bubble { max-width: 90%; }
-            .footer-input { padding: 10px 10px 20px 10px; }
-        }
-    </style>
-</head>
-<body>
-
-    <div id="login-overlay" class="modal-overlay">
-        <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
-            <input type="text" id="serial" placeholder="序號">
-            <input type="password" id="pw" placeholder="密碼">
-            <button class="primary-btn" onclick="login()">登入系統</button>
-        </div>
-    </div>
-
-    <div id="nickname-overlay" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
-            <input type="text" id="new-nickname" placeholder="您的暱稱">
-            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
-        </div>
-    </div>
-
-    <div id="pw-overlay" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3>修改密碼</h3>
-            <input type="password" id="old-pw" placeholder="舊密碼">
-            <input type="password" id="new-pw" placeholder="新密碼">
-            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
-            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
-        </div>
-    </div>
-
-    <div id="app-container" class="hidden">
-        <header>
-            <div class="logo-text">Personal Health Companion</div>
-            <div class="user-info" onclick="toggleDropdown()">
-                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
-                <div class="avatar" id="avatar-char">U</div>
-            </div>
-            <div id="settings-menu" class="dropdown hidden">
-                <button onclick="openPwModal()">🔒 修改密碼</button>
-                <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
-            </div>
-        </header>
-
-        <main id="main-area">
-            <div id="welcome-text" class="welcome-hint">隨時準備好就可以開始了。</div>
-            <div id="chat-history"></div>
-        </main>
-
-        <div class="footer-input">
-            <div class="input-box">
-                <input type="text" id="user-input" placeholder="請輸入您的健康諮詢內容..." onkeypress="if(event.key==='Enter') sendMessage()">
-                <button class="send-btn" onclick="sendMessage()">▲</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        let currentSerial = "";
-
-        // 登入
-        async function login() {
-            const serial = document.getElementById('serial').value;
-            const pw = document.getElementById('pw').value;
-            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
-            
-            if (data) {
-                currentSerial = serial;
-                document.getElementById('login-overlay').classList.add('hidden');
-                if (!data.nickname) {
-                    document.getElementById('nickname-overlay').classList.remove('hidden');
-                } else {
-                    initApp(data.nickname);
-                }
-            } else { alert("驗證失敗"); }
-        }
-
-        // 儲存暱稱
-        async function saveNickname() {
-            const nick = document.getElementById('new-nickname').value;
-            if(!nick) return;
-            await _supabase.from('user_credentials').update({ nickname: nick }).eq('serial_number', currentSerial);
-            document.getElementById('nickname-overlay').classList.add('hidden');
-            initApp(nick);
-        }
-
-        function initApp(name) {
-            document.getElementById('app-container').classList.remove('hidden');
-            document.getElementById('display-name').innerText = name;
-            document.getElementById('avatar-char').innerText = name.charAt(0);
-        }
-
-        // 修改密碼
-        function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
-        function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-        async function updatePassword() {
-            const oldP = document.getElementById('old-pw').value;
-            const newP = document.getElementById('new-pw').value;
-            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
-            if(!data) return alert("舊密碼錯誤");
-            await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-            alert("修改成功！"); closePwModal();
-        }
-
-        // 發送訊息
-        function sendMessage() {
-            const input = document.getElementById('user-input');
-            const history = document.getElementById('chat-history');
-            const welcome = document.getElementById('welcome-text');
-            if (!input.value.trim()) return;
-
-            if (welcome) welcome.classList.add('hidden');
-
-            history.innerHTML += `
-                <div class="msg-row user-row">
-                    <div class="user-bubble">${input.value}</div>
-                </div>`;
-            
-            input.value = '';
-            
+            if (!error) {
+                isNamingPhase = false;
+                setTimeout(() => {
+                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
+                }, 800);
+            }
+        } else {
+            // 3. 一般對話 (之後串接 Gemini)
             setTimeout(() => {
-                history.innerHTML += `
-                    <div class="msg-row ai-row">
-                        <div class="ai-bubble">這是一個 TBPCHC 風格的對話呈現。我們刪除了標籤與複製功能，並針對手機版進行了佈局優化。</div>
-                    </div>`;
-                const main = document.getElementById('main-area');
-                main.scrollTop = main.scrollHeight;
-            }, 600);
+                appendAiMessage("正在分析您的健康數據...");
+            }, 800);
         }
+    }
 
-        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-        function logout() { location.reload(); }
-    </script>
-</body>
-</html>
+    function appendUserMessage(msg) {
+        document.getElementById('chat-history').innerHTML += `
+            <div class="msg-row user-row">
+                <div class="user-bubble" style="color: black;">${msg}</div>
+            </div>`;
+        scrollToBottom();
+    }
+
+    function appendAiMessage(msg) {
+        document.getElementById('chat-history').innerHTML += `
+            <div class="msg-row ai-row">
+                <div class="ai-bubble">${msg}</div>
+            </div>`;
+        scrollToBottom();
+    }
+
+    function scrollToBottom() {
+        const main = document.getElementById('main-area');
+        main.scrollTop = main.scrollHeight;
+    }
+</script>
