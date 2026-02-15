@@ -216,43 +216,80 @@ async function handleExcelUpload() {
     const status = document.getElementById('upload-status');
     if (!fileInput.files[0]) return alert("請先選擇檔案");
 
-    status.innerText = "正在讀取檔案...";
+    status.innerHTML = "⏳ 正在解析 Excel 檔案...";
     const reader = new FileReader();
     
     reader.onload = async (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // 1. 先獲取目前已建立的使用者清單
-        const { data: users } = await _supabase.from('user_credentials').select('serial_number');
-        const validSerials = users.map(u => u.serial_number);
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            // 1. 獲取有效使用者清單
+            const { data: users, error: userError } = await _supabase.from('user_credentials').select('serial_number');
+            if (userError) throw new Error("讀取使用者清單失敗: " + userError.message);
+            const validSerials = users.map(u => u.serial_number);
 
-        let successCount = 0;
+            let totalImported = 0;
+            let sheetsProcessed = 0;
+            let allDataToUpsert = []; // 用於批次上傳
 
-        // 2. 遍歷 Excel 裡的所有分頁 (Sheet)
-        for (const sheetName of workbook.SheetNames) {
-            // 3. 辨識分頁名稱是否在使用者清單內
-            if (validSerials.includes(sheetName)) {
-                const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                
-                // 4. 準備上傳每條數據
-                for (const row of sheetData) {
-                    // 假設 Excel 有 record_start 欄位，轉為日期格式
-                    const recDate = row.record_start ? row.record_start.split(' ')[0] : null;
-                    if(!recDate) continue;
+            // 2. 遍歷所有分頁
+            for (const sheetName of workbook.SheetNames) {
+                if (validSerials.includes(sheetName)) {
+                    sheetsProcessed++;
+                    const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    
+                    sheetData.forEach(row => {
+                        // 強健的日期提取邏輯
+                        let recDate = null;
+                        if (row.record_start) {
+                            // 處理字串或日期物件
+                            const dateStr = String(row.record_start); 
+                            recDate = dateStr.includes(' ') ? dateStr.split(' ')[0] : dateStr;
+                        }
 
-                    await _supabase.from('health_data').upsert({
-                        serial_number: sheetName,
-                        record_date: recDate,
-                        raw_json: row
-                    }, { onConflict: 'serial_number, record_date' });
+                        if (recDate && recDate !== "undefined") {
+                            allDataToUpsert.push({
+                                serial_number: sheetName,
+                                record_date: recDate,
+                                raw_json: row
+                            });
+                        }
+                    });
                 }
-                successCount++;
             }
+
+            if (allDataToUpsert.length === 0) {
+                status.innerHTML = "❌ 找不到匹配的序號分頁或資料格式不正確。";
+                return;
+            }
+
+            status.innerHTML = `🚀 正在上傳 ${allDataToUpsert.length} 筆數據至資料庫...`;
+
+            // 3. 批次上傳 (每 100 筆一組，避免請求過大)
+            const chunkSize = 100;
+            for (let i = 0; i < allDataToUpsert.length; i += chunkSize) {
+                const chunk = allDataToUpsert.slice(i, i + chunkSize);
+                const { error: upsertError } = await _supabase
+                    .from('health_data')
+                    .upsert(chunk, { onConflict: 'serial_number, record_date' });
+                
+                if (upsertError) throw upsertError;
+            }
+
+            status.innerHTML = `✅ 成功！處理了 ${sheetsProcessed} 個分頁，共更新 ${allDataToUpsert.length} 筆數據。`;
+            loadUsers();
+
+        } catch (err) {
+            console.error("匯入過程中出錯:", err);
+            status.innerHTML = `<span style="color:red;">❌ 匯入失敗: ${err.message}</span>`;
         }
-        status.innerText = `匯入完成！成功更新 ${successCount} 位使用者的數據。`;
-        loadUsers(); // 刷新列表
     };
+
+    reader.onerror = () => {
+        status.innerHTML = "❌ 檔案讀取失敗。";
+    };
+    
     reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
