@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n04</title>
+    <title>AI 健康夥伴n04</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --tbp-blue: #8699a3; /* TBPCHC 主題藍 */
+            --tbp-blue: #8699a3; 
             --tbp-light-blue: #e6f0f9;
             --bg-color: #f5f1eb;
             --text-dark: #333;
@@ -20,377 +20,259 @@
             background-color: var(--bg-color);
             color: var(--text-dark);
             font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
-            overflow: hidden; /* 防止整體滾動 */
+            overflow: hidden;
         }
 
         .hidden { display: none !important; }
 
-        /* --- 登入與彈窗 (相容手機) --- */
+        /* --- 登入與彈窗 --- */
         .modal-overlay {
             position: fixed; inset: 0; background: #f5f1eb;
-            display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px;
+            display: flex; justify-content: center; align-items: center; z-index: 2000;
         }
-        .modal-card {
-            background: white; padding: 30px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center;
+        .login-card {
+            background: white; padding: 30px; border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; width: 85%; max-width: 320px;
         }
-        input {
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
-            border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; /* 防止 iOS 放大 */
+        .login-card input {
+            width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box;
         }
-        .primary-btn {
-            width: 100%; padding: 12px; border-radius: 8px; border: none;
-            background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px;
+        .btn-primary {
+            background: var(--tbp-blue); color: white; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; width: 100%;
         }
 
-        /* --- 主頁面佈局 --- */
-        #app-container { display: flex; flex-direction: column; height: 100vh; }
-
-        header {
-            height: 60px; display: flex; justify-content: space-between; align-items: center;
-            padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100;
-        }
-        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
-        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
-
-        /* --- 對話區域 --- */
-        main {
-            flex: 1; overflow-y: auto; padding: 20px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 20px; }
+        /* --- 主畫面佈局 --- */
+        .app-container { height: 100%; display: flex; flex-direction: column; }
         
-        /* 歡迎提示預設隱藏，改用對話氣泡 */
-        .welcome-hint { display: none; margin-top: 30vh; color: #5a5a5a; text-align: center; font-size: 2rem; font-weight: bold; }
+        header {
+            background: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #eee; font-weight: bold;
+        }
 
-        /* 對話氣泡樣式 */
-        .msg-row { display: flex; width: 100%; margin: 5px 0; }
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+
+        /* --- 對話氣泡 --- */
+        .msg-row { display: flex; margin-bottom: 10px; }
         .user-row { justify-content: flex-end; }
-        .user-bubble {
-            background: var(--user-msg-bg); 
-            color: #000; /* 使用者文字顏色改為黑色 */
-            padding: 10px 15px;
-            border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
         .ai-row { justify-content: flex-start; }
-        .ai-bubble {
-            background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px;
-            border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
+        .user-bubble { background: var(--user-msg-bg); padding: 10px 15px; border-radius: 15px 15px 2px 15px; max-width: 75%; }
+        .ai-bubble { background: var(--ai-msg-bg); padding: 10px 15px; border-radius: 15px 15px 15px 2px; max-width: 75%; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
 
-        /* --- 底部輸入框 --- */
-        .footer-input {
-            padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center;
+        /* --- 健康摘要卡片 (重點修正區域) --- */
+        .summary-card {
+            background: white; border-radius: 15px; padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin: 10px 0;
+            text-align: center; border: 1px solid #eee;
         }
-        .input-box {
-            width: 100%; max-width: 800px; background: white; border-radius: 25px;
-            padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd;
-        }
-        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .summary-date { font-size: 0.9em; color: #666; margin-bottom: 10px; }
+        .battery-display { margin: 20px 0; }
+        .battery-label { font-size: 1.1em; color: #444; }
+        .battery-score { font-size: 4em; font-weight: bold; line-height: 1; }
+        .percentile-box { background: #f8f9fa; padding: 8px; border-radius: 10px; font-size: 0.9em; color: #555; }
 
-        /* --- 選單與響應式調整 --- */
+        /* --- 輸入區域 --- */
+        footer {
+            background: white; padding: 10px 15px; display: flex; gap: 10px; align-items: center;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #user-input { flex: 1; border: 1px solid #ddd; padding: 10px; border-radius: 20px; outline: none; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
+
+        /* 漢堡選單 */
+        .settings-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--tbp-blue); }
         .dropdown {
-            position: absolute; top: 55px; right: 20px; background: white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500;
+            position: absolute; right: 15px; top: 60px; background: white; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 10px; z-index: 1000;
         }
-        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-        .dropdown button:hover { background: #f9f9f9; }
-
-        @media (max-width: 600px) {
-            header { padding: 0 15px; }
-            .logo-text { font-size: 0.9rem; }
-            main { padding: 15px; }
-            .user-bubble, .ai-bubble { max-width: 90%; }
-            .footer-input { padding: 10px 10px 20px 10px; }
-        }
-
-
-/* 健康摘要卡片樣式 */
-.summary-card {
-    width: 100%; max-width: 300px;
-    background: white; border-radius: 12px; overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer;
-    margin: 10px 0; border: 1px solid #ddd;
-}
-.summary-card img { width: 100%; display: block; transition: 0.3s; }
-.summary-card:hover img { transform: scale(1.05); }
-
-/* 放大檢視的燈箱 */
-.lightbox {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.9);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 5000; cursor: zoom-out;
-}
-.lightbox img { max-width: 90%; max-height: 90%; border-radius: 8px; }
-
-
-/* 新增：生理電量與圖例專屬樣式 */
-:root {
-    --battery-title: #6c83cf;
-    --text-grey: #5a5a5a;
-    --color-attention: #ff8c73;
-    --color-standard: #a79d8c;
-    --color-good: #a0adb7;
-    --color-excellent: #596b75;
-}
-
-#summary-card {
-    padding: 20px;
-}
-
-.date-display {
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: var(--text-grey);
-    margin-bottom: 15px;
-}
-
-.battery-title {
-    color: var(--battery-title);
-    font-weight: bold;
-    font-size: 1.2rem;
-    margin-bottom: 5px;
-}
-
-#battery-value {
-    font-size: 3.5rem;
-    font-weight: 800;
-    line-height: 1;
-    margin: 10px 0;
-}
-
-.percentile-text {
-    color: var(--text-grey);
-    font-size: 0.95rem;
-    margin-bottom: 20px;
-}
-
-.legend-container {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    font-size: 0.8rem;
-    color: var(--battery-title);
-}
-
-.dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    margin-right: 4px;
-}
-
-
+        .dropdown button { display: block; width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="login-overlay" class="modal-overlay">
-        <div class="modal-card">
+        <div class="login-card">
             <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
-            <input type="text" id="serial" placeholder="序號">
-            <input type="password" id="pw" placeholder="密碼">
-            <button class="primary-btn" onclick="login()">登入系統</button>
+            <p>請輸入你的裝置序號</p>
+            <input type="text" id="serial-input" placeholder="例如: BA000001">
+            <button class="btn-primary" onclick="handleLogin()">進入系統</button>
         </div>
     </div>
 
-    <div id="nickname-overlay" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
-            <input type="text" id="new-nickname" placeholder="你的暱稱">
-            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
-        </div>
-    </div>
-
-    <div id="pw-overlay" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3>修改密碼</h3>
-            <input type="password" id="old-pw" placeholder="舊密碼">
-            <input type="password" id="new-pw" placeholder="新密碼">
-            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
-            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
-        </div>
-    </div>
-
-    <div id="app-container" class="hidden">
+    <div class="app-container">
         <header>
-            <div class="logo-text">Personal Health Companion</div>
-            <div class="user-info" onclick="toggleDropdown()">
-                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
-                <div class="avatar" id="avatar-char">U</div>
-            </div>
+            <div id="ai-display-name">AI 健康夥伴</div>
+            <button class="settings-btn" onclick="toggleDropdown()">☰</button>
             <div id="settings-menu" class="dropdown hidden">
-                <button onclick="openPwModal()">🔒 修改密碼</button>
-                <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
+                <button onclick="logout()">登出</button>
             </div>
         </header>
 
         <main id="main-area">
-            <div id="welcome-text" class="welcome-hint">隨時準備好就可以開始了。</div>
-            <div id="chat-history"></div>
+            <div id="chat-history">
+                </div>
+
+            <div id="summary-card" class="summary-card hidden">
+                <div class="summary-date">今日健康摘要 (<span id="display-date">--/--/--</span>)</div>
+                <div class="battery-display">
+                    <div class="battery-label">身體電量</div>
+                    <div id="battery-value" class="battery-score">--</div>
+                </div>
+                <div class="percentile-box">
+                    你的狀態超過了 <span id="percentile-text" style="font-weight: bold; color: var(--tbp-blue);">--%</span> 的使用者
+                </div>
+                <p style="font-size: 0.85em; color: #888; margin-top: 15px;">
+                    ※ 電量依據前一晚的睡眠分析估算
+                </p>
+            </div>
         </main>
 
-        <div class="footer-input">
-            <div class="input-box">
-                <input type="text" id="user-input" placeholder="請輸入你的健康諮詢內容..." onkeypress="if(event.key==='Enter') sendMessage()">
-                <button class="send-btn" onclick="sendMessage()">▲</button>
-            </div>
-        </div>
+        <footer>
+            <input type="text" id="user-input" placeholder="傳送訊息...">
+            <button class="send-btn" onclick="handleSend()">➤</button>
+        </footer>
     </div>
-
-
-<div id="summary-placeholder" class="msg-row ai-row hidden">
-    <div class="summary-card" onclick="openLightbox()">
-        <img id="summary-img" src="https://via.placeholder.com/600x400?text=Health+Summary+Loading..." alt="健康摘要">
-        <div style="padding: 10px; font-size: 0.8rem; text-align: center; color: #888;">點擊放大查看</div>
-    </div>
-</div>
-
-<div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
-    <img id="lightbox-img" src="">
-</div>
-
-
-<div id="summary-card" class="info-card hidden">
-    <div id="display-date" class="date-display">YYYY/MM/DD</div>
-
-    <div class="battery-title">生理電量</div>
-    <div id="battery-value">--</div>
-
-    <div id="percentile-text" class="percentile-text">超過 --% 的使用者</div>
-
-    <img id="summary-img" src="" alt="健康摘要圖" onclick="openLightbox()" style="width:100%; border-radius:10px; cursor:pointer;">
-
-    <div class="legend-container">
-        <div class="legend-item"><span class="dot" style="background:var(--color-attention)"></span>注意</div>
-        <div class="legend-item"><span class="dot" style="background:var(--color-standard)"></span>標準</div>
-        <div class="legend-item"><span class="dot" style="background:var(--color-good)"></span>良好</div>
-        <div class="legend-item"><span class="dot" style="background:var(--color-excellent)"></span>優秀</div>
-    </div>
-</div>
-
-
 
     <script>
-        const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
+        // --- 初始化 Supabase (請更換為你的金鑰) ---
+        const SUPABASE_URL = 'https://你的專案網址.supabase.co';
+        const SUPABASE_KEY = '你的公開金鑰';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentSerial = "";
-        let isNamingPhase = false; // 判斷是否處於為 AI 取名字的階段
+        let isNamingPhase = false;
 
-        // 登入
-        async function login() {
-            const serial = document.getElementById('serial').value;
-            const pw = document.getElementById('pw').value;
-            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
-            
-            if (data) {
-                currentSerial = serial;
-                document.getElementById('login-overlay').classList.add('hidden');
-                if (!data.nickname) {
-                    document.getElementById('nickname-overlay').classList.remove('hidden');
-                } else {
-                    initApp(data.nickname, data.ai_name);
-                }
-            } else { alert("驗證失敗"); }
-        }
+        // 登入邏輯
+        async function handleLogin() {
+            const sn = document.getElementById('serial-input').value.trim().toUpperCase();
+            if (!sn) return;
 
-        // 儲存暱稱
-        async function saveNickname() {
-            const nick = document.getElementById('new-nickname').value;
-            if(!nick) return;
-            await _supabase.from('user_credentials').update({ nickname: nick }).eq('serial_number', currentSerial);
-            document.getElementById('nickname-overlay').classList.add('hidden');
-            initApp(nick, null); // 新使用者 ai_name 必為空
-        }
+            const { data, error } = await _supabase
+                .from('user_credentials')
+                .select('*')
+                .eq('serial_number', sn)
+                .single();
 
-        function initApp(name, aiName) {
-            document.getElementById('app-container').classList.remove('hidden');
-            document.getElementById('display-name').innerText = name;
-            document.getElementById('avatar-char').innerText = name.charAt(0);
-            
-            const history = document.getElementById('chat-history');
-            
-            if (!aiName) {
-                // 如果還沒有取過名字，啟動命名引導
+            if (error || !data) {
+                alert("序號錯誤，請重新輸入");
+                return;
+            }
+
+            currentSerial = sn;
+            document.getElementById('login-overlay').classList.add('hidden');
+
+            // 檢查是否已命名
+            if (!data.ai_name) {
                 isNamingPhase = true;
-                appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
+                appendAiMessage("你好！我是你的健康夥伴。在開始之前，請幫我取個名字吧？");
             } else {
-                appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。今天有什麼我可以幫你的嗎？`);
+                document.getElementById('ai-display-name').innerText = data.ai_name;
+                appendAiMessage(`歡迎回來！我是 ${data.ai_name}，今天也一起關注健康吧。`);
+                showHealthSummary(); // 已命名者直接顯示摘要
             }
         }
 
-        // 修改密碼
-        function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
-        function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-        async function updatePassword() {
-            const oldP = document.getElementById('old-pw').value;
-            const newP = document.getElementById('new-pw').value;
-            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
-            if(!data) return alert("舊密碼錯誤");
-            await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-            alert("修改成功！"); closePwModal();
-        }
-
-        // 發送與處理訊息
-        async function sendMessage() {
+        // 發送訊息邏輯
+        async function handleSend() {
             const input = document.getElementById('user-input');
-            const text = input.value.trim();
-            if (!text) return;
+            const msg = input.value.trim();
+            if (!msg) return;
 
-            // 1. 顯示使用者氣泡
-            appendUserMessage(text);
-            input.value = '';
+            appendUserMessage(msg);
+            input.value = "";
 
             if (isNamingPhase) {
-                // 2. 處理命名邏輯：記錄到 Supabase
-                const { error } = await _supabase.from('user_credentials')
-                    .update({ ai_name: text })
-                    .eq('serial_number', currentSerial);
-
-                if (!error) {
+                try {
+                    // 更新名字到資料庫
+                    await _supabase
+                        .from('user_credentials')
+                        .update({ ai_name: msg })
+                        .eq('serial_number', currentSerial);
+                    
+                    document.getElementById('ai-display-name').innerText = msg;
                     isNamingPhase = false;
+
                     setTimeout(() => {
-                        appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
+                        appendAiMessage(`謝謝你！從現在起我的名字就是「${msg}」了。讓我們來看看你今天的健康摘要吧！`);
+                        // --- 關鍵修正：命名後立即顯示摘要 ---
+                        showHealthSummary();
                     }, 800);
-                } else {
-                    console.error("命名失敗:", error);
+                } catch (err) {
+                    console.error(err);
                 }
             } else {
-                // 3. 一般對話回應 (模擬)
+                // 一般對話測試邏輯
                 setTimeout(() => {
-                    appendAiMessage("收到你的訊息，正在為你整理健康資訊...");
+                    appendAiMessage("收到！我會隨時為你監控生理數據。");
                 }, 800);
             }
         }
 
-        // 輔助函式：新增氣泡
+        // 顯示健康摘要 (抓取資料庫)
+        async function showHealthSummary() {
+            console.log("正在載入健康數據...");
+            
+            // 1. 顯示卡片容器
+            const card = document.getElementById('summary-card');
+            card.classList.remove('hidden');
+
+            // 2. 抓取該序號最新的數據
+            const { data, error } = await _supabase
+                .from('health_data')
+                .select('*')
+                .eq('serial_number', currentSerial)
+                .order('record_date', { ascending: false })
+                .limit(1);
+
+            if (error || !data || data.length === 0) {
+                console.log("尚無資料");
+                return;
+            }
+
+            const latest = data[0];
+            const batteryVal = latest.raw_json.Personal_Battery_weighted_round || 0;
+            const targetDate = latest.record_date;
+
+            // 設定日期顯示
+            const d = new Date(targetDate);
+            document.getElementById('display-date').innerText = 
+                `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+
+            // 判定電量顏色
+            let color = "#ff8c73"; // 0-59 (紅橘)
+            if (batteryVal >= 100) color = "#596b75";      // 100+ (灰藍)
+            else if (batteryVal >= 80) color = "#a0adb7";  // 80-99 (淺灰)
+            else if (batteryVal >= 60) color = "#a79d8c";  // 60-79 (大地)
+
+            const valEl = document.getElementById('battery-value');
+            valEl.innerText = batteryVal;
+            valEl.style.color = color;
+
+            // 計算當日百分比 (排名)
+            const { data: dayAll } = await _supabase
+                .from('health_data')
+                .select('raw_json')
+                .eq('record_date', targetDate);
+
+            if (dayAll && dayAll.length > 0) {
+                const allScores = dayAll.map(r => r.raw_json.Personal_Battery_weighted_round || 0);
+                const belowCount = allScores.filter(s => s < batteryVal).length;
+                const percentile = Math.round((belowCount / allScores.length) * 100);
+                document.getElementById('percentile-text').innerText = percentile;
+            }
+
+            scrollToBottom();
+        }
+
+        // 輔助函式
         function appendUserMessage(msg) {
-            const history = document.getElementById('chat-history');
-            history.innerHTML += `
-                <div class="msg-row user-row">
-                    <div class="user-bubble">${msg}</div>
-                </div>`;
+            const chat = document.getElementById('chat-history');
+            chat.innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`;
             scrollToBottom();
         }
 
         function appendAiMessage(msg) {
-            const history = document.getElementById('chat-history');
-            history.innerHTML += `
-                <div class="msg-row ai-row">
-                    <div class="ai-bubble">${msg}</div>
-                </div>`;
+            const chat = document.getElementById('chat-history');
+            chat.innerHTML += `<div class="msg-row ai-row"><div class="ai-bubble">${msg}</div></div>`;
             scrollToBottom();
         }
 
@@ -399,83 +281,18 @@
             main.scrollTop = main.scrollHeight;
         }
 
-        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-        function logout() { location.reload(); }
+        function toggleDropdown() {
+            document.getElementById('settings-menu').classList.toggle('hidden');
+        }
 
+        function logout() {
+            location.reload();
+        }
 
-function openLightbox() {
-    const src = document.getElementById('summary-img').src;
-    document.getElementById('lightbox-img').src = src;
-    document.getElementById('lightbox').classList.remove('hidden');
-}
-function closeLightbox() {
-    document.getElementById('lightbox').classList.add('hidden');
-}
-
-// 修改 sendMessage 的邏輯，當命名完成後顯示摘要卡片
-// 在原本的 sendMessage 函式中：
-if (isNamingPhase) {
-    // ... 存入 ai_name 的邏輯 ...
-    setTimeout(() => {
-        appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
-        document.getElementById('summary-placeholder').classList.remove('hidden');
-    }, 800);
-}
-
-
-// 新增：抓取並顯示生理電量數據的邏輯
-async function loadBatteryData(serial) {
-    // 1. 抓取該使用者最新一筆資料
-    const { data: latest, error } = await _supabase
-        .from('health_data')
-        .select('*')
-        .eq('serial_number', serial)
-        .order('record_date', { ascending: false })
-        .limit(1);
-
-    if (error || !latest.length) return;
-    const currentData = latest[0];
-    const targetDate = currentData.record_date;
-    const batteryVal = currentData.raw_json.Personal_Battery_weighted_round || 0;
-
-    // --- 需求 1: 日期格式化 (YYYY/MM/DD 補零) ---
-    // 假設資料庫存的是 '2026-02-10' 或 '2026-2-1'
-    const d = new Date(targetDate);
-    const formattedDate = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-    document.getElementById('display-date').innerText = formattedDate;
-
-    // --- 需求 2: 判定顏色 ---
-    let color = "#ff8c73"; // 0-59
-    if (batteryVal >= 100) color = "#596b75";      // 100-110
-    else if (batteryVal >= 80) color = "#a0adb7";  // 80-99
-    else if (batteryVal >= 60) color = "#a79d8c";  // 60-79
-
-    const valEl = document.getElementById('battery-value');
-    valEl.innerText = batteryVal;
-    valEl.style.color = color;
-
-    // --- 需求 4: 計算當天百分比排行 ---
-    const { data: dayAll } = await _supabase
-        .from('health_data')
-        .select('raw_json')
-        .eq('record_date', targetDate);
-
-    if (dayAll) {
-        const allScores = dayAll.map(r => r.raw_json.Personal_Battery_weighted_round || 0);
-        const belowCount = allScores.filter(s => s < batteryVal).length;
-        const percentile = allScores.length > 0 ? Math.round((belowCount / allScores.length) * 100) : 0;
-        document.getElementById('percentile-text').innerText = `超過 ${percentile}% 的使用者`;
-    }
-}
-
-// 修改您原本顯示摘要卡片的觸發點
-// 找到您程式碼中命名完成後執行的地方：
-/* setTimeout(() => {
-       appendAiMessage("謝謝你幫我取的名字...");
-       document.getElementById('summary-card').classList.remove('hidden');
-       loadBatteryData(currentSerial); // <--- 在這裡新增這行
-   }, 1000);
-*/
+        // 監聽 Enter 鍵
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleSend();
+        });
     </script>
 </body>
 </html>
