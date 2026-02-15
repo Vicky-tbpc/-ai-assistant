@@ -7,132 +7,125 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --tbp-blue: #8699a3; /* 與前台一致的主題藍 */
+            --tbp-blue: #8699a3;
             --bg-color: #f4f7f9;
             --card-bg: #ffffff;
             --text-dark: #333;
+            --danger: #ff8c73;
         }
 
         body {
             font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
             background-color: var(--bg-color);
-            margin: 0;
-            padding: 20px;
+            margin: 0; padding: 0;
             color: var(--text-dark);
         }
 
+        .hidden { display: none !important; }
+
+        /* --- 管理者登入介面 --- */
+        #admin-login-overlay {
+            position: fixed; inset: 0; background: #e2ddd4;
+            display: flex; justify-content: center; align-items: center; z-index: 3000;
+        }
+
+        /* --- 主容器 --- */
         .admin-container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            max-width: 1100px; margin: 20px auto;
+            background: var(--card-bg); padding: 30px;
+            border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
 
         header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid var(--tbp-blue);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 2px solid var(--tbp-blue); padding-bottom: 15px; margin-bottom: 20px;
         }
 
-        h1 {
-            color: var(--tbp-blue);
-            margin: 0;
-            font-size: 1.5rem;
+        h1 { color: var(--tbp-blue); margin: 0; font-size: 1.5rem; }
+
+        .btn-group { display: flex; gap: 10px; }
+
+        button {
+            padding: 10px 18px; border-radius: 6px; border: none;
+            cursor: pointer; font-weight: bold; transition: 0.2s;
         }
 
-        .refresh-btn {
-            background-color: var(--tbp-blue);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: opacity 0.2s;
+        .primary-btn { background: var(--tbp-blue); color: white; }
+        .outline-btn { background: #eee; color: #666; }
+        .danger-btn { background: var(--danger); color: white; }
+
+        /* --- 表單彈窗 --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center; z-index: 2000;
+        }
+        .modal-card {
+            background: white; padding: 25px; border-radius: 10px;
+            width: 100%; max-width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        input {
+            width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd;
+            border-radius: 6px; box-sizing: border-box; font-size: 14px;
         }
 
-        .refresh-btn:hover {
-            opacity: 0.8;
-        }
-
-        /* 表格樣式 */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-
-        th {
-            background-color: #f8f9fa;
-            color: #666;
-            text-align: left;
-            padding: 12px;
-            border-bottom: 2px solid #eee;
-        }
-
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 0.95rem;
-        }
-
-        tr:hover {
-            background-color: #fafafa;
-        }
-
-        .status-tag {
-            font-size: 0.8rem;
-            padding: 4px 8px;
-            border-radius: 4px;
-            background: #eee;
-            color: #888;
-        }
-
-        .active-tag {
-            background: #e6f0f9;
-            color: var(--tbp-blue);
-        }
-
-        /* 響應式處理 */
-        @media (max-width: 768px) {
-            .admin-container { padding: 15px; }
-            th, td { padding: 8px; font-size: 0.85rem; }
-            h1 { font-size: 1.2rem; }
-        }
+        /* --- 表格 --- */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f8f9fa; color: #666; text-align: left; padding: 12px; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .status-tag { font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; background: #eee; color: #888; }
+        .active-tag { background: #e6f0f9; color: #5a7d9a; }
     </style>
 </head>
 <body>
 
-    <div class="admin-container">
+    <div id="admin-login-overlay">
+        <div class="modal-card" style="text-align: center;">
+            <h2 style="color: var(--tbp-blue);">管理者登入</h2>
+            <input type="password" id="admin-password-input" placeholder="請輸入管理密碼">
+            <button class="primary-btn" style="width: 100%;" onclick="checkAdminAuth()">登入後台</button>
+        </div>
+    </div>
+
+    <div id="add-user-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>新增使用者序號</h3>
+            <input type="text" id="new-serial" placeholder="輸入新序號 (例如: BA001)">
+            <input type="text" id="new-password" placeholder="預設密碼">
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="outline-btn" style="flex:1" onclick="closeAddModal()">取消</button>
+                <button class="primary-btn" style="flex:1" onclick="confirmAddUser()">確認新增</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-admin-content" class="admin-container hidden">
         <header>
-            <h1>健康夥伴管理系統 - 使用者清單</h1>
-            <button class="refresh-btn" onclick="loadUsers()">🔄 刷新資料</button>
+            <h1>健康夥伴管理系統</h1>
+            <div class="btn-group">
+                <button class="primary-btn" onclick="openAddModal()">＋ 新增使用者</button>
+                <button class="outline-btn" onclick="loadUsers()">🔄 刷新</button>
+                <button class="danger-btn" onclick="adminLogout()">登出</button>
+            </div>
         </header>
 
         <div style="overflow-x: auto;">
-            <table id="user-table">
+            <table>
                 <thead>
                     <tr>
-                        <th>登入序號</th>
-                        <th>登入密碼</th>
-                        <th>使用者暱稱</th>
-                        <th>健康夥伴名稱</th>
+                        <th>序號</th>
+                        <th>密碼</th>
+                        <th>暱稱</th>
+                        <th>夥伴名字</th>
                         <th>建立時間</th>
                     </tr>
                 </thead>
                 <tbody id="user-list">
-                    <tr>
-                        <td colspan="5" style="text-align:center;">資料載入中...</td>
-                    </tr>
+                    <tr><td colspan="5" style="text-align:center;">載入中...</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
+
 <div style="margin-bottom: 20px; padding: 15px; border: 1px dashed var(--tbp-blue); border-radius: 8px;">
     <label>📊 上傳健康數據 Excel：</label>
     <input type="file" id="excel-upload" accept=".xlsx, .xls" style="width: auto;">
@@ -140,56 +133,83 @@
     <div id="upload-status" style="margin-top: 10px; font-size: 0.9rem; color: #666;"></div>
 </div>
 
+
     <script>
-        // Supabase 設定 (與前台一致)
         const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
         const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 載入使用者資料
+        const ADMIN_PW = "888tBPC!!";
+
+        // --- 管理者驗證 ---
+        function checkAdminAuth() {
+            const input = document.getElementById('admin-password-input').value;
+            if (input === ADMIN_PW) {
+                document.getElementById('admin-login-overlay').classList.add('hidden');
+                document.getElementById('main-admin-content').classList.remove('hidden');
+                loadUsers();
+            } else {
+                alert("管理密碼錯誤！");
+            }
+        }
+
+        function adminLogout() {
+            location.reload(); // 最簡單的登出方式：重新整理
+        }
+
+        // --- 新增使用者邏輯 ---
+        function openAddModal() { document.getElementById('add-user-modal').classList.remove('hidden'); }
+        function closeAddModal() { document.getElementById('add-user-modal').classList.add('hidden'); }
+
+        async function confirmAddUser() {
+            const serial = document.getElementById('new-serial').value;
+            const pw = document.getElementById('new-password').value;
+
+            if (!serial || !pw) return alert("請填寫完整資訊");
+
+            const { error } = await _supabase
+                .from('user_credentials')
+                .insert([{ serial_number: serial, password: pw }]);
+
+            if (error) {
+                alert("新增失敗: " + error.message);
+            } else {
+                alert("使用者 " + serial + " 已成功新增！");
+                document.getElementById('new-serial').value = "";
+                document.getElementById('new-password').value = "";
+                closeAddModal();
+                loadUsers();
+            }
+        }
+
+        // --- 資料載入 ---
         async function loadUsers() {
             const tbody = document.getElementById('user-list');
-            
             try {
-                // 從資料表抓取所有欄位
                 const { data, error } = await _supabase
                     .from('user_credentials')
                     .select('*')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
-
-                tbody.innerHTML = ""; // 清空表格內容
-
-                if (data.length === 0) {
-                    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>目前尚無使用者資料</td></tr>";
-                    return;
-                }
+                tbody.innerHTML = "";
 
                 data.forEach(user => {
-                    const row = document.createElement('tr');
-                    
-                    // 處理時間格式
                     const date = new Date(user.created_at).toLocaleString('zh-TW');
-
-                    row.innerHTML = `
-                        <td><strong>${user.serial_number}</strong></td>
-                        <td><code>${user.password}</code></td>
-                        <td>${user.nickname ? `<span class="status-tag active-tag">${user.nickname}</span>` : '<span class="status-tag">尚未設定</span>'}</td>
-                        <td>${user.ai_name ? `<span class="status-tag active-tag">${user.ai_name}</span>` : '<span class="status-tag">尚未取名</span>'}</td>
-                        <td style="color: #888; font-size: 0.85rem;">${date}</td>
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${user.serial_number}</strong></td>
+                            <td><code>${user.password}</code></td>
+                            <td>${user.nickname ? `<span class="status-tag active-tag">${user.nickname}</span>` : '<span class="status-tag">未設定</span>'}</td>
+                            <td>${user.ai_name ? `<span class="status-tag active-tag">${user.ai_name}</span>` : '<span class="status-tag">未命名</span>'}</td>
+                            <td style="color: #888; font-size: 0.85rem;">${date}</td>
+                        </tr>
                     `;
-                    tbody.appendChild(row);
                 });
-
             } catch (err) {
-                console.error("載入失敗:", err);
-                tbody.innerHTML = `<tr><td colspan='5' style='text-align:center; color:red;'>資料載入失敗: ${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan='5' style='text-align:center; color:red;'>錯誤: ${err.message}</td></tr>`;
             }
         }
-
-        // 頁面開啟時自動載入
-        window.onload = loadUsers;
 
 async function handleExcelUpload() {
     const fileInput = document.getElementById('excel-upload');
@@ -237,8 +257,6 @@ async function handleExcelUpload() {
 }
 
 
-
     </script>
 </body>
 </html>
-
