@@ -106,6 +106,27 @@
             .user-bubble, .ai-bubble { max-width: 90%; }
             .footer-input { padding: 10px 10px 20px 10px; }
         }
+
+
+/* 健康摘要卡片樣式 */
+.summary-card {
+    width: 100%; max-width: 300px;
+    background: white; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer;
+    margin: 10px 0; border: 1px solid #ddd;
+}
+.summary-card img { width: 100%; display: block; transition: 0.3s; }
+.summary-card:hover img { transform: scale(1.05); }
+
+/* 放大檢視的燈箱 */
+.lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 5000; cursor: zoom-out;
+}
+.lightbox img { max-width: 90%; max-height: 90%; border-radius: 8px; }
+
+
     </style>
 </head>
 <body>
@@ -162,6 +183,20 @@
             </div>
         </div>
     </div>
+
+
+<div id="summary-placeholder" class="msg-row ai-row hidden">
+    <div class="summary-card" onclick="openLightbox()">
+        <img id="summary-img" src="https://via.placeholder.com/600x400?text=Health+Summary+Loading..." alt="健康摘要">
+        <div style="padding: 10px; font-size: 0.8rem; text-align: center; color: #888;">點擊放大查看</div>
+    </div>
+</div>
+
+<div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
+    <img id="lightbox-img" src="">
+</div>
+
+
 
     <script>
         const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
@@ -283,6 +318,28 @@
 
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
         function logout() { location.reload(); }
+
+
+function openLightbox() {
+    const src = document.getElementById('summary-img').src;
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.add('hidden');
+}
+
+// 修改 sendMessage 的邏輯，當命名完成後顯示摘要卡片
+// 在原本的 sendMessage 函式中：
+if (isNamingPhase) {
+    // ... 存入 ai_name 的邏輯 ...
+    setTimeout(() => {
+        appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
+        document.getElementById('summary-placeholder').classList.remove('hidden');
+    }, 800);
+}
+
+
     </script>
 </body>
 </html>
