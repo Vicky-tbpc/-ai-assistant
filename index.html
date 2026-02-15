@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康助理 | TBPCHC Style</title>
+    <title>AI 健康夥伴 Style</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -109,7 +109,7 @@
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">健康助理登入</h2>
+            <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
             <button class="primary-btn" onclick="login()">登入系統</button>
@@ -118,9 +118,9 @@
 
     <div id="nickname-overlay" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3>您好！請問該如何稱呼您？</h3>
+            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
             <input type="text" id="new-nickname" placeholder="您的暱稱">
-            <button class="primary-btn" onclick="saveNickname()">進入助理</button>
+            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
         </div>
     </div>
 
@@ -136,14 +136,14 @@
 
     <div id="app-container" class="hidden">
         <header>
-            <div class="logo-text">HEALTH ASSISTANT</div>
+            <div class="logo-text">Personal Health Companion</div>
             <div class="user-info" onclick="toggleDropdown()">
                 <div id="display-name" style="font-size: 14px; color: #666;">User</div>
                 <div class="avatar" id="avatar-char">U</div>
             </div>
             <div id="settings-menu" class="dropdown hidden">
                 <button onclick="openPwModal()">🔒 修改密碼</button>
-                <button onclick="logout()" style="color: #d9534f;">📤 登出系統</button>
+                <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
             </div>
         </header>
 
