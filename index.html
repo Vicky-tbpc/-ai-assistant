@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 - 完整修正版</title>
+    <title>AI 健康夥伴 n02</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --tbp-blue: #8699a3; 
+            --tbp-blue: #8699a3; /* TBPCHC 主題藍 */
             --tbp-light-blue: #e6f0f9;
             --bg-color: #f5f1eb;
             --text-dark: #333;
@@ -20,241 +20,259 @@
             background-color: var(--bg-color);
             color: var(--text-dark);
             font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
-            overflow: hidden;
+            overflow: hidden; /* 防止整體滾動 */
         }
 
         .hidden { display: none !important; }
 
-        /* --- 登入介面 --- */
+        /* --- 登入與彈窗 (相容手機) --- */
         .modal-overlay {
             position: fixed; inset: 0; background: #f5f1eb;
-            display: flex; justify-content: center; align-items: center; z-index: 2000;
+            display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px;
         }
-        .login-card {
-            background: white; padding: 30px; border-radius: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; width: 85%; max-width: 320px;
+        .modal-card {
+            background: white; padding: 30px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center;
         }
-        .login-card h2 { color: var(--tbp-blue); margin-top: 0; }
-        .login-card input {
-            width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box;
-            font-size: 16px;
+        input {
+            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
+            border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; /* 防止 iOS 放大 */
         }
-        .btn-primary {
-            background: var(--tbp-blue); color: white; border: none; padding: 12px 30px; border-radius: 25px; 
-            cursor: pointer; width: 100%; margin-top: 15px; font-size: 16px;
+        .primary-btn {
+            width: 100%; padding: 12px; border-radius: 8px; border: none;
+            background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px;
         }
 
-        /* --- 主畫面佈局 --- */
-        .app-container { height: 100%; display: flex; flex-direction: column; }
-        
+        /* --- 主頁面佈局 --- */
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+
         header {
-            background: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid #eee; font-weight: bold;
+            height: 60px; display: flex; justify-content: space-between; align-items: center;
+            padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100;
         }
+        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
+        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
-        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        /* --- 對話區域 --- */
+        main {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* 歡迎提示預設隱藏，改用對話氣泡 */
+        .welcome-hint { display: none; margin-top: 30vh; color: #5a5a5a; text-align: center; font-size: 2rem; font-weight: bold; }
 
-        /* --- 對話氣泡 --- */
-        .msg-row { display: flex; margin-bottom: 10px; }
+        /* 對話氣泡樣式 */
+        .msg-row { display: flex; width: 100%; margin: 5px 0; }
         .user-row { justify-content: flex-end; }
+        .user-bubble {
+            background: var(--user-msg-bg); 
+            color: #000; /* 使用者文字顏色改為黑色 */
+            padding: 10px 15px;
+            border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
         .ai-row { justify-content: flex-start; }
-        .user-bubble { background: var(--user-msg-bg); padding: 10px 15px; border-radius: 15px 15px 2px 15px; max-width: 75%; }
-        .ai-bubble { background: var(--ai-msg-bg); padding: 10px 15px; border-radius: 15px 15px 15px 2px; max-width: 75%; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-
-        /* --- 健康摘要卡片 --- */
-        .summary-card {
-            background: white; border-radius: 15px; padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin: 10px 0;
-            text-align: center; border: 1px solid #eee;
+        .ai-bubble {
+            background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px;
+            border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-        .summary-date { font-size: 0.9em; color: #666; margin-bottom: 10px; }
-        .battery-display { margin: 20px 0; }
-        .battery-label { font-size: 1.1em; color: #444; }
-        .battery-score { font-size: 4em; font-weight: bold; line-height: 1; }
-        .percentile-box { background: #f8f9fa; padding: 8px; border-radius: 10px; font-size: 0.9em; color: #555; }
 
-        /* --- 輸入區域 --- */
-        footer {
-            background: white; padding: 10px 15px; display: flex; gap: 10px; align-items: center;
-            padding-bottom: env(safe-area-inset-bottom);
+        /* --- 底部輸入框 --- */
+        .footer-input {
+            padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center;
         }
-        #user-input { flex: 1; border: 1px solid #ddd; padding: 10px; border-radius: 20px; outline: none; font-size: 16px; }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
+        .input-box {
+            width: 100%; max-width: 800px; background: white; border-radius: 25px;
+            padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd;
+        }
+        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-        /* 選單 */
-        .settings-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--tbp-blue); }
+        /* --- 選單與響應式調整 --- */
         .dropdown {
-            position: absolute; right: 15px; top: 60px; background: white; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 10px; z-index: 1000;
+            position: absolute; top: 55px; right: 20px; background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500;
         }
-        .dropdown button { display: block; width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; }
+        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
+        .dropdown button:hover { background: #f9f9f9; }
+
+        @media (max-width: 600px) {
+            header { padding: 0 15px; }
+            .logo-text { font-size: 0.9rem; }
+            main { padding: 15px; }
+            .user-bubble, .ai-bubble { max-width: 90%; }
+            .footer-input { padding: 10px 10px 20px 10px; }
+        }
     </style>
 </head>
 <body>
 
     <div id="login-overlay" class="modal-overlay">
-        <div class="login-card">
-            <h2>健康夥伴登入</h2>
-            <input type="text" id="serial-input" placeholder="請輸入裝置序號 (如: BA000001)">
-            <input type="password" id="password-input" placeholder="請輸入密碼">
-            <button class="btn-primary" onclick="handleLogin()">進入系統</button>
+        <div class="modal-card">
+            <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
+            <input type="text" id="serial" placeholder="序號">
+            <input type="password" id="pw" placeholder="密碼">
+            <button class="primary-btn" onclick="login()">登入系統</button>
         </div>
     </div>
 
-    <div class="app-container">
+    <div id="nickname-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
+            <input type="text" id="new-nickname" placeholder="你的暱稱">
+            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
+        </div>
+    </div>
+
+    <div id="pw-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>修改密碼</h3>
+            <input type="password" id="old-pw" placeholder="舊密碼">
+            <input type="password" id="new-pw" placeholder="新密碼">
+            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
+            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
         <header>
-            <div id="ai-display-name">AI 健康夥伴</div>
-            <button class="settings-btn" onclick="toggleDropdown()">☰</button>
+            <div class="logo-text">Personal Health Companion</div>
+            <div class="user-info" onclick="toggleDropdown()">
+                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
+                <div class="avatar" id="avatar-char">U</div>
+            </div>
             <div id="settings-menu" class="dropdown hidden">
-                <button onclick="logout()">登出</button>
+                <button onclick="openPwModal()">🔒 修改密碼</button>
+                <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
             </div>
         </header>
 
         <main id="main-area">
+            <div id="welcome-text" class="welcome-hint">隨時準備好就可以開始了。</div>
             <div id="chat-history"></div>
-
-            <div id="summary-card" class="summary-card hidden">
-                <div class="summary-date">今日健康摘要 (<span id="display-date">--/--/--</span>)</div>
-                <div class="battery-display">
-                    <div class="battery-label">身體電量</div>
-                    <div id="battery-value" class="battery-score">--</div>
-                </div>
-                <div class="percentile-box">
-                    您的狀態超過了 <span id="percentile-text" style="font-weight: bold; color: var(--tbp-blue);">--%</span> 的使用者
-                </div>
-                <p style="font-size: 0.85em; color: #888; margin-top: 15px;">※ 電量依據前一晚的睡眠分析估算</p>
-            </div>
         </main>
 
-        <footer>
-            <input type="text" id="user-input" placeholder="傳送訊息...">
-            <button class="send-btn" onclick="handleSend()">➤</button>
-        </footer>
+        <div class="footer-input">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="請輸入你的健康諮詢內容..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">▲</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // --- 初始化 Supabase ---
-        const SUPABASE_URL = 'https://您的專案網址.supabase.co';
-        const SUPABASE_KEY = '您的公開金鑰';
+        const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentSerial = "";
-        let isNamingPhase = false;
+        let isNamingPhase = false; // 判斷是否處於為 AI 取名字的階段
 
-        // --- 登入邏輯 (同時驗證序號與密碼) ---
-        async function handleLogin() {
-            const sn = document.getElementById('serial-input').value.trim().toUpperCase();
-            const pw = document.getElementById('password-input').value.trim();
+        // 登入
+        async function login() {
+            const serial = document.getElementById('serial').value;
+            const pw = document.getElementById('pw').value;
+            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+            
+            if (data) {
+                currentSerial = serial;
+                document.getElementById('login-overlay').classList.add('hidden');
+                if (!data.nickname) {
+                    document.getElementById('nickname-overlay').classList.remove('hidden');
+                } else {
+                    initApp(data.nickname, data.ai_name);
+                }
+            } else { alert("驗證失敗"); }
+        }
 
-            if (!sn || !pw) {
-                alert("請輸入完整的序號與密碼");
-                return;
-            }
+        // 儲存暱稱
+        async function saveNickname() {
+            const nick = document.getElementById('new-nickname').value;
+            if(!nick) return;
+            await _supabase.from('user_credentials').update({ nickname: nick }).eq('serial_number', currentSerial);
+            document.getElementById('nickname-overlay').classList.add('hidden');
+            initApp(nick, null); // 新使用者 ai_name 必為空
+        }
 
-            const { data, error } = await _supabase
-                .from('user_credentials')
-                .select('*')
-                .eq('serial_number', sn)
-                .eq('password', pw) // 這裡會檢查資料庫中的 password 欄位
-                .single();
-
-            if (error || !data) {
-                alert("序號或密碼錯誤，請重新輸入");
-                return;
-            }
-
-            currentSerial = sn;
-            document.getElementById('login-overlay').classList.add('hidden');
-
-            if (!data.ai_name) {
+        function initApp(name, aiName) {
+            document.getElementById('app-container').classList.remove('hidden');
+            document.getElementById('display-name').innerText = name;
+            document.getElementById('avatar-char').innerText = name.charAt(0);
+            
+            const history = document.getElementById('chat-history');
+            
+            if (!aiName) {
+                // 如果還沒有取過名字，啟動命名引導
                 isNamingPhase = true;
-                appendAiMessage("你好！我是你的健康夥伴。在開始之前，請先幫我取個名字吧？");
+                appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
             } else {
-                document.getElementById('ai-display-name').innerText = data.ai_name;
-                appendAiMessage(`歡迎回來！我是 ${data.ai_name}，今天也一起關注健康吧。`);
-                showHealthSummary(); 
+                appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。今天有什麼我可以幫你的嗎？`);
             }
         }
 
-        async function handleSend() {
-            const input = document.getElementById('user-input');
-            const msg = input.value.trim();
-            if (!msg) return;
+        // 修改密碼
+        function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
+        function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
+        async function updatePassword() {
+            const oldP = document.getElementById('old-pw').value;
+            const newP = document.getElementById('new-pw').value;
+            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
+            if(!data) return alert("舊密碼錯誤");
+            await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
+            alert("修改成功！"); closePwModal();
+        }
 
-            appendUserMessage(msg);
-            input.value = "";
+        // 發送與處理訊息
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // 1. 顯示使用者氣泡
+            appendUserMessage(text);
+            input.value = '';
 
             if (isNamingPhase) {
-                try {
-                    await _supabase
-                        .from('user_credentials')
-                        .update({ ai_name: msg })
-                        .eq('serial_number', currentSerial);
-                    
-                    document.getElementById('ai-display-name').innerText = msg;
+                // 2. 處理命名邏輯：記錄到 Supabase
+                const { error } = await _supabase.from('user_credentials')
+                    .update({ ai_name: text })
+                    .eq('serial_number', currentSerial);
+
+                if (!error) {
                     isNamingPhase = false;
-
                     setTimeout(() => {
-                        appendAiMessage(`謝謝你！以後請叫我「${msg}」。我們來看看今天的健康數據：`);
-                        showHealthSummary();
+                        appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
                     }, 800);
-                } catch (err) { console.error(err); }
+                } else {
+                    console.error("命名失敗:", error);
+                }
             } else {
-                setTimeout(() => { appendAiMessage("收到！我會隨時監控您的生理數據。"); }, 800);
+                // 3. 一般對話回應 (模擬)
+                setTimeout(() => {
+                    appendAiMessage("收到你的訊息，正在為你整理健康資訊...");
+                }, 800);
             }
         }
 
-        async function showHealthSummary() {
-            document.getElementById('summary-card').classList.remove('hidden');
-
-            const { data, error } = await _supabase
-                .from('health_data')
-                .select('*')
-                .eq('serial_number', currentSerial)
-                .order('record_date', { ascending: false })
-                .limit(1);
-
-            if (error || !data || data.length === 0) return;
-
-            const latest = data[0];
-            const batteryVal = latest.raw_json.Personal_Battery_weighted_round || 0;
-            
-            const d = new Date(latest.record_date);
-            document.getElementById('display-date').innerText = 
-                `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
-
-            let color = "#ff8c73";
-            if (batteryVal >= 100) color = "#596b75";
-            else if (batteryVal >= 80) color = "#a0adb7";
-            else if (batteryVal >= 60) color = "#a79d8c";
-
-            const valEl = document.getElementById('battery-value');
-            valEl.innerText = batteryVal;
-            valEl.style.color = color;
-
-            const { data: dayAll } = await _supabase
-                .from('health_data')
-                .select('raw_json')
-                .eq('record_date', latest.record_date);
-
-            if (dayAll) {
-                const allScores = dayAll.map(r => r.raw_json.Personal_Battery_weighted_round || 0);
-                const belowCount = allScores.filter(s => s < batteryVal).length;
-                const percentile = Math.round((belowCount / allScores.length) * 100);
-                document.getElementById('percentile-text').innerText = percentile;
-            }
-            scrollToBottom();
-        }
-
+        // 輔助函式：新增氣泡
         function appendUserMessage(msg) {
-            const chat = document.getElementById('chat-history');
-            chat.innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`;
+            const history = document.getElementById('chat-history');
+            history.innerHTML += `
+                <div class="msg-row user-row">
+                    <div class="user-bubble">${msg}</div>
+                </div>`;
             scrollToBottom();
         }
 
         function appendAiMessage(msg) {
-            const chat = document.getElementById('chat-history');
-            chat.innerHTML += `<div class="msg-row ai-row"><div class="ai-bubble">${msg}</div></div>`;
+            const history = document.getElementById('chat-history');
+            history.innerHTML += `
+                <div class="msg-row ai-row">
+                    <div class="ai-bubble">${msg}</div>
+                </div>`;
             scrollToBottom();
         }
 
@@ -265,10 +283,6 @@
 
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
         function logout() { location.reload(); }
-
-        document.getElementById('user-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleSend();
-        });
     </script>
 </body>
 </html>
