@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n03</title>
+    <title>AI 健康夥伴 n03-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -254,7 +254,7 @@
             scrollToBottom();
         }
 
-        async function sendMessage() {
+       async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -268,11 +268,20 @@
                 localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
             } else if (text.includes("健康摘要")) {
+                // --- 調整關鍵字觸發邏輯 ---
                 setTimeout(async () => {
                     const today = new Date().toISOString().split('T')[0];
                     const data = await fetchSummaryData(today);
-                    const label = data && data.isToday ? "今天" : "最新";
-                    appendAiMessage(`這是我們${label}的健康摘要`);
+                    
+                    if (data && data.isToday) {
+                        // 如果是今天的數據
+                        appendAiMessage(`這是我們今天的健康摘要`);
+                    } else {
+                        // 如果是之前的數據 (最新)
+                        appendAiMessage(`這是我們最新的健康摘要`);
+                        // [新增] 搭配提醒泡泡
+                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
+                    }
                     appendSummaryCard(data);
                 }, 800);
             } else {
