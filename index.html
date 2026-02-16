@@ -3,109 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n02</title>
+    <title>AI 健康夥伴 n03</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --tbp-blue: #8699a3; /* TBPCHC 主題藍 */
+            --tbp-blue: #8699a3; 
             --tbp-light-blue: #e6f0f9;
             --bg-color: #f5f1eb;
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
+            /* 燈號顏色 */
+            --light-red: #ff0000;
+            --light-orange: #ff8000;
+            --light-yellow: #ffe632;
+            --light-green: #3caa28;
         }
 
-        body, html {
-            margin: 0; padding: 0; height: 100%;
-            background-color: var(--bg-color);
-            color: var(--text-dark);
-            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
-            overflow: hidden; /* 防止整體滾動 */
-        }
-
+        body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
-        /* --- 登入與彈窗 (相容手機) --- */
-        .modal-overlay {
-            position: fixed; inset: 0; background: #f5f1eb;
-            display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px;
-        }
-        .modal-card {
-            background: white; padding: 30px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center;
-        }
-        input {
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px;
-            border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; /* 防止 iOS 放大 */
-        }
-        .primary-btn {
-            width: 100%; padding: 12px; border-radius: 8px; border: none;
-            background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px;
-        }
+        /* --- 登入與彈窗 --- */
+        .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
+        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; }
 
         /* --- 主頁面佈局 --- */
         #app-container { display: flex; flex-direction: column; height: 100vh; }
-
-        header {
-            height: 60px; display: flex; justify-content: space-between; align-items: center;
-            padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100;
-        }
+        header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
         /* --- 對話區域 --- */
-        main {
-            flex: 1; overflow-y: auto; padding: 20px;
-            display: flex; flex-direction: column; align-items: center;
-        }
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 20px; }
-        
-        /* 歡迎提示預設隱藏，改用對話氣泡 */
-        .welcome-hint { display: none; margin-top: 30vh; color: #5a5a5a; text-align: center; font-size: 2rem; font-weight: bold; }
-
-        /* 對話氣泡樣式 */
         .msg-row { display: flex; width: 100%; margin: 5px 0; }
         .user-row { justify-content: flex-end; }
-        .user-bubble {
-            background: var(--user-msg-bg); 
-            color: #000; /* 使用者文字顏色改為黑色 */
-            padding: 10px 15px;
-            border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
+        .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .ai-row { justify-content: flex-start; }
-        .ai-bubble {
-            background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px;
-            border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        /* --- 健康摘要卡片樣式 (模擬圖片 004) --- */
+        .summary-card { 
+            background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; 
+            margin-top: 10px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
+        .summary-card:active { transform: scale(0.98); }
+        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
+        .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .summary-label { font-size: 0.9rem; color: #555; }
+        .battery-val { font-size: 1.4rem; font-weight: bold; }
+        .rank-text { font-size: 0.8rem; color: #999; }
+        .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+        /* --- 圖片放大 Overlay --- */
+        #zoom-overlay { 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; 
+            display: flex; justify-content: center; align-items: center; cursor: zoom-out;
+        }
+        #zoom-content { transform: scale(1.5); background: white; border-radius: 12px; pointer-events: none; }
 
         /* --- 底部輸入框 --- */
-        .footer-input {
-            padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center;
-        }
-        .input-box {
-            width: 100%; max-width: 800px; background: white; border-radius: 25px;
-            padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd;
-        }
+        .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
+        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-        /* --- 選單與響應式調整 --- */
-        .dropdown {
-            position: absolute; top: 55px; right: 20px; background: white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500;
-        }
+        .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-        .dropdown button:hover { background: #f9f9f9; }
-
-        @media (max-width: 600px) {
-            header { padding: 0 15px; }
-            .logo-text { font-size: 0.9rem; }
-            main { padding: 15px; }
-            .user-bubble, .ai-bubble { max-width: 90%; }
-            .footer-input { padding: 10px 10px 20px 10px; }
-        }
     </style>
 </head>
 <body>
@@ -137,6 +104,10 @@
         </div>
     </div>
 
+    <div id="zoom-overlay" class="hidden" onclick="this.classList.add('hidden')">
+        <div id="zoom-content"></div>
+    </div>
+
     <div id="app-container" class="hidden">
         <header>
             <div class="logo-text">Personal Health Companion</div>
@@ -151,7 +122,6 @@
         </header>
 
         <main id="main-area">
-            <div id="welcome-text" class="welcome-hint">隨時準備好就可以開始了。</div>
             <div id="chat-history"></div>
         </main>
 
@@ -169,14 +139,12 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentSerial = "";
-        let isNamingPhase = false; // 判斷是否處於為 AI 取名字的階段
+        let isNamingPhase = false;
 
-        // 登入
         async function login() {
             const serial = document.getElementById('serial').value;
             const pw = document.getElementById('pw').value;
             const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
-            
             if (data) {
                 currentSerial = serial;
                 document.getElementById('login-overlay').classList.add('hidden');
@@ -188,32 +156,189 @@
             } else { alert("驗證失敗"); }
         }
 
-        // 儲存暱稱
         async function saveNickname() {
             const nick = document.getElementById('new-nickname').value;
             if(!nick) return;
             await _supabase.from('user_credentials').update({ nickname: nick }).eq('serial_number', currentSerial);
             document.getElementById('nickname-overlay').classList.add('hidden');
-            initApp(nick, null); // 新使用者 ai_name 必為空
+            initApp(nick, null);
         }
 
-        function initApp(name, aiName) {
+        // --- 核心 logic: 初始化 APP 並檢查摘要 ---
+        async function initApp(name, aiName) {
             document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('display-name').innerText = name;
             document.getElementById('avatar-char').innerText = name.charAt(0);
             
-            const history = document.getElementById('chat-history');
-            
             if (!aiName) {
-                // 如果還沒有取過名字，啟動命名引導
                 isNamingPhase = true;
                 appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
             } else {
                 appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。今天有什麼我可以幫你的嗎？`);
+                // [新增] 檢查登入摘要
+                await showLoginSummary(name);
             }
         }
 
-        // 修改密碼
+        // --- 核心 logic: 摘要顯示與資料抓取 ---
+        async function showLoginSummary(nickname) {
+            const today = new Date().toISOString().split('T')[0];
+            const summaryData = await fetchSummaryData(today);
+
+            if (summaryData.isToday) {
+                appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！`);
+            } else {
+                appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！<br>如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
+            }
+            appendSummaryCard(summaryData);
+        }
+
+        async function fetchSummaryData(targetDate) {
+            // 1. 抓取個人最新的健康數據
+            const { data: health } = await _supabase.from('health_data')
+                .select('record_date, raw_json')
+                .eq('serial_number', currentSerial)
+                .order('record_date', { ascending: false })
+                .limit(1);
+
+            if (!health || health.length === 0) return null;
+            const latest = health[0];
+            const date = latest.record_date;
+            const battery = latest.raw_json.Personal_Battery_weighted_round || 0;
+
+            // 2. 抓取生理燈號
+            const { data: feedback } = await _supabase.from('daily_feedback')
+                .select('status_light')
+                .eq('serial_number', currentSerial)
+                .eq('record_date', date)
+                .single();
+
+            // 3. 計算百分比 (超過多少使用者)
+            const { data: allDayData } = await _supabase.from('health_data')
+                .select('raw_json')
+                .eq('record_date', date);
+            
+            let percentage = 0;
+            if (allDayData && allDayData.length > 0) {
+                const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
+                percentage = Math.round((lowerCount / allDayData.length) * 100);
+            }
+
+            return {
+                isToday: date === targetDate,
+                date: date.replace(/-/g, '/'),
+                battery: battery,
+                percentage: percentage,
+                light: feedback ? feedback.status_light : null
+            };
+        }
+
+        function appendSummaryCard(data) {
+            if (!data) return;
+            const history = document.getElementById('chat-history');
+            
+            // 電量顏色
+            let bColor = "#ff8c73";
+            if (data.battery >= 60) bColor = "#a79d8c";
+            if (data.battery >= 80) bColor = "#a0adb7";
+            if (data.battery >= 100) bColor = "#596b75";
+
+            // 燈號顏色與文字
+            const lightMap = {
+                '紅燈': { c: '#ff0000', t: '紅燈' },
+                '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
+                '黃燈': { c: '#ffe632', t: '黃燈' },
+                '綠燈': { c: '#3caa28', t: '綠燈' }
+            };
+            const lightInfo = lightMap[data.light] || null;
+
+            const cardHtml = `
+                <div class="msg-row ai-row">
+                    <div class="summary-card" onclick="zoomCard(this)">
+                        <div class="summary-header">📅 ${data.date} 健康摘要</div>
+                        <div class="summary-item">
+                            <span class="summary-label">生理電量</span>
+                            <span class="battery-val" style="color:${bColor}">${data.battery}</span>
+                        </div>
+                        <div class="summary-item" style="margin-top:-5px;">
+                            <span></span>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                        </div>
+                        ${lightInfo ? `
+                        <div class="summary-item">
+                            <span class="summary-label">生理狀態</span>
+                            <span style="font-weight:bold;">
+                                <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
+                            </span>
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            
+            history.innerHTML += cardHtml;
+            scrollToBottom();
+        }
+
+        function zoomCard(el) {
+            const overlay = document.getElementById('zoom-overlay');
+            const content = document.getElementById('zoom-content');
+            content.innerHTML = el.outerHTML;
+            overlay.classList.remove('hidden');
+        }
+
+        // --- 原始對話邏輯 ---
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendUserMessage(text);
+            input.value = '';
+
+            if (isNamingPhase) {
+                const { error } = await _supabase.from('user_credentials').update({ ai_name: text }).eq('serial_number', currentSerial);
+                if (!error) {
+                    isNamingPhase = false;
+                    setTimeout(() => {
+                        appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
+                        // 命名後直接顯示摘要
+                        showLoginSummary(document.getElementById('display-name').innerText);
+                    }, 800);
+                }
+            } else {
+                // [新增] 檢查關鍵字
+                if (text.includes("健康摘要")) {
+                    setTimeout(async () => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const data = await fetchSummaryData(today);
+                        const label = data && data.isToday ? "今天" : "最新";
+                        appendAiMessage(`這是我們${label}的健康摘要`);
+                        appendSummaryCard(data);
+                    }, 800);
+                } else {
+                    setTimeout(() => {
+                        appendAiMessage("收到你的訊息，正在為你整理健康資訊...");
+                    }, 800);
+                }
+            }
+        }
+
+        // 輔助函式
+        function appendUserMessage(msg) {
+            const history = document.getElementById('chat-history');
+            history.innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`;
+            scrollToBottom();
+        }
+        function appendAiMessage(msg) {
+            const history = document.getElementById('chat-history');
+            history.innerHTML += `<div class="msg-row ai-row"><div class="ai-bubble">${msg}</div></div>`;
+            scrollToBottom();
+        }
+        function scrollToBottom() {
+            const main = document.getElementById('main-area');
+            main.scrollTop = main.scrollHeight;
+        }
+        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+        function logout() { location.reload(); }
         function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
         function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
         async function updatePassword() {
@@ -224,65 +349,6 @@
             await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
             alert("修改成功！"); closePwModal();
         }
-
-        // 發送與處理訊息
-        async function sendMessage() {
-            const input = document.getElementById('user-input');
-            const text = input.value.trim();
-            if (!text) return;
-
-            // 1. 顯示使用者氣泡
-            appendUserMessage(text);
-            input.value = '';
-
-            if (isNamingPhase) {
-                // 2. 處理命名邏輯：記錄到 Supabase
-                const { error } = await _supabase.from('user_credentials')
-                    .update({ ai_name: text })
-                    .eq('serial_number', currentSerial);
-
-                if (!error) {
-                    isNamingPhase = false;
-                    setTimeout(() => {
-                        appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
-                    }, 800);
-                } else {
-                    console.error("命名失敗:", error);
-                }
-            } else {
-                // 3. 一般對話回應 (模擬)
-                setTimeout(() => {
-                    appendAiMessage("收到你的訊息，正在為你整理健康資訊...");
-                }, 800);
-            }
-        }
-
-        // 輔助函式：新增氣泡
-        function appendUserMessage(msg) {
-            const history = document.getElementById('chat-history');
-            history.innerHTML += `
-                <div class="msg-row user-row">
-                    <div class="user-bubble">${msg}</div>
-                </div>`;
-            scrollToBottom();
-        }
-
-        function appendAiMessage(msg) {
-            const history = document.getElementById('chat-history');
-            history.innerHTML += `
-                <div class="msg-row ai-row">
-                    <div class="ai-bubble">${msg}</div>
-                </div>`;
-            scrollToBottom();
-        }
-
-        function scrollToBottom() {
-            const main = document.getElementById('main-area');
-            main.scrollTop = main.scrollHeight;
-        }
-
-        function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-        function logout() { location.reload(); }
     </script>
 </body>
 </html>
