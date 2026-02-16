@@ -3,81 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理者後台 | 健康夥伴管理系統 ad05整合版</title>
+    <title>管理者後台 | ad03+ad05 整合版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
-        :root { --tbp-blue: #8699a3; --bg-color: #f4f7f9; --card-bg: #ffffff; --text-dark: #333; --danger: #ff8c73; }
-        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; color: var(--text-dark); }
-        .hidden { display: none !important; }
-        .admin-container { max-width: 1100px; margin: 20px auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--tbp-blue); padding-bottom: 15px; margin-bottom: 25px; }
+        :root { --tbp-blue: #8699a3; --bg-color: #f4f7f9; --card-bg: #ffffff; --text-dark: #333; }
+        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: var(--text-dark); }
+        .admin-container { max-width: 1000px; margin: 0 auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        header { border-bottom: 2px solid var(--tbp-blue); padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
         h1 { margin: 0; color: var(--tbp-blue); font-size: 24px; }
-        
-        .section-card { background: #fdfdfd; border: 1px solid #eee; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-        .section-card h2 { margin-top: 0; font-size: 18px; color: #555; border-left: 4px solid var(--tbp-blue); padding-left: 10px; }
-        
+        .section-card { background: #fdfdfd; border: 1px solid #eee; border-radius: 10px; padding: 20px; margin-bottom: 25px; }
+        .section-card h2 { margin-top: 0; font-size: 18px; color: #444; border-left: 4px solid var(--tbp-blue); padding-left: 10px; }
         .upload-group { display: flex; align-items: center; gap: 15px; margin-top: 15px; flex-wrap: wrap; }
-        input[type="file"] { border: 1px solid #ddd; padding: 8px; border-radius: 5px; background: white; }
-        
-        button { background: var(--tbp-blue); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #6f818a; }
-        button.secondary { background: #eee; color: #555; }
-        
-        .status-msg { margin-top: 10px; font-size: 0.9em; min-height: 1.2em; }
-        .loading { color: orange; font-weight: bold; }
+        input[type="file"] { border: 1px solid #ddd; padding: 8px; border-radius: 5px; }
+        button { background: var(--tbp-blue); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        .status-msg { margin-top: 12px; font-size: 0.9em; padding: 10px; border-radius: 5px; display: none; }
+        .status-loading { display: block; background: #fff3cd; color: #856404; }
+        .status-success { display: block; background: #d4edda; color: #155724; }
+        .status-error { display: block; background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
 
 <div class="admin-container">
     <header>
-        <h1>管理者後台系統</h1>
-        <button class="secondary" onclick="location.reload()">重新整理</button>
+        <h1>健康夥伴管理系統 (整合版)</h1>
+        <small>v05-ad03-integrated</small>
     </header>
 
     <div class="section-card">
-        <h2>1. 穿戴裝置原始數據 (健康數據同步)</h2>
-        <p style="font-size: 0.85em; color: #888;">請上傳包含以「序號」命名的分頁 Excel。系統會根據 record_end 自動去重並更新數據。</p>
+        <h2>1. 同步穿戴裝置原始數據 (健康數據)</h2>
+        <p style="font-size: 0.85em; color: #666;">系統將讀取 Excel 分頁名稱作為「序號」，並依據 <b>record_end</b> 欄位自動過濾重複日期。</p>
         <div class="upload-group">
             <input type="file" id="health-file" accept=".xlsx, .xls">
-            <button onclick="uploadHealthData()">開始同步健康數據</button>
+            <button onclick="uploadHealthData()">開始同步數據</button>
         </div>
         <div id="health-status" class="status-msg"></div>
     </div>
 
     <div class="section-card">
-        <h2>2. 建議詞句庫更新</h2>
-        <p style="font-size: 0.85em; color: #888;">請上傳包含 battery, Daily_Tag, best, worst, attention, goal, button 等分頁的 Excel。</p>
+        <h2>2. 更新建議詞句庫 (含 Battery/Daily_Tag 等)</h2>
+        <p style="font-size: 0.85em; color: #666;">上傳包含 battery, Daily_Tag, best, worst, attention, goal, button 等分頁之 Excel。</p>
         <div class="upload-group">
             <input type="file" id="phrase-file" accept=".xlsx, .xls">
-            <button onclick="uploadPhraseLibrary()">更新建議詞句庫</button>
+            <button onclick="uploadPhraseLibrary()">更新詞句庫</button>
         </div>
         <div id="phrase-status" class="status-msg"></div>
     </div>
-
 </div>
 
 <script>
-    // --- 請替換您的 Supabase 金鑰 ---
+    // --- Supabase 配置 ---
     const SUPABASE_URL = 'https://您的專案網址.supabase.co';
     const SUPABASE_KEY = '您的公開金鑰';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     /**
-     * 功能 1: 穿戴裝置數據上傳 (核心邏輯參照 ad03)
+     * 【核心邏輯】功能 1：同步健康數據 (ad03 辨識方式)
      */
     async function uploadHealthData() {
         const fileInput = document.getElementById('health-file');
         const status = document.getElementById('health-status');
 
-        if (!fileInput.files.length) {
-            alert("請先選擇 Excel 檔案");
-            return;
-        }
+        if (!fileInput.files.length) { alert("請先選擇 Excel 檔案"); return; }
 
-        status.innerHTML = "正在解析檔案並檢查序號...";
-        status.className = "status-msg loading";
+        showStatus(status, "正在解析檔案並比對資料庫序號...", "loading");
 
         const file = fileInput.files[0];
         const reader = new FileReader();
@@ -87,34 +78,35 @@
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
 
-                // 1. 獲取合法使用者清單
+                // 1. 取得資料庫中現有的序號 (確保只匯入合法使用者)
                 const { data: users, error: userError } = await _supabase.from('user_credentials').select('serial_number');
                 if (userError) throw userError;
                 const validSerials = users.map(u => u.serial_number);
 
-                const dataMap = new Map(); // 用於去重 (Key: 序號_日期)
+                // 2. 使用 Map 進行去重 (Key: 序號_日期) -> 這是解決 ON CONFLICT 的關鍵
+                const dataMap = new Map();
                 let matchedSheets = [];
 
-                // 2. 遍歷分頁，邏輯改為讀取 record_end
                 workbook.SheetNames.forEach(sheetName => {
-                    if (validSerials.includes(sheetName)) {
-                        matchedSheets.push(sheetName);
-                        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    const sn = sheetName.trim();
+                    if (validSerials.includes(sn)) {
+                        matchedSheets.push(sn);
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-                        sheetData.forEach(row => {
-                            // 讀取 record_end 作為基準日期
-                            const endVal = row['record_end'];
-                            if (endVal) {
-                                let rawDate = new Date(endVal);
-
-                                if (!isNaN(rawDate)) {
-                                    const formattedDate = `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`;
+                        rows.forEach(row => {
+                            // 讀取 record_end (ad03 邏輯)
+                            const dateVal = row['record_end'];
+                            if (dateVal) {
+                                const d = new Date(dateVal);
+                                if (!isNaN(d)) {
+                                    // 格式化日期 YYYY-MM-DD
+                                    const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                                    const uniqueKey = `${sn}_${dateKey}`;
                                     
-                                    // ad03 的關鍵去重邏輯：同一天只留最後一筆
-                                    const key = `${sheetName}_${formattedDate}`;
-                                    dataMap.set(key, {
-                                        serial_number: sheetName,
-                                        record_date: formattedDate,
+                                    // 存入 Map，同序號同日期的資料，後者會覆蓋前者，保證不重複
+                                    dataMap.set(uniqueKey, {
+                                        serial_number: sn,
+                                        record_date: dateKey,
                                         raw_json: row
                                     });
                                 }
@@ -123,30 +115,26 @@
                     }
                 });
 
-                const allData = Array.from(dataMap.values());
-                if (allData.length === 0) throw new Error("找不到匹配的序號分頁或日期格式不正確。");
+                const uploadArray = Array.from(dataMap.values());
+                if (uploadArray.length === 0) throw new Error("Excel 中找不到匹配的序號分頁或日期欄位。");
 
-                status.innerHTML = `🚀 已辨識 ${matchedSheets.length} 個序號分頁，準備上傳 ${allData.length} 筆資料...`;
+                showStatus(status, `🚀 辨識成功！發現 ${matchedSheets.length} 個匹配分頁，共 ${uploadArray.length} 筆不重複數據。正在上傳...`, "loading");
 
-                // 3. 批次寫入 (Upsert)
+                // 3. 批次上傳 (避免請求過大)
                 const chunkSize = 100;
-                for (let i = 0; i < allData.length; i += chunkSize) {
-                    const chunk = allData.slice(i, i + chunkSize);
-                    const { error } = await _supabase
+                for (let i = 0; i < uploadArray.length; i += chunkSize) {
+                    const chunk = uploadArray.slice(i, i + chunkSize);
+                    const { error: upsertError } = await _supabase
                         .from('health_data')
                         .upsert(chunk, { onConflict: 'serial_number, record_date' });
                     
-                    if (error) throw error;
+                    if (upsertError) throw upsertError;
                 }
 
-                status.style.color = "green";
-                status.className = "status-msg";
-                status.innerHTML = `✅ 成功！已更新 ${matchedSheets.length} 個分頁，共 ${allData.length} 筆數據。`;
+                showStatus(status, `✅ 同步成功！已處理分頁：${matchedSheets.join(', ')}。共匯入 ${uploadArray.length} 筆數據。`, "success");
 
             } catch (err) {
-                status.style.color = "red";
-                status.className = "status-msg";
-                status.innerHTML = "❌ 失敗: " + err.message;
+                showStatus(status, "❌ 失敗: " + err.message, "error");
                 console.error(err);
             }
         };
@@ -154,19 +142,15 @@
     }
 
     /**
-     * 功能 2: 詞句庫更新 (ad05 原有功能)
+     * 功能 2：更新詞句庫 (ad05 邏輯)
      */
     async function uploadPhraseLibrary() {
         const fileInput = document.getElementById('phrase-file');
         const status = document.getElementById('phrase-status');
 
-        if (!fileInput.files.length) {
-            alert("請選擇詞句庫 Excel 檔案");
-            return;
-        }
+        if (!fileInput.files.length) { alert("請選擇詞句庫檔案"); return; }
 
-        status.innerHTML = "正在處理詞句庫...";
-        status.className = "status-msg loading";
+        showStatus(status, "正在轉換詞句格式...", "loading");
 
         const file = fileInput.files[0];
         const reader = new FileReader();
@@ -181,51 +165,54 @@
                     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
                     rows.forEach(row => {
                         let entry = { category: sheetName };
-                        
+
+                        // 依據不同分頁套用 ad05 的欄位映射邏輯
                         if (sheetName === 'battery') {
                             entry.logic_key = `${row.TST_min}${row.N3_pct}${row.rMSSD}${row.HR_min}${row.HBI}`;
-                            entry.detailed_content = row['詳細解說'];
-                            entry.simple_content = row['一句大眾易懂又強調健康價值的版本'];
                             entry.title = row['重點摘要'];
+                            entry.simple_content = row['一句大眾易懂又強調健康價值的版本'];
+                            entry.detailed_content = row['詳細解說'];
                         } 
                         else if (sheetName === 'Daily_Tag') {
                             entry.title = row['Daily_Tag'];
                             entry.simple_content = row['建議'];
-                            entry.detailed_content = row['__EMPTY'] || row['內容']; // 依 Excel 欄位名稱調整
-                        }
-                        else if (sheetName === 'button') {
-                            entry.title = row['選項問句'];
-                            entry.detailed_content = row['內容'];
-                            entry.action_suggest = row['動作'];
+                            entry.detailed_content = row['內容'] || row['__EMPTY'];
                         }
                         else if (['best', 'worst', 'attention', 'goal'].includes(sheetName)) {
                             entry.logic_key = row['備註'];
                             entry.detailed_content = row['注意'] || row['達標'] || row['重點摘要'];
                             entry.action_suggest = row['建議'];
                         }
+                        else if (sheetName === 'button') {
+                            entry.title = row['選項問句'];
+                            entry.detailed_content = row['內容'];
+                            entry.action_suggest = row['動作'];
+                        }
 
-                        if (entry.detailed_content || entry.title) {
+                        if (entry.title || entry.detailed_content || entry.logic_key) {
                             allPhrases.push(entry);
                         }
                     });
                 });
 
-                // 清理舊資料並匯入新資料
-                await _supabase.from('phrase_library').delete().neq('category', 'keep_this');
-                const { error } = await _supabase.from('phrase_library').insert(allPhrases);
-                if (error) throw error;
-
-                status.style.color = "green";
-                status.className = "status-msg";
-                status.innerHTML = `✅ 詞句庫更新完成！共匯入 ${allPhrases.length} 筆資料。`;
+                // 先刪除舊資料再插入 (ad05 方式)
+                await _supabase.from('phrase_library').delete().neq('category', 'system_temp');
+                const { error: insError } = await _supabase.from('phrase_library').insert(allPhrases);
+                
+                if (insError) throw insError;
+                showStatus(status, `✅ 詞句庫更新完畢！共匯入 ${allPhrases.length} 筆建議詞句。`, "success");
 
             } catch (err) {
-                status.style.color = "red";
-                status.className = "status-msg";
-                status.innerHTML = "❌ 更新失敗: " + err.message;
+                showStatus(status, "❌ 失敗: " + err.message, "error");
             }
         };
         reader.readAsArrayBuffer(file);
+    }
+
+    // 狀態顯示輔助函式
+    function showStatus(el, msg, type) {
+        el.innerText = msg;
+        el.className = "status-msg status-" + type;
     }
 </script>
 
