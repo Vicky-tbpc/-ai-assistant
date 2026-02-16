@@ -13,26 +13,26 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
-            --light-red: #ff0000;
-            --light-orange: #ff8000;
-            --light-yellow: #ffe632;
-            --light-green: #3caa28;
+            --legend-text: #6c83cf; /* 指定的圖例文字顏色 */
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
+        /* 彈窗樣式 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; }
 
+        /* 主佈局 */
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
+        /* 對話內容 */
         main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
         .msg-row { display: flex; width: 100%; margin: 4px 0; }
@@ -41,11 +41,8 @@
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        .summary-card { 
-            background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; 
-            margin: 10px 0; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .summary-card:active { transform: scale(0.98); }
+        /* 健康摘要卡片與 006 圖例 */
+        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; margin: 10px 0; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
         .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .summary-label { font-size: 0.9rem; color: #555; }
@@ -53,9 +50,20 @@
         .rank-text { font-size: 0.8rem; color: #999; }
         .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
 
-        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
-        #zoom-content { transform: scale(1.5); background: white; border-radius: 12px; pointer-events: none; }
+        /* 圖例樣式 (006 圖片內容) */
+        .summary-legend { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #f5f5f5; }
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--legend-text); font-weight: bold; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-notice { background-color: #ff8c73; }
+        .dot-standard { background-color: #a79d8c; }
+        .dot-good { background-color: #a0adb7; }
+        .dot-excellent { background-color: #596b75; }
 
+        /* 放大功能 */
+        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
+        #zoom-content { transform: scale(1.3); background: white; border-radius: 12px; pointer-events: none; }
+
+        /* 輸入框 */
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
@@ -63,36 +71,7 @@
 
         .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-    
-/* 健康摘要卡片內的指標顏色 (Legend) */
-.summary-legend {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #f5f5f5;
-}
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.85rem;
-    color: #6c83cf; /* 指定的文字顏色 */
-}
-.dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-}
-/* 指定色碼 */
-.dot-notice { background-color: #ff8c73; }
-.dot-standard { background-color: #a79d8c; }
-.dot-good { background-color: #a0adb7; }
-.dot-excellent { background-color: #596b75; }
-
-</style>
+    </style>
 </head>
 <body>
 
@@ -195,9 +174,9 @@
             } else {
                 appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。`);
                 
+                // 一天顯示一次摘要邏輯
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
-                
                 if (lastShown !== todayStr) {
                     await showSummaryFlow(name, false);
                     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
@@ -214,14 +193,14 @@
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
                 } else {
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~");
+                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
                 }
             } else {
                 if (summaryData && summaryData.isToday) {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！`);
                 } else {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~`);
+                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
                 }
             }
             appendSummaryCard(summaryData);
@@ -257,64 +236,40 @@
             };
         }
 
-       function appendSummaryCard(data) {
-    if (!data) return;
-    
-    // 根據生理電量決定數值顯示的顏色
-    let bColor = "#ff8c73"; // 注意
-    if (data.battery >= 60) bColor = "#a79d8c"; // 標準
-    if (data.battery >= 80) bColor = "#a0adb7"; // 良好
-    if (data.battery >= 100) bColor = "#596b75"; // 優秀
+        function appendSummaryCard(data) {
+            if (!data) return;
+            let bColor = "#ff8c73";
+            if (data.battery >= 60) bColor = "#a79d8c";
+            if (data.battery >= 80) bColor = "#a0adb7";
+            if (data.battery >= 100) bColor = "#596b75";
 
-    const lightMap = {
-        '紅燈': { c: '#ff0000', t: '紅燈' }, 
-        '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
-        '黃燈': { c: '#ffe632', t: '黃燈' }, 
-        '綠燈': { c: '#3caa28', t: '綠燈' }
-    };
-    const lightInfo = lightMap[data.light] || null;
+            const lightMap = {
+                '紅燈': { c: '#ff0000', t: '紅燈' }, '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
+                '黃燈': { c: '#ffe632', t: '黃燈' }, '綠燈': { c: '#3caa28', t: '綠燈' }
+            };
+            const lightInfo = lightMap[data.light] || null;
 
-    const cardHtml = `
-        <div class="msg-row ai-row">
-            <div class="summary-card" onclick="zoomCard(this)">
-                <div class="summary-header">📅 ${data.date} 健康摘要</div>
-                
-                <div class="summary-item">
-                    <span class="summary-label">生理電量</span>
-                    <span class="battery-val" style="color:${bColor}">${data.battery}</span>
-                </div>
-                
-                <div class="summary-item" style="margin-top:-5px;">
-                    <span></span>
-                    <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
-                </div>
-                
-                ${lightInfo ? `
-                <div class="summary-item">
-                    <span class="summary-label">生理狀態</span>
-                    <span style="font-weight:bold;">
-                        <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
-                    </span>
-                </div>` : ''}
-
-                <div class="summary-legend">
-                    <div class="legend-item"><span class="dot dot-notice"></span>注意</div>
-                    <div class="legend-item"><span class="dot dot-standard"></span>標準</div>
-                    <div class="legend-item"><span class="dot dot-good"></span>良好</div>
-                    <div class="legend-item"><span class="dot dot-excellent"></span>優秀</div>
-                </div>
-            </div>
-        </div>`;
-    
-    document.getElementById('chat-history').innerHTML += cardHtml;
-    scrollToBottom();
-}                    </div>
+            const cardHtml = `
+                <div class="msg-row ai-row">
+                    <div class="summary-card" onclick="zoomCard(this)">
+                        <div class="summary-header">📅 ${data.date} 健康摘要</div>
+                        <div class="summary-item"><span class="summary-label">生理電量</span><span class="battery-val" style="color:${bColor}">${data.battery}</span></div>
+                        <div class="summary-item" style="margin-top:-5px;"><span></span><span class="rank-text">超過 ${data.percentage}% 的使用者</span></div>
+                        ${lightInfo ? `<div class="summary-item"><span class="summary-label">生理狀態</span><span style="font-weight:bold;"><span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}</span></div>` : ''}
+                        
+                        <div class="summary-legend">
+                            <div class="legend-item"><span class="dot dot-notice"></span>注意</div>
+                            <div class="legend-item"><span class="dot dot-standard"></span>標準</div>
+                            <div class="legend-item"><span class="dot dot-good"></span>良好</div>
+                            <div class="legend-item"><span class="dot dot-excellent"></span>優秀</div>
+                        </div>
+                    </div>
                 </div>`;
             document.getElementById('chat-history').innerHTML += cardHtml;
             scrollToBottom();
         }
 
-       async function sendMessage() {
+        async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -328,19 +283,14 @@
                 localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
             } else if (text.includes("健康摘要")) {
-                // --- 調整關鍵字觸發邏輯 ---
                 setTimeout(async () => {
                     const today = new Date().toISOString().split('T')[0];
                     const data = await fetchSummaryData(today);
-                    
                     if (data && data.isToday) {
-                        // 如果是今天的數據
-                        appendAiMessage(`這是我們今天的健康摘要`);
+                        appendAiMessage("這是我們今天的健康摘要");
                     } else {
-                        // 如果是之前的數據 (最新)
-                        appendAiMessage(`這是我們最新的健康摘要`);
-                        // [新增] 搭配提醒泡泡
-                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~`);
+                        appendAiMessage("這是我們最新的健康摘要");
+                        appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
                     }
                     appendSummaryCard(data);
                 }, 800);
@@ -368,20 +318,16 @@
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
         function logout() { location.reload(); }
 
-        // [加回修改密碼相關 JS 函式]
         function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
         function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
         async function updatePassword() {
             const oldP = document.getElementById('old-pw').value;
             const newP = document.getElementById('new-pw').value;
             if (!oldP || !newP) return alert("請輸入完整資料");
-            
             const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
             if(!data) return alert("舊密碼錯誤");
-            
-            const { error } = await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-            if(error) { alert("修改失敗"); } 
-            else { alert("修改成功！"); closePwModal(); }
+            await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
+            alert("修改成功！"); closePwModal();
         }
     </script>
 </body>
