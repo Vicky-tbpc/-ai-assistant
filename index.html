@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n03-1</title>
+    <title>AI 健康夥伴 n03</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -185,14 +185,14 @@
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
                 } else {
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
+                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~");
                 }
             } else {
                 if (summaryData && summaryData.isToday) {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！`);
                 } else {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
+                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~`);
                 }
             }
             appendSummaryCard(summaryData);
@@ -280,7 +280,7 @@
                         // 如果是之前的數據 (最新)
                         appendAiMessage(`這是我們最新的健康摘要`);
                         // [新增] 搭配提醒泡泡
-                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
+                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~`);
                     }
                     appendSummaryCard(data);
                 }, 800);
