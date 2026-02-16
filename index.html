@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n03-1</title>
+    <title>AI 健康夥伴 n03-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -167,6 +167,10 @@
                 // 首次取名完畢後的對話
                 appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
                 appendSummaryCard(summaryData);
+                else {
+                    appendAiMessage(`謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！`);
+                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
+                }
             } else {
                 // 一般登入流程
                 if (summaryData.isToday) {
