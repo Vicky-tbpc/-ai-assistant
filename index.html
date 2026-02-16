@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n06</title>
+    <title>AI 健康夥伴 n07</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,7 +13,7 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
-            --legend-text: #8699a3; /* 指定的圖例文字顏色 */
+            --legend-text: #6c83cf; 
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
@@ -41,7 +41,7 @@
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* 健康摘要卡片與 006 圖例 */
+        /* 健康摘要卡片 */
         .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; margin: 10px 0; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
         .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -50,7 +50,7 @@
         .rank-text { font-size: 0.8rem; color: #999; }
         .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
 
-        /* 圖例樣式 (006 圖片內容) */
+        /* 圖例樣式 (006) */
         .summary-legend { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #f5f5f5; }
         .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--legend-text); font-weight: bold; }
         .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -58,6 +58,14 @@
         .dot-standard { background-color: #a79d8c; }
         .dot-good { background-color: #a0adb7; }
         .dot-excellent { background-color: #596b75; }
+
+        /* 膠囊訊息條樣式 (007) */
+        .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
+        .capsule-best { background-color: #f0f4f5; color: #555; }
+        .capsule-worst { background-color: #fff1ef; color: #555; }
+        .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
+        .icon-best { color: #a0afb7; }
+        .icon-worst { color: #ffb4a3; }
 
         /* 放大功能 */
         #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
@@ -77,7 +85,7 @@
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">Personal Health Companion</h2>
+            <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
             <button class="primary-btn" onclick="login()">登入系統</button>
@@ -139,6 +147,14 @@
         let currentSerial = "";
         let isNamingPhase = false;
 
+        const FIELD_MAP = {
+            'Battery_TST_min_A': { best: 'Battery 總睡眠時間最佳', worst: 'Battery 總睡眠時間最差' },
+            'Battery_N3_pct_A': { best: 'Battery N3最佳', worst: 'Battery N3最差' },
+            'Battery_rMSSD_A': { best: 'Battery rMSSD最佳', worst: 'Battery rMSSD最差' },
+            'Battery_HBI_A': { best: 'Battery HBI最佳', worst: 'Battery HBI最差' },
+            'Battery_HR_min_A': { best: 'Battery 最低脈搏最佳', worst: 'Battery 最低脈搏最差' }
+        };
+
         async function login() {
             const serial = document.getElementById('serial').value;
             const pw = document.getElementById('pw').value;
@@ -151,7 +167,7 @@
                 } else {
                     initApp(data.nickname, data.ai_name);
                 }
-            } else { alert("驗證失敗"); }
+            } else { alert("驗證失敗 😅"); }
         }
 
         async function saveNickname() {
@@ -169,12 +185,10 @@
             
             if (!aiName) {
                 isNamingPhase = true;
-                appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。");
+                appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。 ✨");
                 appendAiMessage("請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
             } else {
-                appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。`);
-                
-                // 一天顯示一次摘要邏輯
+                appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
                 if (lastShown !== todayStr) {
@@ -187,52 +201,66 @@
         async function showSummaryFlow(nickname, isFirstTimeNaming) {
             const today = new Date().toISOString().split('T')[0];
             const summaryData = await fetchSummaryData(today);
+            if (!summaryData) return;
 
             if (isFirstTimeNaming) {
-                if (summaryData && summaryData.isToday) {
-                    appendAiMessage("太棒了！我們一起來看看今天的健康摘要吧！");
+                if (summaryData.isToday) {
+                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
                 } else {
-                    appendAiMessage("太棒了！我們一起來看看最新的健康摘要吧！");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
+                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
+                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~ ☁️");
                 }
             } else {
-                if (summaryData && summaryData.isToday) {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！`);
+                if (summaryData.isToday) {
+                    appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
                 } else {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~`);
+                    appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~ ☁️`);
                 }
             }
             appendSummaryCard(summaryData);
         }
 
-       async function fetchSummaryData(targetDate) {
-            // 查詢指定日期或該日期之前的最新一筆資料
-            const { data: health } = await _supabase.from('health_data')
+        async function fetchSummaryData(targetDate) {
+            // 抓取目標日期與前一筆
+            const { data: healths } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
                 .eq('serial_number', currentSerial)
-                .eq('record_date', targetDate) // 精確查詢該日期
-                .single();
+                .lte('record_date', targetDate)
+                .order('record_date', { ascending: false })
+                .limit(2);
 
-            // 若該日無資料，改為查詢「最新一筆」資料（原邏輯）
-            if (!health) {
-                const { data: latest } = await _supabase.from('health_data')
-                    .select('record_date, raw_json')
-                    .eq('serial_number', currentSerial)
-                    .order('record_date', { ascending: false }).limit(1);
-                
-                if (!latest || latest.length === 0) return null;
-                return processHealthRow(latest[0], new Date().toISOString().split('T')[0]);
+            if (!healths || healths.length === 0) return null;
+
+            const current = healths[0];
+            const prev = healths[1];
+            const raw = current.raw_json;
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            // 邏輯比對
+            let bestKey = 'Battery_TST_min_A';
+            let worstKey = 'Battery_TST_min_A';
+            if (prev) {
+                let maxInc = -Infinity, maxDec = Infinity;
+                const prevRaw = prev.raw_json;
+                Object.keys(FIELD_MAP).forEach(key => {
+                    const diff = (raw[key] || 0) - (prevRaw[key] || 0);
+                    if (diff > maxInc) { maxInc = diff; bestKey = key; }
+                    if (diff < maxDec) { maxDec = diff; worstKey = key; }
+                });
             }
 
-            return processHealthRow(health, new Date().toISOString().split('T')[0]);
-        }
+            // 抓取詞句庫
+            const { data: phrases } = await _supabase.from('phrase_library')
+                .select('logic_key, detailed_content')
+                .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
 
-        // 抽離出來的處理邏輯
-        async function processHealthRow(row, todayStr) {
-            const date = row.record_date;
-            const battery = row.raw_json.Personal_Battery_weighted_round || 0;
+            const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
+            const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
 
+            // 其他數據
+            const date = current.record_date;
+            const battery = raw.Personal_Battery_weighted_round || 0;
             const { data: feedback } = await _supabase.from('daily_feedback')
                 .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
 
@@ -245,11 +273,13 @@
 
             return {
                 isToday: date === todayStr,
-                record_date_raw: date, // 原始格式供判斷用
-                date: date.replace(/-/g, '/'), // 顯示格式
+                record_date_raw: date,
+                date: date.replace(/-/g, '/'),
                 battery: battery,
                 percentage: percentage,
-                light: feedback ? feedback.status_light : null
+                light: feedback ? feedback.status_light : null,
+                bestText: bestText,
+                worstText: worstText
             };
         }
 
@@ -268,17 +298,26 @@
 
             const cardHtml = `
                 <div class="msg-row ai-row">
-                    <div class="summary-card" onclick="zoomCard(this)">
-                        <div class="summary-header">📅 ${data.date} 健康摘要</div>
-                        <div class="summary-item"><span class="summary-label">生理電量</span><span class="battery-val" style="color:${bColor}">${data.battery}</span></div>
-                        <div class="summary-item" style="margin-top:-5px;"><span></span><span class="rank-text">超過 ${data.percentage}% 的使用者</span></div>
-                        ${lightInfo ? `<div class="summary-item"><span class="summary-label">生理狀態</span><span style="font-weight:bold;"><span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}</span></div>` : ''}
-                        
-                        <div class="summary-legend">
-                            <div class="legend-item"><span class="dot dot-notice"></span>注意</div>
-                            <div class="legend-item"><span class="dot dot-standard"></span>標準</div>
-                            <div class="legend-item"><span class="dot dot-good"></span>良好</div>
-                            <div class="legend-item"><span class="dot dot-excellent"></span>優秀</div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <div class="summary-card" onclick="zoomCard(this)">
+                            <div class="summary-header">📅 ${data.date} 健康摘要</div>
+                            <div class="summary-item"><span class="summary-label">生理電量</span><span class="battery-val" style="color:${bColor}">${data.battery}</span></div>
+                            <div class="summary-item" style="margin-top:-5px;"><span></span><span class="rank-text">超過 ${data.percentage}% 的使用者</span></div>
+                            ${lightInfo ? `<div class="summary-item"><span class="summary-label">生理狀態</span><span style="font-weight:bold;"><span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}</span></div>` : ''}
+                            <div class="summary-legend">
+                                <div class="legend-item"><span class="dot dot-notice"></span>注意</div>
+                                <div class="legend-item"><span class="dot dot-standard"></span>標準</div>
+                                <div class="legend-item"><span class="dot dot-good"></span>良好</div>
+                                <div class="legend-item"><span class="dot dot-excellent"></span>優秀</div>
+                            </div>
+                        </div>
+                        <div class="analysis-capsule capsule-best">
+                            <span class="capsule-icon icon-best">😊</span>
+                            <span>${data.bestText}</span>
+                        </div>
+                        <div class="analysis-capsule capsule-worst">
+                            <span class="capsule-icon icon-worst">☹️</span>
+                            <span>${data.worstText}</span>
                         </div>
                     </div>
                 </div>`;
@@ -286,7 +325,7 @@
             scrollToBottom();
         }
 
-   async function sendMessage() {
+        async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -299,45 +338,34 @@
                 const todayStr = new Date().toISOString().split('T')[0];
                 localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
-            } 
-            else if (text.includes("健康摘要")) {
+            } else if (text.includes("健康摘要")) {
                 setTimeout(async () => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     let targetDate = todayStr;
-
-                    // 支援 YYYY/MM/DD, YYYY-MM-DD 或 YYYY年MM月DD日
                     const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
                     const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
 
                     if (dateMatch || dateMatchChn) {
-                        const match = dateMatch || dateMatchChn;
-                        const year = match[1];
-                        const month = match[2].padStart(2, '0');
-                        const day = match[3].padStart(2, '0');
-                        targetDate = `${year}-${month}-${day}`;
+                        const m = dateMatch || dateMatchChn;
+                        targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
                     }
 
                     const data = await fetchSummaryData(targetDate);
-
-                    // --- 關鍵修改：當資料庫找不到該日期記錄時 ---
-                    if (!data || (dateMatch || dateMatchChn ? data.record_date_raw !== targetDate : false)) {
+                    if (!data || ( (dateMatch || dateMatchChn) && data.record_date_raw !== targetDate )) {
                         appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
                         appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
                         return;
                     }
 
-                    // 判斷回覆語句並加入 Emoji
                     if (data.record_date_raw === todayStr) {
                         appendAiMessage("這是我們今天的健康摘要 ✨");
                     } else {
-                        const displayDate = data.record_date_raw.replace(/-/g, '/');
-                        appendAiMessage(`這是我們 ${displayDate} 的健康摘要 📅`);
+                        appendAiMessage(`這是 ${data.date} 的健康摘要 📅`);
                     }
                     appendSummaryCard(data);
                 }, 800);
             } else {
-                // 一般對話加入 Emoji
-                setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊中... 🕒"), 800);
+                setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
             }
         }
 
@@ -356,20 +384,18 @@
             scrollToBottom();
         }
         function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
-        
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
         function logout() { location.reload(); }
 
         function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
         function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
         async function updatePassword() {
-            const oldP = document.getElementById('old-pw').value;
-            const newP = document.getElementById('new-pw').value;
+            const oldP = document.getElementById('old-pw').value, newP = document.getElementById('new-pw').value;
             if (!oldP || !newP) return alert("請輸入完整資料");
             const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
-            if(!data) return alert("舊密碼錯誤");
+            if(!data) return alert("舊密碼錯誤 😅");
             await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-            alert("修改成功！"); closePwModal();
+            alert("修改成功！ ✨"); closePwModal();
         }
     </script>
 </body>
