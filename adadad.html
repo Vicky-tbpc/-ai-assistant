@@ -77,15 +77,15 @@
             <div id="feedback-status" class="status-msg"></div>
         </div>
 
-<div class="upload-section" style="border-color: #a38699;">
-    <h3 style="margin-top:0;">📚 3. 全域詞句庫 (詞句庫_web_01.xlsx)</h3>
-    <p style="font-size:0.8rem; color:#666;">支援分頁：battery, Daily_Tag, best, worst, attention, goal, button</p>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="file" id="excel-upload-phrases" accept=".xlsx, .xls" style="width: auto;">
-        <button class="primary-btn" style="background:#a38699" onclick="handlePhraseUpload()">更新詞句庫</button>
-    </div>
-    <div id="phrase-status" class="status-msg"></div>
-</div>
+        <div class="upload-section" style="border-color: #a38699;">
+            <h3 style="margin-top:0;">📚 3. 全域詞句庫 (詞句庫_web_01.xlsx)</h3>
+            <p style="font-size:0.8rem; color:#666;">支援分頁：battery, Daily_Tag, best, worst, attention, goal, button</p>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="file" id="excel-upload-phrases" accept=".xlsx, .xls" style="width: auto;">
+                <button class="primary-btn" style="background:#a38699" onclick="handlePhraseUpload()">更新詞句庫</button>
+            </div>
+            <div id="phrase-status" class="status-msg"></div>
+        </div>
 
         <table>
             <thead>
@@ -95,17 +95,12 @@
         </table>
     </div>
 
-
-
-
-
     <script>
         const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
         const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const ADMIN_PW = "888tBPC!!";
 
-        // 管理者基礎邏輯
         function checkAdminAuth() {
             if (document.getElementById('admin-password-input').value === ADMIN_PW) {
                 document.getElementById('admin-login-overlay').classList.add('hidden');
@@ -139,20 +134,19 @@
             closeAddModal(); loadUsers();
         }
 
-        // --- 功能 1：處理穿戴數據 (record_end) ---
+        // --- 功能 1：處理穿戴數據 (讀取 record_end 並去重) ---
         async function handleRawDataUpload() {
             await processExcel('excel-upload-raw', 'raw-status', 'health_data', (row, sheetName) => {
-                let d = formatDate(row.record_end);
+                let d = formatDate(row.record_end); // 鎖定 record_end
                 return d ? { serial_number: sheetName, record_date: d, raw_json: row } : null;
             });
         }
 
-        // --- 功能 2：處理燈號回饋 (提取「日期」) ---
+        // --- 功能 2：處理燈號回饋 (讀取「日期」並去重) ---
         async function handleFeedbackUpload() {
             await processExcel('excel-upload-feedback', 'feedback-status', 'daily_feedback', (row, sheetName) => {
-                let d = formatDate(row['日期']); // 精準提取「日期」欄位
+                let d = formatDate(row['日期']);
                 if (!d) return null;
-
                 return {
                     serial_number: sheetName,
                     record_date: d,
@@ -164,7 +158,7 @@
             });
         }
 
-        // 通用 Excel 處理引擎
+        // --- 核心優化：通用 Excel 處理引擎 (使用 Map 避免 ON CONFLICT 錯誤) ---
         async function processExcel(inputId, statusId, tableName, mapperFn) {
             const fileInput = document.getElementById(inputId);
             const status = document.getElementById(statusId);
@@ -179,11 +173,10 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     
-                    // 獲取有效序號
                     const { data: users } = await _supabase.from('user_credentials').select('serial_number');
                     const validSerials = users.map(u => u.serial_number);
 
-                    const finalData = [];
+                    const dataMap = new Map(); // 使用 Map 進行前端去重，避免資料庫衝突
                     let matchedSheets = [];
 
                     workbook.SheetNames.forEach(sheetName => {
@@ -192,19 +185,24 @@
                             const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
                             sheetData.forEach(row => {
                                 const mapped = mapperFn(row, sheetName);
-                                if (mapped) finalData.push(mapped);
+                                // 建立唯一鍵：分頁名稱 + 日期
+                                if (mapped && mapped.record_date) {
+                                    const uniqueKey = `${sheetName}_${mapped.record_date}`;
+                                    dataMap.set(uniqueKey, mapped); 
+                                }
                             });
                         }
                     });
 
+                    const finalData = Array.from(dataMap.values());
                     if (finalData.length === 0) throw new Error("找不到匹配的分頁名稱或日期資料。");
 
                     status.innerHTML = `🚀 已識別分頁: ${matchedSheets.join(', ')}<br>上傳中: ${finalData.length} 筆資料...`;
 
-                    // 批次寫入
                     const chunkSize = 100;
                     for (let i = 0; i < finalData.length; i += chunkSize) {
-                        const { error } = await _supabase.from(tableName).upsert(finalData.slice(i, i + chunkSize), { onConflict: 'serial_number, record_date' });
+                        const chunk = finalData.slice(i, i + chunkSize);
+                        const { error } = await _supabase.from(tableName).upsert(chunk, { onConflict: 'serial_number, record_date' });
                         if (error) throw error;
                     }
 
@@ -218,7 +216,6 @@
             reader.readAsArrayBuffer(fileInput.files[0]);
         }
 
-        // 萬用日期格式化 (支援 Date 物件, Excel 序號, 字串)
         function formatDate(raw) {
             if (!raw || raw === "undefined") return null;
             try {
@@ -227,7 +224,6 @@
                     const d = XLSX.SSF.parse_date_code(raw);
                     return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
                 }
-                // 處理 2025/12/11 格式
                 let str = String(raw).trim().split(' ')[0].replace(/\//g, '-');
                 if (str.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
                     const parts = str.split('-');
@@ -237,85 +233,55 @@
             } catch (e) { return null; }
         }
 
-
-async function handlePhraseUpload() {
-    const fileInput = document.getElementById('excel-upload-phrases');
-    const status = document.getElementById('phrase-status');
-    if (!fileInput.files[0]) return alert("請選擇詞句庫檔案");
-
-    status.innerHTML = "⏳ 正在解析詞句庫多分頁資料...";
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const allPhrases = [];
-
-            workbook.SheetNames.forEach(sheetName => {
-                const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                
-                sheetData.forEach(row => {
-                    let entry = {
-                        category: sheetName,
-                        raw_json: row
-                    };
-
-                    // 根據不同分頁名稱，對應欄位到統一結構
-                    if (sheetName === 'battery') {
-                        // 組合邏輯鍵 (TST, N3, rMSSD, HR, HBI)
-                        entry.logic_key = `${row.TST_min || ''},${row.N3_pct || ''},${row.rMSSD || ''},${row.HR_min || ''},${row.HBI || ''}`;
-                        entry.detailed_content = row['詳細解說'];
-                        entry.simple_content = row['一句大眾易懂又強調健康價值的版本'];
-                        entry.summary_content = row['重點摘要'];
-                    } 
-                    else if (sheetName === 'Daily_Tag') {
-                        entry.logic_key = row.Daily_Tag;
-                        entry.title = row.Daily_Tag;
-                        entry.detailed_content = row['建議']; // 這裡對應 Excel 的建議欄位
-                        entry.simple_content = row['__EMPTY'] || row['建議_1']; // 處理可能沒標題的欄位
-                        entry.action_suggest = row['__EMPTY_1'] || row['建議_2'];
-                    }
-                    else if (sheetName === 'button') {
-                        entry.title = row['選項問句'];
-                        entry.detailed_content = row['內容'];
-                        entry.action_suggest = row['動作'];
-                    }
-                    else if (['best', 'worst', 'attention', 'goal'].includes(sheetName)) {
-                        entry.logic_key = row['備註'];
-                        entry.summary_content = row['備註'];
-                        entry.detailed_content = row['注意'] || row['達標'] || row['重點摘要'];
-                        entry.action_suggest = row['建議'];
-                    }
-
-                    if (entry.detailed_content || entry.simple_content || entry.title) {
-                        allPhrases.push(entry);
-                    }
-                });
-            });
-
-            status.innerHTML = `🚀 正在清理舊資料並匯入 ${allPhrases.length} 筆詞句...`;
-
-            // 1. 先清空該類別的舊資料 (或直接全部清空重新匯入)
-            await _supabase.from('phrase_library').delete().neq('category', 'temp');
-
-            // 2. 批次匯入
-            const { error } = await _supabase.from('phrase_library').insert(allPhrases);
-            if (error) throw error;
-
-            status.style.color = "green";
-            status.innerHTML = `✅ 詞句庫更新完成！已匯入 ${workbook.SheetNames.length} 個分頁共 ${allPhrases.length} 筆建議。`;
-        } catch (err) {
-            status.style.color = "red";
-            status.innerHTML = "❌ 匯入出錯: " + err.message;
+        async function handlePhraseUpload() {
+            const fileInput = document.getElementById('excel-upload-phrases');
+            const status = document.getElementById('phrase-status');
+            if (!fileInput.files[0]) return alert("請選擇詞句庫檔案");
+            status.innerHTML = "⏳ 正在解析詞句庫多分頁資料...";
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const allPhrases = [];
+                    workbook.SheetNames.forEach(sheetName => {
+                        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        sheetData.forEach(row => {
+                            let entry = { category: sheetName, raw_json: row };
+                            if (sheetName === 'battery') {
+                                entry.logic_key = `${row.TST_min || ''},${row.N3_pct || ''},${row.rMSSD || ''},${row.HR_min || ''},${row.HBI || ''}`;
+                                entry.detailed_content = row['詳細解說'];
+                                entry.simple_content = row['一句大眾易懂又強調健康價值的版本'];
+                                entry.summary_content = row['重點摘要'];
+                            } else if (sheetName === 'Daily_Tag') {
+                                entry.logic_key = row.Daily_Tag;
+                                entry.title = row.Daily_Tag;
+                                entry.detailed_content = row['建議'];
+                                entry.simple_content = row['__EMPTY'] || row['建議_1'];
+                                entry.action_suggest = row['__EMPTY_1'] || row['建議_2'];
+                            } else if (sheetName === 'button') {
+                                entry.title = row['選項問句'];
+                                entry.detailed_content = row['內容'];
+                                entry.action_suggest = row['動作'];
+                            } else if (['best', 'worst', 'attention', 'goal'].includes(sheetName)) {
+                                entry.logic_key = row['備註'];
+                                entry.summary_content = row['備註'];
+                                entry.detailed_content = row['注意'] || row['達標'] || row['重點摘要'];
+                                entry.action_suggest = row['建議'];
+                            }
+                            if (entry.detailed_content || entry.simple_content || entry.title) allPhrases.push(entry);
+                        });
+                    });
+                    status.innerHTML = `🚀 正在清理舊資料並匯入 ${allPhrases.length} 筆詞句...`;
+                    await _supabase.from('phrase_library').delete().neq('category', 'temp');
+                    const { error } = await _supabase.from('phrase_library').insert(allPhrases);
+                    if (error) throw error;
+                    status.style.color = "green";
+                    status.innerHTML = `✅ 詞句庫更新完成！已匯入 ${workbook.SheetNames.length} 個分頁。`;
+                } catch (err) { status.style.color = "red"; status.innerHTML = "❌ 錯誤: " + err.message; }
+            };
+            reader.readAsArrayBuffer(fileInput.files[0]);
         }
-    };
-    reader.readAsArrayBuffer(fileInput.files[0]);
-}
-
-
     </script>
 </body>
 </html>
-
-
