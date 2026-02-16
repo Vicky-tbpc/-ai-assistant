@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n03</title>
+    <title>AI 健康夥伴 n03-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -154,7 +154,16 @@
                 appendAiMessage("請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
             } else {
                 appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。`);
-                await showSummaryFlow(name, false); 
+                
+                // [關鍵修改]：判斷今天是否已經顯示過摘要
+                const todayStr = new Date().toISOString().split('T')[0];
+                const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
+                
+                if (lastShown !== todayStr) {
+                    await showSummaryFlow(name, false);
+                    localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+                }
+                // 如果 lastShown === todayStr，則不執行 showSummaryFlow，達成「再次登入不出現摘要」的需求
             }
         }
 
@@ -164,7 +173,6 @@
             const summaryData = await fetchSummaryData(today);
 
             if (isFirstTimeNaming) {
-                // 首次取名後
                 if (summaryData && summaryData.isToday) {
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！");
                 } else {
@@ -172,7 +180,6 @@
                     appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
                 }
             } else {
-                // 一般登入
                 if (summaryData && summaryData.isToday) {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！`);
                 } else {
@@ -249,6 +256,11 @@
             if (isNamingPhase) {
                 await _supabase.from('user_credentials').update({ ai_name: text }).eq('serial_number', currentSerial);
                 isNamingPhase = false;
+                
+                // 首次命名後顯示摘要，並標記今天已顯示
+                const todayStr = new Date().toISOString().split('T')[0];
+                localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+                
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
             } else if (text.includes("健康摘要")) {
                 setTimeout(async () => {
@@ -279,7 +291,10 @@
         }
         function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-        function logout() { location.reload(); }
+        function logout() { 
+            // 登出時不清除 localStorage，這樣再次登入依然能維持「一天只顯示一次」的狀態
+            location.reload(); 
+        }
     </script>
 </body>
 </html>
