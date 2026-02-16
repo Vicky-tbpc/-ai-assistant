@@ -332,7 +332,7 @@
                     } else {
                         // 轉換為 YYYY/MM/DD 格式顯示在對話中
                         const displayDate = data.record_date_raw.replace(/-/g, '/');
-                        appendAiMessage(`這是 ${displayDate} 的健康摘要`);
+                        appendAiMessage(`這是我們 ${displayDate} 的健康摘要`);
                         
                         // 如果查的是歷史，且今天數據還沒出，可以視需求決定是否補提醒
                         // appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
