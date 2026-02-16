@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n07</title>
+    <title>AI 健康夥伴 n08</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,7 +13,6 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
-            --legend-text: #6c83cf; 
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
@@ -49,17 +48,9 @@
         .battery-val { font-size: 1.4rem; font-weight: bold; }
         .rank-text { font-size: 0.8rem; color: #999; }
         .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+        .status-text { font-size: 0.9rem; color: #555; }
 
-        /* 圖例樣式 (006) */
-        .summary-legend { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #f5f5f5; }
-        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--legend-text); font-weight: bold; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-        .dot-notice { background-color: #ff8c73; }
-        .dot-standard { background-color: #a79d8c; }
-        .dot-good { background-color: #a0adb7; }
-        .dot-excellent { background-color: #596b75; }
-
-        /* 膠囊訊息條樣式 (007) */
+        /* 膠囊訊息條樣式 */
         .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
         .capsule-best { background-color: #f0f4f5; color: #555; }
         .capsule-worst { background-color: #fff1ef; color: #555; }
@@ -85,7 +76,7 @@
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">健康夥伴登入</h2>
+            <h2 style="color: var(--tbp-blue);">Personal Health Companion</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
             <button class="primary-btn" onclick="login()">登入系統</button>
@@ -222,7 +213,6 @@
         }
 
         async function fetchSummaryData(targetDate) {
-            // 抓取目標日期與前一筆
             const { data: healths } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
                 .eq('serial_number', currentSerial)
@@ -231,13 +221,11 @@
                 .limit(2);
 
             if (!healths || healths.length === 0) return null;
-
             const current = healths[0];
             const prev = healths[1];
             const raw = current.raw_json;
             const todayStr = new Date().toISOString().split('T')[0];
             
-            // 邏輯比對
             let bestKey = 'Battery_TST_min_A';
             let worstKey = 'Battery_TST_min_A';
             if (prev) {
@@ -250,7 +238,6 @@
                 });
             }
 
-            // 抓取詞句庫
             const { data: phrases } = await _supabase.from('phrase_library')
                 .select('logic_key, detailed_content')
                 .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
@@ -258,7 +245,6 @@
             const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
             const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
 
-            // 其他數據
             const date = current.record_date;
             const battery = raw.Personal_Battery_weighted_round || 0;
             const { data: feedback } = await _supabase.from('daily_feedback')
@@ -291,8 +277,10 @@
             if (data.battery >= 100) bColor = "#596b75";
 
             const lightMap = {
-                '紅燈': { c: '#ff0000', t: '紅燈' }, '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
-                '黃燈': { c: '#ffe632', t: '黃燈' }, '綠燈': { c: '#3caa28', t: '綠燈' }
+                '紅燈': { c: '#ff0000', t: '紅燈' }, 
+                '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
+                '黃燈': { c: '#ffe632', t: '黃燈' }, 
+                '綠燈': { c: '#3caa28', t: '綠燈' }
             };
             const lightInfo = lightMap[data.light] || null;
 
@@ -301,15 +289,21 @@
                     <div style="display: flex; flex-direction: column; align-items: flex-start;">
                         <div class="summary-card" onclick="zoomCard(this)">
                             <div class="summary-header">📅 ${data.date} 健康摘要</div>
-                            <div class="summary-item"><span class="summary-label">生理電量</span><span class="battery-val" style="color:${bColor}">${data.battery}</span></div>
-                            <div class="summary-item" style="margin-top:-5px;"><span></span><span class="rank-text">超過 ${data.percentage}% 的使用者</span></div>
-                            ${lightInfo ? `<div class="summary-item"><span class="summary-label">生理狀態</span><span style="font-weight:bold;"><span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}</span></div>` : ''}
-                            <div class="summary-legend">
-                                <div class="legend-item"><span class="dot dot-notice"></span>注意</div>
-                                <div class="legend-item"><span class="dot dot-standard"></span>標準</div>
-                                <div class="legend-item"><span class="dot dot-good"></span>良好</div>
-                                <div class="legend-item"><span class="dot dot-excellent"></span>優秀</div>
+                            <div class="summary-item">
+                                <span class="summary-label">生理電量</span>
+                                <span class="battery-val" style="color:${bColor}">${data.battery}</span>
                             </div>
+                            <div class="summary-item" style="margin-top:-5px;">
+                                <span></span>
+                                <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                            </div>
+                            ${lightInfo ? `
+                            <div class="summary-item">
+                                <span class="summary-label">生理狀態</span>
+                                <span class="status-text">
+                                    <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
+                                </span>
+                            </div>` : ''}
                         </div>
                         <div class="analysis-capsule capsule-best">
                             <span class="capsule-icon icon-best">😊</span>
