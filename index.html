@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n03-1</title>
+    <title>AI 健康夥伴 n03</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -84,6 +84,16 @@
         </div>
     </div>
 
+    <div id="pw-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>修改密碼</h3>
+            <input type="password" id="old-pw" placeholder="舊密碼">
+            <input type="password" id="new-pw" placeholder="新密碼">
+            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
+            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
+        </div>
+    </div>
+
     <div id="zoom-overlay" class="hidden" onclick="this.classList.add('hidden')">
         <div id="zoom-content"></div>
     </div>
@@ -96,6 +106,7 @@
                 <div class="avatar" id="avatar-char">U</div>
             </div>
             <div id="settings-menu" class="dropdown hidden">
+                <button onclick="openPwModal()">🔒 修改密碼</button>
                 <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
             </div>
         </header>
@@ -155,7 +166,6 @@
             } else {
                 appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。`);
                 
-                // [關鍵修改]：判斷今天是否已經顯示過摘要
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
                 
@@ -163,11 +173,9 @@
                     await showSummaryFlow(name, false);
                     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 }
-                // 如果 lastShown === todayStr，則不執行 showSummaryFlow，達成「再次登入不出現摘要」的需求
             }
         }
 
-        // --- 核心 logic: 健康摘要流程控制 ---
         async function showSummaryFlow(nickname, isFirstTimeNaming) {
             const today = new Date().toISOString().split('T')[0];
             const summaryData = await fetchSummaryData(today);
@@ -256,11 +264,8 @@
             if (isNamingPhase) {
                 await _supabase.from('user_credentials').update({ ai_name: text }).eq('serial_number', currentSerial);
                 isNamingPhase = false;
-                
-                // 首次命名後顯示摘要，並標記今天已顯示
                 const todayStr = new Date().toISOString().split('T')[0];
                 localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-                
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
             } else if (text.includes("健康摘要")) {
                 setTimeout(async () => {
@@ -290,10 +295,24 @@
             scrollToBottom();
         }
         function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
+        
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-        function logout() { 
-            // 登出時不清除 localStorage，這樣再次登入依然能維持「一天只顯示一次」的狀態
-            location.reload(); 
+        function logout() { location.reload(); }
+
+        // [加回修改密碼相關 JS 函式]
+        function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
+        function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
+        async function updatePassword() {
+            const oldP = document.getElementById('old-pw').value;
+            const newP = document.getElementById('new-pw').value;
+            if (!oldP || !newP) return alert("請輸入完整資料");
+            
+            const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
+            if(!data) return alert("舊密碼錯誤");
+            
+            const { error } = await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
+            if(error) { alert("修改失敗"); } 
+            else { alert("修改成功！"); closePwModal(); }
         }
     </script>
 </body>
