@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n04</title>
+    <title>AI 健康夥伴 n05</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -206,16 +206,32 @@
             appendSummaryCard(summaryData);
         }
 
-        async function fetchSummaryData(targetDate) {
+       async function fetchSummaryData(targetDate) {
+            // 查詢指定日期或該日期之前的最新一筆資料
             const { data: health } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
                 .eq('serial_number', currentSerial)
-                .order('record_date', { ascending: false }).limit(1);
+                .eq('record_date', targetDate) // 精確查詢該日期
+                .single();
 
-            if (!health || health.length === 0) return null;
-            const latest = health[0];
-            const date = latest.record_date;
-            const battery = latest.raw_json.Personal_Battery_weighted_round || 0;
+            // 若該日無資料，改為查詢「最新一筆」資料（原邏輯）
+            if (!health) {
+                const { data: latest } = await _supabase.from('health_data')
+                    .select('record_date, raw_json')
+                    .eq('serial_number', currentSerial)
+                    .order('record_date', { ascending: false }).limit(1);
+                
+                if (!latest || latest.length === 0) return null;
+                return processHealthRow(latest[0], new Date().toISOString().split('T')[0]);
+            }
+
+            return processHealthRow(health, new Date().toISOString().split('T')[0]);
+        }
+
+        // 抽離出來的處理邏輯
+        async function processHealthRow(row, todayStr) {
+            const date = row.record_date;
+            const battery = row.raw_json.Personal_Battery_weighted_round || 0;
 
             const { data: feedback } = await _supabase.from('daily_feedback')
                 .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
@@ -228,8 +244,9 @@
             }
 
             return {
-                isToday: date === targetDate,
-                date: date.replace(/-/g, '/'),
+                isToday: date === todayStr,
+                record_date_raw: date, // 原始格式供判斷用
+                date: date.replace(/-/g, '/'), // 顯示格式
                 battery: battery,
                 percentage: percentage,
                 light: feedback ? feedback.status_light : null
@@ -269,7 +286,7 @@
             scrollToBottom();
         }
 
-        async function sendMessage() {
+       async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -282,15 +299,43 @@
                 const todayStr = new Date().toISOString().split('T')[0];
                 localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
-            } else if (text.includes("健康摘要")) {
+            } 
+            else if (text.includes("健康摘要")) {
                 setTimeout(async () => {
-                    const today = new Date().toISOString().split('T')[0];
-                    const data = await fetchSummaryData(today);
-                    if (data && data.isToday) {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    let targetDate = todayStr;
+
+                    // --- 增強日期辨識邏輯 ---
+                    // 1. 辨識 YYYY/MM/DD 或 YYYY-MM-DD
+                    const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+                    // 2. 辨識 YYYY年MM月DD日
+                    const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+
+                    if (dateMatch || dateMatchChn) {
+                        const match = dateMatch || dateMatchChn;
+                        const year = match[1];
+                        const month = match[2].padStart(2, '0');
+                        const day = match[3].padStart(2, '0');
+                        targetDate = `${year}-${month}-${day}`;
+                    }
+
+                    const data = await fetchSummaryData(targetDate);
+
+                    if (!data) {
+                        appendAiMessage(`抱歉，找不到 ${targetDate.replace(/-/g, '/')} 的健康數據。`);
+                        return;
+                    }
+
+                    // 判斷回覆語句
+                    if (data.record_date_raw === todayStr) {
                         appendAiMessage("這是我們今天的健康摘要");
                     } else {
-                        appendAiMessage("這是我們最新的健康摘要");
-                        appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
+                        // 轉換為 YYYY/MM/DD 格式顯示在對話中
+                        const displayDate = data.record_date_raw.replace(/-/g, '/');
+                        appendAiMessage(`這是 ${displayDate} 的健康摘要`);
+                        
+                        // 如果查的是歷史，且今天數據還沒出，可以視需求決定是否補提醒
+                        // appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
                     }
                     appendSummaryCard(data);
                 }, 800);
