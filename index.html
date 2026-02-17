@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n09</title>
+    <title>AI 健康夥伴 n09-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -358,34 +358,46 @@
                 setTimeout(async () => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     let targetDate = todayStr;
+
+                    // --- 增強日期辨識邏輯 ---
+                    // 1. 辨識 YYYY/MM/DD 或 YYYY-MM-DD
                     const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+                    // 2. 辨識 YYYY年MM月DD日
                     const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
 
                     if (dateMatch || dateMatchChn) {
-                        const m = dateMatch || dateMatchChn;
-                        targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                        const match = dateMatch || dateMatchChn;
+                        const year = match[1];
+                        const month = match[2].padStart(2, '0');
+                        const day = match[3].padStart(2, '0');
+                        targetDate = `${year}-${month}-${day}`;
                     }
 
                     const data = await fetchSummaryData(targetDate);
-                    if (!data || ( (dateMatch || dateMatchChn) && data.record_date_raw !== targetDate )) {
-                        appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
-                        appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
+
+                    if (!data) {
+                        appendAiMessage(`抱歉，找不到 ${targetDate.replace(/-/g, '/')} 的健康數據。`);
                         return;
                     }
 
+                    // 判斷回覆語句
                     if (data.record_date_raw === todayStr) {
-                        appendAiMessage("這是我們今天的健康摘要 ✨");
+                        appendAiMessage("這是我們今天的健康摘要");
                     } else {
-                        appendAiMessage("這是我們最新的健康摘要 📅");
-                         appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
-
+                        // 轉換為 YYYY/MM/DD 格式顯示在對話中
+                        const displayDate = data.record_date_raw.replace(/-/g, '/');
+                        appendAiMessage(`這是我們 ${displayDate} 的健康摘要`);
+                        
+                        // 如果查的是歷史，且今天數據還沒出，可以視需求決定是否補提醒
+                        // appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~");
                     }
                     appendSummaryCard(data);
                 }, 800);
             } else {
-                setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
+                setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊..."), 800);
             }
         }
+
 
         function zoomCard(el) {
             const overlay = document.getElementById('zoom-overlay');
