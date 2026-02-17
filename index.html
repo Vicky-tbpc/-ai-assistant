@@ -288,7 +288,7 @@
             };
         }
 
-        function appendSummaryCard(data) {
+       function appendSummaryCard(data) {
             if (!data) return;
             let bColor = "#ff8c73";
             if (data.battery >= 60) bColor = "#a79d8c";
@@ -296,8 +296,10 @@
             if (data.battery >= 100) bColor = "#596b75";
 
             const lightMap = {
-                '紅燈': { c: '#ff0000', t: '紅燈' }, '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
-                '黃燈': { c: '#ffe632', t: '黃燈' }, '綠燈': { c: '#3caa28', t: '綠燈' }
+                '紅燈': { c: '#ff0000', t: '紅燈' }, 
+                '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
+                '黃燈': { c: '#ffe632', t: '黃燈' }, 
+                '綠燈': { c: '#3caa28', t: '綠燈' }
             };
             const lightInfo = lightMap[data.light] || null;
 
@@ -306,25 +308,32 @@
                     <div style="display: flex; flex-direction: column; align-items: flex-start;">
                         <div class="summary-card" onclick="zoomCard(this)">
                             <div class="summary-header">📅 ${data.date} 健康摘要</div>
-                            <div class="summary-item"><span class="summary-label">生理電量</span><span class="battery-val" style="color:${bColor}">${data.battery}</span></div>
-                            <div class="summary-item" style="margin-top:-5px;"><span></span><span class="rank-text">超過 ${data.percentage}% 的使用者</span></div>
-                            ${lightInfo ? `
-<div class="summary-item">
-    <span class="summary-label">生理狀態</span>
-    <span class="status-text">
-        <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
-    </span>
-</div>` : ''}                            <div class="summary-legend">
-                                
+                            <div class="summary-item">
+                                <span class="summary-label">生理電量</span>
+                                <span class="battery-val" style="color:${bColor}">${data.battery}</span>
                             </div>
-                        </div>
-                        <div class="analysis-capsule capsule-best">
-                            <span class="capsule-icon icon-best">😊</span>
-                            <span>${data.bestText}</span>
-                        </div>
-                        <div class="analysis-capsule capsule-worst">
-                            <span class="capsule-icon icon-worst">☹️</span>
-                            <span>${data.worstText}</span>
+                            <div class="summary-item" style="margin-top:-5px;">
+                                <span></span>
+                                <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                            </div>
+                            ${lightInfo ? `
+                            <div class="summary-item">
+                                <span class="summary-label">生理狀態</span>
+                                <span class="status-text">
+                                    <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
+                                </span>
+                            </div>` : ''}
+
+                            <div style="margin-top: 15px; border-top: 1px solid #f5f5f5; padding-top: 10px;">
+                                <div class="analysis-capsule capsule-best" style="width: 100%; margin-top: 5px;">
+                                    <span class="capsule-icon icon-best">😊</span>
+                                    <span>${data.bestText}</span>
+                                </div>
+                                <div class="analysis-capsule capsule-worst" style="width: 100%; margin-top: 8px;">
+                                    <span class="capsule-icon icon-worst">☹️</span>
+                                    <span>${data.worstText}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>`;
