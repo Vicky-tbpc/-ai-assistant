@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n09</title>
+    <title>AI 健康夥伴 n10 - Trend Integration</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,7 +13,6 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
-           
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
@@ -50,10 +49,7 @@
         .rank-text { font-size: 0.8rem; color: #999; }
         .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
 
-
-   
-
-        /* 膠囊訊息條樣式 (007) */
+        /* 膠囊訊息條樣式 */
         .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
         .capsule-best { background-color: #f0f4f5; color: #555; }
         .capsule-worst { background-color: #fff1ef; color: #555; }
@@ -73,13 +69,8 @@
 
         .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-/* 請將這段加入到 <style> 標籤中 */
-.status-text { 
-    font-size: 0.9rem; 
-    color: #555; 
-}   
-
- </style>
+        .status-text { font-size: 0.9rem; color: #555; }   
+    </style>
 </head>
 <body>
 
@@ -178,7 +169,7 @@
             initApp(nick, null);
         }
 
-   async function initApp(name, aiName) {
+        async function initApp(name, aiName) {
             document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('display-name').innerText = name;
             document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -191,13 +182,10 @@
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
                 
-                // 判斷是否為當天第一次登入 (即是否要顯示自動摘要)
                 if (lastShown !== todayStr) {
-                    // --- 關鍵修改：當天第一次登入，直接執行摘要流程，不顯示「歡迎回來」招呼語 ---
                     await showSummaryFlow(name, false);
                     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 } else {
-                    // 只有當天第二次以後登入，且不顯示摘要時，才顯示招呼語
                     appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 }
             }
@@ -224,10 +212,16 @@
                 }
             }
             appendSummaryCard(summaryData);
+
+            // 當天第一次顯示後，追加對話泡泡
+            if (summaryData.bubbleText) {
+                setTimeout(() => {
+                    appendAiMessage(summaryData.bubbleText);
+                }, 800);
+            }
         }
 
         async function fetchSummaryData(targetDate) {
-            // 抓取目標日期與前一筆
             const { data: healths } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
                 .eq('serial_number', currentSerial)
@@ -242,9 +236,10 @@
             const raw = current.raw_json;
             const todayStr = new Date().toISOString().split('T')[0];
             
-            // 邏輯比對
             let bestKey = 'Battery_TST_min_A';
             let worstKey = 'Battery_TST_min_A';
+            let logicKeyTrend = ""; // 用於比對 phrase_library
+
             if (prev) {
                 let maxInc = -Infinity, maxDec = Infinity;
                 const prevRaw = prev.raw_json;
@@ -253,17 +248,38 @@
                     if (diff > maxInc) { maxInc = diff; bestKey = key; }
                     if (diff < maxDec) { maxDec = diff; worstKey = key; }
                 });
+
+                // 生成邏輯比對字串
+                const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "";
+                const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "";
+                const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "";
+                const hrmin = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "";
+                const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "";
+                
+                // 組合成 logic_key 格式: ▼▲,▼,▼,▼,▲
+                logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].filter(x => x !== "").join(",");
             }
 
-            // 抓取詞句庫
+            // 抓取詞句庫，包含原本的最佳最差與新的趨勢 logicKey
+            const searchKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
+            if (logicKeyTrend) searchKeys.push(logicKeyTrend);
+
             const { data: phrases } = await _supabase.from('phrase_library')
-                .select('logic_key, detailed_content')
-                .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
+                .select('logic_key, detailed_content, summary_content, simple_content')
+                .in('logic_key', searchKeys);
 
             const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
             const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
 
-            // 其他數據
+            // 處理追加的對話泡泡內容
+            let bubbleText = "";
+            if (logicKeyTrend) {
+                const trendPhrase = phrases?.find(p => p.logic_key === logicKeyTrend);
+                if (trendPhrase) {
+                    bubbleText = trendPhrase.summary_content || trendPhrase.simple_content || "";
+                }
+            }
+
             const date = current.record_date;
             const battery = raw.Personal_Battery_weighted_round || 0;
             const { data: feedback } = await _supabase.from('daily_feedback')
@@ -284,11 +300,12 @@
                 percentage: percentage,
                 light: feedback ? feedback.status_light : null,
                 bestText: bestText,
-                worstText: worstText
+                worstText: worstText,
+                bubbleText: bubbleText // 新增欄位
             };
         }
 
-       function appendSummaryCard(data) {
+        function appendSummaryCard(data) {
             if (!data) return;
             let bColor = "#ff8c73";
             if (data.battery >= 60) bColor = "#a79d8c";
@@ -341,7 +358,7 @@
             scrollToBottom();
         }
 
-       async function sendMessage() {
+        async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -359,10 +376,9 @@
                     const todayStr = new Date().toISOString().split('T')[0];
                     let targetDate = todayStr;
                     
-                    // 偵測日期格式
                     const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
                     const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                    const isManualSearch = (dateMatch || dateMatchChn); // 判斷是否為使用者主動輸入日期
+                    const isManualSearch = (dateMatch || dateMatchChn);
 
                     if (isManualSearch) {
                         const m = dateMatch || dateMatchChn;
@@ -371,26 +387,29 @@
 
                     const data = await fetchSummaryData(targetDate);
                     
-                    // 查無資料處理
                     if (!data || (isManualSearch && data.record_date_raw !== targetDate)) {
                         appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
                         appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
                         return;
                     }
 
-                    // 根據情境顯示對應訊息
                     if (data.record_date_raw === todayStr) {
                         appendAiMessage("這是我們今天的健康摘要 ✨");
                     } else if (isManualSearch) {
-                        // 若是使用者指定日期查詢，顯示該日期
                         appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
                     } else {
-                        // 若非今天也非指定日期（系統自動抓最新），顯示原本的提示
                         appendAiMessage("這是我們最新的健康摘要 📅");
                         appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
                     }
                     
                     appendSummaryCard(data);
+
+                    // 手動查詢同樣支持顯示趨勢對話泡泡
+                    if (data.bubbleText) {
+                        setTimeout(() => {
+                            appendAiMessage(data.bubbleText);
+                        }, 800);
+                    }
                 }, 800);
             } else {
                 setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
