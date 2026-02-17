@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n07</title>
+    <title>AI 健康夥伴 n08</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -178,7 +178,7 @@
             initApp(nick, null);
         }
 
-        async function initApp(name, aiName) {
+   async function initApp(name, aiName) {
             document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('display-name').innerText = name;
             document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -188,12 +188,17 @@
                 appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。 ✨");
                 appendAiMessage("請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
             } else {
-                appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
+                
+                // 判斷是否為當天第一次登入 (即是否要顯示自動摘要)
                 if (lastShown !== todayStr) {
+                    // --- 關鍵修改：當天第一次登入，直接執行摘要流程，不顯示「歡迎回來」招呼語 ---
                     await showSummaryFlow(name, false);
                     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+                } else {
+                    // 只有當天第二次以後登入，且不顯示摘要時，才顯示招呼語
+                    appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 }
             }
         }
@@ -208,14 +213,14 @@
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
                 } else {
                     appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~ ☁️");
+                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
                 }
             } else {
                 if (summaryData.isToday) {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
                 } else {
                     appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡覺的數據唷~ ☁️`);
+                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
                 }
             }
             appendSummaryCard(summaryData);
@@ -360,7 +365,9 @@
                     if (data.record_date_raw === todayStr) {
                         appendAiMessage("這是我們今天的健康摘要 ✨");
                     } else {
-                        appendAiMessage(`這是 ${data.date} 的健康摘要 📅`);
+                        appendAiMessage("這是我們最新的健康摘要 📅");
+                         appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
+
                     }
                     appendSummaryCard(data);
                 }, 800);
