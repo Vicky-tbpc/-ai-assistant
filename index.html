@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n09</title>
+    <title>AI 健康夥伴 n09-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -341,7 +341,7 @@
             scrollToBottom();
         }
 
-        async function sendMessage() {
+       async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -358,28 +358,38 @@
                 setTimeout(async () => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     let targetDate = todayStr;
+                    
+                    // 偵測日期格式
                     const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
                     const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                    const isManualSearch = (dateMatch || dateMatchChn); // 判斷是否為使用者主動輸入日期
 
-                    if (dateMatch || dateMatchChn) {
+                    if (isManualSearch) {
                         const m = dateMatch || dateMatchChn;
                         targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
                     }
 
                     const data = await fetchSummaryData(targetDate);
-                    if (!data || ( (dateMatch || dateMatchChn) && data.record_date_raw !== targetDate )) {
+                    
+                    // 查無資料處理
+                    if (!data || (isManualSearch && data.record_date_raw !== targetDate)) {
                         appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
                         appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
                         return;
                     }
 
+                    // 根據情境顯示對應訊息
                     if (data.record_date_raw === todayStr) {
                         appendAiMessage("這是我們今天的健康摘要 ✨");
+                    } else if (isManualSearch) {
+                        // 若是使用者指定日期查詢，顯示該日期
+                        appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
                     } else {
+                        // 若非今天也非指定日期（系統自動抓最新），顯示原本的提示
                         appendAiMessage("這是我們最新的健康摘要 📅");
-                         appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
-
+                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
                     }
+                    
                     appendSummaryCard(data);
                 }, 800);
             } else {
