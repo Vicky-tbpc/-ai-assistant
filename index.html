@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n10</title>
+    <title>AI 健康夥伴 n09</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -203,59 +203,31 @@
             }
         }
 
-   async function showSummaryFlow(nickname, isFirstTimeNaming) {
+        async function showSummaryFlow(nickname, isFirstTimeNaming) {
             const today = new Date().toISOString().split('T')[0];
             const summaryData = await fetchSummaryData(today);
             if (!summaryData) return;
 
-            // 顯示招呼語
             if (isFirstTimeNaming) {
-                appendAiMessage(summaryData.isToday ? "謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨" : "謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
+                if (summaryData.isToday) {
+                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
+                } else {
+                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
+                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
+                }
             } else {
-                appendAiMessage(summaryData.isToday ? `哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨` : `哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+                if (summaryData.isToday) {
+                    appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
+                } else {
+                    appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
+                }
             }
-            
-            // 顯示卡片
             appendSummaryCard(summaryData);
-
-            // 深度分析自動彈出
-            if (summaryData.dynamicAdvice) {
-                setTimeout(() => appendAiMessage(summaryData.dynamicAdvice), 800);
-            }
         }
 
-        // 修改 sendMessage 內的部分邏輯，確保關鍵字查詢也有深度分析
-        async function sendMessage() {
-            const input = document.getElementById('user-input'), text = input.value.trim();
-            if (!text) return;
-            appendUserMessage(text); input.value = '';
-
-            if (isNamingPhase) {
-                // ... (取名邏輯保持不變)
-            } else if (text.includes("健康摘要")) {
-                setTimeout(async () => {
-                    let targetDate = new Date().toISOString().split('T')[0];
-                    const m = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                    if (m) targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-                    
-                    const data = await fetchSummaryData(targetDate);
-                    if (!data) return appendAiMessage("目前沒有該日期的紀錄資料喔~ 😅");
-                    
-                    appendAiMessage(data.record_date_raw === new Date().toISOString().split('T')[0] ? "這是我們今天的健康摘要 ✨" : `這是 ${data.date} 的健康摘要 📅`);
-                    appendSummaryCard(data);
-
-                    // 關鍵字查詢也同樣觸發深度分析
-                    if (data.dynamicAdvice) {
-                        setTimeout(() => appendAiMessage(data.dynamicAdvice), 800);
-                    }
-                }, 800);
-            } else {
-                setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
-            }
-        }
-
-        
-async function fetchSummaryData(targetDate) {
+        async function fetchSummaryData(targetDate) {
+            // 抓取目標日期與前一筆
             const { data: healths } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
                 .eq('serial_number', currentSerial)
@@ -264,65 +236,40 @@ async function fetchSummaryData(targetDate) {
                 .limit(2);
 
             if (!healths || healths.length === 0) return null;
+
             const current = healths[0];
             const prev = healths[1];
             const raw = current.raw_json;
             const todayStr = new Date().toISOString().split('T')[0];
             
-            let bestText = "今日整體狀態穩定。", worstText = "維持良好的生活習慣。", dynamicAdvice = "";
-
+            // 邏輯比對
+            let bestKey = 'Battery_TST_min_A';
+            let worstKey = 'Battery_TST_min_A';
             if (prev) {
-                const prevRaw = prev.raw_json;
-                
-                // --- 深度分析 Logic Key 比對機制 ---
-                const tst_val = (raw.Battery_TST_min_A || 0);
-                const p_tst_val = (prevRaw.Battery_TST_min_A || 0);
-                // TST_min: 小於前一天但大於 420
-                const tst_sym = (tst_val < p_tst_val && tst_val > 420) ? "▼▲" : "";
-                // N3, rMSSD, HR_min: 小於前一天
-                const n3_sym = (raw.Battery_N3_pct_A || 0) < (prevRaw.Battery_N3_pct_A || 0) ? "▼" : "";
-                const rmssd_sym = (raw.Battery_rMSSD_A || 0) < (prevRaw.Battery_rMSSD_A || 0) ? "▼" : "";
-                const hr_sym = (raw.Battery_HR_min_A || 0) < (prevRaw.Battery_HR_min_A || 0) ? "▼" : "";
-                // HBI: 大於前一天
-                const hbi_sym = (raw.Battery_HBI_A || 0) > (prevRaw.Battery_HBI_A || 0) ? "▲" : "";
-
-                const logicKeyStr = [tst_sym, n3_sym, rmssd_sym, hr_sym, hbi_sym].join(',');
-
-                // 從 phrase_library 抓取內容 (優先抓 summary_content)
-                const { data: adviceData } = await _supabase.from('phrase_library')
-                    .select('summary_content, simple_content')
-                    .eq('logic_key', logicKeyStr)
-                    .single();
-
-                if (adviceData) {
-                    dynamicAdvice = adviceData.summary_content || adviceData.simple_content || "";
-                }
-
-                // --- (保留原本的卡片內 Best/Worst 膠囊邏輯) ---
-                let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
                 let maxInc = -Infinity, maxDec = Infinity;
+                const prevRaw = prev.raw_json;
                 Object.keys(FIELD_MAP).forEach(key => {
                     const diff = (raw[key] || 0) - (prevRaw[key] || 0);
                     if (diff > maxInc) { maxInc = diff; bestKey = key; }
                     if (diff < maxDec) { maxDec = diff; worstKey = key; }
                 });
-
-                const { data: phrases } = await _supabase.from('phrase_library')
-                    .select('logic_key, detailed_content')
-                    .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
-                
-                if (phrases) {
-                    const b = phrases.find(p => p.logic_key === FIELD_MAP[bestKey].best);
-                    if (b) bestText = b.detailed_content;
-                    const w = phrases.find(p => p.logic_key === FIELD_MAP[worstKey].worst);
-                    if (w) worstText = w.detailed_content;
-                }
             }
 
-            const battery = raw.Personal_Battery_weighted_round || 0;
-            const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
+            // 抓取詞句庫
+            const { data: phrases } = await _supabase.from('phrase_library')
+                .select('logic_key, detailed_content')
+                .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
 
-            const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', current.record_date);
+            const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
+            const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
+
+            // 其他數據
+            const date = current.record_date;
+            const battery = raw.Personal_Battery_weighted_round || 0;
+            const { data: feedback } = await _supabase.from('daily_feedback')
+                .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
+
+            const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
             let percentage = 0;
             if (allDayData?.length > 0) {
                 const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
@@ -330,16 +277,16 @@ async function fetchSummaryData(targetDate) {
             }
 
             return {
-                isToday: current.record_date === todayStr,
-                record_date_raw: current.record_date,
-                date: current.record_date.replace(/-/g, '/'),
-                battery, percentage,
+                isToday: date === todayStr,
+                record_date_raw: date,
+                date: date.replace(/-/g, '/'),
+                battery: battery,
+                percentage: percentage,
                 light: feedback ? feedback.status_light : null,
-                bestText, worstText, dynamicAdvice
+                bestText: bestText,
+                worstText: worstText
             };
         }
-
-
 
        function appendSummaryCard(data) {
             if (!data) return;
