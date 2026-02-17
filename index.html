@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n10 - Trend Integration</title>
+    <title>AI 健康夥伴 n10-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,16 +13,18 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
         /* 彈窗樣式 */
-        .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
-        .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
-        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .modal-overlay { position: fixed; inset: 0; background: var(--bg-color); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; outline: none; }
+        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: opacity 0.2s; }
+        .primary-btn:active { opacity: 0.8; }
 
         /* 主佈局 */
         #app-container { display: flex; flex-direction: column; height: 100vh; }
@@ -32,25 +34,28 @@
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
         /* 對話內容 */
-        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
-        .msg-row { display: flex; width: 100%; margin: 4px 0; }
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
+        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 12px; }
+        .msg-row { display: flex; width: 100%; margin: 4px 0; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
         .user-row { justify-content: flex-end; }
-        .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .ai-row { justify-content: flex-start; }
-        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
 
         /* 健康摘要卡片 */
-        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; margin: 10px 0; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
+        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 280px; padding: 18px; margin: 10px 0; cursor: pointer; box-shadow: var(--shadow); transition: transform 0.2s; }
+        .summary-card:active { transform: scale(0.98); }
+        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 12px; }
         .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .summary-label { font-size: 0.9rem; color: #555; }
-        .battery-val { font-size: 1.4rem; font-weight: bold; }
+        .battery-val { font-size: 1.6rem; font-weight: bold; }
         .rank-text { font-size: 0.8rem; color: #999; }
-        .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
 
         /* 膠囊訊息條樣式 */
-        .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
+        .analysis-capsule { display: flex; align-items: center; padding: 12px; border-radius: 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; }
         .capsule-best { background-color: #f0f4f5; color: #555; }
         .capsule-worst { background-color: #fff1ef; color: #555; }
         .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
@@ -58,36 +63,37 @@
         .icon-worst { color: #ffb4a3; }
 
         /* 放大功能 */
-        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
-        #zoom-content { transform: scale(1.3); background: white; border-radius: 12px; pointer-events: none; }
+        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
+        #zoom-content { transform: scale(1.2); pointer-events: none; }
 
         /* 輸入框 */
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
-        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
+        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 
         .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
-        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-        .status-text { font-size: 0.9rem; color: #555; }   
+        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; transition: background 0.2s; }
+        .dropdown button:hover { background: #f9f9f9; }
+        .status-text { font-size: 0.9rem; color: #555; font-weight: 500; }   
     </style>
 </head>
 <body>
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">Personal Health Companion</h2>
-            <input type="text" id="serial" placeholder="序號">
-            <input type="password" id="pw" placeholder="密碼">
+            <h2 style="color: var(--tbp-blue); margin-top:0;">Personal Health</h2>
+            <input type="text" id="serial" placeholder="請輸入序號">
+            <input type="password" id="pw" placeholder="請輸入密碼">
             <button class="primary-btn" onclick="login()">登入系統</button>
         </div>
     </div>
 
     <div id="nickname-overlay" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
+            <h3>歡迎加入！請問該怎麼稱呼你？</h3>
             <input type="text" id="new-nickname" placeholder="你的暱稱">
-            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
+            <button class="primary-btn" onclick="saveNickname()">開始使用</button>
         </div>
     </div>
 
@@ -124,13 +130,14 @@
 
         <div class="footer-input">
             <div class="input-box">
-                <input type="text" id="user-input" placeholder="請輸入內容..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <input type="text" id="user-input" placeholder="問問健康摘要..." onkeypress="if(event.key==='Enter') sendMessage()">
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         </div>
     </div>
 
     <script>
+        // --- 設定與初始化 ---
         const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
         const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -146,9 +153,12 @@
             'Battery_HR_min_A': { best: 'Battery 最低脈搏最佳', worst: 'Battery 最低脈搏最差' }
         };
 
+        // --- 登入邏輯 ---
         async function login() {
             const serial = document.getElementById('serial').value;
             const pw = document.getElementById('pw').value;
+            if(!serial || !pw) return;
+
             const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
             if (data) {
                 currentSerial = serial;
@@ -158,7 +168,7 @@
                 } else {
                     initApp(data.nickname, data.ai_name);
                 }
-            } else { alert("驗證失敗 😅"); }
+            } else { alert("驗證失敗，請檢查序號或密碼 😅"); }
         }
 
         async function saveNickname() {
@@ -176,7 +186,7 @@
             
             if (!aiName) {
                 isNamingPhase = true;
-                appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。 ✨");
+                appendAiMessage("很高興認識你！我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。 ✨");
                 appendAiMessage("請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
             } else {
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -191,36 +201,7 @@
             }
         }
 
-        async function showSummaryFlow(nickname, isFirstTimeNaming) {
-            const today = new Date().toISOString().split('T')[0];
-            const summaryData = await fetchSummaryData(today);
-            if (!summaryData) return;
-
-            if (isFirstTimeNaming) {
-                if (summaryData.isToday) {
-                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
-                } else {
-                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
-                }
-            } else {
-                if (summaryData.isToday) {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
-                } else {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
-                }
-            }
-            appendSummaryCard(summaryData);
-
-            // 當天第一次顯示後，追加對話泡泡
-            if (summaryData.bubbleText) {
-                setTimeout(() => {
-                    appendAiMessage(summaryData.bubbleText);
-                }, 800);
-            }
-        }
-
+        // --- 資料抓取與核心邏輯 ---
         async function fetchSummaryData(targetDate) {
             const { data: healths } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
@@ -236,9 +217,7 @@
             const raw = current.raw_json;
             const todayStr = new Date().toISOString().split('T')[0];
             
-            let bestKey = 'Battery_TST_min_A';
-            let worstKey = 'Battery_TST_min_A';
-            let logicKeyTrend = ""; // 用於比對 phrase_library
+            let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A', logicKeyTrend = "";
 
             if (prev) {
                 let maxInc = -Infinity, maxDec = Infinity;
@@ -249,18 +228,15 @@
                     if (diff < maxDec) { maxDec = diff; worstKey = key; }
                 });
 
-                // 生成邏輯比對字串
+                // 趨勢邏輯組合成 logic_key
                 const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "";
                 const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "";
                 const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "";
                 const hrmin = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "";
                 const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "";
-                
-                // 組合成 logic_key 格式: ▼▲,▼,▼,▼,▲
                 logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].filter(x => x !== "").join(",");
             }
 
-            // 抓取詞句庫，包含原本的最佳最差與新的趨勢 logicKey
             const searchKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
             if (logicKeyTrend) searchKeys.push(logicKeyTrend);
 
@@ -270,14 +246,11 @@
 
             const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
             const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
-
-            // 處理追加的對話泡泡內容
+            
             let bubbleText = "";
             if (logicKeyTrend) {
                 const trendPhrase = phrases?.find(p => p.logic_key === logicKeyTrend);
-                if (trendPhrase) {
-                    bubbleText = trendPhrase.summary_content || trendPhrase.simple_content || "";
-                }
+                if (trendPhrase) bubbleText = trendPhrase.summary_content || trendPhrase.simple_content || "";
             }
 
             const date = current.record_date;
@@ -301,60 +274,75 @@
                 light: feedback ? feedback.status_light : null,
                 bestText: bestText,
                 worstText: worstText,
-                bubbleText: bubbleText // 新增欄位
+                bubbleText: bubbleText
             };
         }
 
-        function appendSummaryCard(data) {
+        async function showSummaryFlow(nickname, isFirstTimeNaming) {
+            const today = new Date().toISOString().split('T')[0];
+            const data = await fetchSummaryData(today);
             if (!data) return;
+
+            const welcomeMsg = isFirstTimeNaming ? "謝謝你幫我取的名字，我們來看看今天的健康摘要吧！ ✨" : `哈囉 ${nickname}！一起來看看今天的健康摘要吧！ ✨`;
+            appendAiMessage(welcomeMsg);
+            
+            if (!data.isToday) {
+                appendAiMessage("由於今天還沒有上傳數據，這是你最新的紀錄資料唷~ 📅");
+            }
+
+            setTimeout(() => {
+                appendSummaryCard(data);
+                if (data.bubbleText) {
+                    setTimeout(() => appendAiMessage(data.bubbleText), 800);
+                }
+            }, 600);
+        }
+
+        // --- UI 渲染函數 ---
+        function appendSummaryCard(data) {
             let bColor = "#ff8c73";
             if (data.battery >= 60) bColor = "#a79d8c";
             if (data.battery >= 80) bColor = "#a0adb7";
             if (data.battery >= 100) bColor = "#596b75";
 
             const lightMap = {
-                '紅燈': { c: '#ff0000', t: '紅燈' }, 
-                '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
-                '黃燈': { c: '#ffe632', t: '黃燈' }, 
-                '綠燈': { c: '#3caa28', t: '綠燈' }
+                '紅燈': { c: '#ff0000', t: '紅燈' }, '黃紅燈': { c: '#ff8000', t: '黃紅燈' },
+                '黃燈': { c: '#ffe632', t: '黃燈' }, '綠燈': { c: '#3caa28', t: '綠燈' }
             };
             const lightInfo = lightMap[data.light] || null;
 
             const cardHtml = `
                 <div class="msg-row ai-row">
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                        <div class="summary-card" onclick="zoomCard(this)">
-                            <div class="summary-header">📅 ${data.date} 健康摘要</div>
-                            <div class="summary-item">
-                                <span class="summary-label">生理電量</span>
-                                <span class="battery-val" style="color:${bColor}">${data.battery}</span>
+                    <div class="summary-card" onclick="zoomCard(this)">
+                        <div class="summary-header">📅 ${data.date} 健康摘要</div>
+                        <div class="summary-item">
+                            <span class="summary-label">生理電量</span>
+                            <span class="battery-val" style="color:${bColor}">${data.battery}</span>
+                        </div>
+                        <div class="summary-item" style="margin-top:-8px;">
+                            <span></span>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                        </div>
+                        ${lightInfo ? `
+                        <div class="summary-item">
+                            <span class="summary-label">生理狀態</span>
+                            <span class="status-text">
+                                <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
+                            </span>
+                        </div>` : ''}
+                        <div style="margin-top: 15px; border-top: 1px solid #f5f5f5; padding-top: 10px;">
+                            <div class="analysis-capsule capsule-best">
+                                <span class="capsule-icon icon-best">😊</span>
+                                <span>${data.bestText}</span>
                             </div>
-                            <div class="summary-item" style="margin-top:-5px;">
-                                <span></span>
-                                <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
-                            </div>
-                            ${lightInfo ? `
-                            <div class="summary-item">
-                                <span class="summary-label">生理狀態</span>
-                                <span class="status-text">
-                                    <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
-                                </span>
-                            </div>` : ''}
-
-                            <div style="margin-top: 15px; border-top: 1px solid #f5f5f5; padding-top: 10px;">
-                                <div class="analysis-capsule capsule-best" style="width: 100%; margin-top: 5px;">
-                                    <span class="capsule-icon icon-best">😊</span>
-                                    <span>${data.bestText}</span>
-                                </div>
-                                <div class="analysis-capsule capsule-worst" style="width: 100%; margin-top: 8px;">
-                                    <span class="capsule-icon icon-worst">😟</span>
-                                    <span>${data.worstText}</span>
-                                </div>
+                            <div class="analysis-capsule capsule-worst">
+                                <span class="capsule-icon icon-worst">😟</span>
+                                <span>${data.worstText}</span>
                             </div>
                         </div>
                     </div>
                 </div>`;
-            document.getElementById('chat-history').innerHTML += cardHtml;
+            document.getElementById('chat-history').insertAdjacentHTML('beforeend', cardHtml);
             scrollToBottom();
         }
 
@@ -362,58 +350,50 @@
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
+            
             appendUserMessage(text);
             input.value = '';
 
             if (isNamingPhase) {
                 await _supabase.from('user_credentials').update({ ai_name: text }).eq('serial_number', currentSerial);
                 isNamingPhase = false;
-                const todayStr = new Date().toISOString().split('T')[0];
-                localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
             } else if (text.includes("健康摘要")) {
-                setTimeout(async () => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    let targetDate = todayStr;
-                    
-                    const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-                    const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                    const isManualSearch = (dateMatch || dateMatchChn);
+                const todayStr = new Date().toISOString().split('T')[0];
+                let targetDate = todayStr;
+                const m = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                if (m) targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
 
-                    if (isManualSearch) {
-                        const m = dateMatch || dateMatchChn;
-                        targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-                    }
-
-                    const data = await fetchSummaryData(targetDate);
-                    
-                    if (!data || (isManualSearch && data.record_date_raw !== targetDate)) {
-                        appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
-                        appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
-                        return;
-                    }
-
-                    if (data.record_date_raw === todayStr) {
-                        appendAiMessage("這是我們今天的健康摘要 ✨");
-                    } else if (isManualSearch) {
-                        appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
-                    } else {
-                        appendAiMessage("這是我們最新的健康摘要 📅");
-                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
-                    }
-                    
+                const data = await fetchSummaryData(targetDate);
+                if (!data || (m && data.record_date_raw !== targetDate)) {
+                    appendAiMessage("這一天目前沒有紀錄資料喔~ 😅 可能是尚未同步完成。");
+                } else {
+                    appendAiMessage(data.record_date_raw === todayStr ? "這是我們今天的健康摘要 ✨" : `這是 ${data.date} 的健康摘要 📅`);
                     appendSummaryCard(data);
-
-                    // 手動查詢同樣支持顯示趨勢對話泡泡
-                    if (data.bubbleText) {
-                        setTimeout(() => {
-                            appendAiMessage(data.bubbleText);
-                        }, 800);
-                    }
-                }, 800);
+                    if (data.bubbleText) setTimeout(() => appendAiMessage(data.bubbleText), 800);
+                }
             } else {
-                setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
+                setTimeout(() => appendAiMessage("收到您的訊息！正在為您整理相關健康資訊... 🕒"), 600);
             }
+        }
+
+        // --- 輔助工具 ---
+        function appendUserMessage(msg) {
+            const safeMsg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const html = `<div class="msg-row user-row"><div class="user-bubble">${safeMsg}</div></div>`;
+            document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+            scrollToBottom();
+        }
+
+        function appendAiMessage(msg) {
+            const html = `<div class="msg-row ai-row"><div class="ai-bubble">${msg}</div></div>`;
+            document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const m = document.getElementById('main-area');
+            setTimeout(() => m.scrollTo({ top: m.scrollHeight, behavior: 'smooth' }), 50);
         }
 
         function zoomCard(el) {
@@ -422,27 +402,18 @@
             overlay.classList.remove('hidden');
         }
 
-        function appendUserMessage(msg) {
-            document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`;
-            scrollToBottom();
-        }
-        function appendAiMessage(msg) {
-            document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row"><div class="ai-bubble">${msg}</div></div>`;
-            scrollToBottom();
-        }
-        function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
         function logout() { location.reload(); }
-
         function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
         function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
+
         async function updatePassword() {
             const oldP = document.getElementById('old-pw').value, newP = document.getElementById('new-pw').value;
-            if (!oldP || !newP) return alert("請輸入完整資料");
+            if (!oldP || !newP) return;
             const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
-            if(!data) return alert("舊密碼錯誤 😅");
+            if(!data) return alert("舊密碼不正確 😅");
             await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-            alert("修改成功！ ✨"); closePwModal();
+            alert("密碼修改成功！ ✨"); closePwModal();
         }
     </script>
 </body>
