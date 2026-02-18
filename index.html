@@ -211,7 +211,7 @@
         appendUserMessage(selectedText);
         tempScore = score;
         setTimeout(() => {
-            appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻過敏發作\n\n(如果一切正常，請幫我輸入「無」或「正常」唷！)");
+            appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻過敏。\n\n如果一切正常，請幫我輸入「無」或「正常」唷！");
             isWaitingForAbnormality = true;
             document.getElementById('user-input').focus();
         }, 600);
