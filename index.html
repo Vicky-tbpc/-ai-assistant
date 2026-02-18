@@ -258,11 +258,11 @@
 
             // 從詞句庫抓取對應趨勢的摘要
             const { data: trendPhrases } = await _supabase.from('phrase_library')
-                .select('重點摘要, 一句大眾易懂又強調健康價值的版本')
+                .select('summary_content, simple_content')
                 .contains('raw_json', trend)
                 .limit(1);
 
-            const insightText = trendPhrases?.[0]?.["重點摘要"] || trendPhrases?.[0]?.["一句大眾易懂又強調健康價值的版本"] || "持續追蹤身體數據，讓我們一起維持健康。";
+            const insightText = trendPhrases?.[0]?.["summary_content"] || trendPhrases?.[0]?.["simple_content"] || "持續追蹤身體數據，讓我們一起維持健康。";
 
             // 原有的膠囊詞句抓取
             let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
