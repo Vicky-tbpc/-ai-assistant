@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n10</title>
+    <title>AI 健康夥伴 n11</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -18,92 +18,80 @@
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
-        /* 彈窗樣式 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
-        .modal-content { background: white; padding: 30px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 320px; text-align: center; }
-        .modal-content h2 { margin-top: 0; color: var(--tbp-blue); font-size: 20px; }
-        .modal-content input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; box-sizing: border-box; outline: none; font-size: 16px; }
-        
-        .primary-btn { background: var(--tbp-blue); color: white; border: none; padding: 12px; width: 100%; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; margin-top: 10px; }
-        .primary-btn:hover { opacity: 0.9; }
+        .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
+        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; }
 
-        /* 主介面 */
-        #app-container { display: flex; flex-direction: column; height: 100dvh; }
-        
-        /* 頂欄 */
-        header { background: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.03); z-index: 100; }
-        .header-left { display: flex; align-items: center; gap: 12px; }
-        .avatar { width: 40px; height: 40px; background: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px; }
-        .user-info .name { font-weight: bold; font-size: 16px; }
-        
-        .header-right { position: relative; }
-        .settings-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; color: #888; }
-        .dropdown-menu { position: absolute; right: 0; top: 40px; background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); width: 150px; overflow: hidden; z-index: 500; }
-        .dropdown-item { padding: 12px 15px; font-size: 14px; cursor: pointer; transition: 0.2s; border-bottom: 1px solid #f5f5f5; }
-        .dropdown-item:last-child { border-bottom: none; }
-        .dropdown-item:hover { background: #f9f9f9; }
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
+        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
+        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
-        /* 對話區 */
-        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
-        .msg-row { display: flex; width: 100%; margin-bottom: 5px; }
-        .ai-row { justify-content: flex-start; }
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
+        .msg-row { display: flex; width: 100%; margin: 4px 0; }
         .user-row { justify-content: flex-end; }
-        .ai-bubble { background: var(--ai-msg-bg); padding: 12px 16px; border-radius: 18px 18px 18px 4px; max-width: 80%; line-height: 1.5; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-        .user-bubble { background: var(--user-msg-bg); padding: 12px 16px; border-radius: 18px 18px 4px 18px; max-width: 80%; line-height: 1.5; font-size: 15px; }
+        .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .ai-row { justify-content: flex-start; }
+        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* 健康摘要卡片 */
-        .summary-card { background: white; border-radius: 20px; padding: 20px; width: 85%; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 10px; cursor: pointer; transition: 0.3s; border: 1px solid #eee; }
-        .summary-header { font-weight: bold; color: var(--tbp-blue); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; font-size: 16px; }
-        .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .summary-label { color: #888; font-size: 14px; }
-        .battery-val { font-size: 32px; font-weight: 900; }
-        .rank-text { font-size: 12px; color: #aaa; }
-        .status-text { font-weight: bold; font-size: 15px; display: flex; align-items: center; gap: 5px; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-        
-        .analysis-capsule { margin-top: 12px; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.4; display: flex; align-items: flex-start; gap: 8px; }
-        .capsule-best { background: #f0f7f4; color: #4a7c59; }
-        .capsule-worst { background: #fff5f5; color: #c05656; }
-        .capsule-icon { font-size: 16px; }
+        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; margin: 10px 0; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
+        .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .summary-label { font-size: 0.9rem; color: #555; }
+        .battery-val { font-size: 1.4rem; font-weight: bold; }
+        .rank-text { font-size: 0.8rem; color: #999; }
+        .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
 
-        /* 輸入框 */
-        footer { background: white; padding: 12px 20px 30px; display: flex; gap: 10px; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.03); }
-        .input-box { flex: 1; background: #f2f2f2; border: none; padding: 12px 18px; border-radius: 25px; outline: none; font-size: 15px; }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+        .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
+        .capsule-best { background-color: #f0f4f5; color: #555; }
+        .capsule-worst { background-color: #fff1ef; color: #555; }
+        .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
+        .icon-best { color: #a0afb7; }
+        .icon-worst { color: #ffb4a3; }
 
-        /* 縮放圖層 */
-        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; }
-        #zoom-content .summary-card { width: 320px; transform: scale(1.1); cursor: default; }
+        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
+        #zoom-content { transform: scale(1.3); background: white; border-radius: 12px; pointer-events: none; }
 
+        .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
+        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
+        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
+        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
+        .status-text { font-size: 0.9rem; color: #555; }   
+        #status-options-container .primary-btn:active { background-color: var(--tbp-light-blue) !important; transform: scale(0.98); }
     </style>
 </head>
 <body>
 
     <div id="login-overlay" class="modal-overlay">
-        <div class="modal-content">
-            <h2>AI 健康夥伴登入</h2>
-            <input type="text" id="serial" placeholder="請輸入序號">
-            <input type="password" id="pw" placeholder="請輸入密碼">
+        <div class="modal-card">
+            <h2 style="color: var(--tbp-blue);">Personal Health Companion</h2>
+            <input type="text" id="serial" placeholder="序號">
+            <input type="password" id="pw" placeholder="密碼">
             <button class="primary-btn" onclick="login()">登入系統</button>
         </div>
     </div>
 
     <div id="nickname-overlay" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2>初次見面！</h2>
-            <p style="font-size: 14px; color: #666;">請告訴我該如何稱呼您？</p>
-            <input type="text" id="new-nickname" placeholder="您的暱稱">
-            <button class="primary-btn" onclick="saveNickname()">開始體驗</button>
+        <div class="modal-card">
+            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
+            <input type="text" id="new-nickname" placeholder="你的暱稱">
+            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
         </div>
     </div>
 
     <div id="pw-overlay" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2>修改密碼</h2>
-            <input type="password" id="old-pw" placeholder="輸入舊密碼">
-            <input type="password" id="new-pw" placeholder="輸入新密碼">
-            <button class="primary-btn" onclick="updatePassword()">確認修改</button>
-            <button class="primary-btn" style="background:#ccc;" onclick="closePwModal()">取消</button>
+        <div class="modal-card">
+            <h3>修改密碼</h3>
+            <input type="password" id="old-pw" placeholder="舊密碼">
+            <input type="password" id="new-pw" placeholder="新密碼">
+            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
+            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
         </div>
     </div>
 
@@ -113,31 +101,27 @@
 
     <div id="app-container" class="hidden">
         <header>
-            <div class="header-left">
-                <div class="avatar" id="avatar-char">V</div>
-                <div class="user-info">
-                    <div class="name" id="display-name">使用者</div>
-                    <div style="font-size: 12px; color: #888;">AI 健康夥伴在線中</div>
-                </div>
+            <div class="logo-text">Personal Health Companion</div>
+            <div class="user-info" onclick="toggleDropdown()">
+                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
+                <div class="avatar" id="avatar-char">U</div>
             </div>
-            <div class="header-right">
-                <button class="settings-btn" onclick="toggleDropdown()">⋮</button>
-                <div id="settings-menu" class="dropdown-menu hidden">
-                    <div class="dropdown-item" onclick="openPwModal()">修改密碼</div>
-                    <div class="dropdown-item" onclick="logout()">登出系統</div>
-                </div>
+            <div id="settings-menu" class="dropdown hidden">
+                <button onclick="openPwModal()">🔒 修改密碼</button>
+                <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
             </div>
         </header>
 
         <main id="main-area">
-            <div id="chat-history">
-                </div>
+            <div id="chat-history"></div>
         </main>
 
-        <footer>
-            <input type="text" id="user-input" class="input-box" placeholder="輸入訊息..." onkeypress="if(event.key==='Enter') sendMessage()">
-            <button class="send-btn" onclick="sendMessage()">➔</button>
-        </footer>
+        <div class="footer-input">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="請輸入內容..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">▲</button>
+            </div>
+        </div>
     </div>
 
 <script>
@@ -149,7 +133,7 @@
     let isNamingPhase = false;
     let tempScore = null;             
     let isWaitingForAbnormality = false; 
-    let isWaitingForDate = false; // 新功能：追蹤日期提問狀態
+    let isWaitingForSummaryDate = false; // 新增：狀態控制
 
     const FIELD_MAP = {
         'Battery_TST_min_A': { best: 'Battery 總睡眠時間最佳', worst: 'Battery 總睡眠時間最差' },
@@ -212,13 +196,11 @@
             { text: "④ 醒來就覺得不錯，腦袋清楚、身體不重", val: 85 },
             { text: "⑤ 精神飽滿、神清氣爽，對今天有期待感", val: 95 }
         ];
-
         let optionsHtml = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:300px; margin-top:10px;">';
         options.forEach(opt => {
             optionsHtml += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; font-weight:normal; text-align:left; font-size:14px; line-height:1.4; padding:10px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`;
         });
         optionsHtml += '</div></div>';
-        
         document.getElementById('chat-history').innerHTML += optionsHtml;
         scrollToBottom();
     }
@@ -227,8 +209,7 @@
         const container = document.getElementById('status-options-container');
         if (container) container.remove();
         appendUserMessage(selectedText);
-        tempScore = score; 
-
+        tempScore = score;
         setTimeout(() => {
             appendAiMessage("今天生理狀態是否有自覺異常的地方呢？\n例如，體溫較高、心跳較快、鼻過敏... (若無請輸入「無」)");
             isWaitingForAbnormality = true;
@@ -242,21 +223,19 @@
         if (!msg) return;
         input.value = '';
 
-        // A. 攔截：處理生理狀態回覆
         if (isWaitingForAbnormality) {
             isWaitingForAbnormality = false; 
             await handleAbnormalityInput(msg); 
             return; 
         }
 
-        // B. 攔截：處理日期查詢回覆
-        if (isWaitingForDate) {
-            isWaitingForDate = false;
-            processDateSearch(msg);
+        // 處理反問日期的回覆
+        if (isWaitingForSummaryDate) {
+            isWaitingForSummaryDate = false;
+            await handleManualDateInput(msg);
             return;
         }
 
-        // C. 攔截：處理取名字
         if (isNamingPhase) {
             appendUserMessage(msg);
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
@@ -267,51 +246,55 @@
             return;
         }
 
-        // 一般對話與關鍵字觸發
         appendUserMessage(msg);
-        if (msg.includes("健康摘要")) {
+
+        // 偵測是否包含特定日期
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+        const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+
+        if (msg === "健康摘要") {
+            isWaitingForSummaryDate = true;
             setTimeout(() => {
-                appendAiMessage("沒問題！請問你想查看哪一天的健康摘要呢？\n(請輸入日期，例如：2026-02-18 或 2月18日)");
-                isWaitingForDate = true; 
-                document.getElementById('user-input').focus();
+                appendAiMessage("請問你想查看哪一天的健康摘要呢？📅\n(請輸入日期，例如：2026/02/18)");
             }, 600);
+        } else if (msg.includes("健康摘要") && (dateMatch || dateMatchChn)) {
+            // 直接包含日期的輸入
+            const m = dateMatch || dateMatchChn;
+            const targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+            processSummarySearch(targetDate);
         } else {
             setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
         }
     }
 
-    // 處理日期搜尋邏輯
-    async function processDateSearch(msg) {
+    async function handleManualDateInput(msg) {
         appendUserMessage(msg);
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+        const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
         
-        setTimeout(async () => {
-            const todayStr = new Date().toISOString().split('T')[0];
-            let targetDate = todayStr;
-            
-            // 支援多種日期格式解析
-            const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-            const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-            const shortDateMatch = msg.match(/(\d{1,2})月(\d{1,2})日/);
+        if (dateMatch || dateMatchChn) {
+            const m = dateMatch || dateMatchChn;
+            const targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+            processSummarySearch(targetDate);
+        } else {
+            setTimeout(() => appendAiMessage("抱歉，我看不懂這個日期格式 😅。請試試輸入如「2026/02/18」的格式。"), 600);
+        }
+    }
 
-            if (dateMatch || dateMatchChn) {
-                const m = dateMatch || dateMatchChn;
-                targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-            } else if (shortDateMatch) {
-                const year = new Date().getFullYear();
-                targetDate = `${year}-${shortDateMatch[1].padStart(2, '0')}-${shortDateMatch[2].padStart(2, '0')}`;
-            } else if (msg.includes("今天")) {
-                targetDate = todayStr;
-            }
-
-            const data = await fetchSummaryData(targetDate);
-            
-            // 檢查是否有該日期的對應資料
+    async function processSummarySearch(targetDate) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const data = await fetchSummaryData(targetDate);
+        
+        setTimeout(() => {
             if (!data || data.record_date_raw !== targetDate) {
-                appendAiMessage(`${targetDate.replace(/-/g, '/')} 這一天目前沒有紀錄資料喔~ 😅`);
+                appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
                 return;
             }
-
-            appendAiMessage(`這是 ${targetDate.replace(/-/g, '/')} 的健康摘要 ✨`);
+            if (data.record_date_raw === todayStr) {
+                appendAiMessage("這是我們今天的健康摘要 ✨");
+            } else {
+                appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
+            }
             appendSummaryCard(data);
         }, 800);
     }
@@ -319,7 +302,6 @@
     async function handleAbnormalityInput(msg) {
         appendUserMessage(msg); 
         const todayStr = new Date().toISOString().split('T')[0];
-
         try {
             await _supabase.from('user_daily_surveys').upsert({ 
                 serial_number: currentSerial, 
@@ -328,9 +310,7 @@
                 physical_abnormality: msg
             });
         } catch (err) { console.error(err); }
-
         localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-
         setTimeout(() => {
             appendAiMessage("收到了！謝謝你的分享。我們一起來看看今天的健康摘要吧！ ✨");
             setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false, true), 800);
@@ -341,13 +321,8 @@
         const today = new Date().toISOString().split('T')[0];
         const summaryData = await fetchSummaryData(today);
         if (!summaryData) return;
-
         if (!skipGreeting) {
-            if (isFirstTimeNaming) {
-                appendAiMessage(summaryData.isToday ? "謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨" : "謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
-            } else {
-                appendAiMessage(summaryData.isToday ? `哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨` : `哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
-            }
+            appendAiMessage(summaryData.isToday ? `哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨` : `哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
         }
         appendSummaryCard(summaryData);
     }
@@ -361,14 +336,12 @@
             .limit(2);
 
         if (!healths || healths.length === 0) return null;
-
         const current = healths[0];
         const prev = healths[1];
         const raw = current.raw_json;
         const todayStr = new Date().toISOString().split('T')[0];
         
-        let bestKey = 'Battery_TST_min_A';
-        let worstKey = 'Battery_TST_min_A';
+        let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
         if (prev) {
             let maxInc = -Infinity, maxDec = Infinity;
             const prevRaw = prev.raw_json;
@@ -416,10 +389,8 @@
         if (data.battery >= 60) bColor = "#a79d8c";
         if (data.battery >= 80) bColor = "#a0adb7";
         if (data.battery >= 100) bColor = "#596b75";
-
         const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
         const lightColor = lightMap[data.light] || null;
-
         const cardHtml = `
             <div class="msg-row ai-row">
                 <div class="summary-card" onclick="zoomCard(this)">
@@ -473,5 +444,6 @@
         alert("修改成功！ ✨"); closePwModal();
     }
 </script>
+
 </body>
 </html>
