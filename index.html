@@ -80,7 +80,7 @@
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">Health Companion</h2>
+            <h2 style="color: var(--tbp-blue);">Soosy Health Companion</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
             <button class="primary-btn" onclick="login()">登入系統</button>
@@ -107,7 +107,7 @@
 
     <div id="app-container" class="hidden">
         <header>
-            <div class="logo-text">Health Companion</div>
+            <div class="logo-text">Soosyn Health Companion</div>
             <div class="user-info" onclick="toggleDropdown()">
                 <div id="display-name" style="font-size: 14px; color: #666;">User</div>
                 <div class="avatar" id="avatar-char">U</div>
@@ -167,7 +167,7 @@
         } else {
             const todayStr = new Date().toISOString().split('T')[0];
             if (localStorage.getItem(`last_summary_${currentSerial}`) !== todayStr) {
-                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你現在的感覺比較接近哪一個呢？`);
+                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一個呢？`);
                 appendStatusOptions();
             } else await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
         }
@@ -185,7 +185,7 @@
     }
 
     function appendStatusOptions() {
-        const options = [{text:"① 只想賴床", val:40}, {text:"② 還是很累", val:60}, {text:"③ 與平常無異", val:75}, {text:"④ 感覺不錯", val:85}, {text:"⑤ 神清氣爽", val:95}];
+        const options = [{text:"① 像是沒睡一樣，感覺頭昏、身體重，只想賴床", val:50}, {text:"② 睡了，但還是很累，需要一段時間才能正常運轉", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚、身體不重", val:85}, {text:"⑤ 精神飽滿、神清氣爽，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
         document.getElementById('chat-history').innerHTML += html + '</div></div>';
@@ -204,7 +204,7 @@
         if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
         if (isNamingPhase) {
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
-            isNamingPhase = false; await appendAiMessage(`「${msg}」！以後就由我來守護你的健康。`);
+            isNamingPhase = false; await appendAiMessage(`太棒了！以後就由我來守護你的健康。`);
             showSummaryFlow(); return;
         }
         if (msg.includes("健康摘要")) { await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); showDateActions(); return; }
@@ -250,12 +250,12 @@
         }
         const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
         const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
-        return { date: current.record_date.replace(/-/g, '/'), battery: raw.Personal_Battery_weighted_round || 0, light: feedback?.status_light || '未知', bestText: phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "狀態穩定。", worstText: phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "建議維持作息。" };
+        return { date: current.record_date.replace(/-/g, '/'), battery: raw.Personal_Battery_weighted_round || 0, light: feedback?.status_light || '--', bestText: phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "狀態穩定。", worstText: phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "建議維持作息。" };
     }
 
     function appendSummaryCard(data) {
         const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
-        const lightMap = { '紅燈': '#ff4d4d', '黃紅燈': '#ffae42', '黃燈': '#f4d03f', '綠燈': '#2ecc71' };
+        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
         document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row"><div class="summary-card" style="border-left-color: ${lightMap[data.light] || '#ddd'}"><div class="summary-header"><span>📅 ${data.date}</span><span style="color:${lightMap[data.light]}; font-weight:bold;">● ${data.light}</span></div><div class="battery-container"><div class="battery-meta"><span style="font-size:0.9rem">生理電量</span><span class="battery-val" style="color:${colors}">${data.battery}</span></div><div class="progress-bg"><div class="progress-fill" style="width: ${data.battery}%; background: ${colors}"></div></div></div><div class="analysis-capsule capsule-best"><span>🌟</span> ${data.bestText}</div><div class="analysis-capsule capsule-worst"><span>⚠️</span> ${data.worstText}</div></div></div>`;
         scrollToBottom();
     }
