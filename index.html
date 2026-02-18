@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n11</title>
+    <title>AI 健康夥伴 n12</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -317,12 +317,17 @@
         }, 500);
     }
 
-    async function showSummaryFlow(nickname, isFirstTimeNaming, skipGreeting = false) {
+     async function showSummaryFlow(nickname, isFirstTimeNaming, skipGreeting = false) {
         const today = new Date().toISOString().split('T')[0];
         const summaryData = await fetchSummaryData(today);
         if (!summaryData) return;
+
         if (!skipGreeting) {
-            appendAiMessage(summaryData.isToday ? `哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨` : `哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+            if (isFirstTimeNaming) {
+                appendAiMessage(summaryData.isToday ? "謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨" : "謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
+            } else {
+                appendAiMessage(summaryData.isToday ? `哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨` : `哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+            }
         }
         appendSummaryCard(summaryData);
     }
