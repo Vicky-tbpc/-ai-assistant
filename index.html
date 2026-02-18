@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 健康夥伴 n10-1</title>
+    <title>AI 健康夥伴 n10-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -203,80 +203,93 @@
 
         // --- 資料抓取與核心邏輯 ---
         async function fetchSummaryData(targetDate) {
-            const { data: healths } = await _supabase.from('health_data')
-                .select('record_date, raw_json')
-                .eq('serial_number', currentSerial)
-                .lte('record_date', targetDate)
-                .order('record_date', { ascending: false })
-                .limit(2);
+    const { data: healths } = await _supabase.from('health_data')
+        .select('record_date, raw_json, serial_number')
+        .eq('serial_number', currentSerial)
+        .lte('record_date', targetDate)
+        .order('record_date', { ascending: false })
+        .limit(2);
 
-            if (!healths || healths.length === 0) return null;
+    if (!healths || healths.length === 0) return null;
 
-            const current = healths[0];
-            const prev = healths[1];
-            const raw = current.raw_json;
-            const todayStr = new Date().toISOString().split('T')[0];
-            
-            let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A', logicKeyTrend = "";
+    const current = healths[0];
+    const prev = healths[1];
+    const raw = current.raw_json;
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A', logicKeyTrend = "";
 
-            if (prev) {
-                let maxInc = -Infinity, maxDec = Infinity;
-                const prevRaw = prev.raw_json;
-                Object.keys(FIELD_MAP).forEach(key => {
-                    const diff = (raw[key] || 0) - (prevRaw[key] || 0);
-                    if (diff > maxInc) { maxInc = diff; bestKey = key; }
-                    if (diff < maxDec) { maxDec = diff; worstKey = key; }
-                });
+    // 必須有前一天資料才能生成趨勢泡泡
+    if (prev) {
+        let maxInc = -Infinity, maxDec = Infinity;
+        const prevRaw = prev.raw_json;
+        
+        // 找出最佳與最差 (維持原有邏輯)
+        Object.keys(FIELD_MAP).forEach(key => {
+            const diff = (raw[key] || 0) - (prevRaw[key] || 0);
+            if (diff > maxInc) { maxInc = diff; bestKey = key; }
+            if (diff < maxDec) { maxDec = diff; worstKey = key; }
+        });
 
-                // 趨勢邏輯組合成 logic_key
-                const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "";
-                const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "";
-                const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "";
-                const hrmin = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "";
-                const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "";
-                logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].filter(x => x !== "").join(",");
-            }
+        // --- 核心修正：依照您的需求生成固定 5 欄位的邏輯特徵碼 ---
+        // 判斷邏輯：TST_min, N3_pct, rMSSD, HR_min, HBI
+        const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "";
+        const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "";
+        const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "";
+        const hrmin = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "";
+        const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "";
+        
+        // 確保產生的格式為 "▼▲,▼,,▼," 這種固定逗號隔開的格式
+        logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].join(","); 
+    }
 
-            const searchKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
-            if (logicKeyTrend) searchKeys.push(logicKeyTrend);
+    const searchKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
+    if (logicKeyTrend && logicKeyTrend !== ",,,,") searchKeys.push(logicKeyTrend);
 
-            const { data: phrases } = await _supabase.from('phrase_library')
-                .select('logic_key, detailed_content, summary_content, simple_content')
-                .in('logic_key', searchKeys);
+    const { data: phrases } = await _supabase.from('phrase_library')
+        .select('logic_key, detailed_content, summary_content, simple_content')
+        .in('logic_key', searchKeys);
 
-            const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
-            const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
-            
-            let bubbleText = "";
-            if (logicKeyTrend) {
-                const trendPhrase = phrases?.find(p => p.logic_key === logicKeyTrend);
-                if (trendPhrase) bubbleText = trendPhrase.summary_content || trendPhrase.simple_content || "";
-            }
-
-            const date = current.record_date;
-            const battery = raw.Personal_Battery_weighted_round || 0;
-            const { data: feedback } = await _supabase.from('daily_feedback')
-                .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
-
-            const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
-            let percentage = 0;
-            if (allDayData?.length > 0) {
-                const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
-                percentage = Math.round((lowerCount / allDayData.length) * 100);
-            }
-
-            return {
-                isToday: date === todayStr,
-                record_date_raw: date,
-                date: date.replace(/-/g, '/'),
-                battery: battery,
-                percentage: percentage,
-                light: feedback ? feedback.status_light : null,
-                bestText: bestText,
-                worstText: worstText,
-                bubbleText: bubbleText
-            };
+    const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
+    const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
+    
+    let bubbleText = "";
+    if (logicKeyTrend && logicKeyTrend !== ",,,,") {
+        const trendPhrase = phrases?.find(p => p.logic_key === logicKeyTrend);
+        if (trendPhrase) {
+            // 優先抓取 summary_content，若無則抓 simple_content
+            bubbleText = trendPhrase.summary_content || trendPhrase.simple_content || "";
         }
+    }
+
+    // 生理電量與排名計算
+    const date = current.record_date;
+    const battery = raw.Personal_Battery_weighted_round || 0;
+    const { data: feedback } = await _supabase.from('daily_feedback')
+        .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
+
+    // 修正：計算排名時應篩選同日期的所有使用者
+    const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
+    let percentage = 0;
+    if (allDayData?.length > 0) {
+        const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
+        percentage = Math.round((lowerCount / allDayData.length) * 100);
+    }
+
+    return {
+        isToday: date === todayStr,
+        record_date_raw: date,
+        date: date.replace(/-/g, '/'),
+        battery: battery,
+        percentage: percentage,
+        light: feedback ? feedback.status_light : null,
+        bestText: bestText,
+        worstText: worstText,
+        bubbleText: bubbleText // 這裡是輸出的對話內容
+    };
+}
+
+
 
         async function showSummaryFlow(nickname, isFirstTimeNaming) {
             const today = new Date().toISOString().split('T')[0];
