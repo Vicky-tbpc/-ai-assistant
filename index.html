@@ -228,30 +228,50 @@
                     if (diff < maxDec) { maxDec = diff; worstKey = key; }
                 });
 
-                // 趨勢邏輯組合成 logic_key
-                const tst = (raw.TST_min < prevRaw.TST_min && raw.TST_min > 420) ? "▼▲" : "";
-                const n3 = (raw.N3_pct < prevRaw.N3_pct) ? "▼" : "";
-                const rmssd = (raw.rMSSD < prevRaw.rMSSD) ? "▼" : "";
-                const hrmin = (raw.HR_min < prevRaw.HR_min) ? "▼" : "";
-                const hbi = (raw.HBI > prevRaw.HBI) ? "▲" : "";
-                logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].filter(x => x !== "").join(",");
-            }
+               // === 1. 趨勢判斷 ===
+const trendSymbols = [];
 
-            const searchKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
-            if (logicKeyTrend) searchKeys.push(logicKeyTrend);
+if (raw.TST_min < prevRaw.TST_min && raw.TST_min > 420) {
+  trendSymbols.push("▼▲");
+}
 
-            const { data: phrases } = await _supabase.from('phrase_library')
-                .select('logic_key, detailed_content, summary_content, simple_content')
-                .in('logic_key', searchKeys);
+if (raw.N3_pct < prevRaw.N3_pct) {
+  trendSymbols.push("▼");
+}
 
-            const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
-            const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
-            
-            let bubbleText = "";
-            if (logicKeyTrend) {
-                const trendPhrase = phrases?.find(p => p.logic_key === logicKeyTrend);
-                if (trendPhrase) bubbleText = trendPhrase.summary_content || trendPhrase.simple_content || "";
-            }
+if (raw.rMSSD < prevRaw.rMSSD) {
+  trendSymbols.push("▼");
+}
+
+if (raw.HR_min < prevRaw.HR_min) {
+  trendSymbols.push("▼");
+}
+
+if (raw.HBI > prevRaw.HBI) {
+  trendSymbols.push("▲");
+}
+
+// === 2. 組合 logic_key ===
+const logicKeyTrend = trendSymbols.join(",");
+
+// === 3. 查詢 phrase_library ===
+let bubbleText = "";
+
+if (logicKeyTrend) {
+  const { data: phrase } = await _supabase
+    .from("phrase_library")
+    .select("logic_key, summary_content, simple_content")
+    .eq("logic_key", logicKeyTrend)
+    .single();
+
+  if (phrase) {
+    bubbleText =
+      phrase.summary_content ||
+      phrase.simple_content ||
+      "";
+  }
+}
+
 
             const date = current.record_date;
             const battery = raw.Personal_Battery_weighted_round || 0;
