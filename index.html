@@ -207,28 +207,35 @@
             }
         }
 
-        async function showSummaryFlow(nickname, isFirstTimeNaming) {
-            const today = new Date().toISOString().split('T')[0];
-            const summaryData = await fetchSummaryData(today);
-            if (!summaryData) return;
 
-            if (isFirstTimeNaming) {
-                if (summaryData.isToday) {
-                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
-                } else {
-                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
-                }
+// 新增 skipGreeting 參數，預設為 false
+async function showSummaryFlow(nickname, isFirstTimeNaming, skipGreeting = false) {
+    const today = new Date().toISOString().split('T')[0];
+    const summaryData = await fetchSummaryData(today);
+    if (!summaryData) return;
+
+    // 只有在不跳過招呼語的情況下，才顯示原本的問候
+    if (!skipGreeting) {
+        if (isFirstTimeNaming) {
+            if (summaryData.isToday) {
+                appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
             } else {
-                if (summaryData.isToday) {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
-                } else {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
-                }
+                appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
+                appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
             }
-            appendSummaryCard(summaryData);
+        } else {
+            if (summaryData.isToday) {
+                appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
+            } else {
+                appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+                appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
+            }
         }
+    }
+
+    // 顯示健康摘要卡片
+    appendSummaryCard(summaryData);
+}
 
         async function fetchSummaryData(targetDate) {
             // 抓取目標日期與前一筆
@@ -458,30 +465,23 @@ async function handleStatusSelection(selectedText, score) {
     appendUserMessage(selectedText);
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 寫入新的資料表 user_daily_surveys
-    const { data, error } = await _supabase.from('user_daily_surveys').upsert({ 
+    // 寫入新資料表 user_daily_surveys
+    await _supabase.from('user_daily_surveys').upsert({ 
         serial_number: currentSerial, 
         record_date: todayStr,
         subjective_score: score 
     });
 
-    if (error) {
-        console.error("上傳失敗:", error.message);
-        alert("資料儲存失敗，請檢查網路或資料庫設定。");
-    } else {
-        console.log("資料成功存入新資料表！");
-    }
-
-    // 標記今天已完成問答
     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
 
-    // 接著顯示健康摘要
     setTimeout(() => {
-        appendAiMessage("收到了！謝謝你的分享。接著為你呈現今天的健康摘要：");
-        setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false), 800);
+        // 設定唯一的轉場文字
+        appendAiMessage("收到了！謝謝你的分享。我們一起來看看今天的健康摘要吧！ ✨");
+        
+        // 傳入 true 代表「跳過招呼語」
+        setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false, true), 800);
     }, 500);
 }
-
 
     </script>
 </body>
