@@ -13,22 +13,26 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
+           
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
+        /* 彈窗樣式 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; }
 
+        /* 主佈局 */
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
+        /* 對話內容 */
         main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
         .msg-row { display: flex; width: 100%; margin: 4px 0; }
@@ -37,6 +41,7 @@
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
+        /* 健康摘要卡片 */
         .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; margin: 10px 0; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
         .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -44,8 +49,11 @@
         .battery-val { font-size: 1.4rem; font-weight: bold; }
         .rank-text { font-size: 0.8rem; color: #999; }
         .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
-        .status-text { font-size: 0.9rem; color: #555; }
 
+
+   
+
+        /* 膠囊訊息條樣式 (007) */
         .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
         .capsule-best { background-color: #f0f4f5; color: #555; }
         .capsule-worst { background-color: #fff1ef; color: #555; }
@@ -53,9 +61,11 @@
         .icon-best { color: #a0afb7; }
         .icon-worst { color: #ffb4a3; }
 
+        /* 放大功能 */
         #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
         #zoom-content { transform: scale(1.3); background: white; border-radius: 12px; pointer-events: none; }
 
+        /* 輸入框 */
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
@@ -63,7 +73,17 @@
 
         .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-    </style>
+/* 請將這段加入到 <style> 標籤中 */
+.status-text { 
+    font-size: 0.9rem; 
+    color: #555; 
+}   
+#status-options-container .primary-btn:active {
+    background-color: var(--tbp-light-blue) !important;
+    transform: scale(0.98);
+}
+
+ </style>
 </head>
 <body>
 
@@ -162,7 +182,7 @@
             initApp(nick, null);
         }
 
-        async function initApp(name, aiName) {
+   async function initApp(name, aiName) {
             document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('display-name').innerText = name;
             document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -175,10 +195,13 @@
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
                 
-                if (lastShown !== todayStr) {
-                    await showSummaryFlow(name, false);
-                    localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-                } else {
+                // 判斷是否為當天第一次登入 (即是否要顯示自動摘要)
+               if (lastShown !== todayStr) {
+    // 修改這裡：不再直接執行 showSummaryFlow
+    appendAiMessage(`哈囉 ${name}，早安！在看今天的數據前，想先請問你現在的感覺比較接近哪一個呢？`);
+    appendStatusOptions(); // 呼叫新增的選項按鈕
+} else {
+                    // 只有當天第二次以後登入，且不顯示摘要時，才顯示招呼語
                     appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 }
             }
@@ -205,14 +228,10 @@
                 }
             }
             appendSummaryCard(summaryData);
-            
-            // 每天第一次顯示摘要後追加的對話泡泡
-            if (summaryData.insightText) {
-                setTimeout(() => appendAiMessage(summaryData.insightText), 800);
-            }
         }
 
         async function fetchSummaryData(targetDate) {
+            // 抓取目標日期與前一筆
             const { data: healths } = await _supabase.from('health_data')
                 .select('record_date, raw_json')
                 .eq('serial_number', currentSerial)
@@ -227,45 +246,9 @@
             const raw = current.raw_json;
             const todayStr = new Date().toISOString().split('T')[0];
             
-            // 比對邏輯 (新增部分)
-            let trend = {
-                "TST_min": "=", "N3_pct": "=", "rMSSD": "=", "HR_min": "=", "HBI": "="
-            };
-
-            if (prev) {
-                const pRaw = prev.raw_json;
-                // TST_min: 小於前一天但大於420為 ▼▲
-                if (raw.TST_min < pRaw.TST_min && raw.TST_min > 420) trend.TST_min = "▼▲";
-           else if (raw.TST_min < pRaw.TST_min && raw.TST_min < 420) trend.TST_min = "▼▼";
-           else if (raw.TST_min > pRaw.TST_min && raw.TST_min > 420) trend.TST_min = "▲▲";
-           else if (raw.TST_min > pRaw.TST_min && raw.TST_min < 420) trend.TST_min = "▲▼";
-
-
-
-
-                if (raw.N3_pct < pRaw.N3_pct) trend.N3_pct = "▼";
-                else if (raw.N3_pct > pRaw.N3_pct) trend.N3_pct = "▲";
-
-                if (raw.rMSSD < pRaw.rMSSD) trend.rMSSD = "▼";
-                else if (raw.rMSSD > pRaw.rMSSD) trend.rMSSD = "▲";
-
-                if (raw.HR_min < pRaw.HR_min) trend.HR_min = "▼";
-                else if (raw.HR_min > pRaw.HR_min) trend.HR_min = "▲";
-
-                if (raw.HBI > pRaw.HBI) trend.HBI = "▲";
-                else if (raw.HBI < pRaw.HBI) trend.HBI = "▼";
-            }
-
-            // 從詞句庫抓取對應趨勢的摘要
-            const { data: trendPhrases } = await _supabase.from('phrase_library')
-                .select('summary_content, simple_content')
-                .contains('raw_json', trend)
-                .limit(1);
-
-            const insightText = trendPhrases?.[0]?.["summary_content"] || trendPhrases?.[0]?.["simple_content"] || "持續追蹤身體數據，讓我們一起維持健康。";
-
-            // 原有的膠囊詞句抓取
-            let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
+            // 邏輯比對
+            let bestKey = 'Battery_TST_min_A';
+            let worstKey = 'Battery_TST_min_A';
             if (prev) {
                 let maxInc = -Infinity, maxDec = Infinity;
                 const prevRaw = prev.raw_json;
@@ -276,6 +259,7 @@
                 });
             }
 
+            // 抓取詞句庫
             const { data: phrases } = await _supabase.from('phrase_library')
                 .select('logic_key, detailed_content')
                 .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
@@ -283,11 +267,13 @@
             const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
             const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
 
+            // 其他數據
+            const date = current.record_date;
             const battery = raw.Personal_Battery_weighted_round || 0;
             const { data: feedback } = await _supabase.from('daily_feedback')
-                .select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
+                .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
 
-            const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', current.record_date);
+            const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
             let percentage = 0;
             if (allDayData?.length > 0) {
                 const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
@@ -295,19 +281,18 @@
             }
 
             return {
-                isToday: current.record_date === todayStr,
-                record_date_raw: current.record_date,
-                date: current.record_date.replace(/-/g, '/'),
+                isToday: date === todayStr,
+                record_date_raw: date,
+                date: date.replace(/-/g, '/'),
                 battery: battery,
                 percentage: percentage,
                 light: feedback ? feedback.status_light : null,
                 bestText: bestText,
-                worstText: worstText,
-                insightText: insightText
+                worstText: worstText
             };
         }
 
-        function appendSummaryCard(data) {
+       function appendSummaryCard(data) {
             if (!data) return;
             let bColor = "#ff8c73";
             if (data.battery >= 60) bColor = "#a79d8c";
@@ -342,6 +327,7 @@
                                     <span class="status-dot" style="background:${lightInfo.c}"></span>${lightInfo.t}
                                 </span>
                             </div>` : ''}
+
                             <div style="margin-top: 15px; border-top: 1px solid #f5f5f5; padding-top: 10px;">
                                 <div class="analysis-capsule capsule-best" style="width: 100%; margin-top: 5px;">
                                     <span class="capsule-icon icon-best">😊</span>
@@ -359,7 +345,7 @@
             scrollToBottom();
         }
 
-        async function sendMessage() {
+       async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -376,9 +362,11 @@
                 setTimeout(async () => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     let targetDate = todayStr;
+                    
+                    // 偵測日期格式
                     const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
                     const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                    const isManualSearch = (dateMatch || dateMatchChn);
+                    const isManualSearch = (dateMatch || dateMatchChn); // 判斷是否為使用者主動輸入日期
 
                     if (isManualSearch) {
                         const m = dateMatch || dateMatchChn;
@@ -386,18 +374,27 @@
                     }
 
                     const data = await fetchSummaryData(targetDate);
+                    
+                    // 查無資料處理
                     if (!data || (isManualSearch && data.record_date_raw !== targetDate)) {
                         appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
+                        appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
                         return;
                     }
 
-                    if (data.record_date_raw === todayStr) appendAiMessage("這是我們今天的健康摘要 ✨");
-                    else if (isManualSearch) appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
-                    else appendAiMessage("這是我們最新的健康摘要 📅");
+                    // 根據情境顯示對應訊息
+                    if (data.record_date_raw === todayStr) {
+                        appendAiMessage("這是我們今天的健康摘要 ✨");
+                    } else if (isManualSearch) {
+                        // 若是使用者指定日期查詢，顯示該日期
+                        appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
+                    } else {
+                        // 若非今天也非指定日期（系統自動抓最新），顯示原本的提示
+                        appendAiMessage("這是我們最新的健康摘要 📅");
+                        appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
+                    }
                     
                     appendSummaryCard(data);
-                    // 手動查詢也會顯示重點摘要
-                    if (data.insightText) setTimeout(() => appendAiMessage(data.insightText), 800);
                 }, 800);
             } else {
                 setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
@@ -421,6 +418,7 @@
         function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
         function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
         function logout() { location.reload(); }
+
         function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
         function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
         async function updatePassword() {
@@ -431,6 +429,57 @@
             await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
             alert("修改成功！ ✨"); closePwModal();
         }
+
+// 產生選項按鈕
+function appendStatusOptions() {
+    const options = [
+        { text: "① 像是沒睡一樣，感覺頭昏、身體重，只想賴床", val: 40 },
+        { text: "② 睡了，但還是很累，需要一段時間才能正常運轉", val: 60 },
+        { text: "③ 與平常無異，沒特別好，也不算差", val: 75 },
+        { text: "④ 醒來就覺得不錯，腦袋清楚、身體不重", val: 85 },
+        { text: "⑤ 精神飽滿、神清氣爽，對今天有期待感", val: 95 }
+    ];
+
+    let optionsHtml = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:280px;">';
+    options.forEach(opt => {
+        optionsHtml += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; font-weight:normal; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`;
+    });
+    optionsHtml += '</div></div>';
+    
+    document.getElementById('chat-history').innerHTML += optionsHtml;
+    scrollToBottom();
+}
+
+// 處理選擇後的邏輯
+async function handleStatusSelection(selectedText, score) {
+    // 1. 移除選項按鈕，避免重複點擊
+    const container = document.getElementById('status-options-container');
+    if (container) container.remove();
+
+    // 2. 顯示使用者的選擇
+    appendUserMessage(selectedText);
+
+    // 3. 將數值寫入 Supabase (存入 daily_feedback 的 subjective_score 欄位，或您自定義的欄位)
+    const todayStr = new Date().toISOString().split('T')[0];
+    try {
+        await _supabase.from('daily_feedback').upsert({ 
+            serial_number: currentSerial, 
+            record_date: todayStr,
+            subjective_score: score // 請確保資料表有此欄位，或根據需求調整
+        });
+    } catch (err) {
+        console.error("更新數據失敗", err);
+    }
+
+    // 4. 標記今天已詢問過
+    localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+
+    // 5. 延遲顯示健康摘要
+    setTimeout(async () => {
+        const name = document.getElementById('display-name').innerText;
+        await showSummaryFlow(name, false);
+    }, 800);
+}
     </script>
 </body>
 </html>
