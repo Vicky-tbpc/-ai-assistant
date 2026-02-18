@@ -452,34 +452,37 @@ function appendStatusOptions() {
 
 // 處理選擇後的邏輯
 async function handleStatusSelection(selectedText, score) {
-    // 1. 移除選項按鈕，避免重複點擊
     const container = document.getElementById('status-options-container');
     if (container) container.remove();
 
-    // 2. 顯示使用者的選擇
     appendUserMessage(selectedText);
-
-    // 3. 將數值寫入 Supabase (存入 daily_feedback 的 subjective_score 欄位，或您自定義的欄位)
     const todayStr = new Date().toISOString().split('T')[0];
-    try {
-        await _supabase.from('daily_feedback').upsert({ 
-            serial_number: currentSerial, 
-            record_date: todayStr,
-            subjective_score: score // 請確保資料表有此欄位，或根據需求調整
-        });
-    } catch (err) {
-        console.error("更新數據失敗", err);
+
+    // 寫入新的資料表 user_daily_surveys
+    const { data, error } = await _supabase.from('user_daily_surveys').upsert({ 
+        serial_number: currentSerial, 
+        record_date: todayStr,
+        subjective_score: score 
+    });
+
+    if (error) {
+        console.error("上傳失敗:", error.message);
+        alert("資料儲存失敗，請檢查網路或資料庫設定。");
+    } else {
+        console.log("資料成功存入新資料表！");
     }
 
-    // 4. 標記今天已詢問過
+    // 標記今天已完成問答
     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
 
-    // 5. 延遲顯示健康摘要
-    setTimeout(async () => {
-        const name = document.getElementById('display-name').innerText;
-        await showSummaryFlow(name, false);
-    }, 800);
+    // 接著顯示健康摘要
+    setTimeout(() => {
+        appendAiMessage("收到了！謝謝你的分享。接著為你呈現今天的健康摘要：");
+        setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false), 800);
+    }, 500);
 }
+
+
     </script>
 </body>
 </html>
