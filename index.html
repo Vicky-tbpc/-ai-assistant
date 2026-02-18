@@ -153,6 +153,7 @@
     let isNamingPhase = false;
     let tempScore = null;             // 全域變數：暫存主觀分數
     let isWaitingForAbnormality = false; // 全域變數：追蹤是否在等待下方輸入框輸入異常狀態
+let isWaitingForDate = false;
 
     const FIELD_MAP = {
         'Battery_TST_min_A': { best: 'Battery 總睡眠時間最佳', worst: 'Battery 總睡眠時間最差' },
@@ -243,61 +244,88 @@
         }, 600);
     }
 
-    async function sendMessage() {
-        const input = document.getElementById('user-input');
-        const msg = input.value.trim();
-        if (!msg) return;
-        input.value = '';
+ async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
 
-        // 1. 優先處理「生理狀態異常」的回合
-        if (isWaitingForAbnormality) {
-            isWaitingForAbnormality = false; 
-            await handleAbnormalityInput(msg); 
-            return; 
+    // A. 處理生理狀態異常的攔截 (原本的功能)
+    if (isWaitingForAbnormality) {
+        isWaitingForAbnormality = false; 
+        await handleAbnormalityInput(msg); 
+        return; 
+    }
+
+    // B. 新增：處理日期詢問的攔截
+    if (isWaitingForDate) {
+        isWaitingForDate = false;
+        processDateSearch(msg); // 呼叫搜尋日期的函式
+        return;
+    }
+
+    // C. 處理取名字回合
+    if (isNamingPhase) {
+        appendUserMessage(msg);
+        await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+        isNamingPhase = false;
+        const todayStr = new Date().toISOString().split('T')[0];
+        localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+        setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
+        return;
+    }
+
+    // D. 一般訊息處理
+    appendUserMessage(msg);
+    
+    // 修改這裡：當輸入「健康摘要」時，先反問日期
+    if (msg.includes("健康摘要")) {
+        setTimeout(() => {
+            appendAiMessage("沒問題！請問你想查看哪一天的健康摘要呢？\n(請輸入日期，例如：2026-02-18 或 2月18日)");
+            isWaitingForDate = true; // 開啟等待日期模式
+            document.getElementById('user-input').focus();
+        }, 600);
+    } else {
+        setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
+    }
+}
+
+// 3. 新增搜尋日期的處理函式
+async function processDateSearch(msg) {
+    appendUserMessage(msg);
+    
+    setTimeout(async () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        let targetDate = todayStr;
+        
+        // 解析日期格式 (支援 2026-02-18 或 2026/02/18 或 2026年02月18日)
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+        const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        const shortDateMatch = msg.match(/(\d{1,2})月(\d{1,2})日/);
+
+        if (dateMatch || dateMatchChn) {
+            const m = dateMatch || dateMatchChn;
+            targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        } else if (shortDateMatch) {
+            // 如果只輸入月日，預設為今年
+            const year = new Date().getFullYear();
+            targetDate = `${year}-${shortDateMatch[1].padStart(2, '0')}-${shortDateMatch[2].padStart(2, '0')}`;
+        } else if (msg.includes("今天")) {
+            targetDate = todayStr;
         }
 
-        // 2. 處理「取名字」回合
-        if (isNamingPhase) {
-            appendUserMessage(msg);
-            await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
-            isNamingPhase = false;
-            const todayStr = new Date().toISOString().split('T')[0];
-            localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-            setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
+        const data = await fetchSummaryData(targetDate);
+        
+        // 檢查回傳的資料日期是否真的符合使用者的要求
+        if (!data || data.record_date_raw !== targetDate) {
+            appendAiMessage(`${targetDate.replace(/-/g, '/')} 這一天目前沒有紀錄資料喔~ 😅`);
             return;
         }
 
-        // 3. 一般訊息處理
-        appendUserMessage(msg);
-        if (msg.includes("健康摘要")) {
-            setTimeout(async () => {
-                const todayStr = new Date().toISOString().split('T')[0];
-                let targetDate = todayStr;
-                const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-                const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                const isManualSearch = (dateMatch || dateMatchChn);
-
-                if (isManualSearch) {
-                    const m = dateMatch || dateMatchChn;
-                    targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-                }
-
-                const data = await fetchSummaryData(targetDate);
-                if (!data || (isManualSearch && data.record_date_raw !== targetDate)) {
-                    appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
-                    return;
-                }
-
-                if (data.record_date_raw === todayStr) {
-                    appendAiMessage("這是我們今天的健康摘要 ✨");
-                } else if (isManualSearch) {
-                    appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
-                } else {
-                    appendAiMessage("這是我們最新的健康摘要 📅");
-                }
-                appendSummaryCard(data);
-            }, 800);
-        } else {
+        appendAiMessage(`這是 ${targetDate.replace(/-/g, '/')} 的健康摘要 ✨`);
+        appendSummaryCard(data);
+    }, 800);
+} else {
             setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
         }
     }
