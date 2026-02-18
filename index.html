@@ -352,12 +352,21 @@ async function showSummaryFlow(nickname, isFirstTimeNaming, skipGreeting = false
             scrollToBottom();
         }
 
-       async function sendMessage() {
-            const input = document.getElementById('user-input');
-            const text = input.value.trim();
-            if (!text) return;
-            appendUserMessage(text);
-            input.value = '';
+     let tempScore = null; 
+let isWaitingForAbnormality = false;
+
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+// 攔截邏輯：如果正在等待異常狀態回答，就交給 handleAbnormalityInput 處理
+    if (isWaitingForAbnormality) {
+        isWaitingForAbnormality = false; // 重設狀態，回到一般對話/取名模式
+        await handleAbnormalityInput(msg); 
+        return; 
+    }
 
             if (isNamingPhase) {
                 await _supabase.from('user_credentials').update({ ai_name: text }).eq('serial_number', currentSerial);
@@ -472,21 +481,6 @@ async function handleStatusSelection(selectedText, score) {
     }, 600);
 }
 
-function appendPhysicalStatusInput() {
-    const inputHtml = `
-        <div class="msg-row ai-row" id="physical-input-container">
-            <div style="display:flex; gap:8px; width:100%; max-width:300px; margin-top:10px;">
-                <input type="text" id="abnormality-input" placeholder="填寫狀況或「無」" 
-                    style="flex:1; padding:10px; border-radius:12px; border:1px solid #ddd; outline:none; font-size:14px;">
-                <button class="primary-btn" style="width:auto; padding:0 15px; white-space:nowrap;" onclick="submitFinalFeedback()">送出</button>
-            </div>
-        </div>`;
-    document.getElementById('chat-history').innerHTML += inputHtml;
-    scrollToBottom();
-    
-    // 讓手機自動彈出鍵盤
-    document.getElementById('abnormality-input').focus();
-}
 
 async function submitFinalFeedback() {
     const inputVal = document.getElementById('abnormality-input').value.trim();
@@ -519,7 +513,32 @@ async function submitFinalFeedback() {
     }, 500);
 }
 
+async function handleAbnormalityInput(msg) {
+    appendUserMessage(msg); // 將使用者的文字顯示在對話視窗中
+    
+    const todayStr = new Date().toISOString().split('T')[0];
 
+    try {
+        // 將剛剛點選的分數 (tempScore) 與現在輸入的文字 (msg) 一起存入
+        const { error } = await _supabase.from('user_daily_surveys').upsert({ 
+            serial_number: currentSerial, 
+            record_date: todayStr,
+            subjective_score: tempScore,
+            physical_abnormality: msg
+        });
+        if (error) throw error;
+        console.log("資料成功同步到 user_daily_surveys");
+    } catch (err) {
+        console.error("資料庫更新失敗:", err.message);
+    }
+
+    localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+
+    setTimeout(() => {
+        appendAiMessage("收到了！謝謝你的分享。我們一起來看看今天的健康摘要吧！ ✨");
+        setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false, true), 800);
+    }, 500);
+}
     </script>
 </body>
 </html>
