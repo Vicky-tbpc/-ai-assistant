@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Soosyn 健康夥伴 n14</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --tbp-blue: #8699a3; --tbp-light-blue: #e6f0f9; --bg-color: #f5f1eb;
+            --text-dark: #333; --user-msg-bg: #e2ddd4; --ai-msg-bg: #ffffff;
+            --accent-red: #ff8c73; --chart-grey: #c1cdd3; --chart-dot: #596b75;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+        .hidden { display: none !important; }
+
+        /* 介面佈局 */
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
+        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
+        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
+        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* 訊息氣泡 */
+        .msg-row { display: flex; width: 100%; margin: 4px 0; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .user-row { justify-content: flex-end; }
+        .user-bubble { background: var(--user-msg-bg); padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .ai-row { justify-content: flex-start; }
+        .ai-bubble { background: var(--ai-msg-bg); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        /* 健康摘要與按鈕 */
+        .summary-card { background: #fff; border-radius: 16px; width: 280px; padding: 18px; border-left: 6px solid #ddd; box-shadow: 0 8px 15px rgba(0,0,0,0.05); }
+        .battery-val { font-size: 1.8rem; font-weight: bold; }
+        .progress-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .progress-fill { height: 100%; transition: width 1s; }
+        .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
+
+        /* 圖表彈窗 */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 3000; padding: 15px; }
+        .chart-modal { background: white; width: 100%; max-width: 600px; border-radius: 20px; padding: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .chart-title { color: #5a5a5a; font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+        .chart-unit { font-size: 0.8rem; color: #888; margin-bottom: 10px; }
+        .chart-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid #ddd; background: #f9f9f9; cursor: pointer; font-size: 0.8rem; }
+        .tab-btn.active { background: var(--tbp-blue); color: white; border-color: var(--tbp-blue); }
+        .close-btn { position: absolute; top: 15px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #aaa; }
+
+        /* 輸入框 */
+        .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
+        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
+        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
+        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay" class="modal-overlay">
+        <div style="background:white; padding:30px; border-radius:15px; text-align:center; width:300px;">
+            <h2 style="color:var(--tbp-blue)">Soosyn Health</h2>
+            <input type="text" id="serial" placeholder="序號" value="">
+            <input type="password" id="pw" placeholder="密碼" value="">
+            <button class="primary-btn" onclick="login()" style="width:100%; padding:12px; border-radius:8px; border:none; background:var(--tbp-blue); color:white; font-weight:bold; cursor:pointer;">登入</button>
+        </div>
+    </div>
+
+    <div id="nickname-overlay" class="modal-overlay hidden">
+        <div style="background:white; padding:30px; border-radius:15px; text-align:center;">
+            <h3>歡迎！請問該怎麼稱呼你？</h3>
+            <input type="text" id="new-nickname" placeholder="你的暱稱">
+            <button onclick="saveNickname()" style="width:100%; padding:12px; border-radius:8px; border:none; background:var(--tbp-blue); color:white;">開始體驗</button>
+        </div>
+    </div>
+
+    <div id="chart-modal-overlay" class="modal-overlay hidden">
+        <div class="chart-modal">
+            <span class="close-btn" onclick="closeChart()">×</span>
+            <div id="chart-title" class="chart-title"></div>
+            <div id="chart-unit" class="chart-unit"></div>
+            <div class="chart-tabs">
+                <button class="tab-btn active" onclick="updateChartDays(7, this)">7日趨勢</button>
+                <button class="tab-btn" onclick="updateChartDays(14, this)">14日趨勢</button>
+                <button class="tab-btn" onclick="updateChartDays(30, this)">30日趨勢</button>
+            </div>
+            <div style="height: 300px; position: relative;">
+                <canvas id="healthChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
+        <header>
+            <div class="logo-text">Health Companion</div>
+            <div class="user-info" onclick="toggleDropdown()">
+                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
+                <div class="avatar" id="avatar-char">U</div>
+            </div>
+            <div id="settings-menu" class="dropdown hidden" style="position: absolute; top: 60px; right: 20px; background:white; box-shadow:0 4px 10px rgba(0,0,0,0.1); border-radius:8px; z-index:500;">
+                <button onclick="logout()" style="padding:10px 20px; border:none; background:none; cursor:pointer; color:var(--accent-red)">登出</button>
+            </div>
+        </header>
+
+        <main id="main-area"><div id="chat-history"></div></main>
+
+        <div class="footer-input">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="問問我關於健康資訊或趨勢圖..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">▲</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentSerial = "", myNickname = "", myAiName = "";
+    let healthDataRaw = []; 
+    let activeChartType = "";
+    let chartInstance = null;
+
+    const RANDOM_PHRASES = [
+        "保持健康是每天的小累積，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？趨勢圖表、生理狀態、N3深睡比例或HBI缺氧負荷呢？",
+        "維持健康的好習慣很重要！還想查看哪個資訊呢？生理電量、趨勢圖、rMSSD放鬆恢復 或睡眠最低脈搏？"
+    ];
+
+    async function login() {
+        const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
+        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+        if (data) {
+            currentSerial = serial; myNickname = data.nickname; myAiName = data.ai_name;
+            document.getElementById('login-overlay').classList.add('hidden');
+            if (!myNickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+            else initApp();
+        } else alert("驗證失敗 😅");
+    }
+
+    async function initApp() {
+        document.getElementById('app-container').classList.remove('hidden');
+        document.getElementById('display-name').innerText = myNickname;
+        document.getElementById('avatar-char').innerText = myNickname.charAt(0);
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const lastLogin = localStorage.getItem(`last_login_${currentSerial}`);
+        
+        // 抓取最近 30 天數據備用
+        const { data } = await _supabase.from('health_data').select('*').eq('serial_number', currentSerial).order('record_date', {ascending: false}).limit(30);
+        healthDataRaw = data || [];
+
+        if (lastLogin !== todayStr) {
+            // 當天第一次登入
+            localStorage.setItem(`last_login_${currentSerial}`, todayStr);
+            await showInitialFlow();
+        } else {
+            // 當天第二次及以後
+            await appendAiMessage(`歡迎回來 ${myNickname}，我是你的健康夥伴 ${myAiName || 'vv'}。 👋`);
+            await appendAiMessage(getRandomPhrase());
+        }
+    }
+
+    async function showInitialFlow() {
+        // 1. 顯示當天摘要
+        const todayData = await fetchSummaryData(new Date().toISOString().split('T')[0]);
+        if (todayData) appendSummaryCard(todayData);
+
+        // 2. 進行連續天數檢查 (Logic Keys)
+        await checkConsecutiveTrends();
+
+        // 3. 結尾隨機語句
+        await appendAiMessage(getRandomPhrase());
+    }
+
+    async function checkConsecutiveTrends() {
+        if (healthDataRaw.length < 3) return;
+        const latest = healthDataRaw.map(d => d.raw_json);
+        const avg7 = calculateAvg(latest, 7);
+        
+        const conditions = [
+            { key: "5ds TST_min<420", check: () => latest.slice(0,5).every(d => d.Battery_TST_min_A < 420), len: 5 },
+            { key: "3ds TST_min<420", check: () => latest.slice(0,3).every(d => d.Battery_TST_min_A < 420), len: 3 },
+            { key: "5ds N3_pct<avg", check: () => latest.slice(0,5).every(d => d.Battery_N3_pct_A < avg7.N3), len: 5 },
+            { key: "3ds N3_pct<avg", check: () => latest.slice(0,3).every(d => d.Battery_N3_pct_A < avg7.N3), len: 3 },
+            { key: "3ds rMSSD<avg", check: () => latest.slice(0,3).every(d => d.Battery_rMSSD_A < avg7.rMSSD * 0.9), len: 3 },
+            { key: "3ds HR_min>avg", check: () => latest.slice(0,3).every(d => d.Battery_HR_min_A > avg7.HR + 5), len: 3 },
+            { key: "3ds HBI>avg", check: () => latest.slice(0,3).every(d => d.Battery_HBI_A > avg7.HBI), len: 3 },
+            { key: "3ds TST_min>420", check: () => latest.slice(0,3).every(d => d.Battery_TST_min_A > 420), len: 3 },
+            { key: "3ds N3_pct>avg", check: () => latest.slice(0,3).every(d => d.Battery_N3_pct_A > avg7.N3), len: 3 },
+            { key: "3ds rMSSD>avg", check: () => latest.slice(0,3).every(d => d.Battery_rMSSD_A > avg7.rMSSD * 1.1), len: 3 },
+            { key: "3ds HR_min<avg", check: () => latest.slice(0,3).every(d => d.Battery_HR_min_A < avg7.HR - 5), len: 3 },
+            { key: "3ds HBI<avg", check: () => latest.slice(0,3).every(d => d.Battery_HBI_A < avg7.HBI), len: 3 },
+            { key: "3ds battery>avg", check: () => latest.slice(0,3).every(d => d.Personal_Battery_weighted_round > avg7.Battery), len: 3 }
+        ];
+
+        for (let cond of conditions) {
+            if (healthDataRaw.length >= cond.len && cond.check()) {
+                const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('logic_key', cond.key).single();
+                if (data) await appendAiMessage(data.detailed_content);
+                break; // 優先呈現第一個符合的（例如 5天優先於 3天）
+            }
+        }
+    }
+
+    function calculateAvg(data, days) {
+        const slice = data.slice(0, days);
+        const sum = (key) => slice.reduce((acc, curr) => acc + (curr[key] || 0), 0) / slice.length;
+        return {
+            N3: sum('Battery_N3_pct_A'), rMSSD: sum('Battery_rMSSD_A'), 
+            HR: sum('Battery_HR_min_A'), HBI: sum('Battery_HBI_A'), 
+            Battery: sum('Personal_Battery_weighted_round')
+        };
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('user-input'), msg = input.value.trim();
+        if (!msg) return; input.value = ''; appendUserMessage(msg);
+
+        // 趨勢圖關鍵字
+        if (msg.includes("趨勢圖")) {
+            await appendAiMessage("請問你需要看哪一種趨勢圖表呢？");
+            appendQuickActions(["完整趨勢圖表", "生理電量趨勢圖表", "N3深睡比例趨勢圖表", "rMSSD放鬆恢復趨勢圖表", "睡眠最低脈搏趨勢圖表", "HBI缺氧負荷趨勢圖表"]);
+            return;
+        }
+
+        // 百科關鍵字查詢
+        const keywords = ["生理電量", "生理狀態", "總睡眠時間", "N3深睡比例", "rMSSD放鬆恢復", "睡眠最低脈搏", "HBI缺氧負荷", "REM快速動眼期"];
+        const foundKey = keywords.find(k => msg.includes(k));
+        if (foundKey) {
+            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', foundKey).single();
+            if (data) await appendAiMessage(data.detailed_content);
+            return;
+        }
+
+        // 圖表觸發
+        if (msg.includes("趨勢圖表")) {
+            if (msg.includes("完整")) openChartModal("FULL");
+            else if (msg.includes("生理電量")) openChartModal("BATTERY");
+            else if (msg.includes("N3")) openChartModal("N3");
+            else if (msg.includes("rMSSD")) openChartModal("RMSSD");
+            else if (msg.includes("睡眠最低脈搏")) openChartModal("HR");
+            else if (msg.includes("HBI")) openChartModal("HBI");
+            return;
+        }
+
+        await appendAiMessage("收到！我正在持續學習如何分析這些數據，希望能帶給你更好的健康建議。 ✨");
+    }
+
+    /* --- 圖表核心邏輯 --- */
+    function openChartModal(type) {
+        activeChartType = type;
+        document.getElementById('chart-modal-overlay').classList.remove('hidden');
+        renderHealthChart(7);
+    }
+
+    function closeChart() {
+        document.getElementById('chart-modal-overlay').classList.add('hidden');
+        if (chartInstance) chartInstance.destroy();
+    }
+
+    function updateChartDays(days, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderHealthChart(days);
+    }
+
+    function renderHealthChart(days) {
+        const ctx = document.getElementById('healthChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        const dataSlice = [...healthDataRaw].reverse().slice(-days);
+        const labels = dataSlice.map(d => d.record_date.split('-').slice(1).join('/'));
+        
+        let chartConfig = getChartConfig(activeChartType, dataSlice, labels);
+        
+        document.getElementById('chart-title').innerText = chartConfig.title;
+        document.getElementById('chart-unit').innerText = chartConfig.unit ? `單位：${chartConfig.unit}` : "";
+        
+        chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: labels, datasets: chartConfig.datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } },
+                scales: { y: { beginAtZero: false, grid: { color: '#f0f0f0' } }, x: { grid: { display: false } } }
+            }
+        });
+    }
+
+    function getChartConfig(type, data, labels) {
+        const rawValues = (key) => data.map(d => d.raw_json[key] || 0);
+        const sma7 = (vals) => vals.map((_, i, arr) => {
+            const sub = arr.slice(Math.max(0, i - 6), i + 1);
+            return Math.round(sub.reduce((a, b) => a + b, 0) / sub.length);
+        });
+
+        const commonLine = (vals, avg, threshold = null, compareType = 'low') => ({
+            type: 'line', label: '當日數值', data: vals, borderColor: '#999', borderWidth: 2,
+            pointBackgroundColor: vals.map((v, i) => {
+                const comp = threshold !== null ? threshold : avg[i];
+                if (compareType === 'low') return v < comp ? '#ff8c73' : '#596b75';
+                return v > comp ? '#ff8c73' : '#596b75';
+            }),
+            pointRadius: 4, fill: false, order: 1
+        });
+
+        const commonBar = (label, data) => ({
+            type: 'bar', label: label, data: data, backgroundColor: '#c1cdd3', barThickness: 15, order: 2
+        });
+
+        // 根據不同圖表類型回傳配置
+        switch(type) {
+            case "BATTERY":
+                const bVals = rawValues('Personal_Battery_weighted_round');
+                const bAvg = sma7(bVals);
+                return { title: "生理電量趨勢", unit: "", datasets: [commonLine(bVals, bAvg), commonBar('7日均值', bAvg)] };
+            case "N3":
+                const n3Vals = rawValues('Battery_N3_pct_A');
+                const n3Avg = sma7(n3Vals);
+                return { title: "N3 深睡比例趨勢", unit: "%", datasets: [commonLine(n3Vals, n3Avg, 10, 'low'), commonBar('7日均值', n3Avg)] };
+            case "RMSSD":
+                const rVals = rawValues('Battery_rMSSD_A');
+                const rAvg = sma7(rVals);
+                return { title: "rMSSD 放鬆恢復趨勢", unit: "ms", datasets: [commonLine(rVals, rAvg.map(v => v * 0.9), null, 'low'), commonBar('7日均值範圍', rAvg)] };
+            case "HR":
+                const hVals = rawValues('Battery_HR_min_A');
+                const hAvg = sma7(hVals);
+                return { title: "睡眠最低脈搏趨勢", unit: "bpm", datasets: [commonLine(hVals, hAvg.map(v => v + 5), null, 'high'), commonBar('7日均值範圍', hAvg)] };
+            case "HBI":
+                const hbVals = rawValues('Battery_HBI_A');
+                const hbAvg = sma7(hbVals);
+                return { title: "HBI 缺氧負荷趨勢", unit: "%min/h", datasets: [commonLine(hbVals, hbAvg, null, 'high'), commonBar('7日均值', hbAvg)] };
+            default:
+                return { title: "趨勢圖表", datasets: [] };
+        }
+    }
+
+    /* 輔助函式 */
+    function getRandomPhrase() { return RANDOM_PHRASES[Math.floor(Math.random() * RANDOM_PHRASES.length)]; }
+    function appendQuickActions(btns) {
+        const history = document.getElementById('chat-history');
+        let html = '<div class="msg-row ai-row"><div class="quick-actions">';
+        btns.forEach(b => html += `<button class="action-btn" onclick="handleQuickAction('${b}')">${b}</button>`);
+        history.innerHTML += html + '</div></div>';
+        scrollToBottom();
+    }
+    function handleQuickAction(text) { appendUserMessage(text); document.getElementById('user-input').value = text; sendMessage(); }
+    async function appendAiMessage(text) {
+        const history = document.getElementById('chat-history'), tid = 't-'+Date.now();
+        history.innerHTML += `<div class="msg-row ai-row" id="${tid}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
+        scrollToBottom();
+        await new Promise(r => setTimeout(r, 600));
+        document.getElementById(tid).querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>');
+        scrollToBottom();
+    }
+    function appendUserMessage(m) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${m}</div></div>`; scrollToBottom(); }
+    function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
+    function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+    function logout() { localStorage.clear(); location.reload(); }
+
+    async function fetchSummaryData(targetDate) {
+        const { data } = await _supabase.from('health_data').select('*').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(1);
+        if (!data || data.length === 0) return null;
+        const raw = data[0].raw_json;
+        return { date: data[0].record_date, battery: raw.Personal_Battery_weighted_round, light: '綠燈' }; // 簡化示範
+    }
+
+    function appendSummaryCard(data) {
+        const cardHtml = `<div class="msg-row ai-row"><div class="summary-card"><strong>📅 ${data.date} 摘要</strong><div class="battery-val">${data.battery}</div><div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:var(--tbp-blue)"></div></div></div></div>`;
+        document.getElementById('chat-history').innerHTML += cardHtml;
+    }
+</script>
+</body>
+</html>
