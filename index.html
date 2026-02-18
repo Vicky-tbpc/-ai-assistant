@@ -198,7 +198,7 @@
                 // 判斷是否為當天第一次登入 (即是否要顯示自動摘要)
                if (lastShown !== todayStr) {
     // 修改這裡：不再直接執行 showSummaryFlow
-    appendAiMessage(`哈囉 ${name}，早安！在看今天的數據前，想先請問你現在的感覺比較接近哪一個呢？`);
+    appendAiMessage(`哈囉 ${name}，在看今天的數據前，想先請問你現在的感覺比較接近哪一個呢？`);
     appendStatusOptions(); // 呼叫新增的選項按鈕
 } else {
                     // 只有當天第二次以後登入，且不顯示摘要時，才顯示招呼語
@@ -438,18 +438,20 @@ async function showSummaryFlow(nickname, isFirstTimeNaming, skipGreeting = false
         }
 
 // 產生選項按鈕
+let tempScore = null; // 全域變數，用來暫存第一題的分數
+
 function appendStatusOptions() {
     const options = [
         { text: "① 像是沒睡一樣，感覺頭昏、身體重，只想賴床", val: 40 },
-        { text: "② 睡了，但還是很累，需要一段時間才能正常運轉", val: 60 },
+        { text: "② 睡了，但還是還累，需要一段時間才能正常運轉", val: 60 },
         { text: "③ 與平常無異，沒特別好，也不算差", val: 75 },
         { text: "④ 醒來就覺得不錯，腦袋清楚、身體不重", val: 85 },
         { text: "⑤ 精神飽滿、神清氣爽，對今天有期待感", val: 95 }
     ];
 
-    let optionsHtml = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:280px;">';
+    let optionsHtml = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:300px; margin-top:10px;">';
     options.forEach(opt => {
-        optionsHtml += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; font-weight:normal; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`;
+        optionsHtml += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; font-weight:normal; text-align:left; font-size:14px; line-height:1.4; padding:10px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`;
     });
     optionsHtml += '</div></div>';
     
@@ -457,31 +459,66 @@ function appendStatusOptions() {
     scrollToBottom();
 }
 
-// 處理選擇後的邏輯
 async function handleStatusSelection(selectedText, score) {
     const container = document.getElementById('status-options-container');
     if (container) container.remove();
 
     appendUserMessage(selectedText);
+    tempScore = score; // 紀錄分數
+
+    setTimeout(() => {
+        appendAiMessage("今天生理狀態是否有自覺異常的地方呢？\n例如，體溫較高、心跳較快、鼻過敏... (若無請輸入「無」)");
+        appendPhysicalStatusInput();
+    }, 600);
+}
+
+function appendPhysicalStatusInput() {
+    const inputHtml = `
+        <div class="msg-row ai-row" id="physical-input-container">
+            <div style="display:flex; gap:8px; width:100%; max-width:300px; margin-top:10px;">
+                <input type="text" id="abnormality-input" placeholder="填寫狀況或「無」" 
+                    style="flex:1; padding:10px; border-radius:12px; border:1px solid #ddd; outline:none; font-size:14px;">
+                <button class="primary-btn" style="width:auto; padding:0 15px; white-space:nowrap;" onclick="submitFinalFeedback()">送出</button>
+            </div>
+        </div>`;
+    document.getElementById('chat-history').innerHTML += inputHtml;
+    scrollToBottom();
+    
+    // 讓手機自動彈出鍵盤
+    document.getElementById('abnormality-input').focus();
+}
+
+async function submitFinalFeedback() {
+    const inputVal = document.getElementById('abnormality-input').value.trim();
+    if (!inputVal) return alert("請輸入內容或填寫「無」");
+
+    const container = document.getElementById('physical-input-container');
+    if (container) container.remove();
+
+    appendUserMessage(inputVal);
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 寫入新資料表 user_daily_surveys
-    await _supabase.from('user_daily_surveys').upsert({ 
+    // 同時寫入分數與異常狀態
+    const { error } = await _supabase.from('user_daily_surveys').upsert({ 
         serial_number: currentSerial, 
         record_date: todayStr,
-        subjective_score: score 
+        subjective_score: tempScore,
+        physical_abnormality: inputVal
     });
+
+    if (error) console.error("Database Error:", error);
 
     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
 
     setTimeout(() => {
-        // 設定唯一的轉場文字
+        // 使用您要求的最終過渡文字
         appendAiMessage("收到了！謝謝你的分享。我們一起來看看今天的健康摘要吧！ ✨");
         
-        // 傳入 true 代表「跳過招呼語」
+        // 呼叫 showSummaryFlow 並跳過原本的招呼語
         setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false, true), 800);
     }, 500);
 }
+
 
     </script>
 </body>
