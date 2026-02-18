@@ -204,7 +204,7 @@
         if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
         if (isNamingPhase) {
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
-            isNamingPhase = false; await appendAiMessage(`太棒了！以後就由我來守護你的健康。先來看看我們的健康摘要吧！`);
+            isNamingPhase = false; await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
             showSummaryFlow(); return;
         }
         if (msg.includes("健康摘要")) { await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); showDateActions(); return; }
