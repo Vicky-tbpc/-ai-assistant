@@ -233,11 +233,29 @@
 
         // --- 核心修正：依照您的需求生成固定 5 欄位的邏輯特徵碼 ---
         // 判斷邏輯：TST_min, N3_pct, rMSSD, HR_min, HBI
-        const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "";
-        const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "";
-        const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "";
-        const hrmin = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "";
-        const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "";
+// 更加全面的趨勢判斷邏輯
+const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" 
+          : (raw.Battery_TST_min_A > prevRaw.Battery_TST_min_A) ? "▲" // 進步
+          : (raw.Battery_TST_min_A <= 420) ? "▼" // 嚴重不足
+          : ""; 
+
+const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" 
+         : (raw.Battery_N3_pct_A > prevRaw.Battery_N3_pct_A) ? "▲" // 進步
+         : "";
+
+const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" 
+            : (raw.Battery_rMSSD_A > prevRaw.Battery_rMSSD_A) ? "▲" // 進步
+            : "";
+
+const hrmin = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" 
+            : (raw.Battery_HR_min_A > prevRaw.Battery_HR_min_A) ? "▲" // 升高(通常代表疲勞)
+            : "";
+
+const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" 
+          : (raw.Battery_HBI_A < prevRaw.Battery_HBI_A) ? "▼" // 降低(進步)
+          : "";
+
+logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].join(",");
         
         // 確保產生的格式為 "▼▲,▼,,▼," 這種固定逗號隔開的格式
         logicKeyTrend = [tst, n3, rmssd, hrmin, hbi].join(","); 
