@@ -231,7 +231,7 @@
         const todayStr = new Date().toISOString().split('T')[0];
         await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg });
         localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-        await appendAiMessage("收到了！一起來看看今天的健康摘要吧！ ✨");
+        await appendAiMessage("收到了！一起來看看健康摘要吧！ ✨");
         showSummaryFlow();
     }
 
