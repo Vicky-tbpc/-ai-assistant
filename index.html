@@ -13,15 +13,19 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
+            --accent-red: #ff8c73;
+            --accent-green: #3caa28;
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
+        /* 登入與彈窗 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
-        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        .primary-btn:active { transform: scale(0.98); opacity: 0.9; }
 
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
@@ -29,32 +33,51 @@
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
-        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
-        .msg-row { display: flex; width: 100%; margin: 4px 0; }
+        
+        /* 訊息氣泡 */
+        .msg-row { display: flex; width: 100%; margin: 4px 0; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
         .user-row { justify-content: flex-end; }
         .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .ai-row { justify-content: flex-start; }
-        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; }
 
-        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 12px; width: 260px; padding: 15px; margin: 10px 0; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 10px; }
-        .summary-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .summary-label { font-size: 0.9rem; color: #555; }
-        .battery-val { font-size: 1.4rem; font-weight: bold; }
-        .rank-text { font-size: 0.8rem; color: #999; }
-        .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+        /* 打字中動畫 */
+        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
+        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
 
-        .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
-        .capsule-best { background-color: #f0f4f5; color: #555; }
-        .capsule-worst { background-color: #fff1ef; color: #555; }
-        .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
-        .icon-best { color: #a0afb7; }
-        .icon-worst { color: #ffb4a3; }
+        /* 健康摘要卡片優化 */
+        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 280px; padding: 18px; margin: 10px 0; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.05); transition: transform 0.2s; border-left: 6px solid #ddd; }
+        .summary-card:hover { transform: translateY(-3px); }
+        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+        
+        /* 進度條設計 */
+        .battery-container { margin: 15px 0; }
+        .battery-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+        .battery-label { font-size: 0.9rem; color: #555; }
+        .battery-val { font-size: 1.8rem; font-weight: bold; }
+        .progress-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 4px; }
 
-        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
-        #zoom-content { transform: scale(1.3); background: white; border-radius: 12px; pointer-events: none; }
+        .rank-text { font-size: 0.75rem; color: #aaa; margin-top: 4px; text-align: right; }
+        
+        .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; }
+        .capsule-best { background-color: #f0f7f8; color: #4a5a61; border: 1px solid #e0edf0; }
+        .capsule-worst { background-color: #fff5f3; color: #6e524d; border: 1px solid #ffe8e3; }
+        .capsule-icon { font-size: 1.2rem; margin-right: 10px; }
 
+        /* 日期快速選單 */
+        .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
+        .action-btn:hover { background: var(--tbp-light-blue); }
+
+        /* 底部輸入 */
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
@@ -62,52 +85,35 @@
 
         .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-        .status-text { font-size: 0.9rem; color: #555; }   
-        #status-options-container .primary-btn:active { background-color: var(--tbp-light-blue) !important; transform: scale(0.98); }
     </style>
 </head>
 <body>
 
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
-            <h2 style="color: var(--tbp-blue);">Personal Health Companion</h2>
-            <input type="text" id="serial" placeholder="序號">
-            <input type="password" id="pw" placeholder="密碼">
+            <h2 style="color: var(--tbp-blue);">Health Companion</h2>
+            <input type="text" id="serial" placeholder="序號" value="">
+            <input type="password" id="pw" placeholder="密碼" value="">
             <button class="primary-btn" onclick="login()">登入系統</button>
         </div>
     </div>
 
     <div id="nickname-overlay" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3>歡迎你的加入！請問該怎麼稱呼你？</h3>
+            <h3>歡迎！請問該怎麼稱呼你？</h3>
             <input type="text" id="new-nickname" placeholder="你的暱稱">
             <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
         </div>
     </div>
 
-    <div id="pw-overlay" class="modal-overlay hidden">
-        <div class="modal-card">
-            <h3>修改密碼</h3>
-            <input type="password" id="old-pw" placeholder="舊密碼">
-            <input type="password" id="new-pw" placeholder="新密碼">
-            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
-            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
-        </div>
-    </div>
-
-    <div id="zoom-overlay" class="hidden" onclick="this.classList.add('hidden')">
-        <div id="zoom-content"></div>
-    </div>
-
     <div id="app-container" class="hidden">
         <header>
-            <div class="logo-text">Personal Health Companion</div>
+            <div class="logo-text">Health Companion</div>
             <div class="user-info" onclick="toggleDropdown()">
                 <div id="display-name" style="font-size: 14px; color: #666;">User</div>
                 <div class="avatar" id="avatar-char">U</div>
             </div>
             <div id="settings-menu" class="dropdown hidden">
-                <button onclick="openPwModal()">🔒 修改密碼</button>
                 <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
             </div>
         </header>
@@ -118,7 +124,7 @@
 
         <div class="footer-input">
             <div class="input-box">
-                <input type="text" id="user-input" placeholder="請輸入內容..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         </div>
@@ -131,9 +137,9 @@
 
     let currentSerial = "";
     let isNamingPhase = false;
-    let tempScore = null;             
-    let isWaitingForAbnormality = false; 
-    let isWaitingForSummaryDate = false; // 新增：狀態控制
+    let isWaitingForAbnormality = false;
+    let isWaitingForSummaryDate = false;
+    let tempScore = null;
 
     const FIELD_MAP = {
         'Battery_TST_min_A': { best: 'Battery 總睡眠時間最佳', worst: 'Battery 總睡眠時間最差' },
@@ -150,11 +156,8 @@
         if (data) {
             currentSerial = serial;
             document.getElementById('login-overlay').classList.add('hidden');
-            if (!data.nickname) {
-                document.getElementById('nickname-overlay').classList.remove('hidden');
-            } else {
-                initApp(data.nickname, data.ai_name);
-            }
+            if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+            else initApp(data.nickname, data.ai_name);
         } else { alert("驗證失敗 😅"); }
     }
 
@@ -173,48 +176,64 @@
         
         if (!aiName) {
             isNamingPhase = true;
-            appendAiMessage("很高興認識你，我會即時反映你的健康數據與身體變化，陪伴你一起守護健康。 ✨");
-            appendAiMessage("請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
+            await appendAiMessage("很高興認識你！我會即時反映你的健康數據變化，陪伴你守護健康。 ✨");
+            await appendAiMessage("請幫我取一個名字，讓我成為專屬於你的健康夥伴。");
         } else {
             const todayStr = new Date().toISOString().split('T')[0];
             const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
-            
             if (lastShown !== todayStr) {
-                appendAiMessage(`哈囉 ${name} 👋，在看今天的數據前，想先請問你現在的感覺比較接近哪一個呢？ ✨`);
+                await appendAiMessage(`哈囉 ${name} 👋，在看今天的數據前，想先請問你現在的感覺比較接近哪一個呢？`);
                 appendStatusOptions(); 
             } else {
-                appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
+                await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
             }
         }
     }
 
-    function appendStatusOptions() {
-        const options = [
-            { text: "① 像是沒睡一樣，感覺頭昏、身體重，只想賴床", val: 40 },
-            { text: "② 睡了，但還是很累，需要一段時間才能正常運轉", val: 60 },
-            { text: "③ 與平常無異，沒特別好，也不算差", val: 75 },
-            { text: "④ 醒來就覺得不錯，腦袋清楚、身體不重", val: 85 },
-            { text: "⑤ 精神飽滿、神清氣爽，對今天有期待感", val: 95 }
-        ];
-        let optionsHtml = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:300px; margin-top:10px;">';
-        options.forEach(opt => {
-            optionsHtml += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; font-weight:normal; text-align:left; font-size:14px; line-height:1.4; padding:10px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`;
-        });
-        optionsHtml += '</div></div>';
-        document.getElementById('chat-history').innerHTML += optionsHtml;
+    // 模擬打字效果的訊息發送
+    async function appendAiMessage(text) {
+        const history = document.getElementById('chat-history');
+        const typingId = 'typing-' + Date.now();
+        
+        // 顯示打字中
+        const typingHtml = `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
+        history.innerHTML += typingHtml;
+        scrollToBottom();
+
+        // 模擬延遲
+        await new Promise(r => setTimeout(r, 800 + Math.random() * 1000));
+        
+        // 替換為正式內容
+        const typingElem = document.getElementById(typingId);
+        if (typingElem) {
+            typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>');
+        }
         scrollToBottom();
     }
 
-    async function handleStatusSelection(selectedText, score) {
-        const container = document.getElementById('status-options-container');
-        if (container) container.remove();
-        appendUserMessage(selectedText);
+    function appendStatusOptions() {
+        const options = [
+            { text: "① 頭昏、身體重，只想賴床", val: 40 },
+            { text: "② 還是很累，需要時間開機", val: 60 },
+            { text: "③ 與平常無異，不差", val: 75 },
+            { text: "④ 感覺不錯，腦袋清楚", val: 85 },
+            { text: "⑤ 精神飽滿、神清氣爽", val: 95 }
+        ];
+        let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:280px;">';
+        options.forEach(opt => {
+            html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`;
+        });
+        html += '</div></div>';
+        document.getElementById('chat-history').innerHTML += html;
+        scrollToBottom();
+    }
+
+    async function handleStatusSelection(text, score) {
+        document.getElementById('status-options-container')?.remove();
+        appendUserMessage(text);
         tempScore = score;
-        setTimeout(() => {
-            appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻過敏。\n\n如果一切正常，請幫我輸入「無」或「正常」唷！");
-            isWaitingForAbnormality = true;
-            document.getElementById('user-input').focus();
-        }, 600);
+        isWaitingForAbnormality = true;
+        await appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔\n(例如：體溫高、心跳快、過敏。若無請輸入「無」)");
     }
 
     async function sendMessage() {
@@ -222,114 +241,80 @@
         const msg = input.value.trim();
         if (!msg) return;
         input.value = '';
+        appendUserMessage(msg);
 
         if (isWaitingForAbnormality) {
-            isWaitingForAbnormality = false; 
-            await handleAbnormalityInput(msg); 
-            return; 
-        }
-
-        // 處理反問日期的回覆
-        if (isWaitingForSummaryDate) {
-            isWaitingForSummaryDate = false;
-            await handleManualDateInput(msg);
+            isWaitingForAbnormality = false;
+            await handleAbnormalityInput(msg);
             return;
         }
 
         if (isNamingPhase) {
-            appendUserMessage(msg);
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
             isNamingPhase = false;
-            const todayStr = new Date().toISOString().split('T')[0];
-            localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-            setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, true), 800);
+            await appendAiMessage(`「${msg}」這個名字真好聽！以後就由我來守護你的健康。`);
+            showSummaryFlow(document.getElementById('display-name').innerText, true);
             return;
         }
 
-        appendUserMessage(msg);
+        if (msg.includes("健康摘要")) {
+            await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅");
+            showDateActions();
+            return;
+        }
 
-        // 偵測是否包含特定日期
-        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-        const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-
-        if (msg === "健康摘要") {
-            isWaitingForSummaryDate = true;
-            setTimeout(() => {
-                appendAiMessage("請問你想查看哪一天的健康摘要呢？📅\n(請輸入日期，例如：2026/02/18健康摘要)");
-            }, 600);
-        } else if (msg.includes("健康摘要") && (dateMatch || dateMatchChn)) {
-            // 直接包含日期的輸入
-            const m = dateMatch || dateMatchChn;
-            const targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (dateMatch) {
+            const targetDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
             processSummarySearch(targetDate);
         } else {
-            setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
+            await appendAiMessage("收到你的訊息，我正在努力學習如何更好地協助你！ ✨");
         }
     }
 
-    async function handleManualDateInput(msg) {
-        appendUserMessage(msg);
-        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-        const dateMatchChn = msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    function showDateActions() {
+        const today = new Date();
+        const formatDate = (d) => d.toISOString().split('T')[0];
+        const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
         
-        if (dateMatch || dateMatchChn) {
-            const m = dateMatch || dateMatchChn;
-            const targetDate = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-            processSummarySearch(targetDate);
-        } else {
-            setTimeout(() => appendAiMessage("抱歉，我看不懂這個日期格式 😅。請試試輸入如「2026/02/18」的格式。"), 600);
-        }
+        const html = `
+            <div class="msg-row ai-row date-actions">
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="processSummarySearch('${formatDate(today)}')">今天</button>
+                    <button class="action-btn" onclick="processSummarySearch('${formatDate(yesterday)}')">昨天</button>
+                    <button class="action-btn" onclick="alert('請直接輸入日期，例如 2026/02/18')">其他日期...</button>
+                </div>
+            </div>`;
+        document.getElementById('chat-history').innerHTML += html;
+        scrollToBottom();
     }
 
     async function processSummarySearch(targetDate) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const data = await fetchSummaryData(targetDate);
+        const actions = document.querySelector('.date-actions');
+        if(actions) actions.remove();
         
-        setTimeout(() => {
-            if (!data || data.record_date_raw !== targetDate) {
-                appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
-                return;
-            }
-            if (data.record_date_raw === todayStr) {
-                appendAiMessage("這是我們今天的健康摘要 ✨");
-            } else {
-                appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
-            }
+        await appendAiMessage(`正在查詢 ${targetDate.replace(/-/g, '/')} 的資料...`);
+        const data = await fetchSummaryData(targetDate);
+        if (!data) {
+            await appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
+        } else {
             appendSummaryCard(data);
-        }, 800);
+        }
     }
 
     async function handleAbnormalityInput(msg) {
-        appendUserMessage(msg); 
         const todayStr = new Date().toISOString().split('T')[0];
-        try {
-            await _supabase.from('user_daily_surveys').upsert({ 
-                serial_number: currentSerial, 
-                record_date: todayStr,
-                subjective_score: tempScore,
-                physical_abnormality: msg
-            });
-        } catch (err) { console.error(err); }
+        await _supabase.from('user_daily_surveys').upsert({ 
+            serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg
+        });
         localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-        setTimeout(() => {
-            appendAiMessage("收到了！謝謝你的分享。我們一起來看看今天的健康摘要吧！ ✨");
-            setTimeout(() => showSummaryFlow(document.getElementById('display-name').innerText, false, true), 800);
-        }, 500);
+        await appendAiMessage("收到了！我們一起來看看今天的健康摘要吧！ ✨");
+        showSummaryFlow(document.getElementById('display-name').innerText, false, true);
     }
 
-     async function showSummaryFlow(nickname, isFirstTimeNaming, skipGreeting = false) {
-        const today = new Date().toISOString().split('T')[0];
-        const summaryData = await fetchSummaryData(today);
-        if (!summaryData) return;
-
-        if (!skipGreeting) {
-            if (isFirstTimeNaming) {
-                appendAiMessage(summaryData.isToday ? "謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨" : "謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
-            } else {
-                appendAiMessage(summaryData.isToday ? `哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨` : `哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
-            }
-        }
-        appendSummaryCard(summaryData);
+    async function showSummaryFlow(nickname, isFirst, skipGreeting = false) {
+        const data = await fetchSummaryData(new Date().toISOString().split('T')[0]);
+        if (data) appendSummaryCard(data);
     }
 
     async function fetchSummaryData(targetDate) {
@@ -337,21 +322,17 @@
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
             .lte('record_date', targetDate)
-            .order('record_date', { ascending: false })
-            .limit(2);
+            .order('record_date', { ascending: false }).limit(2);
 
         if (!healths || healths.length === 0) return null;
-        const current = healths[0];
-        const prev = healths[1];
+        const current = healths[0], prev = healths[1];
         const raw = current.raw_json;
-        const todayStr = new Date().toISOString().split('T')[0];
         
         let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
         if (prev) {
             let maxInc = -Infinity, maxDec = Infinity;
-            const prevRaw = prev.raw_json;
             Object.keys(FIELD_MAP).forEach(key => {
-                const diff = (raw[key] || 0) - (prevRaw[key] || 0);
+                const diff = (raw[key] || 0) - (prev.raw_json[key] || 0);
                 if (diff > maxInc) { maxInc = diff; bestKey = key; }
                 if (diff < maxDec) { maxDec = diff; worstKey = key; }
             });
@@ -361,61 +342,50 @@
             .select('logic_key, detailed_content')
             .in('logic_key', [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst]);
 
-        const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
-        const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
-
-        const date = current.record_date;
-        const battery = raw.Personal_Battery_weighted_round || 0;
         const { data: feedback } = await _supabase.from('daily_feedback')
-            .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
-
-        const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
-        let percentage = 0;
-        if (allDayData?.length > 0) {
-            const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
-            percentage = Math.round((lowerCount / allDayData.length) * 100);
-        }
+            .select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
 
         return {
-            isToday: date === todayStr,
-            record_date_raw: date,
-            date: date.replace(/-/g, '/'),
-            battery: battery,
-            percentage: percentage,
-            light: feedback ? feedback.status_light : null,
-            bestText: bestText,
-            worstText: worstText
+            date: current.record_date.replace(/-/g, '/'),
+            battery: raw.Personal_Battery_weighted_round || 0,
+            light: feedback ? feedback.status_light : '未知',
+            bestText: phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "狀態穩定。",
+            worstText: phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "建議維持作息。"
         };
     }
 
     function appendSummaryCard(data) {
-        if (!data) return;
-        let bColor = "#ff8c73";
-        if (data.battery >= 60) bColor = "#a79d8c";
-        if (data.battery >= 80) bColor = "#a0adb7";
-        if (data.battery >= 100) bColor = "#596b75";
-        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
-        const lightColor = lightMap[data.light] || null;
+        let bColor = "#ff8c73"; // < 60
+        if (data.battery >= 60) bColor = "#a79d8c"; // 60-80
+        if (data.battery >= 80) bColor = "#8699a3"; // 80-90
+        if (data.battery >= 95) bColor = "#596b75"; // > 95
+
+        const lightMap = { '紅燈': '#ff4d4d', '黃紅燈': '#ffae42', '黃燈': '#f4d03f', '綠燈': '#2ecc71' };
+        const borderColor = lightMap[data.light] || '#ddd';
+
         const cardHtml = `
             <div class="msg-row ai-row">
-                <div class="summary-card" onclick="zoomCard(this)">
-                    <div class="summary-header">📅 ${data.date} 健康摘要</div>
-                    <div class="summary-item">
-                        <span class="summary-label">生理電量</span>
-                        <span class="battery-val" style="color:${bColor}">${data.battery}</span>
+                <div class="summary-card" style="border-left-color: ${borderColor}">
+                    <div class="summary-header">
+                        <span>📅 ${data.date}</span>
+                        <span style="color:${borderColor}; font-weight:bold;">● ${data.light}</span>
                     </div>
-                    <div class="summary-item" style="margin-top:-5px;">
-                        <span></span>
-                        <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                    <div class="battery-container">
+                        <div class="battery-meta">
+                            <span class="battery-label">生理電量</span>
+                            <span class="battery-val" style="color:${bColor}">${data.battery}</span>
+                        </div>
+                        <div class="progress-bg">
+                            <div class="progress-fill" style="width: ${data.battery}%; background: ${bColor}"></div>
+                        </div>
                     </div>
-                    ${lightColor ? `
-                    <div class="summary-item">
-                        <span class="summary-label">生理狀態</span>
-                        <span class="status-text"><span class="status-dot" style="background:${lightColor}"></span>${data.light}</span>
-                    </div>` : ''}
-                    <div style="margin-top: 15px; border-top: 1px solid #f5f5f5; padding-top: 10px;">
-                        <div class="analysis-capsule capsule-best" style="width: 100%;"><span class="capsule-icon">😊</span><span>${data.bestText}</span></div>
-                        <div class="analysis-capsule capsule-worst" style="width: 100%; margin-top: 8px;"><span class="capsule-icon">😟</span><span>${data.worstText}</span></div>
+                    <div class="analysis-capsule capsule-best">
+                        <span class="capsule-icon">🌟</span>
+                        <span>${data.bestText}</span>
+                    </div>
+                    <div class="analysis-capsule capsule-worst">
+                        <span class="capsule-icon">⚠️</span>
+                        <span>${data.worstText}</span>
                     </div>
                 </div>
             </div>`;
@@ -423,32 +393,13 @@
         scrollToBottom();
     }
 
-    function zoomCard(el) {
-        document.getElementById('zoom-content').innerHTML = el.outerHTML;
-        document.getElementById('zoom-overlay').classList.remove('hidden');
-    }
     function appendUserMessage(msg) {
         document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`;
-        scrollToBottom();
-    }
-    function appendAiMessage(msg) {
-        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row"><div class="ai-bubble">${msg}</div></div>`;
         scrollToBottom();
     }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
     function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
     function logout() { location.reload(); }
-    function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
-    function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-    async function updatePassword() {
-        const oldP = document.getElementById('old-pw').value, newP = document.getElementById('new-pw').value;
-        if (!oldP || !newP) return alert("請輸入完整資料");
-        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
-        if(!data) return alert("舊密碼錯誤 😅");
-        await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-        alert("修改成功！ ✨"); closePwModal();
-    }
 </script>
-
 </body>
 </html>
