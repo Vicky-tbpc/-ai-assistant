@@ -13,6 +13,7 @@
             --text-dark: #333;
             --user-msg-bg: #e2ddd4;
             --ai-msg-bg: #ffffff;
+           
         }
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
@@ -49,7 +50,10 @@
         .rank-text { font-size: 0.8rem; color: #999; }
         .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
 
-        /* 膠囊訊息條樣式 */
+
+   
+
+        /* 膠囊訊息條樣式 (007) */
         .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 25px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; width: 260px; box-sizing: border-box; }
         .capsule-best { background-color: #f0f4f5; color: #555; }
         .capsule-worst { background-color: #fff1ef; color: #555; }
@@ -69,8 +73,13 @@
 
         .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
-        .status-text { font-size: 0.9rem; color: #555; }   
-    </style>
+/* 請將這段加入到 <style> 標籤中 */
+.status-text { 
+    font-size: 0.9rem; 
+    color: #555; 
+}   
+
+ </style>
 </head>
 <body>
 
@@ -169,7 +178,7 @@
             initApp(nick, null);
         }
 
-        async function initApp(name, aiName) {
+   async function initApp(name, aiName) {
             document.getElementById('app-container').classList.remove('hidden');
             document.getElementById('display-name').innerText = name;
             document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -182,124 +191,154 @@
                 const todayStr = new Date().toISOString().split('T')[0];
                 const lastShown = localStorage.getItem(`last_summary_${currentSerial}`);
                 
+                // 判斷是否為當天第一次登入 (即是否要顯示自動摘要)
                 if (lastShown !== todayStr) {
+                    // --- 關鍵修改：當天第一次登入，直接執行摘要流程，不顯示「歡迎回來」招呼語 ---
                     await showSummaryFlow(name, false);
                     localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
                 } else {
+                    // 只有當天第二次以後登入，且不顯示摘要時，才顯示招呼語
                     appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 }
             }
         }
 
-        async function showSummaryFlow(nickname, isFirstTimeNaming) {
-            const today = new Date().toISOString().split('T')[0];
-            const summaryData = await fetchSummaryData(today);
-            if (!summaryData) return;
+     
+     // 修改 showSummaryFlow，加入鼓勵對話顯示
+async function showSummaryFlow(nickname, isFirstTimeNaming) {
+    const today = new Date().toISOString().split('T')[0];
+    const summaryData = await fetchSummaryData(today);
+    if (!summaryData) return;
 
-            if (isFirstTimeNaming) {
-                if (summaryData.isToday) {
-                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
-                } else {
-                    appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
-                    appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
-                }
-            } else {
-                if (summaryData.isToday) {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
-                } else {
-                    appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
-                    appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
-                }
-            }
-            appendSummaryCard(summaryData);
-
-            // 當天摘要顯示後，追加鼓勵對話
-            if (summaryData.isToday && summaryData.encouragementText) {
-                setTimeout(() => appendAiMessage(summaryData.encouragementText), 1000);
-            }
+    if (isFirstTimeNaming) {
+        if (summaryData.isToday) {
+            appendAiMessage("謝謝你幫我取的名字，我們一起來看看今天的健康摘要吧！ ✨");
+        } else {
+            appendAiMessage("謝謝你幫我取的名字，我們一起來看看最新的健康摘要吧！ 📅");
+            appendAiMessage("如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️");
         }
-
-        async function fetchSummaryData(targetDate) {
-            const { data: healths } = await _supabase.from('health_data')
-                .select('record_date, raw_json')
-                .eq('serial_number', currentSerial)
-                .lte('record_date', targetDate)
-                .order('record_date', { ascending: false })
-                .limit(2);
-
-            if (!healths || healths.length === 0) return null;
-
-            const current = healths[0];
-            const prev = healths[1];
-            const raw = current.raw_json;
-            const todayStr = new Date().toISOString().split('T')[0];
-            
-            let bestKey = 'Battery_TST_min_A';
-            let worstKey = 'Battery_TST_min_A';
-            let trendLogicKey = "";
-
-            if (prev) {
-                const prevRaw = prev.raw_json;
-                
-                // 1. 原有的最優/最差分析
-                let maxInc = -Infinity, maxDec = Infinity;
-                Object.keys(FIELD_MAP).forEach(key => {
-                    const diff = (raw[key] || 0) - (prevRaw[key] || 0);
-                    if (diff > maxInc) { maxInc = diff; bestKey = key; }
-                    if (diff < maxDec) { maxDec = diff; worstKey = key; }
-                });
-
-                // 2. 新增：五項指標趨勢比對
-                const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "－";
-                const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "－";
-                const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "－";
-                const hr = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "－";
-                const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "－";
-                
-                trendLogicKey = `${tst},${n3},${rmssd},${hr},${hbi}`;
-            }
-
-            // 抓取詞句庫 (包含最優最差 + 趨勢 Key)
-            const searchKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
-            if (trendLogicKey) searchKeys.push(trendLogicLogicKey);
-
-            const { data: phrases } = await _supabase.from('phrase_library')
-                .select('logic_key, detailed_content, summary_content, simple_content')
-                .in('logic_key', searchKeys);
-
-            const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
-            const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
-            
-            // 鼓勵對話內容抓取邏輯 (Priority: summary_content > simple_content)
-            const trendObj = phrases?.find(p => p.logic_key === trendLogicKey);
-            const encouragementText = trendObj ? (trendObj.summary_content || trendObj.simple_content) : null;
-
-            const date = current.record_date;
-            const battery = raw.Personal_Battery_weighted_round || 0;
-            const { data: feedback } = await _supabase.from('daily_feedback')
-                .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
-
-            const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
-            let percentage = 0;
-            if (allDayData?.length > 0) {
-                const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
-                percentage = Math.round((lowerCount / allDayData.length) * 100);
-            }
-
-            return {
-                isToday: date === todayStr,
-                record_date_raw: date,
-                date: date.replace(/-/g, '/'),
-                battery: battery,
-                percentage: percentage,
-                light: feedback ? feedback.status_light : null,
-                bestText: bestText,
-                worstText: worstText,
-                encouragementText: encouragementText
-            };
+    } else {
+        if (summaryData.isToday) {
+            appendAiMessage(`哈囉，${nickname}！我們一起來看看今天的健康摘要吧！ ✨`);
+        } else {
+            appendAiMessage(`哈囉，${nickname}！我們一起來看看最新的健康摘要吧！ 📅`);
+            appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
         }
+    }
+    
+    appendSummaryCard(summaryData);
 
-        function appendSummaryCard(data) {
+    // --- 新增：如果當天有鼓勵對話，則顯示 ---
+    if (summaryData.isToday && summaryData.encouragementText) {
+        setTimeout(() => {
+            appendAiMessage(summaryData.encouragementText);
+        }, 1200); // 稍微延遲顯示，感覺更自然
+    }
+}
+  
+
+
+
+
+
+
+ // ... 前方代碼保持不變 ...
+
+async function fetchSummaryData(targetDate) {
+    const { data: healths } = await _supabase.from('health_data')
+        .select('record_date, raw_json')
+        .eq('serial_number', currentSerial)
+        .lte('record_date', targetDate)
+        .order('record_date', { ascending: false })
+        .limit(2);
+
+    if (!healths || healths.length === 0) return null;
+
+    const current = healths[0];
+    const prev = healths[1];
+    const raw = current.raw_json;
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // 1. 原有的最優/最差分析邏輯
+    let bestKey = 'Battery_TST_min_A';
+    let worstKey = 'Battery_TST_min_A';
+    
+    // 2. 新增：五項指標趨勢邏輯 (用於產生鼓勵對話)
+    let trendKey = "";
+    if (prev) {
+        const prevRaw = prev.raw_json;
+        
+        // 找出最優/最差 (原有邏輯)
+        let maxInc = -Infinity, maxDec = Infinity;
+        Object.keys(FIELD_MAP).forEach(key => {
+            const diff = (raw[key] || 0) - (prevRaw[key] || 0);
+            if (diff > maxInc) { maxInc = diff; bestKey = key; }
+            if (diff < maxDec) { maxDec = diff; worstKey = key; }
+        });
+
+        // 計算五項指標趨勢組合
+        const tst = (raw.Battery_TST_min_A < prevRaw.Battery_TST_min_A && raw.Battery_TST_min_A > 420) ? "▼▲" : "－";
+        const n3 = (raw.Battery_N3_pct_A < prevRaw.Battery_N3_pct_A) ? "▼" : "－";
+        const rmssd = (raw.Battery_rMSSD_A < prevRaw.Battery_rMSSD_A) ? "▼" : "－";
+        const hr = (raw.Battery_HR_min_A < prevRaw.Battery_HR_min_A) ? "▼" : "－";
+        const hbi = (raw.Battery_HBI_A > prevRaw.Battery_HBI_A) ? "▲" : "－";
+        
+        trendKey = `${tst},${n3},${rmssd},${hr},${hbi}`;
+    }
+
+    // 3. 抓取詞句庫 (包含最優/最差以及新的趨勢 Key)
+    const queryKeys = [FIELD_MAP[bestKey].best, FIELD_MAP[worstKey].worst];
+    if (trendKey) queryKeys.push(trendKey);
+
+    const { data: phrases } = await _supabase.from('phrase_library')
+        .select('logic_key, detailed_content, summary_content, simple_content')
+        .in('logic_key', queryKeys);
+
+    // 處理摘要卡片內的文字
+    const bestText = phrases?.find(p => p.logic_key === FIELD_MAP[bestKey].best)?.detailed_content || "今日整體狀態穩定。";
+    const worstText = phrases?.find(p => p.logic_key === FIELD_MAP[worstKey].worst)?.detailed_content || "維持良好的生活習慣。";
+    
+    // 處理鼓勵對話泡泡內容
+    const trendPhrase = phrases?.find(p => p.logic_key === trendKey);
+    const encouragementText = trendPhrase ? (trendPhrase.summary_content || trendPhrase.simple_content) : null;
+
+    // 其他數據計算
+    const date = current.record_date;
+    const battery = raw.Personal_Battery_weighted_round || 0;
+    const { data: feedback } = await _supabase.from('daily_feedback')
+        .select('status_light').eq('serial_number', currentSerial).eq('record_date', date).single();
+
+    const { data: allDayData } = await _supabase.from('health_data').select('raw_json').eq('record_date', date);
+    let percentage = 0;
+    if (allDayData?.length > 0) {
+        const lowerCount = allDayData.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < battery).length;
+        percentage = Math.round((lowerCount / allDayData.length) * 100);
+    }
+
+    return {
+        isToday: date === todayStr,
+        record_date_raw: date,
+        date: date.replace(/-/g, '/'),
+        battery: battery,
+        percentage: percentage,
+        light: feedback ? feedback.status_light : null,
+        bestText: bestText,
+        worstText: worstText,
+        encouragementText: encouragementText // 回傳鼓勵文字
+    };
+}
+
+
+
+
+
+
+
+
+
+
+
+       function appendSummaryCard(data) {
             if (!data) return;
             let bColor = "#ff8c73";
             if (data.battery >= 60) bColor = "#a79d8c";
@@ -352,7 +391,12 @@
             scrollToBottom();
         }
 
-        async function sendMessage() {
+
+
+
+
+
+       async function sendMessage() {
             const input = document.getElementById('user-input');
             const text = input.value.trim();
             if (!text) return;
@@ -369,9 +413,11 @@
                 setTimeout(async () => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     let targetDate = todayStr;
+                    
+                    // 偵測日期格式
                     const dateMatch = text.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
                     const dateMatchChn = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                    const isManualSearch = (dateMatch || dateMatchChn);
+                    const isManualSearch = (dateMatch || dateMatchChn); // 判斷是否為使用者主動輸入日期
 
                     if (isManualSearch) {
                         const m = dateMatch || dateMatchChn;
@@ -379,28 +425,33 @@
                     }
 
                     const data = await fetchSummaryData(targetDate);
+                    
+                    // 查無資料處理
                     if (!data || (isManualSearch && data.record_date_raw !== targetDate)) {
                         appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
                         appendAiMessage("可能是沒有上傳，或資料尚未同步完成。 ☁️");
                         return;
                     }
 
+                    // 根據情境顯示對應訊息
                     if (data.record_date_raw === todayStr) {
                         appendAiMessage("這是我們今天的健康摘要 ✨");
                     } else if (isManualSearch) {
+                        // 若是使用者指定日期查詢，顯示該日期
                         appendAiMessage(`這是我們 ${targetDate.replace(/-/g, '/')} 的健康摘要 📅`);
                     } else {
+                        // 若非今天也非指定日期（系統自動抓最新），顯示原本的提示
                         appendAiMessage("這是我們最新的健康摘要 📅");
                         appendAiMessage(`如果要知道今天的健康摘要，記得使用APP上傳昨晚睡眠的數據唷~ ☁️`);
                     }
                     
                     appendSummaryCard(data);
 
-                    // 查詢當天數據後顯示鼓勵文字
-                    if (data.record_date_raw === todayStr && data.encouragementText) {
-                        setTimeout(() => appendAiMessage(data.encouragementText), 1000);
-                    }
-                }, 800);
+ // --- 新增：若是當天資料，顯示鼓勵對話 ---
+            if (data.record_date_raw === todayStr && data.encouragementText) {
+                setTimeout(() => appendAiMessage(data.encouragementText), 1000);
+            }
+        }, 800);
             } else {
                 setTimeout(() => appendAiMessage("收到你的訊息，正在為你整理健康資訊... 🕒"), 800);
             }
