@@ -167,7 +167,7 @@
         } else {
             const todayStr = new Date().toISOString().split('T')[0];
             if (localStorage.getItem(`last_summary_${currentSerial}`) !== todayStr) {
-                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一個呢？`);
+                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
                 appendStatusOptions();
             } else await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
         }
