@@ -150,7 +150,7 @@
         'Battery_HBI_A': 'Battery HBI',
         'Battery_HR_min_A': 'Battery 最低脈搏'
     };
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3深睡比例", "rMSSD放鬆恢復", "睡眠最低脈搏", "HBI缺氧負荷", "REM快速動眼期", "睡眠規律性"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", " N3", " N3深睡", " N3深睡比例", " rMSSD ", "放鬆恢復", " rMSSD放鬆恢復", "最低脈搏", "睡眠最低脈搏", " HBI ", "缺氧負荷", " HBI缺氧負荷", "黃金修復", "標準修復", "精神負荷", "高身心壓力", "過度疲憊", "修復不足", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", " REM ", "快速動眼期", " REM快速動眼期", " N3 深睡", " N3 深睡比例", " rMSSD 放鬆恢復", " HBI 缺氧負荷", " REM 快速動眼期"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -311,7 +311,9 @@
     }
 
     function appendSummaryCard(data) {
-        const colors = data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+      
+        const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+
         const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
         
         document.getElementById('chat-history').innerHTML += `
