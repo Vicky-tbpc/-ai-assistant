@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n18-1</title>
+    <title>Soosyn 健康夥伴 n18-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -283,18 +283,28 @@ async function sendMessage() {
         };
     }
 
-    async function showSummaryFlow(isFirstTime = false) { 
-        const data = await fetchSummaryData(new Date().toISOString().split('T')[0]);
-        if (data) {
-            appendSummaryCard(data);
-            if (isFirstTime && data.flowSuggestion) {
-                await new Promise(r => setTimeout(r, 1000));
-                await appendAiMessage(data.flowSuggestion); // 顯示隨機建議
-                await new Promise(r => setTimeout(r, 800));
-                await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-            } else { await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); }
+    
+
+
+
+// --- 確保 showSummaryFlow 也能正確運作 ---
+async function showSummaryFlow(isFirstTime = false) { 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const data = await fetchSummaryData(todayStr);
+    if (data) {
+        appendSummaryCard(data);
+        // 無論是否為第一次登入，只要有當天數據就顯示隨機建議
+        if (data.flowSuggestion) {
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage(data.flowSuggestion);
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
+}
+
+
+
 
     // --- 核心邏輯：雷達圖平衡度 (新增) ---
     function appendBalanceCard(data) {
@@ -340,7 +350,43 @@ async function sendMessage() {
 
     // 其他輔助函數
     async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
-    async function processSummarySearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 健康摘要...`); const data = await fetchSummaryData(d); if (data) { appendSummaryCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
+    
+
+
+
+
+// --- 修改後的 processSummarySearch 函數 ---
+async function processSummarySearch(d) {
+    document.querySelector('.date-actions')?.remove();
+    await appendAiMessage(`正在查詢 ${d} 摘要...`);
+    
+    const data = await fetchSummaryData(d);
+    if (data) {
+        appendSummaryCard(data);
+        
+        // 新增邏輯：如果是查詢「今天」，則自動出現隨機建議
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (d === todayStr && data.flowSuggestion) {
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage(data.flowSuggestion); // 顯示減少最多指標的隨機建議 (1-3)
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+        } else {
+            // 如果不是今天，則顯示一般結尾
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
+        }
+    } else {
+        await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+    }
+}
+
+
+
+
+
+
+
     function showDateActions(type) {
         const today = new Date().toISOString().split('T')[0], yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
         const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
