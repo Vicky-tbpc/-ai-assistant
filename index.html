@@ -139,9 +139,9 @@
 
     // 配置：隨機引導語
     const CTA_PHRASES = [
-        "保持健康是每天的小累積，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "維持健康的好習慣很重要！還想查看哪個資訊呢？平衡度、趨勢圖、rMSSD放鬆恢復或睡眠最低脈搏？"
+        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD 放鬆恢復、🔋 生理電量？"
     ];
 
     // 配置：指標標籤與 logic_key 前綴
@@ -229,7 +229,7 @@
         if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
         if (isNamingPhase) {
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
-            isNamingPhase = false; await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
+            isNamingPhase = false; await appendAiMessage(`✨ 太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
             showSummaryFlow(true); return;
         }
         if (msg.includes("健康摘要")) { await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); showDateActions(); return; }
