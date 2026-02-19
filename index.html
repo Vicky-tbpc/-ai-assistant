@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n18</title>
+    <title>Soosyn 健康夥伴 n18-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -183,56 +183,68 @@
         }
     }
 
-    async function sendMessage() {
-        const input = document.getElementById('user-input'), msg = input.value.trim();
-        if (!msg) return; 
-        input.value = ''; 
-        appendUserMessage(msg);
+    
 
-            // 2. 處理「平衡度」關鍵字
-    if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
-        await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
-        showDateActions('balance');
+async function sendMessage() {
+    const input = document.getElementById('user-input'), msg = input.value.trim();
+    if (!msg) return; 
+    input.value = ''; 
+    appendUserMessage(msg);
+
+    // --- A. 日期提取工具 (預先提取，支援多種格式) ---
+    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
+
+    // --- B. 判斷是否為科普詢問 (排除定義、說明、問號) ---
+    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
+
+    // 1. 處理「健康摘要」關鍵字 (支援帶日期的組合輸入)
+    if (msg.includes("健康摘要")) {
+        if (formattedDate) {
+            processSummarySearch(formattedDate);
+        } else {
+            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); 
+            showDateActions('summary'); 
+        }
+        return; 
+    }
+
+    // 2. 處理「平衡度」相關關鍵字 (僅在不是詢問定義的情況下進入數據查詢)
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isAskingDefinition) {
+        if (formattedDate) {
+            processBalanceSearch(formattedDate);
+        } else {
+            await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
+            showDateActions('balance');
+        }
         return;
     }
 
-       // 1. 先處理特定的「健康摘要」關鍵字搜尋 (包含年月日組合)
-    if (msg.includes("健康摘要")) {
-        // 嘗試從字串中提取日期 (支援 YYYY/MM/DD, YYYY-MM-DD, YYYY年MM月DD日)
-        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-        
-        if (dateMatch) {
-            // 如果有日期，直接執行搜尋
-            const formattedDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
-            processSummarySearch(formattedDate);
-            return;
-        } else {
-            // 如果只有「健康摘要」四個字，才問日期
-            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); 
-            showDateActions('summary'); 
+    // 3. 百科關鍵字匹配 (例如：輸入「什麼是平衡度？」或「rMSSD」)
+    const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
+    if (matchedKeyword) {
+        const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
+        if (data) { 
+            await appendAiMessage(data.detailed_content); 
+            await new Promise(r => setTimeout(r, 600)); 
+            await appendAiMessage(END_QUESTION); 
             return; 
         }
     }
 
-
-        const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
-        if (matchedKeyword) {
-            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
-            if (data) { await appendAiMessage(data.detailed_content); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); return; }
-        }
-
-        if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
-        if (isNamingPhase) {
-            await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
-            isNamingPhase = false; 
-            await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
-            showSummaryFlow(true); 
-            return;
-        }
-        
-            const pureDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-    if (pureDateMatch) {
-        processSummarySearch(`${pureDateMatch[1]}-${pureDateMatch[2].padStart(2, '0')}-${pureDateMatch[3].padStart(2, '0')}`);
+    // 4. 特殊流程判定 (自覺異常輸入、命名階段)
+    if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
+    if (isNamingPhase) {
+        await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+        isNamingPhase = false; 
+        await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
+        showSummaryFlow(true); 
+        return;
+    }
+    
+    // 5. 純日期格式匹配 (使用者只傳日期如 "2025/02/19")
+    if (formattedDate) {
+        processSummarySearch(formattedDate);
     } else {
         await appendAiMessage("收到！正在學習更好地協助你。 ✨");
         await new Promise(r => setTimeout(r, 600));
