@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n15</title>
+    <title>Soosyn 健康夥伴 n16</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -65,7 +65,6 @@
         .icon-smile { color: #a0afb7; }
         .icon-frown { color: #ffb4a3; }
 
-        /* 按鈕與輸入 */
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
@@ -137,14 +136,13 @@
     let isNamingPhase = false, isWaitingForAbnormality = false;
     let tempScore = null;
 
-    // 配置：隨機引導語
+    // 常數配置
+    const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
     const CTA_PHRASES = [
         "保持健康是每天的小累積，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
         "維持健康的好習慣很重要！還想查看哪個資訊呢？平衡度、趨勢圖、rMSSD放鬆恢復或睡眠最低脈搏？"
     ];
-
-    // 配置：指標標籤與 logic_key 前綴
     const FIELD_CONFIG = {
         'Battery_TST_min_A': 'Battery 總睡眠時間',
         'Battery_N3_pct_A': 'Battery N3',
@@ -152,7 +150,6 @@
         'Battery_HBI_A': 'Battery HBI',
         'Battery_HR_min_A': 'Battery 最低脈搏'
     };
-
     const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3深睡比例", "rMSSD放鬆恢復", "睡眠最低脈搏", "HBI缺氧負荷", "REM快速動眼期", "睡眠規律性"];
 
     async function login() {
@@ -185,6 +182,8 @@
                 await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 await new Promise(r => setTimeout(r, 600));
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+                await new Promise(r => setTimeout(r, 600));
+                await appendAiMessage(END_QUESTION);
             }
         }
     }
@@ -219,24 +218,46 @@
         input.value = ''; 
         appendUserMessage(msg);
 
-        // 百科搜尋邏輯
+        // 百科比對
         const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
         if (matchedKeyword) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
-            if (data) return await appendAiMessage(data.detailed_content);
+            if (data) {
+                await appendAiMessage(data.detailed_content);
+                await new Promise(r => setTimeout(r, 600));
+                await appendAiMessage(END_QUESTION);
+                return;
+            }
         }
 
-        if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
+        if (isWaitingForAbnormality) { 
+            isWaitingForAbnormality = false; 
+            await handleAbnormalityInput(msg); 
+            return; 
+        }
+
         if (isNamingPhase) {
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
-            isNamingPhase = false; await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
-            showSummaryFlow(true); return;
+            isNamingPhase = false; 
+            await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
+            showSummaryFlow(true); 
+            return;
         }
-        if (msg.includes("健康摘要")) { await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); showDateActions(); return; }
+
+        if (msg.includes("健康摘要")) { 
+            await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); 
+            showDateActions(); 
+            return; 
+        }
         
         const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-        if (dateMatch) processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
-        else await appendAiMessage("收到你的訊息！正在努力學習更好地協助你。 ✨");
+        if (dateMatch) {
+            processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
+        } else {
+            await appendAiMessage("收到你的訊息！正在努力學習更好地協助你。 ✨");
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
+        }
     }
 
     async function handleAbnormalityInput(msg) {
@@ -256,6 +277,11 @@
                 await appendAiMessage(data.flowSuggestion);
                 await new Promise(r => setTimeout(r, 800));
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+                await new Promise(r => setTimeout(r, 600));
+                await appendAiMessage(END_QUESTION);
+            } else {
+                await new Promise(r => setTimeout(r, 600));
+                await appendAiMessage(END_QUESTION);
             }
         }
     }
@@ -288,9 +314,9 @@
             date: current.record_date.replace(/-/g, '/'), 
             battery: raw.Personal_Battery_weighted_round || 0, 
             light: feedback?.status_light || '--', 
-            bestText: phrases?.find(p => p.logic_key === bestLogicKey)?.detailed_content || "生理指標表現優異。",
-            worstText: phrases?.find(p => p.logic_key === worstLogicKey)?.detailed_content || "指標略有起伏，請多留意。",
-            flowSuggestion: phrases?.find(p => p.logic_key === worstFlowKey)?.detailed_content || "保持良好作息是健康的基石。"
+            bestText: phrases?.find(p => p.logic_key === bestLogicKey)?.detailed_content || "今日數據表現亮眼！",
+            worstText: phrases?.find(p => p.logic_key === worstLogicKey)?.detailed_content || "這項指標可以稍作調整。",
+            flowSuggestion: phrases?.find(p => p.logic_key === worstFlowKey)?.detailed_content || "適度休息是維持健康的關鍵。"
         };
     }
 
@@ -338,7 +364,15 @@
         document.querySelector('.date-actions')?.remove();
         await appendAiMessage(`正在查詢 ${targetDate}...`);
         const data = await fetchSummaryData(targetDate);
-        if (data) appendSummaryCard(data); else await appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
+        if (data) {
+            appendSummaryCard(data);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
+        } else {
+            await appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
+        }
     }
 
     function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
