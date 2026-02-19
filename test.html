@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n16 - 完整修正版</title>
+    <title>Soosyn 健康夥伴 n18</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -50,7 +50,7 @@
         .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
         .radar-svg { width: 100%; height: auto; }
         .radar-label { font-size: 11px; fill: #888; font-weight: 500; }
-        .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #555; text-anchor: middle; }
+        .radar-result-text { font-size: 0.8rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
@@ -61,7 +61,18 @@
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
-    </style>
+    
+.balance-description {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #eee; /* 加一條虛線分隔線，不想要可刪除 */
+    font-size: 0.8rem;
+    color: #777;
+    line-height: 1.5;
+    text-align: justify;
+}
+
+</style>
 </head>
 <body>
 
@@ -139,7 +150,7 @@
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
         "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡比例", "rMSSD", "放鬆恢復", "最低脈搏", "HBI", "缺氧負荷", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "平衡度", "生理電量平衡度", "睡眠連續性", "睡眠規律性"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡比例", "rMSSD", "放鬆恢復", "最低脈搏", "HBI", "缺氧負荷", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -178,16 +189,31 @@
         input.value = ''; 
         appendUserMessage(msg);
 
-        if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
-            await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
-            showDateActions('balance');
+            // 2. 處理「平衡度」關鍵字
+    if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
+        await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
+        showDateActions('balance');
+        return;
+    }
+
+       // 1. 先處理特定的「健康摘要」關鍵字搜尋 (包含年月日組合)
+    if (msg.includes("健康摘要")) {
+        // 嘗試從字串中提取日期 (支援 YYYY/MM/DD, YYYY-MM-DD, YYYY年MM月DD日)
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        
+        if (dateMatch) {
+            // 如果有日期，直接執行搜尋
+            const formattedDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+            processSummarySearch(formattedDate);
             return;
-        }
-        if (msg.includes("健康摘要")) { 
-            await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); 
+        } else {
+            // 如果只有「健康摘要」四個字，才問日期
+            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); 
             showDateActions('summary'); 
             return; 
         }
+    }
+
 
         const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
         if (matchedKeyword) {
@@ -204,10 +230,16 @@
             return;
         }
         
-        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-        if (dateMatch) processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
-        else { await appendAiMessage("收到！正在學習更好地協助你。 ✨"); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); }
+            const pureDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    if (pureDateMatch) {
+        processSummarySearch(`${pureDateMatch[1]}-${pureDateMatch[2].padStart(2, '0')}-${pureDateMatch[3].padStart(2, '0')}`);
+    } else {
+        await appendAiMessage("收到！正在學習更好地協助你。 ✨");
+        await new Promise(r => setTimeout(r, 600));
+        await appendAiMessage(END_QUESTION);
     }
+}
+
 
     // --- 核心邏輯：摘要比較與建議 (修正版) ---
     async function fetchSummaryData(targetDate) {
@@ -270,21 +302,25 @@
         const points = indicators.map((ind, i) => {
             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
             let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
-            r = Math.min(r, radiusOuter + 5);
+            r = Math.min(r, radiusOuter + 2);
             const color = ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
-            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 25) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
+            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 35) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
         });
 
         const cardHtml = `
             <div class="msg-row ai-row">
                 <div class="balance-card" onclick="zoomChart(this)">
-                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 平衡度</span><span>🔍 點擊放大</span></div>
+                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
                     <svg viewBox="0 0 300 320" class="radar-svg">
                         <circle cx="150" cy="150" r="${radiusOuter}" fill="#f2f2f2" /><circle cx="150" cy="150" r="${radiusInner}" fill="#e6e6e6" /><circle cx="150" cy="150" r="30" fill="white" />
                         ${indicators.map((_, i) => `<line x1="150" y1="150" x2="${center + radiusOuter * Math.cos((Math.PI * 2 * i / 7) - (Math.PI / 2))}" y2="${center + radiusOuter * Math.sin((Math.PI * 2 * i / 7) - (Math.PI / 2))}" stroke="white" stroke-width="1.5" />`).join('')}
-                        ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${p.color}" /><text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle">${indicators[i].label}</text>`).join('')}
+                        ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${p.color}" /><text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle">${indicators[i].label}</text>`).join('')}
                         <text x="150" y="155" class="radar-result-text">${resultText}</text>
                     </svg>
+
+<div class="balance-description">
+                    綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
+                </div>
                 </div>
             </div>`;
         document.getElementById('chat-history').innerHTML += cardHtml; scrollToBottom();
@@ -311,7 +347,7 @@
             </div></div>`; scrollToBottom();
     }
     function appendStatusOptions() {
-        const options = [{text:"① 賴床頭昏", val:50}, {text:"② 睡了仍累", val:60}, {text:"③ 與平常無異", val:75}, {text:"④ 醒來不錯", val:85}, {text:"⑤ 精神飽滿", val:95}];
+        const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
@@ -331,3 +367,4 @@
 </script>
 </body>
 </html>
+
