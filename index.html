@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n18-2</title>
+    <title>Soosyn 健康夥伴 n18-3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -144,7 +144,16 @@
     };
     // 比較用指標 (5項)
     const COMPARISON_FIELDS = Object.keys(FIELD_CONFIG);
-    const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
+    const END_QUESTIONS = [
+    "😊 今天還有想進一步了解的健康資訊嗎？",
+    "關於健康資訊，還有哪部分想了解的嗎？😊",
+    "✨ 還有其他想了解的指標或建議嗎？我隨時都在喔！",
+    "希望這些資訊對你有幫助！還有想查看其他的健康資訊嗎？🌿"
+];
+// 隨機抽選函數
+function getRandomEndQuestion() {
+    return END_QUESTIONS[Math.floor(Math.random() * END_QUESTIONS.length)];
+}
     const CTA_PHRASES = [
         "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
@@ -227,8 +236,8 @@ async function sendMessage() {
         if (data) { 
             await appendAiMessage(data.detailed_content); 
             await new Promise(r => setTimeout(r, 600)); 
-            await appendAiMessage(END_QUESTION); 
-            return; 
+            await appendAiMessage(getRandomEndQuestion()); 
+        return;
         }
     }
 
@@ -349,7 +358,8 @@ async function showSummaryFlow(isFirstTime = false) {
     }
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
+    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
+} else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
     
 
 
@@ -370,11 +380,11 @@ async function processSummarySearch(d) {
             await new Promise(r => setTimeout(r, 1000));
             await appendAiMessage(data.flowSuggestion); // 顯示減少最多指標的隨機建議 (1-3)
             await new Promise(r => setTimeout(r, 800));
-            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-        } else {
+       await appendAiMessage(getRandomEndQuestion());
+} else {
             // 如果不是今天，則顯示一般結尾
             await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(END_QUESTION);
+            await appendAiMessage(getRandomEndQuestion());
         }
     } else {
         await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
