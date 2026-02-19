@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n16_修正版</title>
+    <title>Soosyn 健康夥伴 n16 - 平衡度版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -32,7 +32,6 @@
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; position: relative; }
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
 
-        /* 下拉選單修正 */
         .dropdown { position: absolute; top: 50px; right: 0; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; min-width: 150px; border: 1px solid #eee; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; font-size: 14px; }
         .dropdown button:hover { background-color: #f9f9f9; }
@@ -47,15 +46,21 @@
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
+        /* 卡片共用樣式 */
+        .summary-card, .balance-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .summary-header { font-size: 0.9rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+
+        /* 雷達圖專用 */
+        .radar-svg { width: 100%; height: auto; }
+        .radar-label { font-size: 11px; fill: #888; font-weight: 500; }
+        .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #555; text-anchor: middle; }
+
         .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
         @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
 
-        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-        .summary-header { font-size: 0.9rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .battery-container { margin: 15px 0; }
         .battery-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .battery-label { font-size: 1rem; color: #333; font-weight: 500; }
         .battery-val { font-size: 2rem; font-weight: bold; }
         .progress-bg { width: 100%; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 5px; }
@@ -64,8 +69,6 @@
         .capsule-best { background-color: #f0f8f9; color: #4a5a61; border: 1px solid #e0eff1; }
         .capsule-worst { background-color: #fff6f4; color: #6e524d; border: 1px solid #ffe8e3; }
         .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
-        .icon-smile { color: #a0afb7; }
-        .icon-frown { color: #ffb4a3; }
 
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
@@ -136,21 +139,22 @@
     let isNamingPhase = false, isWaitingForAbnormality = false;
     let tempScore = null;
 
-    // 配置區
     const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
     const CTA_PHRASES = [
         "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD 放鬆恢復、🔋 生理電量？"
+        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
     const FIELD_CONFIG = {
         'Battery_TST_min_A': 'Battery 總睡眠時間',
         'Battery_N3_pct_A': 'Battery N3',
         'Battery_rMSSD_A': 'Battery rMSSD',
         'Battery_HBI_A': 'Battery HBI',
-        'Battery_HR_min_A': 'Battery 最低脈搏'
+        'Battery_HR_min_A': 'Battery 最低脈搏',
+        'Battery_wake_minutes_A': '睡眠連續性',
+        'Battery_OnsetDev_min_A': '睡眠規律性'
     };
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3深睡比例", "rMSSD放鬆恢復", "睡眠最低脈搏", "HBI缺氧負荷", "REM快速動眼期", "睡眠規律性"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡", "N3深睡比例", "rMSSD ", "放鬆恢復", "rMSSD放鬆恢復", "最低脈搏", "睡眠最低脈搏", "HBI ", "缺氧負荷", "HBI缺氧負荷", "黃金修復", "標準修復", "精神負荷", "高身心壓力", "過度疲憊", "修復不足", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -216,6 +220,13 @@
         input.value = ''; 
         appendUserMessage(msg);
 
+        // 平衡度關鍵字判斷
+        if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
+            await appendAiMessage("正在為你準備生理電量平衡度分析... 📊");
+            await showBalanceFlow();
+            return;
+        }
+
         const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
         if (matchedKeyword) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
@@ -257,6 +268,94 @@
         }
     }
 
+    // --- 平衡度圖表邏輯 ---
+
+    async function showBalanceFlow(targetDate = null) {
+        const date = targetDate || new Date().toISOString().split('T')[0];
+        const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', date).order('record_date', { ascending: false }).limit(1).single();
+        
+        if (data) {
+            appendBalanceCard(data);
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(END_QUESTION);
+        } else {
+            await appendAiMessage("找不到相關的健康數據來計算平衡度喔。 😅");
+        }
+    }
+
+    function getColor(val) {
+        if (val >= 95) return "#596b75";
+        if (val >= 80) return "#8699a3";
+        if (val >= 60) return "#a79d8c";
+        return "#ff8c73";
+    }
+
+    function appendBalanceCard(data) {
+        const raw = data.raw_json;
+        const indicators = [
+            { label: '修復時間', val: raw.Battery_TST_min_A || 0 },
+            { label: '核心修復', val: raw.Battery_N3_pct_A || 0 },
+            { label: '放鬆指數', val: raw.Battery_rMSSD_A || 0 },
+            { label: '脈搏穩定度', val: raw.Battery_HR_min_A || 0 },
+            { label: '血氧穩定度', val: raw.Battery_HBI_A || 0 },
+            { label: '睡眠連續性', val: raw.Battery_wake_minutes_A || 0 },
+            { label: '睡眠規律性', val: raw.Battery_OnsetDev_min_A || 0 }
+        ];
+
+        // 平衡度判定邏輯
+        const lowCount = indicators.filter(i => i.val < 60).length;
+        const allHigh = indicators.every(i => i.val >= 60);
+        let resultText = "中平衡度";
+        if (lowCount > 3) resultText = "低平衡度";
+        else if (allHigh) resultText = "高平衡度";
+
+        const center = 150, radiusOuter = 90, radiusInner = 50;
+        const points = indicators.map((ind, i) => {
+            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
+            // 根據數值決定半徑位置：0-59 在內圈到內圈邊緣，60-100 在內圈邊緣到外圈邊緣
+            let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
+            if (r > radiusOuter) r = radiusOuter + 5; // 稍微超出外圈
+            return {
+                x: center + r * Math.cos(angle),
+                y: center + r * Math.sin(angle),
+                color: getColor(ind.val),
+                labelX: center + (radiusOuter + 25) * Math.cos(angle),
+                labelY: center + (radiusOuter + 25) * Math.sin(angle)
+            };
+        });
+
+        const cardHtml = `
+            <div class="msg-row ai-row">
+                <div class="balance-card">
+                    <div class="summary-header">
+                        <span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span>
+                    </div>
+                    <svg viewBox="0 0 300 320" class="radar-svg">
+                        <circle cx="150" cy="150" r="${radiusOuter}" fill="#f2f2f2" />
+                        <circle cx="150" cy="150" r="${radiusInner}" fill="#e6e6e6" />
+                        <circle cx="150" cy="150" r="30" fill="white" />
+                        
+                        ${indicators.map((_, i) => {
+                            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
+                            return `<line x1="150" y1="150" x2="${center + radiusOuter * Math.cos(angle)}" y2="${center + radiusOuter * Math.sin(angle)}" stroke="white" stroke-width="1.5" />`;
+                        }).join('')}
+
+                        ${points.map((p, i) => `
+                            <circle cx="${p.x}" cy="${p.y}" r="6" fill="${p.color}" />
+                            <text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${indicators[i].label}</text>
+                        `).join('')}
+
+                        <text x="150" y="155" class="radar-result-text">${resultText}</text>
+                    </svg>
+                </div>
+            </div>`;
+        
+        document.getElementById('chat-history').innerHTML += cardHtml;
+        scrollToBottom();
+    }
+
+    // --- 原有邏輯保持不變 ---
+
     async function handleAbnormalityInput(msg) {
         const todayStr = new Date().toISOString().split('T')[0];
         await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg });
@@ -291,7 +390,8 @@
         if (healths[1]) {
             let maxInc = -Infinity, maxDec = Infinity;
             Object.keys(FIELD_CONFIG).forEach(k => {
-                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
+                if(!raw[k] || !healths[1].raw_json[k]) return;
+                const diff = raw[k] - healths[1].raw_json[k];
                 if (diff > maxInc) { maxInc = diff; bestKey = k; }
                 if (diff < maxDec) { maxDec = diff; worstKey = k; }
             });
@@ -311,7 +411,7 @@
     }
 
     function appendSummaryCard(data) {
-        const colors = data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+        const colors = getColor(data.battery);
         const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
         
         document.getElementById('chat-history').innerHTML += `
@@ -360,13 +460,7 @@
     function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
     function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
-    
-    // 修正下拉選單顯示
-    function toggleDropdown(e) { 
-        const menu = document.getElementById('settings-menu');
-        menu.classList.toggle('hidden');
-    }
-
+    function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
     function logout(e) { e?.stopPropagation(); location.reload(); }
     function openPwModal(e) { e?.stopPropagation(); document.getElementById('pw-overlay').classList.remove('hidden'); document.getElementById('settings-menu').classList.add('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
@@ -380,12 +474,7 @@
         alert("修改成功！ ✨"); closePwModal();
     }
 
-    // 點擊外部關閉選單
-    window.onclick = function(event) {
-        if (!event.target.closest('.user-info')) {
-            document.getElementById('settings-menu').classList.add('hidden');
-        }
-    }
+    window.onclick = function(event) { if (!event.target.closest('.user-info')) { document.getElementById('settings-menu').classList.add('hidden'); } }
 </script>
 </body>
 </html>
