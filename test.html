@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n16</title>
+    <title>Soosyn 健康夥伴 n16_精簡版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -19,13 +19,11 @@
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
-        /* 模態框樣式 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
 
-        /* 版面配置 */
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
@@ -35,7 +33,6 @@
         main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
         
-        /* 訊息氣泡 */
         .msg-row { display: flex; width: 100%; margin: 4px 0; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .user-row { justify-content: flex-end; }
@@ -47,7 +44,6 @@
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
         @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
 
-        /* 健康摘要卡片 */
         .summary-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
         .summary-header { font-size: 0.9rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .battery-container { margin: 15px 0; }
@@ -57,7 +53,6 @@
         .progress-bg { width: 100%; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 5px; }
         
-        /* 膠囊樣式 */
         .analysis-capsule { display: flex; align-items: center; padding: 12px 15px; border-radius: 16px; margin-top: 10px; font-size: 0.88rem; line-height: 1.5; }
         .capsule-best { background-color: #f0f8f9; color: #4a5a61; border: 1px solid #e0eff1; }
         .capsule-worst { background-color: #fff6f4; color: #6e524d; border: 1px solid #ffe8e3; }
@@ -136,12 +131,12 @@
     let isNamingPhase = false, isWaitingForAbnormality = false;
     let tempScore = null;
 
-    // 常數配置
+    // 配置區
     const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
     const CTA_PHRASES = [
-        "保持健康是每天的小累積，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "維持健康的好習慣很重要！還想查看哪個資訊呢？平衡度、趨勢圖、rMSSD放鬆恢復或睡眠最低脈搏？"
+        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD 放鬆恢復、🔋 生理電量？"
     ];
     const FIELD_CONFIG = {
         'Battery_TST_min_A': 'Battery 總睡眠時間',
@@ -181,9 +176,8 @@
             } else {
                 await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 await new Promise(r => setTimeout(r, 600));
+                // 顯示隨機引導語 (這後面不加 END_QUESTION)
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-                await new Promise(r => setTimeout(r, 600));
-                await appendAiMessage(END_QUESTION);
             }
         }
     }
@@ -276,9 +270,8 @@
                 await new Promise(r => setTimeout(r, 1000));
                 await appendAiMessage(data.flowSuggestion);
                 await new Promise(r => setTimeout(r, 800));
+                // 顯示隨機引導語 (最後結尾，不加 END_QUESTION)
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-                await new Promise(r => setTimeout(r, 600));
-                await appendAiMessage(END_QUESTION);
             } else {
                 await new Promise(r => setTimeout(r, 600));
                 await appendAiMessage(END_QUESTION);
@@ -314,9 +307,9 @@
             date: current.record_date.replace(/-/g, '/'), 
             battery: raw.Personal_Battery_weighted_round || 0, 
             light: feedback?.status_light || '--', 
-            bestText: phrases?.find(p => p.logic_key === bestLogicKey)?.detailed_content || "今日數據表現亮眼！",
-            worstText: phrases?.find(p => p.logic_key === worstLogicKey)?.detailed_content || "這項指標可以稍作調整。",
-            flowSuggestion: phrases?.find(p => p.logic_key === worstFlowKey)?.detailed_content || "適度休息是維持健康的關鍵。"
+            bestText: phrases?.find(p => p.logic_key === bestLogicKey)?.detailed_content || "今日數據穩定。",
+            worstText: phrases?.find(p => p.logic_key === worstLogicKey)?.detailed_content || "注意這部分的平衡喔。",
+            flowSuggestion: phrases?.find(p => p.logic_key === worstFlowKey)?.detailed_content || "健康是每天的累積。"
         };
     }
 
@@ -378,7 +371,7 @@
     function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
     function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
-    function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+    function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('toggle'); }
     function logout() { location.reload(); }
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
