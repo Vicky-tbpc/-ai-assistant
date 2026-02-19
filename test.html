@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n16 - 平衡度版</title>
+    <title>Soosyn 健康夥伴 n16 - 強化版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -19,9 +19,12 @@
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
 
-        /* 模態框樣式 */
+        /* 模態框與放大層 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
+        #zoom-container { width: 90%; max-width: 500px; background: white; border-radius: 20px; padding: 20px; transform: scale(1.05); }
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
+        
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
 
@@ -34,7 +37,6 @@
 
         .dropdown { position: absolute; top: 50px; right: 0; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; min-width: 150px; border: 1px solid #eee; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; font-size: 14px; }
-        .dropdown button:hover { background-color: #f9f9f9; }
 
         main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
@@ -46,19 +48,17 @@
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* 卡片共用樣式 */
-        .summary-card, .balance-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        /* 卡片設計 */
+        .summary-card, .balance-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; }
+        .summary-card:active, .balance-card:active { transform: scale(0.98); }
         .summary-header { font-size: 0.9rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
 
-        /* 雷達圖專用 */
+        /* 雷達圖相關 */
         .radar-svg { width: 100%; height: auto; }
         .radar-label { font-size: 11px; fill: #888; font-weight: 500; }
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #555; text-anchor: middle; }
 
-        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
-        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
-        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
-
+        /* 生理電量條 */
         .battery-container { margin: 15px 0; }
         .battery-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .battery-val { font-size: 2rem; font-weight: bold; }
@@ -72,10 +72,15 @@
 
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
+        
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        
+        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
+        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -105,6 +110,10 @@
             <button class="primary-btn" onclick="updatePassword()">確認更改</button>
             <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
         </div>
+    </div>
+
+    <div id="zoom-overlay" class="hidden" onclick="closeZoom()">
+        <div id="zoom-container" onclick="event.stopPropagation()"></div>
     </div>
 
     <div id="app-container" class="hidden">
@@ -139,6 +148,7 @@
     let isNamingPhase = false, isWaitingForAbnormality = false;
     let tempScore = null;
 
+    // 核心邏輯配置 (來自 n16)
     const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
     const CTA_PHRASES = [
         "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
@@ -154,8 +164,9 @@
         'Battery_wake_minutes_A': '睡眠連續性',
         'Battery_OnsetDev_min_A': '睡眠規律性'
     };
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡", "N3深睡比例", "rMSSD ", "放鬆恢復", "rMSSD放鬆恢復", "最低脈搏", "睡眠最低脈搏", "HBI ", "缺氧負荷", "HBI缺氧負荷", "黃金修復", "標準修復", "精神負荷", "高身心壓力", "過度疲憊", "修復不足", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡", "N3深睡比例", "rMSSD ", "放鬆恢復", "rMSSD放鬆恢復", "最低脈搏", "睡眠最低脈搏", "HBI ", "缺氧負荷", "HBI缺氧負荷", "黃金修復", "標準修復", "精神負荷", "高身心壓力", "過度疲憊", "修復不足", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "N3 深睡", "N3 深睡比例", "rMSSD 放鬆恢復", "HBI 缺氧負荷", "REM 快速動眼期"];
 
+    // 初始化與登入
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
         const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
@@ -171,14 +182,12 @@
         document.getElementById('app-container').classList.remove('hidden');
         document.getElementById('display-name').innerText = name;
         document.getElementById('avatar-char').innerText = name.charAt(0);
-        
         if (!aiName) {
             isNamingPhase = true;
             await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
         } else {
             const todayStr = new Date().toISOString().split('T')[0];
             const hasSeenSummary = localStorage.getItem(`last_summary_${currentSerial}`) === todayStr;
-
             if (!hasSeenSummary) {
                 await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
                 appendStatusOptions();
@@ -190,43 +199,36 @@
         }
     }
 
-    async function appendAiMessage(text) {
-        const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now();
-        history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
-        scrollToBottom();
-        await new Promise(r => setTimeout(r, 800));
-        const typingElem = document.getElementById(typingId);
-        if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>');
-        scrollToBottom();
+    // 放大功能
+    function zoomChart(element) {
+        const container = document.getElementById('zoom-container');
+        container.innerHTML = element.outerHTML;
+        document.getElementById('zoom-overlay').classList.remove('hidden');
     }
+    function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
 
-    function appendStatusOptions() {
-        const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
-        let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
-        options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
-        document.getElementById('chat-history').innerHTML += html + '</div></div>';
-        scrollToBottom();
-    }
-
-    async function handleStatusSelection(text, score) {
-        document.getElementById('status-options-container')?.remove();
-        appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true;
-        await appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔 (若無請輸入「無」)");
-    }
-
+    // 訊息處理中心
     async function sendMessage() {
         const input = document.getElementById('user-input'), msg = input.value.trim();
         if (!msg) return; 
         input.value = ''; 
         appendUserMessage(msg);
 
-        // 平衡度關鍵字判斷
+        // 平衡度觸發
         if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
-            await appendAiMessage("正在為你準備生理電量平衡度分析... 📊");
-            await showBalanceFlow();
+            await appendAiMessage("你想查看哪一天的生理電量平衡度呢？ 📅");
+            showDateActions('balance');
             return;
         }
 
+        // 健康摘要觸發
+        if (msg.includes("健康摘要")) { 
+            await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); 
+            showDateActions('summary'); 
+            return; 
+        }
+
+        // 百科全書比對 (來自 n16)
         const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
         if (matchedKeyword) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
@@ -238,12 +240,7 @@
             }
         }
 
-        if (isWaitingForAbnormality) { 
-            isWaitingForAbnormality = false; 
-            await handleAbnormalityInput(msg); 
-            return; 
-        }
-
+        if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
         if (isNamingPhase) {
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
             isNamingPhase = false; 
@@ -251,16 +248,12 @@
             showSummaryFlow(true); 
             return;
         }
-
-        if (msg.includes("健康摘要")) { 
-            await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); 
-            showDateActions(); 
-            return; 
-        }
         
+        // 具體日期偵測
         const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
         if (dateMatch) {
-            processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
+            const dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+            processSummarySearch(dateStr);
         } else {
             await appendAiMessage("收到你的訊息！正在努力學習更好地協助你。 ✨");
             await new Promise(r => setTimeout(r, 600));
@@ -268,28 +261,38 @@
         }
     }
 
-    // --- 平衡度圖表邏輯 ---
+    // 日期選擇按鈕
+    function showDateActions(type) {
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
+        const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+        document.getElementById('chat-history').innerHTML += `
+            <div class="msg-row ai-row date-actions-container">
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="${callback}('${today}')">今天</button>
+                    <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
+                </div>
+            </div>`;
+        scrollToBottom();
+    }
 
-    async function showBalanceFlow(targetDate = null) {
-        const date = targetDate || new Date().toISOString().split('T')[0];
-        const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', date).order('record_date', { ascending: false }).limit(1).single();
-        
+    // 處理平衡度查詢
+    async function processBalanceSearch(targetDate) {
+        document.querySelector('.date-actions-container')?.remove();
+        await appendAiMessage(`正在查詢 ${targetDate} 的生理電量平衡度... 📊`);
+        const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', targetDate).single();
         if (data) {
             appendBalanceCard(data);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(END_QUESTION);
         } else {
-            await appendAiMessage("找不到相關的健康數據來計算平衡度喔。 😅");
+            await appendAiMessage(`找不到 ${targetDate} 的數據。試試查詢其他日期吧！ 😅`);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
         }
     }
 
-    function getColor(val) {
-        if (val >= 95) return "#596b75";
-        if (val >= 80) return "#8699a3";
-        if (val >= 60) return "#a79d8c";
-        return "#ff8c73";
-    }
-
+    // 渲染雷達圖卡片
     function appendBalanceCard(data) {
         const raw = data.raw_json;
         const indicators = [
@@ -302,68 +305,93 @@
             { label: '睡眠規律性', val: raw.Battery_OnsetDev_min_A || 0 }
         ];
 
-        // 平衡度判定邏輯
         const lowCount = indicators.filter(i => i.val < 60).length;
         const allHigh = indicators.every(i => i.val >= 60);
-        let resultText = "中平衡度";
-        if (lowCount > 3) resultText = "低平衡度";
-        else if (allHigh) resultText = "高平衡度";
-
+        const resultText = lowCount > 3 ? "低平衡度" : allHigh ? "高平衡度" : "中平衡度";
         const center = 150, radiusOuter = 90, radiusInner = 50;
+
         const points = indicators.map((ind, i) => {
             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
-            // 根據數值決定半徑位置：0-59 在內圈到內圈邊緣，60-100 在內圈邊緣到外圈邊緣
             let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
-            if (r > radiusOuter) r = radiusOuter + 5; // 稍微超出外圈
-            return {
-                x: center + r * Math.cos(angle),
-                y: center + r * Math.sin(angle),
-                color: getColor(ind.val),
-                labelX: center + (radiusOuter + 25) * Math.cos(angle),
-                labelY: center + (radiusOuter + 25) * Math.sin(angle)
-            };
+            r = Math.min(r, radiusOuter + 5);
+            const color = ind.val >= 95 ? "#596b75" : ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
+            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 25) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
         });
 
         const cardHtml = `
             <div class="msg-row ai-row">
-                <div class="balance-card">
-                    <div class="summary-header">
-                        <span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span>
-                    </div>
+                <div class="balance-card" onclick="zoomChart(this)">
+                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 平衡度分析</span><span style="font-size:10px; color:#aaa;">(點擊放大)</span></div>
                     <svg viewBox="0 0 300 320" class="radar-svg">
-                        <circle cx="150" cy="150" r="${radiusOuter}" fill="#f2f2f2" />
-                        <circle cx="150" cy="150" r="${radiusInner}" fill="#e6e6e6" />
-                        <circle cx="150" cy="150" r="30" fill="white" />
-                        
-                        ${indicators.map((_, i) => {
-                            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
-                            return `<line x1="150" y1="150" x2="${center + radiusOuter * Math.cos(angle)}" y2="${center + radiusOuter * Math.sin(angle)}" stroke="white" stroke-width="1.5" />`;
-                        }).join('')}
-
-                        ${points.map((p, i) => `
-                            <circle cx="${p.x}" cy="${p.y}" r="6" fill="${p.color}" />
-                            <text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${indicators[i].label}</text>
-                        `).join('')}
-
+                        <circle cx="150" cy="150" r="${radiusOuter}" fill="#f2f2f2" /><circle cx="150" cy="150" r="${radiusInner}" fill="#e6e6e6" /><circle cx="150" cy="150" r="30" fill="white" />
+                        ${indicators.map((_, i) => `<line x1="150" y1="150" x2="${center + radiusOuter * Math.cos((Math.PI * 2 * i / 7) - (Math.PI / 2))}" y2="${center + radiusOuter * Math.sin((Math.PI * 2 * i / 7) - (Math.PI / 2))}" stroke="white" stroke-width="1.5" />`).join('')}
+                        ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${p.color}" /><text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${indicators[i].label}</text>`).join('')}
                         <text x="150" y="155" class="radar-result-text">${resultText}</text>
                     </svg>
                 </div>
             </div>`;
-        
         document.getElementById('chat-history').innerHTML += cardHtml;
         scrollToBottom();
     }
 
-    // --- 原有邏輯保持不變 ---
-
-    async function handleAbnormalityInput(msg) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg });
-        localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-        await appendAiMessage("收到了！一起來看看健康摘要吧！ ✨");
-        showSummaryFlow(true);
+    // 健康摘要數據邏輯 (來自 n16)
+    async function fetchSummaryData(targetDate) {
+        const { data: healths } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(2);
+        if (!healths?.length) return null;
+        const current = healths[0], raw = current.raw_json;
+        let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
+        if (healths[1]) {
+            let maxInc = -Infinity, maxDec = Infinity;
+            Object.keys(FIELD_CONFIG).forEach(k => {
+                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
+                if (diff > maxInc) { maxInc = diff; bestKey = k; }
+                if (diff < maxDec) { maxDec = diff; worstKey = k; }
+            });
+        }
+        const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${Math.floor(Math.random()*3)+1}`]);
+        const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
+        return { 
+            date: current.record_date.replace(/-/g, '/'), battery: raw.Personal_Battery_weighted_round || 0, light: feedback?.status_light || '--', 
+            bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
+            worstText: phrases?.find(p => p.logic_key.endsWith('最差'))?.detailed_content || "這部分可留意。",
+            flowSuggestion: phrases?.find(p => p.logic_key.match(/最差\d/))?.detailed_content || "健康是累積的成果。"
+        };
     }
 
+    function appendSummaryCard(data) {
+        const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
+        document.getElementById('chat-history').innerHTML += `
+            <div class="msg-row ai-row">
+                <div class="summary-card" onclick="zoomChart(this)">
+                    <div class="summary-header"><span>📅 ${data.date} 健康摘要</span><span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span></div>
+                    <div class="battery-container">
+                        <div class="battery-meta"><span>生理電量</span><span class="battery-val" style="color:${colors}">${data.battery}</span></div>
+                        <div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div></div>
+                    </div>
+                    <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
+                    <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
+                </div>
+            </div>`;
+        scrollToBottom();
+    }
+
+    async function processSummarySearch(targetDate) {
+        document.querySelector('.date-actions-container')?.remove();
+        await appendAiMessage(`正在查詢 ${targetDate} 的健康摘要...`);
+        const data = await fetchSummaryData(targetDate);
+        if (data) {
+            appendSummaryCard(data);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
+        } else {
+            await appendAiMessage("這天沒數據喔~ 😅");
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(END_QUESTION);
+        }
+    }
+
+    // 其他 UI 與 Survey 邏輯 (來自 n16)
     async function showSummaryFlow(isFirstTime = false) { 
         const data = await fetchSummaryData(new Date().toISOString().split('T')[0]);
         if (data) {
@@ -380,81 +408,38 @@
         }
     }
 
-    async function fetchSummaryData(targetDate) {
-        const { data: healths } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(2);
-        if (!healths?.length) return null;
-
-        const current = healths[0], raw = current.raw_json;
-        let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
-        
-        if (healths[1]) {
-            let maxInc = -Infinity, maxDec = Infinity;
-            Object.keys(FIELD_CONFIG).forEach(k => {
-                if(!raw[k] || !healths[1].raw_json[k]) return;
-                const diff = raw[k] - healths[1].raw_json[k];
-                if (diff > maxInc) { maxInc = diff; bestKey = k; }
-                if (diff < maxDec) { maxDec = diff; worstKey = k; }
-            });
-        }
-
-        const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${Math.floor(Math.random()*3)+1}`]);
-        const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
-
-        return { 
-            date: current.record_date.replace(/-/g, '/'), 
-            battery: raw.Personal_Battery_weighted_round || 0, 
-            light: feedback?.status_light || '--', 
-            bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
-            worstText: phrases?.find(p => p.logic_key.endsWith('最差'))?.detailed_content || "這部分可留意。",
-            flowSuggestion: phrases?.find(p => p.logic_key.match(/最差\d/))?.detailed_content || "健康是累積的成果。"
-        };
+    function appendAiMessage(text) {
+        const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now();
+        history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
+        scrollToBottom();
+        return new Promise(r => setTimeout(() => {
+            const typingElem = document.getElementById(typingId);
+            if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>');
+            scrollToBottom();
+            r();
+        }, 800));
     }
 
-    function appendSummaryCard(data) {
-        const colors = getColor(data.battery);
-        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
-        
-        document.getElementById('chat-history').innerHTML += `
-            <div class="msg-row ai-row">
-                <div class="summary-card">
-                    <div class="summary-header">
-                        <span>📅 ${data.date} 健康摘要</span>
-                        <span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span>
-                    </div>
-                    <div class="battery-container">
-                        <div class="battery-meta">
-                            <span class="battery-label">生理電量</span>
-                            <span class="battery-val" style="color:${colors}">${data.battery}</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div></div>
-                    </div>
-                    <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
-                    <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
-                </div>
-            </div>`;
+    function appendStatusOptions() {
+        const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
+        let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
+        options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
+        document.getElementById('chat-history').innerHTML += html + '</div></div>';
         scrollToBottom();
     }
 
-    function showDateActions() {
-        const today = new Date().toISOString().split('T')[0];
-        const yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
-        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row date-actions"><div class="quick-actions"><button class="action-btn" onclick="processSummarySearch('${today}')">今天</button><button class="action-btn" onclick="processSummarySearch('${yesterday}')">昨天</button></div></div>`;
-        scrollToBottom();
+    async function handleStatusSelection(text, score) {
+        document.getElementById('status-options-container')?.remove();
+        appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true;
+        await appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔 (若無請輸入「無」)");
     }
 
-    async function processSummarySearch(targetDate) {
-        document.querySelector('.date-actions')?.remove();
-        await appendAiMessage(`正在查詢 ${targetDate}...`);
-        const data = await fetchSummaryData(targetDate);
-        if (data) {
-            appendSummaryCard(data);
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(END_QUESTION);
-        } else {
-            await appendAiMessage("這天沒數據喔~ 😅");
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(END_QUESTION);
-        }
+    async function handleAbnormalityInput(msg) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg });
+        localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+        await appendAiMessage("收到了！一起來看看健康摘要吧！ ✨");
+        showSummaryFlow(true);
     }
 
     function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
@@ -464,7 +449,6 @@
     function logout(e) { e?.stopPropagation(); location.reload(); }
     function openPwModal(e) { e?.stopPropagation(); document.getElementById('pw-overlay').classList.remove('hidden'); document.getElementById('settings-menu').classList.add('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-    
     async function updatePassword() {
         const oldP = document.getElementById('old-pw').value, newP = document.getElementById('new-pw').value;
         if (!oldP || !newP) return alert("請輸入完整資料");
@@ -473,7 +457,6 @@
         await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
         alert("修改成功！ ✨"); closePwModal();
     }
-
     window.onclick = function(event) { if (!event.target.closest('.user-info')) { document.getElementById('settings-menu').classList.add('hidden'); } }
 </script>
 </body>
