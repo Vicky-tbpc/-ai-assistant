@@ -416,7 +416,7 @@ async function showSummaryFlow(isFirstTime = false) {
 // --- 修改後的 processSummarySearch 函數 ---
 async function processSummarySearch(d) {
     document.querySelector('.date-actions')?.remove();
-    await appendAiMessage(`正在查詢 ${d} 摘要...`);
+    await appendAiMessage(`正在查詢 ${d} 健康摘要...`);
     
     const data = await fetchSummaryData(d);
     if (data) {
