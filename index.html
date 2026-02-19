@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n17</title>
+    <title>Soosyn 健康夥伴 n18</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -189,16 +189,31 @@
         input.value = ''; 
         appendUserMessage(msg);
 
-        if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
-            await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
-            showDateActions('balance');
+            // 2. 處理「平衡度」關鍵字
+    if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
+        await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
+        showDateActions('balance');
+        return;
+    }
+
+       // 1. 先處理特定的「健康摘要」關鍵字搜尋 (包含年月日組合)
+    if (msg.includes("健康摘要")) {
+        // 嘗試從字串中提取日期 (支援 YYYY/MM/DD, YYYY-MM-DD, YYYY年MM月DD日)
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        
+        if (dateMatch) {
+            // 如果有日期，直接執行搜尋
+            const formattedDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+            processSummarySearch(formattedDate);
             return;
-        }
-        if (msg.includes("健康摘要")) { 
+        } else {
+            // 如果只有「健康摘要」四個字，才問日期
             await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); 
             showDateActions('summary'); 
             return; 
         }
+    }
+
 
         const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
         if (matchedKeyword) {
@@ -215,10 +230,16 @@
             return;
         }
         
-        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-        if (dateMatch) processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
-        else { await appendAiMessage("收到！正在學習更好地協助你。 ✨"); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); }
+            const pureDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    if (pureDateMatch) {
+        processSummarySearch(`${pureDateMatch[1]}-${pureDateMatch[2].padStart(2, '0')}-${pureDateMatch[3].padStart(2, '0')}`);
+    } else {
+        await appendAiMessage("收到！正在學習更好地協助你。 ✨");
+        await new Promise(r => setTimeout(r, 600));
+        await appendAiMessage(END_QUESTION);
     }
+}
+
 
     // --- 核心邏輯：摘要比較與建議 (修正版) ---
     async function fetchSummaryData(targetDate) {
@@ -306,8 +327,8 @@
     }
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("查無數據喔 😅"); }
-    async function processSummarySearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 摘要...`); const data = await fetchSummaryData(d); if (data) { appendSummaryCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("查無數據喔 😅"); }
+    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
+    async function processSummarySearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 健康摘要...`); const data = await fetchSummaryData(d); if (data) { appendSummaryCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
     function showDateActions(type) {
         const today = new Date().toISOString().split('T')[0], yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
         const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
