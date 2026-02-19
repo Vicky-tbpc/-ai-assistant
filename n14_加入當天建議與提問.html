@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Soosyn 健康夥伴 n14</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --tbp-blue: #8699a3; 
+            --tbp-light-blue: #e6f0f9;
+            --bg-color: #f5f1eb;
+            --text-dark: #333;
+            --user-msg-bg: #e2ddd4;
+            --ai-msg-bg: #ffffff;
+            --accent-red: #ff8c73;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+        .hidden { display: none !important; }
+
+        /* 模態框樣式 */
+        .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
+        .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        .primary-btn:active { transform: scale(0.98); opacity: 0.9; }
+
+        /* 版面配置 */
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
+        .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
+        .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+
+        main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
+        #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
+        
+        /* 訊息氣泡 */
+        .msg-row { display: flex; width: 100%; margin: 4px 0; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .user-row { justify-content: flex-end; }
+        .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .ai-row { justify-content: flex-start; }
+        .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
+        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+        /* 健康摘要卡片 */
+        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 280px; padding: 18px; margin: 10px 0; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.05); border-left: 6px solid #ddd; }
+        .summary-header { font-size: 0.85rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+        .battery-container { margin: 15px 0; }
+        .battery-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+        .battery-val { font-size: 1.8rem; font-weight: bold; }
+        .progress-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 4px; }
+        .analysis-capsule { display: flex; align-items: center; padding: 10px 14px; border-radius: 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.4; }
+        .capsule-best { background-color: #f0f7f8; color: #4a5a61; border: 1px solid #e0edf0; }
+        .capsule-worst { background-color: #fff5f3; color: #6e524d; border: 1px solid #ffe8e3; }
+
+        /* 按鈕與輸入 */
+        .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
+        .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
+        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
+        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
+        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .dropdown { position: absolute; top: 55px; right: 20px; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; }
+        .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay" class="modal-overlay">
+        <div class="modal-card">
+            <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
+            <input type="text" id="serial" placeholder="序號">
+            <input type="password" id="pw" placeholder="密碼">
+            <button class="primary-btn" onclick="login()">登入系統</button>
+        </div>
+    </div>
+
+    <div id="nickname-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>歡迎！請問該怎麼稱呼你？</h3>
+            <input type="text" id="new-nickname" placeholder="你的暱稱">
+            <button class="primary-btn" onclick="saveNickname()">加入健康夥伴</button>
+        </div>
+    </div>
+
+    <div id="pw-overlay" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>修改密碼</h3>
+            <input type="password" id="old-pw" placeholder="舊密碼">
+            <input type="password" id="new-pw" placeholder="新密碼">
+            <button class="primary-btn" onclick="updatePassword()">確認更改</button>
+            <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
+        <header>
+            <div class="logo-text">Soosyn Health Companion</div>
+            <div class="user-info" onclick="toggleDropdown()">
+                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
+                <div class="avatar" id="avatar-char">U</div>
+            </div>
+            <div id="settings-menu" class="dropdown hidden">
+                <button onclick="openPwModal()">🔒 修改密碼</button>
+                <button onclick="logout()" style="color: #ff8c73;">📤 登出系統</button>
+            </div>
+        </header>
+
+        <main id="main-area"><div id="chat-history"></div></main>
+
+        <div class="footer-input">
+            <div class="input-box">
+                <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">▲</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentSerial = "";
+    let isNamingPhase = false, isWaitingForAbnormality = false;
+    let tempScore = null;
+
+    // 配置：隨機引導語
+    const CTA_PHRASES = [
+        "保持健康是每天的小累積，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
+        "維持健康的好習慣很重要！還想查看哪個資訊呢？平衡度、趨勢圖、rMSSD放鬆恢復或睡眠最低脈搏？"
+    ];
+
+    // 配置：需要監控的減少指標及其基礎 LogicKey
+    const WORST_LOGIC_MAP = {
+        'Battery_TST_min_A': 'Battery 總睡眠時間最差',
+        'Battery_N3_pct_A': 'Battery N3最差',
+        'Battery_rMSSD_A': 'Battery rMSSD最差',
+        'Battery_HBI_A': 'Battery HBI最差',
+        'Battery_HR_min_A': 'Battery 最低脈搏最差'
+    };
+
+    // 配置：關鍵字百科對應的 Title
+    const HEALTH_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3深睡比例", "rMSSD放鬆恢復", "睡眠最低脈搏", "HBI缺氧負荷", "REM快速動眼期", "睡眠規律性"];
+
+    async function login() {
+        const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
+        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+        if (data) {
+            currentSerial = serial;
+            document.getElementById('login-overlay').classList.add('hidden');
+            if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+            else initApp(data.nickname, data.ai_name);
+        } else alert("驗證失敗 😅");
+    }
+
+    async function initApp(name, aiName) {
+        document.getElementById('app-container').classList.remove('hidden');
+        document.getElementById('display-name').innerText = name;
+        document.getElementById('avatar-char').innerText = name.charAt(0);
+        
+        if (!aiName) {
+            isNamingPhase = true;
+            await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
+        } else {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const hasSeenSummary = localStorage.getItem(`last_summary_${currentSerial}`) === todayStr;
+
+            if (!hasSeenSummary) {
+                // 首次登入流程
+                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
+                appendStatusOptions();
+            } else {
+                // 當天第二次登入
+                await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
+                await new Promise(r => setTimeout(r, 600));
+                await appendAiMessage(getRandomCTA());
+            }
+        }
+    }
+
+    function getRandomCTA() {
+        return CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)];
+    }
+
+    async function appendAiMessage(text) {
+        const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now();
+        history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
+        scrollToBottom();
+        await new Promise(r => setTimeout(r, 800));
+        const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>');
+        scrollToBottom();
+    }
+
+    function appendStatusOptions() {
+        const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
+        let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
+        options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
+        document.getElementById('chat-history').innerHTML += html + '</div></div>';
+        scrollToBottom();
+    }
+
+    async function handleStatusSelection(text, score) {
+        document.getElementById('status-options-container')?.remove();
+        appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true;
+        await appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔 (若無請輸入「無」)");
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('user-input'), msg = input.value.trim();
+        if (!msg) return; 
+        input.value = ''; 
+        appendUserMessage(msg);
+
+        // 1. 關鍵字搜尋功能
+        const matchedKeyword = HEALTH_KEYWORDS.find(k => msg.includes(k));
+        if (matchedKeyword) {
+            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
+            if (data) {
+                await appendAiMessage(data.detailed_content);
+                return;
+            }
+        }
+
+        // 2. 原有流程邏輯
+        if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
+        if (isNamingPhase) {
+            await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+            isNamingPhase = false; await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
+            showSummaryFlow(); return;
+        }
+        if (msg.includes("健康摘要")) { await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); showDateActions(); return; }
+        
+        const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (dateMatch) processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
+        else await appendAiMessage("收到你的訊息！正在努力學習更好地協助你。 ✨");
+    }
+
+    async function handleAbnormalityInput(msg) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg });
+        localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
+        await appendAiMessage("收到了！一起來看看健康摘要吧！ ✨");
+        showSummaryFlow(true); // true 代表觸發「首次登入建議」
+    }
+
+    async function showSummaryFlow(isFirstTime = false) { 
+        const data = await fetchSummaryData(new Date().toISOString().split('T')[0]);
+        if (data) {
+            appendSummaryCard(data);
+            if (isFirstTime && data.suggestion) {
+                await new Promise(r => setTimeout(r, 1000));
+                await appendAiMessage(data.suggestion);
+                await new Promise(r => setTimeout(r, 800));
+                await appendAiMessage(getRandomCTA());
+            }
+        }
+    }
+
+    async function fetchSummaryData(targetDate) {
+        const { data: healths } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(2);
+        if (!healths?.length) return null;
+
+        const current = healths[0], raw = current.raw_json;
+        let worstKey = 'Battery_TST_min_A';
+        
+        // 找出減少最多的指標 (針對特定 5 項)
+        if (healths[1]) {
+            let maxDec = Infinity;
+            Object.keys(WORST_LOGIC_MAP).forEach(k => {
+                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
+                if (diff < maxDec) { maxDec = diff; worstKey = k; }
+            });
+        }
+
+        // 隨機選取 1~3 號建議
+        const randomIdx = Math.floor(Math.random() * 3) + 1;
+        const targetLogicKey = `${WORST_LOGIC_MAP[worstKey]}${randomIdx}`;
+        
+        // 抓取建議文字與燈號資訊
+        const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', [targetLogicKey]);
+        const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
+
+        return { 
+            date: current.record_date.replace(/-/g, '/'), 
+            battery: raw.Personal_Battery_weighted_round || 0, 
+            light: feedback?.status_light || '--', 
+            bestText: "狀態穩定運作中。", // 這裡可維持簡短
+            worstText: "注意數值波動。", 
+            suggestion: phrases?.find(p => p.logic_key === targetLogicKey)?.detailed_content || "保持良好作息是健康的基石。"
+        };
+    }
+
+    function appendSummaryCard(data) {
+        const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
+        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row"><div class="summary-card" style="border-left-color: ${lightMap[data.light] || '#ddd'}"><div class="summary-header"><span>📅 ${data.date}</span><span style="color:${lightMap[data.light]}; font-weight:bold;">● ${data.light}</span></div><div class="battery-container"><div class="battery-meta"><span style="font-size:0.9rem">生理電量</span><span class="battery-val" style="color:${colors}">${data.battery}</span></div><div class="progress-bg"><div class="progress-fill" style="width: ${data.battery}%; background: ${colors}"></div></div></div><div class="analysis-capsule capsule-best"><span>😊</span> 數據分析已更新</div></div></div>`;
+        scrollToBottom();
+    }
+
+    function showDateActions() {
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
+        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row date-actions"><div class="quick-actions"><button class="action-btn" onclick="processSummarySearch('${today}')">今天</button><button class="action-btn" onclick="processSummarySearch('${yesterday}')">昨天</button></div></div>`;
+        scrollToBottom();
+    }
+
+    async function processSummarySearch(targetDate) {
+        document.querySelector('.date-actions')?.remove();
+        await appendAiMessage(`正在查詢 ${targetDate}...`);
+        const data = await fetchSummaryData(targetDate);
+        if (data) appendSummaryCard(data); else await appendAiMessage("這一天目前沒有紀錄資料喔~ 😅");
+    }
+
+    function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
+    function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
+    function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
+    function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+    function logout() { location.reload(); }
+    function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); toggleDropdown(); }
+    function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
+    async function updatePassword() {
+        const oldP = document.getElementById('old-pw').value, newP = document.getElementById('new-pw').value;
+        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
+        if(!data) return alert("舊密碼錯誤 😅");
+        await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
+        alert("修改成功！ ✨"); closePwModal();
+    }
+</script>
+</body>
+</html>
