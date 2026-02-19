@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n18-3</title>
+    <title>Soosyn 健康夥伴 n18-4</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -70,6 +70,13 @@
     color: #777;
     line-height: 1.5;
     text-align: justify;
+}
+
+.rank-text {
+    font-size: 0.72rem; /* 稍微縮小 */
+    color: #888;
+    display: block;
+    margin-top: -4px; /* 貼近上方的電量數值 */
 }
 
 </style>
@@ -265,35 +272,74 @@ async function sendMessage() {
 
 
     // --- 核心邏輯：摘要比較與建議 (修正版) ---
-    async function fetchSummaryData(targetDate) {
-        const { data: healths } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(2);
-        if (!healths?.length) return null;
 
-        const current = healths[0], raw = current.raw_json;
-        let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
-        
-        if (healths[1]) {
-            let maxInc = -Infinity, maxDec = Infinity;
-            COMPARISON_FIELDS.forEach(k => {
-                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
-                if (diff > maxInc) { maxInc = diff; bestKey = k; }
-                if (diff < maxDec) { maxDec = diff; worstKey = k; } // 找出減少最多的
-            });
-        }
 
-        const randomIdx = Math.floor(Math.random() * 3) + 1; // 隨機 1-3
-        const logicKeys = [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${randomIdx}`];
-        const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', logicKeys);
-        const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
+async function fetchSummaryData(targetDate) {
+    // 1. 獲取個人當前與前一天的數據
+    const { data: healths } = await _supabase.from('health_data')
+        .select('record_date, raw_json')
+        .eq('serial_number', currentSerial)
+        .lte('record_date', targetDate)
+        .order('record_date', { ascending: false })
+        .limit(2);
 
-        return { 
-            date: current.record_date.replace(/-/g, '/'), battery: raw.Personal_Battery_weighted_round || 0, light: feedback?.status_light || '--', 
-            bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
-            worstText: phrases?.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
-            flowSuggestion: phrases?.find(p => p.logic_key.includes('最差') && p.logic_key.match(/\d$/))?.detailed_content // 這裡存隨機建議
-        };
+    if (!healths?.length) return null;
+
+    const current = healths[0], raw = current.raw_json;
+    const currentBattery = raw.Personal_Battery_weighted_round || 0;
+
+    // --- 2. 新增：計算百分比排名邏輯 (整合自 n12) ---
+    const { data: allUsersData } = await _supabase.from('health_data')
+        .select('raw_json')
+        .eq('record_date', current.record_date);
+
+    let percentage = 0;
+    if (allUsersData && allUsersData.length > 0) {
+        const totalUsers = allUsersData.length;
+        // 計算有多少人的生理電量低於目前使用者
+        const lowerUsers = allUsersData.filter(d => 
+            (d.raw_json.Personal_Battery_weighted_round || 0) < currentBattery
+        ).length;
+        percentage = Math.round((lowerUsers / totalUsers) * 100);
+    }
+    // --------------------------------------------
+
+    // 3. 指標增減比較邏輯
+    let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
+    if (healths[1]) {
+        let maxInc = -Infinity, maxDec = Infinity;
+        COMPARISON_FIELDS.forEach(k => {
+            const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
+            if (diff > maxInc) { maxInc = diff; bestKey = k; }
+            if (diff < maxDec) { maxDec = diff; worstKey = k; }
+        });
     }
 
+    // 4. 從資料庫獲取建議文字與狀態燈號
+    const randomIdx = Math.floor(Math.random() * 3) + 1;
+    const logicKeys = [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${randomIdx}`];
+    
+    const { data: phrases } = await _supabase.from('phrase_library')
+        .select('logic_key, detailed_content')
+        .in('logic_key', logicKeys);
+        
+    const { data: feedback } = await _supabase.from('daily_feedback')
+        .select('status_light')
+        .eq('serial_number', currentSerial)
+        .eq('record_date', current.record_date)
+        .single();
+
+    // 5. 回傳整合後的物件
+    return { 
+        date: current.record_date.replace(/-/g, '/'), 
+        battery: currentBattery, 
+        percentage: percentage, // 傳回計算出的百分比
+        light: feedback?.status_light || '--', 
+        bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
+        worstText: phrases?.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
+        flowSuggestion: phrases?.find(p => p.logic_key.includes('最差') && p.logic_key.match(/\d$/))?.detailed_content 
+    };
+}
     
 
 
@@ -336,7 +382,7 @@ async function showSummaryFlow(isFirstTime = false) {
             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
             let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
             r = Math.min(r, radiusOuter + 2);
-            const color = ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
+            const color = ind.val >= 95 ? "#596b75" : ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
             return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 35) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
         });
 
@@ -405,17 +451,39 @@ async function processSummarySearch(d) {
         document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row date-actions"><div class="quick-actions"><button class="action-btn" onclick="${callback}('${today}')">今天</button><button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button></div></div>`;
         scrollToBottom();
     }
-    function appendSummaryCard(data) {
-        const colors = data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
-        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
-        document.getElementById('chat-history').innerHTML += `
-            <div class="msg-row ai-row"><div class="summary-card" onclick="zoomChart(this)">
-                <div class="summary-header"><span>📅 ${data.date} 健康摘要</span><span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span></div>
-                <div class="battery-container"><div class="battery-meta"><span>生理電量</span><span class="battery-val" style="color:${colors}">${data.battery}</span></div><div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div></div></div>
+
+
+function appendSummaryCard(data) {
+    const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+    const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
+    
+    document.getElementById('chat-history').innerHTML += `
+        <div class="msg-row ai-row">
+            <div class="summary-card" onclick="zoomChart(this)">
+                <div class="summary-header">
+                    <span>📅 ${data.date} 健康摘要</span>
+                    <span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span>
+                </div>
+                <div class="battery-container">
+                    <div class="battery-meta">
+                        <span>生理電量</span>
+                        <div style="text-align: right;">
+                            <span class="battery-val" style="color:${colors}">${data.battery}</span><br>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                        </div>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div>
+                    </div>
+                </div>
                 <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
                 <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
-            </div></div>`; scrollToBottom();
-    }
+            </div>
+        </div>`; 
+    scrollToBottom();
+}
+
+
     function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
