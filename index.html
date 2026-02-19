@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n16</title>
+    <title>Soosyn 健康夥伴 n17</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -15,64 +15,52 @@
             --ai-msg-bg: #ffffff;
             --accent-red: #ff8c73;
         }
-
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         .hidden { display: none !important; }
-
-        /* 模態框樣式 */
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
+        #zoom-container { width: 90%; max-width: 500px; background: white; border-radius: 20px; padding: 20px; }
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
-
-        /* 版面配置 */
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; position: relative; }
         .avatar { width: 32px; height: 32px; background: var(--tbp-light-blue); color: var(--tbp-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
-
-        /* 下拉選單修正 */
         .dropdown { position: absolute; top: 50px; right: 0; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; z-index: 500; min-width: 150px; border: 1px solid #eee; }
         .dropdown button { width: 100%; padding: 12px 20px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f4f4f4; font-size: 14px; }
-        .dropdown button:hover { background-color: #f9f9f9; }
-
         main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; }
         #chat-history { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 8px; }
-        
         .msg-row { display: flex; width: 100%; margin: 4px 0; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .user-row { justify-content: flex-end; }
         .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-
-        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
-        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
-        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
-
-        .summary-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .summary-card, .balance-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); cursor: pointer; }
         .summary-header { font-size: 0.9rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .battery-container { margin: 15px 0; }
         .battery-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .battery-label { font-size: 1rem; color: #333; font-weight: 500; }
         .battery-val { font-size: 2rem; font-weight: bold; }
         .progress-bg { width: 100%; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 5px; }
-        
         .analysis-capsule { display: flex; align-items: center; padding: 12px 15px; border-radius: 16px; margin-top: 10px; font-size: 0.88rem; line-height: 1.5; }
         .capsule-best { background-color: #f0f8f9; color: #4a5a61; border: 1px solid #e0eff1; }
         .capsule-worst { background-color: #fff6f4; color: #6e524d; border: 1px solid #ffe8e3; }
         .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
-        .icon-smile { color: #a0afb7; }
-        .icon-frown { color: #ffb4a3; }
-
+        .radar-svg { width: 100%; height: auto; }
+        .radar-label { font-size: 11px; fill: #888; font-weight: 500; }
+        .radar-result-text { font-size: 1rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
         .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
+        .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -104,6 +92,8 @@
         </div>
     </div>
 
+    <div id="zoom-overlay" class="hidden" onclick="closeZoom()"><div id="zoom-container" onclick="event.stopPropagation()"></div></div>
+
     <div id="app-container" class="hidden">
         <header>
             <div class="logo-text">Soosyn Health Companion</div>
@@ -116,9 +106,7 @@
                 </div>
             </div>
         </header>
-
         <main id="main-area"><div id="chat-history"></div></main>
-
         <div class="footer-input">
             <div class="input-box">
                 <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
@@ -133,16 +121,9 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentSerial = "";
-    let isNamingPhase = false, isWaitingForAbnormality = false;
-    let tempScore = null;
+    let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
 
-    // 配置區
-    const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
-    const CTA_PHRASES = [
-        "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
-        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
-    ];
+    // 指標配置
     const FIELD_CONFIG = {
         'Battery_TST_min_A': 'Battery 總睡眠時間',
         'Battery_N3_pct_A': 'Battery N3',
@@ -150,7 +131,15 @@
         'Battery_HBI_A': 'Battery HBI',
         'Battery_HR_min_A': 'Battery 最低脈搏'
     };
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡", "N3深睡比例", "rMSSD ", "放鬆恢復", "rMSSD放鬆恢復", "最低脈搏", "睡眠最低脈搏", "HBI ", "缺氧負荷", "HBI缺氧負荷", "黃金修復", "標準修復", "精神負荷", "高身心壓力", "過度疲憊", "修復不足", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "N3 深睡", "N3 深睡比例", "rMSSD 放鬆恢復", "HBI 缺氧負荷", "REM 快速動眼期"];
+    // 比較用指標 (5項)
+    const COMPARISON_FIELDS = Object.keys(FIELD_CONFIG);
+    const END_QUESTION = "😊 今天還有想進一步了解的健康資訊嗎？";
+    const CTA_PHRASES = [
+        "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
+        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
+    ];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡比例", "rMSSD", "放鬆恢復", "最低脈搏", "HBI", "缺氧負荷", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -167,15 +156,12 @@
         document.getElementById('app-container').classList.remove('hidden');
         document.getElementById('display-name').innerText = name;
         document.getElementById('avatar-char').innerText = name.charAt(0);
-        
         if (!aiName) {
             isNamingPhase = true;
             await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
         } else {
             const todayStr = new Date().toISOString().split('T')[0];
-            const hasSeenSummary = localStorage.getItem(`last_summary_${currentSerial}`) === todayStr;
-
-            if (!hasSeenSummary) {
+            if (localStorage.getItem(`last_summary_${currentSerial}`) !== todayStr) {
                 await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
                 appendStatusOptions();
             } else {
@@ -186,53 +172,30 @@
         }
     }
 
-    async function appendAiMessage(text) {
-        const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now();
-        history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
-        scrollToBottom();
-        await new Promise(r => setTimeout(r, 800));
-        const typingElem = document.getElementById(typingId);
-        if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>');
-        scrollToBottom();
-    }
-
-    function appendStatusOptions() {
-        const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
-        let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
-        options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
-        document.getElementById('chat-history').innerHTML += html + '</div></div>';
-        scrollToBottom();
-    }
-
-    async function handleStatusSelection(text, score) {
-        document.getElementById('status-options-container')?.remove();
-        appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true;
-        await appendAiMessage("今天生理狀態是否有自覺異常的地方呢？ 🤔 (若無請輸入「無」)");
-    }
-
     async function sendMessage() {
         const input = document.getElementById('user-input'), msg = input.value.trim();
         if (!msg) return; 
         input.value = ''; 
         appendUserMessage(msg);
 
-        const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
-        if (matchedKeyword) {
-            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
-            if (data) {
-                await appendAiMessage(data.detailed_content);
-                await new Promise(r => setTimeout(r, 600));
-                await appendAiMessage(END_QUESTION);
-                return;
-            }
+        if (msg.includes("平衡度") || msg.includes("生理電量平衡度")) {
+            await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
+            showDateActions('balance');
+            return;
         }
-
-        if (isWaitingForAbnormality) { 
-            isWaitingForAbnormality = false; 
-            await handleAbnormalityInput(msg); 
+        if (msg.includes("健康摘要")) { 
+            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); 
+            showDateActions('summary'); 
             return; 
         }
 
+        const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
+        if (matchedKeyword) {
+            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
+            if (data) { await appendAiMessage(data.detailed_content); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); return; }
+        }
+
+        if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
         if (isNamingPhase) {
             await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
             isNamingPhase = false; 
@@ -240,29 +203,40 @@
             showSummaryFlow(true); 
             return;
         }
-
-        if (msg.includes("健康摘要")) { 
-            await appendAiMessage("請問你想查看哪一天的健康摘要呢？ 📅"); 
-            showDateActions(); 
-            return; 
-        }
         
         const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-        if (dateMatch) {
-            processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
-        } else {
-            await appendAiMessage("收到你的訊息！正在努力學習更好地協助你。 ✨");
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(END_QUESTION);
-        }
+        if (dateMatch) processSummarySearch(`${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`);
+        else { await appendAiMessage("收到！正在學習更好地協助你。 ✨"); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); }
     }
 
-    async function handleAbnormalityInput(msg) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg });
-        localStorage.setItem(`last_summary_${currentSerial}`, todayStr);
-        await appendAiMessage("收到了！一起來看看健康摘要吧！ ✨");
-        showSummaryFlow(true);
+    // --- 核心邏輯：摘要比較與建議 (修正版) ---
+    async function fetchSummaryData(targetDate) {
+        const { data: healths } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(2);
+        if (!healths?.length) return null;
+
+        const current = healths[0], raw = current.raw_json;
+        let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
+        
+        if (healths[1]) {
+            let maxInc = -Infinity, maxDec = Infinity;
+            COMPARISON_FIELDS.forEach(k => {
+                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
+                if (diff > maxInc) { maxInc = diff; bestKey = k; }
+                if (diff < maxDec) { maxDec = diff; worstKey = k; } // 找出減少最多的
+            });
+        }
+
+        const randomIdx = Math.floor(Math.random() * 3) + 1; // 隨機 1-3
+        const logicKeys = [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${randomIdx}`];
+        const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', logicKeys);
+        const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
+
+        return { 
+            date: current.record_date.replace(/-/g, '/'), battery: raw.Personal_Battery_weighted_round || 0, light: feedback?.status_light || '--', 
+            bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
+            worstText: phrases?.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
+            flowSuggestion: phrases?.find(p => p.logic_key.includes('最差') && p.logic_key.match(/\d$/))?.detailed_content // 這裡存隨機建議
+        };
     }
 
     async function showSummaryFlow(isFirstTime = false) { 
@@ -271,123 +245,89 @@
             appendSummaryCard(data);
             if (isFirstTime && data.flowSuggestion) {
                 await new Promise(r => setTimeout(r, 1000));
-                await appendAiMessage(data.flowSuggestion);
+                await appendAiMessage(data.flowSuggestion); // 顯示隨機建議
                 await new Promise(r => setTimeout(r, 800));
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-            } else {
-                await new Promise(r => setTimeout(r, 600));
-                await appendAiMessage(END_QUESTION);
-            }
+            } else { await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); }
         }
     }
 
-    async function fetchSummaryData(targetDate) {
-        const { data: healths } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).lte('record_date', targetDate).order('record_date', { ascending: false }).limit(2);
-        if (!healths?.length) return null;
+    // --- 核心邏輯：雷達圖平衡度 (新增) ---
+    function appendBalanceCard(data) {
+        const raw = data.raw_json;
+        const indicators = [
+            { label: '修復時間', val: raw.Battery_TST_min_A || 0 },
+            { label: '核心修復', val: raw.Battery_N3_pct_A || 0 },
+            { label: '放鬆指數', val: raw.Battery_rMSSD_A || 0 },
+            { label: '脈搏穩定度', val: raw.Battery_HR_min_A || 0 },
+            { label: '血氧穩定度', val: raw.Battery_HBI_A || 0 },
+            { label: '睡眠連續性', val: raw.Battery_wake_minutes_A || 0 },
+            { label: '睡眠規律性', val: raw.Battery_OnsetDev_min_A || 0 }
+        ];
+        const lowCount = indicators.filter(i => i.val < 60).length;
+        const resultText = lowCount > 3 ? "低平衡度" : indicators.every(i => i.val >= 60) ? "高平衡度" : "中平衡度";
+        const center = 150, radiusOuter = 90, radiusInner = 50;
+        const points = indicators.map((ind, i) => {
+            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
+            let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
+            r = Math.min(r, radiusOuter + 5);
+            const color = ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
+            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 25) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
+        });
 
-        const current = healths[0], raw = current.raw_json;
-        let bestKey = 'Battery_TST_min_A', worstKey = 'Battery_TST_min_A';
-        
-        if (healths[1]) {
-            let maxInc = -Infinity, maxDec = Infinity;
-            Object.keys(FIELD_CONFIG).forEach(k => {
-                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
-                if (diff > maxInc) { maxInc = diff; bestKey = k; }
-                if (diff < maxDec) { maxDec = diff; worstKey = k; }
-            });
-        }
-
-        const { data: phrases } = await _supabase.from('phrase_library').select('logic_key, detailed_content').in('logic_key', [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${Math.floor(Math.random()*3)+1}`]);
-        const { data: feedback } = await _supabase.from('daily_feedback').select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
-
-        return { 
-            date: current.record_date.replace(/-/g, '/'), 
-            battery: raw.Personal_Battery_weighted_round || 0, 
-            light: feedback?.status_light || '--', 
-            bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
-            worstText: phrases?.find(p => p.logic_key.endsWith('最差'))?.detailed_content || "這部分可留意。",
-            flowSuggestion: phrases?.find(p => p.logic_key.match(/最差\d/))?.detailed_content || "健康是累積的成果。"
-        };
-    }
-
-    function appendSummaryCard(data) {
-      
-        const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
-
-        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
-        
-        document.getElementById('chat-history').innerHTML += `
+        const cardHtml = `
             <div class="msg-row ai-row">
-                <div class="summary-card">
-                    <div class="summary-header">
-                        <span>📅 ${data.date} 健康摘要</span>
-                        <span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span>
-                    </div>
-                    <div class="battery-container">
-                        <div class="battery-meta">
-                            <span class="battery-label">生理電量</span>
-                            <span class="battery-val" style="color:${colors}">${data.battery}</span>
-                        </div>
-                        <div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div></div>
-                    </div>
-                    <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
-                    <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
+                <div class="balance-card" onclick="zoomChart(this)">
+                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
+                    <svg viewBox="0 0 300 320" class="radar-svg">
+                        <circle cx="150" cy="150" r="${radiusOuter}" fill="#f2f2f2" /><circle cx="150" cy="150" r="${radiusInner}" fill="#e6e6e6" /><circle cx="150" cy="150" r="30" fill="white" />
+                        ${indicators.map((_, i) => `<line x1="150" y1="150" x2="${center + radiusOuter * Math.cos((Math.PI * 2 * i / 7) - (Math.PI / 2))}" y2="${center + radiusOuter * Math.sin((Math.PI * 2 * i / 7) - (Math.PI / 2))}" stroke="white" stroke-width="1.5" />`).join('')}
+                        ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${p.color}" /><text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle">${indicators[i].label}</text>`).join('')}
+                        <text x="150" y="155" class="radar-result-text">${resultText}</text>
+                    </svg>
                 </div>
             </div>`;
+        document.getElementById('chat-history').innerHTML += cardHtml; scrollToBottom();
+    }
+
+    // 其他輔助函數
+    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("查無數據喔 😅"); }
+    async function processSummarySearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 摘要...`); const data = await fetchSummaryData(d); if (data) { appendSummaryCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(END_QUESTION); } else await appendAiMessage("查無數據喔 😅"); }
+    function showDateActions(type) {
+        const today = new Date().toISOString().split('T')[0], yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
+        const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row date-actions"><div class="quick-actions"><button class="action-btn" onclick="${callback}('${today}')">今天</button><button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button></div></div>`;
         scrollToBottom();
     }
-
-    function showDateActions() {
-        const today = new Date().toISOString().split('T')[0];
-        const yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
-        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row date-actions"><div class="quick-actions"><button class="action-btn" onclick="processSummarySearch('${today}')">今天</button><button class="action-btn" onclick="processSummarySearch('${yesterday}')">昨天</button></div></div>`;
-        scrollToBottom();
+    function appendSummaryCard(data) {
+        const colors = data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+        const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
+        document.getElementById('chat-history').innerHTML += `
+            <div class="msg-row ai-row"><div class="summary-card" onclick="zoomChart(this)">
+                <div class="summary-header"><span>📅 ${data.date} 健康摘要</span><span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span></div>
+                <div class="battery-container"><div class="battery-meta"><span>生理電量</span><span class="battery-val" style="color:${colors}">${data.battery}</span></div><div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div></div></div>
+                <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
+                <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
+            </div></div>`; scrollToBottom();
     }
-
-    async function processSummarySearch(targetDate) {
-        document.querySelector('.date-actions')?.remove();
-        await appendAiMessage(`正在查詢 ${targetDate}...`);
-        const data = await fetchSummaryData(targetDate);
-        if (data) {
-            appendSummaryCard(data);
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(END_QUESTION);
-        } else {
-            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(END_QUESTION);
-        }
+    function appendStatusOptions() {
+        const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
+        let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
+        options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
+        document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
-
-    function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
+    async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天生理狀態有自覺異常嗎？ 🤔 (無請輸「無」)"); }
+    async function handleAbnormalityInput(msg) { const todayStr = new Date().toISOString().split('T')[0]; await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg }); localStorage.setItem(`last_summary_${currentSerial}`, todayStr); await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); showSummaryFlow(true); }
+    function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
+    function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
+    async function appendAiMessage(text) { const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; scrollToBottom(); await new Promise(r => setTimeout(r, 800)); const typingElem = document.getElementById(typingId); if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>'); scrollToBottom(); }
     function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
-    
-    // 修正下拉選單顯示
-    function toggleDropdown(e) { 
-        const menu = document.getElementById('settings-menu');
-        menu.classList.toggle('hidden');
-    }
-
-    function logout(e) { e?.stopPropagation(); location.reload(); }
-    function openPwModal(e) { e?.stopPropagation(); document.getElementById('pw-overlay').classList.remove('hidden'); document.getElementById('settings-menu').classList.add('hidden'); }
+    function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
+    function logout() { location.reload(); }
+    function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-    
-    async function updatePassword() {
-        const oldP = document.getElementById('old-pw').value, newP = document.getElementById('new-pw').value;
-        if (!oldP || !newP) return alert("請輸入完整資料");
-        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', currentSerial).eq('password', oldP).single();
-        if(!data) return alert("舊密碼錯誤 😅");
-        await _supabase.from('user_credentials').update({ password: newP }).eq('serial_number', currentSerial);
-        alert("修改成功！ ✨"); closePwModal();
-    }
-
-    // 點擊外部關閉選單
-    window.onclick = function(event) {
-        if (!event.target.closest('.user-info')) {
-            document.getElementById('settings-menu').classList.add('hidden');
-        }
-    }
+    function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
 </script>
 </body>
 </html>
