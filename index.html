@@ -61,7 +61,18 @@
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
-    </style>
+    
+.balance-description {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #eee; /* 加一條虛線分隔線，不想要可刪除 */
+    font-size: 0.8rem;
+    color: #777;
+    line-height: 1.5;
+    text-align: justify;
+}
+
+</style>
 </head>
 <body>
 
@@ -272,7 +283,7 @@
             let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
             r = Math.min(r, radiusOuter + 5);
             const color = ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
-            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 25) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
+            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 30) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
         });
 
         const cardHtml = `
@@ -285,6 +296,10 @@
                         ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${p.color}" /><text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle">${indicators[i].label}</text>`).join('')}
                         <text x="150" y="155" class="radar-result-text">${resultText}</text>
                     </svg>
+
+<div class="balance-description">
+                    綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
+                </div>
                 </div>
             </div>`;
         document.getElementById('chat-history').innerHTML += cardHtml; scrollToBottom();
