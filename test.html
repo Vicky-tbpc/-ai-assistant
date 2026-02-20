@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n21</title>
+    <title>Soosyn 健康夥伴 n20-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -97,7 +97,7 @@
 .nav-btn.active { background: #8699a3; color: white; border-color: #8699a3; }
 
 /* 圖表區塊：改為上下佈局，有利於手機顯示 */
-.chart-item { margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #f9f9f9; }
+.chart-item { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #f9f9f9; }
 .chart-info-header { display: flex; flex-direction: column; margin-bottom: 8px; }
 .chart-title-row { display: flex; justify-content: space-between; align-items: baseline; }
 .chart-title { font-weight: bold; font-size: 14px; color: #444; }
@@ -113,7 +113,7 @@
 .bar-sample { width: 10px; height: 6px; border-radius: 2px; }
 
 /* 繪圖區與標籤對齊關鍵 */
-.chart-wrapper { position: relative; height: 180px; width: 100%; }
+.chart-wrapper { position: relative; height: 160px; width: 100%; }
 
 
 /* 標籤容器，確保它在電量數字上方有足夠間距 */
@@ -132,27 +132,6 @@
     font-weight: bold;
     display: inline-block;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* 增加陰影使其立體 */
-}
-
-
-/* 讓放大視窗內的內容可以滾動（如果圖表很多的話） */
-#zoom-container {
-    max-height: 85vh;
-    overflow-y: auto;
-    padding: 25px;
-}
-
-/* 放大視窗內的趨勢圖例微調 */
-#zoom-container .chart-legend {
-    margin-bottom: 10px;
-    justify-content: center;
-}
-
-#zoom-container .chart-title {
-    font-size: 16px;
-    display: block;
-    text-align: center;
-    margin-bottom: 5px;
 }
 
 
@@ -477,13 +456,12 @@ async function startTrendFlow(type, name) {
 
 async function renderTrendCard(type, days) {
     const cardId = `trend-${Date.now()}`;
-   const html = `
-    <div class="msg-row ai-row">
-        <div class="trend-card" id="${cardId}" onclick="zoomChart(this)" style="cursor: zoom-in;">
-            <div class="trend-header">
-                <span class="chart-title">📈 趨勢分析 (點擊放大)</span>
-                <div class="trend-nav" onclick="event.stopPropagation()">
-                        
+    const html = `
+        <div class="msg-row ai-row">
+            <div class="trend-card" id="${cardId}">
+                <div class="trend-header">
+                    <span class="chart-title">📈 趨勢分析</span>
+                    <div class="trend-nav">
                         <button class="nav-btn ${days===7?'active':''}" onclick="updateTrend('${cardId}', '${type}', 7)">7日</button>
                         <button class="nav-btn ${days===14?'active':''}" onclick="updateTrend('${cardId}', '${type}', 14)">14日</button>
                         <button class="nav-btn ${days===30?'active':''}" onclick="updateTrend('${cardId}', '${type}', 30)">30日</button>
@@ -593,7 +571,6 @@ function drawSingleChart(container, type, rawData) {
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
         </div>
         <div class="chart-wrapper"><canvas></canvas></div>
-     
     `;
 
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -648,7 +625,9 @@ function drawSingleChart(container, type, rawData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { right: 10 } }, // 確保右側不貼邊
+            layout: { padding: { top: 5,    // 減少頂部邊距
+            bottom: 0, // 將底部邊距設為 0
+            right: 10 } }, // 確保右側不貼邊
             plugins: { legend: { display: false } },
             scales: {
                 y: { 
@@ -836,51 +815,9 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
-    async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天生理狀態有自覺異常嗎？ 🤔 (無請輸「無」)"); }
+    async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天有覺得哪裡不舒服嗎？\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻過敏。\n\n如果一切正常，請幫我輸入「無」或「正常」唷！"); }
     async function handleAbnormalityInput(msg) { const todayStr = new Date().toISOString().split('T')[0]; await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg }); localStorage.setItem(`last_summary_${currentSerial}`, todayStr); await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); showSummaryFlow(true); }
-    
-function zoomChart(el) {
-    const zoomContainer = document.getElementById('zoom-container');
-    
-    // 先清空容器
-    zoomContainer.innerHTML = '';
-
-    // 檢查點擊的是否為趨勢圖卡片 (或包含 Canvas 的容器)
-    const canvases = el.querySelectorAll('canvas');
-    
-    if (canvases.length > 0) {
-        // 如果有 Canvas (趨勢圖)，將其轉換為圖片以供放大顯示
-        // 先複製標題等文字資訊
-        const header = el.querySelector('.trend-header') ? el.querySelector('.trend-header').outerHTML : '';
-        zoomContainer.innerHTML = header;
-
-        canvases.forEach(canvas => {
-            const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/png');
-            img.style.width = '100%';
-            img.style.marginBottom = '15px';
-            img.style.borderRadius = '8px';
-            
-            // 嘗試抓取該圖表的標題與圖例
-            const chartItem = canvas.closest('.chart-item');
-            if (chartItem) {
-                const info = chartItem.querySelector('.chart-info-header');
-                if (info) {
-                    const infoClone = info.cloneNode(true);
-                    zoomContainer.appendChild(infoClone);
-                }
-            }
-            zoomContainer.appendChild(img);
-        });
-    } else {
-        // 如果是普通的摘要卡片或平衡度，照舊處理
-        zoomContainer.innerHTML = el.innerHTML;
-    }
-
-    document.getElementById('zoom-overlay').classList.remove('hidden');
-}
-
-
+    function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; scrollToBottom(); await new Promise(r => setTimeout(r, 800)); const typingElem = document.getElementById(typingId); if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>'); scrollToBottom(); }
     function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
