@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n18-4</title>
+    <title>Soosyn 健康夥伴 n19</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --tbp-blue: #8699a3; 
@@ -79,6 +80,44 @@
     margin-top: -4px; /* 貼近上方的電量數值 */
 }
 
+
+
+/* 趨勢圖容器 */
+    .trend-card { 
+        background: #fff; border: 1px solid #eee; border-radius: 16px; 
+        width: 95%; max-width: 800px; padding: 15px; margin: 10px 0; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05); 
+    }
+    .trend-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .trend-nav { display: flex; gap: 5px; }
+    .nav-btn { 
+        padding: 4px 12px; border-radius: 15px; border: 1px solid #ccc; 
+        background: #fff; font-size: 12px; cursor: pointer; color: #666;
+    }
+    .nav-btn.active { background: #8699a3; color: white; border-color: #8699a3; }
+    
+    /* 圖表區塊布局 */
+    .chart-item { position: relative; margin-bottom: 30px; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; }
+    .chart-container-row { display: flex; align-items: flex-start; gap: 10px; }
+    .chart-main { flex: 1; height: 200px; }
+    
+    /* 右側圖例 */
+    .chart-legend { width: 110px; font-size: 11px; color: #888; display: flex; flex-direction: column; gap: 5px; padding-top: 20px; }
+    .legend-row { display: flex; align-items: center; gap: 5px; }
+    .dot-sample { width: 8px; height: 8px; border-radius: 50%; }
+    .bar-sample { width: 12px; height: 8px; }
+
+    /* 下方 Tag 樣式 */
+    .tag-row { display: flex; margin-top: 5px; padding-left: 35px; overflow-x: hidden; }
+    .daily-tag-capsule {
+        padding: 2px 8px; border-radius: 10px; font-size: 10px; white-space: nowrap;
+        background: #8699a3; color: white; margin-right: 2px;
+    }
+    .unit-text { font-size: 11px; color: #aaa; margin-top: -5px; margin-bottom: 5px; }
+    .chart-title { font-weight: bold; font-size: 14px; color: #555; }
+
+
+
 </style>
 </head>
 <body>
@@ -152,8 +191,8 @@
     // 比較用指標 (5項)
     const COMPARISON_FIELDS = Object.keys(FIELD_CONFIG);
     const END_QUESTIONS = [
-    "😊 今天還有想進一步了解的健康資訊嗎？趨勢圖表、還是健康摘要呢？",
-    "關於健康資訊，還有哪部分想了解的嗎？😊",
+    "😊 還有想進一步了解的健康資訊嗎？趨勢圖表、還是健康摘要呢？",
+    "關於健康資訊，還有哪部分想了解的呢？😊",
     "✨ 還有其他想了解的指標或建議嗎？我隨時都在喔！",
     "希望這些資訊對你有幫助！還有想查看其他的健康資訊或健康摘要嗎？🌿"
 ];
@@ -162,13 +201,13 @@ function getRandomEndQuestion() {
     return END_QUESTIONS[Math.floor(Math.random() * END_QUESTIONS.length)];
 }
     const CTA_PHRASES = [
-        "🌱 保持健康是每天的小累積💪，還想先了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "健康是每天最好的投資！🌿 除了剛剛的數據，你還想了解生理狀態、趨勢圖表，或是生理電量平衡度嗎？",
-        "我會與你一起建立好習慣！✨ 現在想先從哪個部分開始了解？生理狀態、趨勢圖，還是平衡度？",
-        "🌟 維持健康的好習慣很重要！今天想先查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
+        "健康是每天最好的投資！🌿 除了剛剛的數據，你還想了解生理狀態、趨勢圖表，或是生理電量平衡度呢？",
+        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解？生理狀態、趨勢圖，還是平衡度？",
+        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡比例", "rMSSD", "放鬆恢復", "最低脈搏", "HBI", "缺氧負荷", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？", "rmssd", "n3", "hbi"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡比例", "rMSSD", "放鬆恢復", "最低脈搏", "HBI", "缺氧負荷", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？", "rmssd", "n3", "hbi", "綠燈", "紅燈", "黃燈", "黃紅燈", "rMSSD放鬆恢復", "HBI缺氧負荷", "rMSSD 放鬆恢復", "HBI 缺氧負荷", "N3 深睡比例", "N3深睡", "睡眠最低脈搏", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "N3 深睡", "REM 快速動眼期"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -237,6 +276,15 @@ async function sendMessage() {
         }
         return;
     }
+
+
+
+if (msg.includes("趨勢")) {
+    await appendAiMessage("想查看哪一種趨勢圖表呢？ ✨");
+    appendTrendOptions();
+    return;
+}
+
 
     // 3. 百科關鍵字匹配 (例如：輸入「什麼是平衡度？」或「rMSSD」)
     const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
@@ -363,6 +411,218 @@ async function showSummaryFlow(isFirstTime = false) {
 
 
 
+// --- 趨勢圖專用函數庫 ---
+
+function appendTrendOptions() {
+    const options = [
+        { name: "📊 完整圖表", type: "all" },
+        { name: "🔋 生理電量", type: "battery" },
+        { name: "😴 N3 深睡比例", type: "n3" },
+        { name: "🧘 rMSSD 放鬆恢復", type: "rmssd" },
+        { name: "💓 睡眠最低脈搏", type: "hrmin" },
+        { name: "☁️ HBI 缺氧負荷", type: "hbi" }
+    ];
+    let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
+    options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
+    document.getElementById('chat-history').innerHTML += html + '</div></div>';
+    scrollToBottom();
+}
+
+async function startTrendFlow(type, name) {
+    document.getElementById('trend-options-container')?.remove();
+    appendUserMessage(name);
+    await appendAiMessage(`正在準備你的 ${name}...`);
+    renderTrendCard(type, 7); // 預設顯示 7 日
+}
+
+async function renderTrendCard(type, days) {
+    const cardId = `trend-${Date.now()}`;
+    const html = `
+        <div class="msg-row ai-row">
+            <div class="trend-card" id="${cardId}">
+                <div class="trend-header">
+                    <span class="chart-title">📈 趨勢分析</span>
+                    <div class="trend-nav">
+                        <button class="nav-btn ${days===7?'active':''}" onclick="updateTrend('${cardId}', '${type}', 7)">7日</button>
+                        <button class="nav-btn ${days===14?'active':''}" onclick="updateTrend('${cardId}', '${type}', 14)">14日</button>
+                        <button class="nav-btn ${days===30?'active':''}" onclick="updateTrend('${cardId}', '${type}', 30)">30日</button>
+                    </div>
+                </div>
+                <div class="trend-content"></div>
+            </div>
+        </div>`;
+    document.getElementById('chat-history').innerHTML += html;
+    scrollToBottom();
+    updateTrend(cardId, type, days);
+}
+
+async function updateTrend(cardId, type, days) {
+    // 切換按鈕狀態
+    const card = document.getElementById(cardId);
+    card.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.remove('active');
+        if(b.innerText.includes(days)) b.classList.add('active');
+    });
+
+    // 抓取數據
+    const { data, error } = await _supabase.from('health_data')
+        .select('record_date, raw_json, Daily_Tag')
+        .eq('serial_number', currentSerial)
+        .order('record_date', { ascending: false })
+        .limit(days);
+
+    if (!data || data.length === 0) {
+        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+        return;
+    }
+
+    const sortedData = data.reverse();
+    const container = card.querySelector('.trend-content');
+    container.innerHTML = ''; // 清空
+
+    const typesToRender = type === 'all' ? ['battery', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
+    
+    for (const t of typesToRender) {
+        const chartBox = document.createElement('div');
+        chartBox.className = 'chart-item';
+        container.appendChild(chartBox);
+        drawSingleChart(chartBox, t, sortedData);
+    }
+}
+
+function drawSingleChart(container, type, rawData) {
+    const config = {
+        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75" },
+        n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75" },
+        rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75" },
+        hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75" },
+        hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75" }
+    }[type];
+
+    // 計算平均與區間
+    const labels = rawData.map(d => d.record_date.slice(5).replace('-', '/'));
+    const dailyValues = rawData.map(d => d.raw_json[config.field] || 0);
+    const movingAvgs = [];
+    const lowerBounds = []; // 用於範圍圖
+    const upperBounds = [];
+
+    dailyValues.forEach((val, i) => {
+        const start = Math.max(0, i - 6);
+        const chunk = dailyValues.slice(start, i + 1);
+        const avg = chunk.reduce((a, b) => a + b, 0) / chunk.length;
+        
+        if (type === 'rmssd') {
+            movingAvgs.push(parseFloat(avg.toFixed(1)));
+            lowerBounds.push(avg * 0.9);
+            upperBounds.push(avg * 1.1);
+        } else if (type === 'hrmin') {
+            movingAvgs.push(Math.round(avg));
+            lowerBounds.push(avg - 5);
+            upperBounds.push(avg + 5);
+        } else if (type === 'hbi') {
+            movingAvgs.push(parseFloat(avg.toFixed(1)));
+        } else {
+            movingAvgs.push(Math.round(avg));
+        }
+    });
+
+    // 處理異常點顏色
+    const pointColors = dailyValues.map((v, i) => {
+        const ma = movingAvgs[i];
+        if (type === 'battery' && v < ma) return '#ff8c73';
+        if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
+        if (type === 'rmssd' && v < lowerBounds[i]) return '#ff8c73';
+        if (type === 'hrmin' && v > upperBounds[i]) return '#ff8c73';
+        if (type === 'hbi' && v > ma) return '#ff8c73';
+        return config.color;
+    });
+
+    // 建立 HTML 結構
+    container.innerHTML = `
+        <div class="chart-title">${config.title}</div>
+        <div class="unit-text">${config.unit}</div>
+        <div class="chart-container-row">
+            <div class="chart-main"><canvas></canvas></div>
+            <div class="chart-legend">${renderLegend(type)}</div>
+        </div>
+        <div class="tag-row">${rawData.map(d => `
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+                ${d.Daily_Tag ? `<span class="daily-tag-capsule">${d.Daily_Tag}</span>` : ''}
+            </div>`).join('')}
+        </div>
+    `;
+
+    // 繪製圖表
+    const ctx = container.querySelector('canvas').getContext('2d');
+    const datasets = [
+        {
+            type: 'line',
+            label: '當日數值',
+            data: dailyValues,
+            borderColor: '#999999',
+            borderWidth: 1.5,
+            pointBackgroundColor: pointColors,
+            pointRadius: 4,
+            zIndex: 10
+        }
+    ];
+
+    // 如果是區間類型
+    if (type === 'rmssd' || type === 'hrmin') {
+        datasets.push({
+            type: 'bar',
+            label: '7日平均範圍',
+            data: rawData.map((_, i) => [lowerBounds[i], upperBounds[i]]),
+            backgroundColor: '#c1cdd3',
+            barPercentage: 0.6
+        });
+    } else {
+        datasets.push({
+            type: 'bar',
+            label: '7日平均',
+            data: movingAvgs,
+            backgroundColor: '#c1cdd3',
+            barPercentage: 0.6
+        });
+    }
+
+    new Chart(ctx, {
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: type !== 'hrmin', grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } },
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+}
+
+function renderLegend(type) {
+    const common = `
+        <div class="legend-row"><div class="dot-sample" style="background:#596b75"></div> 當日數值</div>
+        <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${(type==='rmssd'||type==='hrmin')?'範圍':''}</div>`;
+    const abnormal = {
+        battery: '低於個人平均',
+        n3: '低於個人平均/標準範圍',
+        rmssd: '低於個人平均範圍',
+        hrmin: '高於個人平均範圍',
+        hbi: '高於個人平均'
+    }[type];
+    const std = type === 'n3' ? `<div class="legend-row"><div class="bar-sample" style="border:1px dashed #ccc"></div> 標準參考範圍</div>` : '';
+    
+    return `${common}${std}<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormal}</div>`;
+}
+
+
+
+
+
+
+
+
     // --- 核心邏輯：雷達圖平衡度 (新增) ---
     function appendBalanceCard(data) {
         const raw = data.raw_json;
@@ -416,7 +676,7 @@ async function showSummaryFlow(isFirstTime = false) {
 // --- 修改後的 processSummarySearch 函數 ---
 async function processSummarySearch(d) {
     document.querySelector('.date-actions')?.remove();
-    await appendAiMessage(`正在查詢 ${d} 摘要...`);
+    await appendAiMessage(`正在查詢 ${d} 健康摘要...`);
     
     const data = await fetchSummaryData(d);
     if (data) {
