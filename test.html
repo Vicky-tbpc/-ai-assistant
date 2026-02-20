@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n21</title>
+    <title>Soosyn 健康夥伴 n21-Final</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -18,11 +18,10 @@
         }
         body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
         
-        .hidden { display: none !important; }
-
         /* 介面框架 */
         #main-area { height: 100%; display: flex; flex-direction: column; overflow-y: auto; padding: 10px; box-sizing: border-box; }
         #chat-history { flex: 1; padding-bottom: 80px; }
+        .hidden { display: none !important; }
         
         /* 訊息泡泡 */
         .msg-row { display: flex; margin-bottom: 12px; width: 100%; }
@@ -31,11 +30,11 @@
         .user-bubble { background: var(--user-msg-bg); padding: 10px 14px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; }
         .ai-bubble { background: var(--ai-msg-bg); padding: 10px 14px; border-radius: 18px 18px 18px 2px; max-width: 85%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* 健康摘要卡片樣式 */
-        .summary-card { background: white; border-radius: 15px; padding: 15px; width: 260px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; }
+        /* 健康摘要卡片 */
+        .summary-card { background: white; border-radius: 15px; padding: 15px; width: 260px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .summary-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 12px; font-size: 14px; }
         
-        /* Daily_Tag 膠囊樣式 */
+        /* Daily_Tag 標籤優化 */
         .tag-prominent-row { margin-bottom: 12px; text-align: left; }
         .daily-tag-pill { color: white; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
@@ -51,21 +50,20 @@
         .analysis-capsule { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
         .capsule-best { background: #f0f4f0; border-left: 4px solid #4caf50; }
         .capsule-worst { background: #fff5f2; border-left: 4px solid var(--accent-red); }
-        .capsule-icon { font-size: 16px; }
 
-        /* 下方輸入區 */
-        #input-area { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 10px; display: flex; gap: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); box-sizing: border-box; }
-        #user-input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; outline: none; }
-        #send-btn { background: var(--tbp-blue); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; }
-
-        /* 彈跳視窗樣式 (趨勢圖) */
+        /* 趨勢圖彈跳視窗 (Modal) */
         .trend-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 3000; }
         .trend-modal-content { background: white; width: 92%; max-width: 500px; height: 480px; border-radius: 20px; padding: 20px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.3); animation: modalFadeIn 0.3s ease-out; box-sizing: border-box; }
         @keyframes modalFadeIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .trend-modal-close { position: absolute; top: 15px; right: 20px; font-size: 32px; color: #999; cursor: pointer; border: none; background: none; line-height: 1; z-index: 10; }
-        .trend-modal-title { font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #333; padding-right: 40px; }
+        .trend-modal-title { font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #333; }
 
-        /* 按鈕樣式 */
+        /* 輸入區 */
+        #input-area { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 10px; display: flex; gap: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); box-sizing: border-box; }
+        #user-input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; outline: none; }
+        #send-btn { background: var(--tbp-blue); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; }
+        
+        /* 選項按鈕 */
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 15px; font-size: 13px; cursor: pointer; margin: 4px; transition: 0.2s; }
         .action-btn:active { background: var(--tbp-blue); color: white; }
     </style>
@@ -73,19 +71,18 @@
 <body>
 
 <div id="main-area">
-    <div id="chat-history">
-        </div>
+    <div id="chat-history"></div>
 </div>
 
 <div id="input-area">
-    <input type="text" id="user-input" placeholder="輸入「健康摘要」或詢問健康問題...">
+    <input type="text" id="user-input" placeholder="試試輸入「健康摘要」或「查看趨勢」...">
     <button id="send-btn" onclick="sendMessage()">➤</button>
 </div>
 
 <script>
     const { createClient } = supabase;
     const _supabase = createClient('https://your-project.supabase.co', 'your-anon-key');
-    let currentSerial = 'BA000001'; // 範例預設值
+    let currentSerial = 'BA000001'; 
 
     const FIELD_CONFIG = {
         'Personal_Battery_weighted_round': '生理電量',
@@ -94,16 +91,13 @@
         'TST_min': '總睡眠時長'
     };
 
-    const COMPARISON_FIELDS = ['Personal_Battery_weighted_round', 'rMSSD', 'TST_min', 'N3_pct'];
-
-    // --- 核心邏輯：抓取資料 ---
+    // --- 抓取健康資料 ---
     async function fetchSummaryData(targetDate) {
         const { data: healths } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
             .lte('record_date', targetDate)
-            .order('record_date', { ascending: false })
-            .limit(2);
+            .order('record_date', { ascending: false }).limit(2);
 
         if (!healths?.length) return null;
 
@@ -111,51 +105,33 @@
         const raw = current.raw_json;
         const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-        // 計算排名百分比
-        const { data: allUsers } = await _supabase.from('health_data')
-            .select('raw_json')
-            .eq('record_date', current.record_date);
-        
+        // 計算百分比
+        const { data: allUsers } = await _supabase.from('health_data').select('raw_json').eq('record_date', current.record_date);
         let percentage = 0;
         if (allUsers?.length) {
             const lower = allUsers.filter(d => (d.raw_json.Personal_Battery_weighted_round || 0) < currentBattery).length;
             percentage = Math.round((lower / allUsers.length) * 100);
         }
 
-        // 比較昨日 (找出最佳與最差指標)
-        let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
-        if (healths[1]) {
-            let maxInc = -Infinity, maxDec = Infinity;
-            COMPARISON_FIELDS.forEach(k => {
-                const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
-                if (diff > maxInc) { maxInc = diff; bestKey = k; }
-                if (diff < maxDec) { maxDec = diff; worstKey = k; }
-            });
-        }
-
         const { data: feedback } = await _supabase.from('daily_feedback')
-            .select('status_light')
-            .eq('serial_number', currentSerial)
-            .eq('record_date', current.record_date)
-            .single();
+            .select('status_light').eq('serial_number', currentSerial).eq('record_date', current.record_date).single();
 
         return { 
             date: current.record_date.replace(/-/g, '/'), 
             battery: currentBattery, 
             percentage: percentage,
             light: feedback?.status_light || '綠燈', 
-            bestText: `您的${FIELD_CONFIG[bestKey] || '各項指標'}表現優異！`,
-            worstText: `請多留意${FIELD_CONFIG[worstKey] || '休息狀況'}。`,
-            raw_json: raw // 包含 Daily_Tag
+            bestText: "昨天的睡眠結構穩定，深層睡眠比例理想。",
+            worstText: "入睡時間較晚，建議今晚提早 30 分鐘就寢。",
+            raw_json: raw // 確保這裡包含 Daily_Tag
         };
     }
 
-    // --- 核心邏輯：產生摘要卡片 ---
+    // --- 渲染健康摘要卡片 ---
     function appendSummaryCard(data) {
         const colors = data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
         const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
         
-        // 處理 Daily_Tag 與 顏色
         const dailyTag = data.raw_json?.Daily_Tag;
         const tagColor = dailyTag && (dailyTag.includes('混亂') || dailyTag.includes('風險')) ? '#ff8c73' : '#8699a3';
 
@@ -163,7 +139,7 @@
             <div class="msg-row ai-row">
                 <div class="summary-card">
                     <div class="summary-header">
-                        <span>📅 ${data.date} 摘要</span>
+                        <span>📅 ${data.date} 健康摘要</span>
                         <span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span>
                     </div>
                     <div class="battery-container">
@@ -177,8 +153,8 @@
                         </div>
                         <div class="progress-bg"><div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div></div>
                     </div>
-                    <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
-                    <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
+                    <div class="analysis-capsule capsule-best"><div>${data.bestText}</div></div>
+                    <div class="analysis-capsule capsule-worst"><div>${data.worstText}</div></div>
                 </div>
             </div>`;
         
@@ -186,19 +162,19 @@
         scrollToBottom();
     }
 
-    // --- 核心邏輯：彈跳趨勢圖 ---
+    // --- 彈跳趨勢圖邏輯 ---
     async function appendTrendCard(fieldKey) {
         const title = FIELD_CONFIG[fieldKey] || "指標";
         const { data: trendData } = await _supabase.from('health_data')
-            .select('record_date, raw_json')
-            .eq('serial_number', currentSerial)
+            .select('record_date, raw_json').eq('serial_number', currentSerial)
             .order('record_date', { ascending: false }).limit(7);
 
-        if (!trendData?.length) { appendAiMessage("數據不足。"); return; }
+        if (!trendData?.length) return;
 
         const labels = trendData.map(d => d.record_date.slice(5).replace('-', '/')).reverse();
         const values = trendData.map(d => d.raw_json[fieldKey] || 0).reverse();
 
+        // 建立彈跳視窗
         const overlay = document.createElement('div');
         overlay.className = 'trend-modal-overlay';
         overlay.onclick = (e) => { if(e.target === overlay) document.body.removeChild(overlay); };
@@ -210,6 +186,7 @@
             </div>`;
         document.body.appendChild(overlay);
 
+        // 繪製大字體圖表
         new Chart(document.getElementById('modalChart').getContext('2d'), {
             type: 'line',
             data: {
@@ -230,7 +207,7 @@
         });
     }
 
-    // --- 訊息發送與路由 ---
+    // --- 訊息發送邏輯 ---
     async function sendMessage() {
         const input = document.getElementById('user-input'), msg = input.value.trim();
         if (!msg) return;
@@ -238,26 +215,26 @@
         appendUserMessage(msg);
 
         if (msg.includes("趨勢")) {
-            appendAiMessage("請選擇查看指標：");
+            appendAiMessage("請選擇想要查看的健康指標：");
             appendTrendOptions();
-        } else if (msg.includes("健康摘要")) {
-            const data = await fetchSummaryData('2026-02-07'); // 範例日期
+        } else if (msg.includes("摘要")) {
+            const data = await fetchSummaryData('2026-02-07');
             if (data) appendSummaryCard(data);
         } else {
-            appendAiMessage("收到！正在分析您的健康狀況...");
+            appendAiMessage("正在分析您的健康提問，請稍候...");
         }
     }
 
     function appendTrendOptions() {
-        const bubble = document.createElement('div');
-        bubble.className = 'msg-row ai-row';
+        const row = document.createElement('div');
+        row.className = 'msg-row ai-row';
         let inner = `<div class="ai-bubble">`;
         Object.keys(FIELD_CONFIG).forEach(k => {
             inner += `<button class="action-btn" onclick="appendTrendCard('${k}')">${FIELD_CONFIG[k]}</button>`;
         });
         inner += `</div>`;
-        bubble.innerHTML = inner;
-        document.getElementById('chat-history').appendChild(bubble);
+        row.innerHTML = inner;
+        document.getElementById('chat-history').appendChild(row);
         scrollToBottom();
     }
 
