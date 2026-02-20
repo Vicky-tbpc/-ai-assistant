@@ -456,20 +456,26 @@ async function renderTrendCard(type, days) {
     updateTrend(cardId, type, days);
 }
 
+
 async function updateTrend(cardId, type, days) {
-    // 切換按鈕狀態
     const card = document.getElementById(cardId);
     card.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.remove('active');
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 抓取數據
+    // 修正：移除查詢中的 Daily_Tag，因為它在 raw_json 裡面
     const { data, error } = await _supabase.from('health_data')
-        .select('record_date, raw_json, Daily_Tag')
+        .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
         .order('record_date', { ascending: false })
         .limit(days);
+
+    if (error) {
+        console.error("資料讀取錯誤:", error);
+        card.querySelector('.trend-content').innerHTML = "讀取失敗，請檢查控制台。";
+        return;
+    }
 
     if (!data || data.length === 0) {
         card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
@@ -478,7 +484,7 @@ async function updateTrend(cardId, type, days) {
 
     const sortedData = data.reverse();
     const container = card.querySelector('.trend-content');
-    container.innerHTML = ''; // 清空
+    container.innerHTML = ''; 
 
     const typesToRender = type === 'all' ? ['battery', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
     
@@ -489,6 +495,11 @@ async function updateTrend(cardId, type, days) {
         drawSingleChart(chartBox, t, sortedData);
     }
 }
+
+
+
+
+
 
 function drawSingleChart(container, type, rawData) {
     const config = {
@@ -538,19 +549,20 @@ function drawSingleChart(container, type, rawData) {
     });
 
     // 建立 HTML 結構
-    container.innerHTML = `
-        <div class="chart-title">${config.title}</div>
-        <div class="unit-text">${config.unit}</div>
-        <div class="chart-container-row">
-            <div class="chart-main"><canvas></canvas></div>
-            <div class="chart-legend">${renderLegend(type)}</div>
-        </div>
-        <div class="tag-row">${rawData.map(d => `
-            <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
-                ${d.Daily_Tag ? `<span class="daily-tag-capsule">${d.Daily_Tag}</span>` : ''}
-            </div>`).join('')}
-        </div>
-    `;
+// 請找到 drawSingleChart 函數內部的這段 HTML 生成程式碼並替換
+container.innerHTML = `
+    <div class="chart-title">${config.title}</div>
+    <div class="unit-text">${config.unit}</div>
+    <div class="chart-container-row">
+        <div class="chart-main"><canvas></canvas></div>
+        <div class="chart-legend">${renderLegend(type)}</div>
+    </div>
+    <div class="tag-row">${rawData.map(d => `
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+            ${d.raw_json.Daily_Tag ? `<span class="daily-tag-capsule">${d.raw_json.Daily_Tag}</span>` : ''}
+        </div>`).join('')}
+    </div>
+`;
 
     // 繪製圖表
     const ctx = container.querySelector('canvas').getContext('2d');
