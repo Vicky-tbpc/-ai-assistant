@@ -782,7 +782,9 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                 <div class="battery-container">
                     ${dailyTag ? `
                         <div class="tag-prominent-row">
-                            <span class="daily-tag-pill">${dailyTag}</span>
+                            <span class="daily-tag-pill" style="background-color: ${tagColor};">
+                                ${dailyTag}
+                            </span>
                         </div>
                     ` : ''}
                     
