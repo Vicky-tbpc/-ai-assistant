@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n23</title>
+    <title>Soosyn 健康夥伴 n23-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -159,6 +159,41 @@
     font-weight: bold;
     display: inline-block;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* 增加陰影使其立體 */
+}
+
+
+/* 膠囊按鈕容器 */
+.trend-actions {
+    display: flex;
+    justify-content: center;
+    gap: 15px;         /* 增加按鈕之間的間距 */
+    margin-bottom: 20px;
+}
+
+/* 膠囊按鈕本人 */
+.trend-btn {
+    padding: 10px 24px;  /* 增加內距，讓按鈕變胖變長 */
+    border-radius: 25px; /* 維持膠囊圓角 */
+    border: 1.5px solid var(--tbp-blue);
+    background: white;
+    color: var(--tbp-blue);
+    font-size: 16px;     /* 字體從原本的 12-14px 加大到 16px */
+    font-weight: 600;    /* 字體加粗 */
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+/* 點選後的狀態 */
+.trend-btn.active {
+    background: var(--tbp-blue);
+    color: white;
+    box-shadow: 0 4px 10px rgba(134, 153, 163, 0.3); /* 增加一點陰影感 */
+}
+
+/* 滑鼠移上去的效果 (桌機版很重要) */
+.trend-btn:hover {
+    background: var(--tbp-light-blue);
+    transform: translateY(-2px); /* 輕微浮起感 */
 }
 
 
@@ -541,20 +576,18 @@ async function startTrendFlow(type, name) {
 
 async function renderTrendCard(type, days) {
     const cardId = `trend-${Date.now()}`;
-    const html = `
+const html = `
         <div class="msg-row ai-row">
-            <div class="trend-card" id="${cardId}">
-                <div class="trend-header">
-                    <span class="chart-title">📈 趨勢分析</span>
-                    <div class="trend-nav">
-                        <button class="nav-btn ${days===7?'active':''}" onclick="updateTrend('${cardId}', '${type}', 7)">7日</button>
-                        <button class="nav-btn ${days===14?'active':''}" onclick="updateTrend('${cardId}', '${type}', 14)">14日</button>
-                        <button class="nav-btn ${days===30?'active':''}" onclick="updateTrend('${cardId}', '${type}', 30)">30日</button>
-                    </div>
+            <div class="trend-card">
+                <div class="chart-title">📈 選擇查詢區間</div>
+                <div class="trend-actions">
+                    <button class="trend-btn" onclick="processTrendSearch(7, this)">7日</button>
+                    <button class="trend-btn" onclick="processTrendSearch(14, this)">14日</button>
+                    <button class="trend-btn" onclick="processTrendSearch(30, this)">30日</button>
                 </div>
-                <div class="trend-content"></div>
             </div>
-        </div>`;
+        </div>
+    `;
     document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
     updateTrend(cardId, type, days);
