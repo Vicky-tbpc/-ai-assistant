@@ -261,57 +261,54 @@ function getRandomEndQuestion() {
     
 
 // --- 修改後的 sendMessage 函數 ---
+// --- 修改後的 sendMessage 函數 ---
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
     input.value = ''; 
     appendUserMessage(msg);
 
-    // --- A. 日期提取工具 ---
-    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
-
-    // --- B. 關鍵字定義 (包含你要求的所有對應關係) ---
-    const keywordConfigs = [
-        { regex: /睡眠/, field: 'Battery_TST_min_A', logicPrefix: 'Battery 總睡眠時間', titleKey: '總睡眠時間' },
-        { regex: /n3|深睡/i, field: 'Battery_N3_pct_A', logicPrefix: 'Battery N3', titleKey: 'N3' },
-        { regex: /rmssd|放鬆恢復/i, field: 'Battery_rMSSD_A', logicPrefix: 'Battery rMSSD', titleKey: 'rMSSD' },
-        { regex: /hbi|缺氧負荷/i, field: 'Battery_HBI_A', logicPrefix: 'Battery HBI', titleKey: 'HBI' },
-        { regex: /最低脈搏/, field: 'Battery_HR_min_A', logicPrefix: 'Battery 最低脈搏', titleKey: '最低脈搏' }
+    // --- A. 定義健康指標關鍵字配置 ---
+    const healthConfigs = [
+        { regex: /睡眠/, field: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間' },
+        { regex: /n3|深睡/i, field: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3' },
+        { regex: /rmssd|放鬆恢復/i, field: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD' },
+        { regex: /hbi|缺氧負荷/i, field: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI' },
+        { regex: /最低脈搏/, field: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏' }
     ];
 
-    // 檢測是否命中上述關鍵字
-    const matchedKeyword = keywordConfigs.find(k => k.regex.test(msg));
+    const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
 
-    // 1. 處理健康摘要
+    // 1. 處理健康指標特定分析 (您要求的新功能)
+    if (matchedConfig) {
+        await processHealthKeyword(matchedConfig);
+        return;
+    }
+
+    // --- 以下為原有功能邏輯 ---
+    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
+    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
+
     if (msg.includes("健康摘要")) {
         if (formattedDate) processSummarySearch(formattedDate);
         else { await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); showDateActions('summary'); }
         return; 
     }
 
-    // 2. 處理平衡度 (排除科普詢問)
-    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
     if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isAskingDefinition) {
         if (formattedDate) processBalanceSearch(formattedDate);
         else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
         return;
     }
 
-    // 3. 處理趨勢圖
     if (msg.includes("趨勢")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
         appendTrendOptions();
         return;
     }
 
-    // 4. 處理「特定指標」比較分析 (新增功能)
-    if (matchedKeyword) {
-        await processKeywordSearch(matchedKeyword);
-        return;
-    }
-
-    // 5. 百科關鍵字匹配
+    // 百科關鍵字
     const wikiKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
     if (wikiKeyword) {
         const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', wikiKeyword).limit(1).single();
@@ -323,7 +320,6 @@ async function sendMessage() {
         }
     }
 
-    // 6. 其他流程
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
     if (isNamingPhase) {
         await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
@@ -342,55 +338,58 @@ async function sendMessage() {
     }
 }
 
-// --- 新增：關鍵字指標比較與建議邏輯 ---
-async function processKeywordSearch(config) {
-    // 1. 抓取當天與前一天的數據
-    const { data: healths } = await _supabase.from('health_data')
-        .select('raw_json')
+// --- 新增：處理健康指標關鍵字比對函數 ---
+async function processHealthKeyword(config) {
+    // 1. 取得今天與昨天的日期字串 (依照使用者電腦/手機目前的日期)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+    // 2. 抓取這兩天的資料
+    const { data: records } = await _supabase.from('health_data')
+        .select('record_date, raw_json')
         .eq('serial_number', currentSerial)
-        .order('record_date', { ascending: false })
-        .limit(2);
+        .in('record_date', [todayStr, yesterdayStr]);
 
-    let queryKey = "";
-    let useTitle = false;
+    const todayData = records?.find(r => r.record_date === todayStr);
+    const yesterdayData = records?.find(r => r.record_date === yesterdayStr);
 
-    // 檢查是否有數據與具體欄位
-    const currentVal = healths?.[0]?.raw_json[config.field];
-    const prevVal = healths?.[1]?.raw_json[config.field];
+    let finalContent = "";
 
-    if (currentVal === undefined || currentVal === null) {
-        // 若無數值，抓取標題 (title)
-        queryKey = config.titleKey;
-        useTitle = true;
+    // 3. 判斷數值邏輯
+    if (!todayData || todayData.raw_json[config.field] === undefined || todayData.raw_json[config.field] === null) {
+        // 若當天沒數值 -> 抓取 title
+        const { data } = await _supabase.from('phrase_library')
+            .select('detailed_content')
+            .eq('title', config.fallbackTitle)
+            .limit(1).single();
+        finalContent = data?.detailed_content || `目前沒有關於${config.fallbackTitle}的詳細資料。`;
     } else {
-        // 若有數值，進行比較 (排除無前一天數據的情況，若無前一天則預設最佳)
-        const randomIdx = Math.floor(Math.random() * 3) + 1;
-        let status = "最佳"; 
+        // 若有數值 -> 進行比較
+        const todayVal = todayData.raw_json[config.field];
+        const yesterdayVal = yesterdayData ? yesterdayData.raw_json[config.field] : null;
         
-        if (prevVal !== undefined && prevVal !== null) {
-            if (currentVal < prevVal) status = "最差";
-            else if (currentVal > prevVal) status = "最佳";
+        const randomNum = Math.floor(Math.random() * 3) + 1; // 隨機 1, 2, 3
+        let status = "最佳"; // 預設為最佳 (若無昨天資料也視為最佳)
+
+        if (yesterdayVal !== null) {
+            if (todayVal < yesterdayVal) status = "最差";
+            else status = "最佳";
         }
-        queryKey = `${config.logicPrefix}${status}${randomIdx}`;
+
+        const targetLogicKey = `${config.prefix}${status}${randomNum}`;
+        
+        const { data } = await _supabase.from('phrase_library')
+            .select('detailed_content')
+            .eq('logic_key', targetLogicKey)
+            .limit(1).single();
+            
+        finalContent = data?.detailed_content || `目前的數值比昨天${status === '最佳' ? '進步' : '退步'}，繼續加油！`;
     }
 
-    // 2. 從 phrase_library 查詢對應內容
-    const query = _supabase.from('phrase_library').select('detailed_content');
-    if (useTitle) {
-        query.eq('title', queryKey);
-    } else {
-        query.eq('logic_key', queryKey);
-    }
-
-    const { data: phrase, error } = await query.limit(1).single();
-
-    if (phrase) {
-        await appendAiMessage(phrase.detailed_content);
-    } else {
-        await appendAiMessage("關於這項指標，目前還沒有相關的詳細分析唷。");
-    }
-
-    // 3. 結束後隨機提問
+    // 4. 呈現內容並詢問結尾
+    await appendAiMessage(finalContent);
     await new Promise(r => setTimeout(r, 800));
     await appendAiMessage(getRandomEndQuestion());
 }
