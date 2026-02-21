@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n22</title>
+    <title>Soosyn 健康夥伴 n22-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -38,7 +38,17 @@
         .user-bubble { background: var(--user-msg-bg); color: #000; padding: 10px 15px; border-radius: 18px 18px 2px 18px; max-width: 80%; line-height: 1.5; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .ai-row { justify-content: flex-start; }
         .ai-bubble { background: var(--ai-msg-bg); color: var(--text-dark); padding: 10px 15px; border-radius: 18px 18px 18px 2px; max-width: 80%; line-height: 1.5; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .summary-card, .balance-card { background: #fff; border: 1px solid #eee; border-radius: 16px; width: 300px; padding: 20px; margin: 10px 0; box-shadow: 0 10px 20px rgba(0,0,0,0.05); cursor: pointer; }
+
+.summary-card, .balance-card { 
+    background: #fff; border: 1px solid #eee; border-radius: 16px; 
+    width: 95%;           /* 在小螢幕時佔比 */
+    max-width: 450px;     /* 在大螢幕時的最大寬度，從 300 提升到 450 */
+    padding: 20px; 
+    margin: 15px auto;    /* 居中顯示 */
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05); 
+    cursor: pointer; 
+}
+
         .summary-header { font-size: 0.9rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .battery-container { margin: 15px 0; }
         .battery-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -717,7 +727,7 @@ function renderLegend(type, abnormalLabel) {
 
 
 // --- 核心邏輯：雷達圖平衡度 (修正版：最大化圓圈尺寸) ---
-    function appendBalanceCard(data) {
+   function appendBalanceCard(data) {
         const raw = data.raw_json;
         const indicators = [
             { label: '修復時間', val: raw.Battery_TST_min_A || 0 },
@@ -732,20 +742,15 @@ function renderLegend(type, abnormalLabel) {
         const lowCount = indicators.filter(i => i.val < 60).length;
         const resultText = lowCount > 3 ? "低平衡度" : indicators.every(i => i.val >= 60) ? "高平衡度" : "中平衡度";
         
-        // --- 雷達圖參數設定 (再次加大半徑與畫布) ---
-        const viewSize = 460;   // 畫布總尺寸
-        const centerX = 230;    // 置中 X (viewSize / 2)
-        const centerY = 230;    // 置中 Y
-        
-        const radiusMin = 45;   // 數值 0 的起始位置 (原本 35)
-        const radiusMid = 95;   // 數值 60 的圓圈位置 (原本 65)
-        const radiusMax = 150;  // 數值 100 的最大圓圈 (原本 105)
+        const centerX = 230;
+        const centerY = 230;
+        const radiusMin = 45; 
+        const radiusMid = 95; 
+        const radiusMax = 150;
 
         const points = indicators.map((ind, i) => {
             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
             let r;
-            
-            // 計算半徑映射
             if (ind.val < 60) {
                 r = radiusMin + (ind.val / 60) * (radiusMid - radiusMin);
             } else {
@@ -753,16 +758,14 @@ function renderLegend(type, abnormalLabel) {
             }
 
             const color = ind.val >= 95 ? "#596b75" : ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
-            
-            // 標籤位置調整：距離外圓更遠一些，避免大圓擠壓文字
-            const labelDist = radiusMax + 55;
+            const labelDist = radiusMax + 65; // 再往外推一點點
             
             return { 
                 x: centerX + r * Math.cos(angle), 
                 y: centerY + r * Math.sin(angle), 
                 color, 
                 labelX: centerX + labelDist * Math.cos(angle), 
-                labelY: centerY + (labelDist - 10) * Math.sin(angle) 
+                labelY: centerY + (labelDist - 5) * Math.sin(angle) 
             };
         });
 
@@ -770,7 +773,7 @@ function renderLegend(type, abnormalLabel) {
             <div class="msg-row ai-row">
                 <div class="balance-card" onclick="zoomChart(this)">
                     <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
-                    <svg viewBox="-50 0 560 460" class="radar-svg" style="width: 100%; height: auto; max-width: 350px; margin: 0 auto; display: block;">
+                    <svg viewBox="-70 0 600 460" class="radar-svg" style="width: 100%; height: auto; display: block;">
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMax}" fill="#f2f2f2" />
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMid}" fill="#e6e6e6" />
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMin}" fill="white" />
@@ -786,14 +789,14 @@ function renderLegend(type, abnormalLabel) {
                             <circle cx="${p.x}" cy="${p.y}" r="7" fill="${p.color}" stroke="white" stroke-width="1.5" />
                             <text x="${p.labelX}" y="${p.labelY}" class="radar-label" 
                                   text-anchor="middle" dominant-baseline="middle" 
-                                  style="font-size: 15px; font-weight: 500; fill: #555;">${indicators[i].label}</text>
+                                  style="font-size: 17px; font-weight: 600; fill: #333;">${indicators[i].label}</text>
                         `).join('')}
                         
-                        <text x="${centerX}" y="${centerY + 5}" class="radar-result-text" text-anchor="middle" style="font-size: 18px; font-weight: bold;">${resultText}</text>
+                        <text x="${centerX}" y="${centerY + 5}" class="radar-result-text" text-anchor="middle" style="font-size: 20px; font-weight: bold; fill: #444;">${resultText}</text>
                     </svg>
 
                     <div class="balance-description">
-                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
+                        綜合七大項指標評估當天的生理平衡狀態。
                     </div>
                 </div>
             </div>`;
