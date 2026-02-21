@@ -113,6 +113,7 @@
 .chart-item { margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #f9f9f9; }
 .chart-info-header { display: flex; flex-direction: column; margin-bottom: 8px; }
 .chart-title-row { display: flex; justify-content: space-between; align-items: baseline; }
+/* 3. 放大標題、單位與圖例字體 */
 .chart-title { 
     font-weight: bold; 
     font-size: 18px;     /* 從 14px 增加到 18px */
@@ -123,6 +124,7 @@
     font-size: 13px;     /* 從 10px 增加到 13px */
     color: #999; 
 }
+
 /* 圖例調整：橫向排列，平衡視覺 */
 .chart-legend { 
     display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; 
@@ -131,10 +133,8 @@
     border-top: 1px dashed #eee; padding-top: 8px;
 }
 .legend-row { display: flex; align-items: center; gap: 3px; }
-/* 調整圖例的小圓點與長條圖示 */
 .dot-sample { width: 10px; height: 10px; border-radius: 50%; } /* 從 6px 增加到 10px */
 .bar-sample { width: 16px; height: 8px; border-radius: 2px; }  /* 加大一點 */
-
 /* 2. 增加圖表高度，讓電腦上看更有份量 */
 .chart-wrapper { 
     position: relative; 
@@ -709,29 +709,24 @@ function drawSingleChart(container, type, rawData) {
         plugins: [n3BackgroundPlugin],
         data: { labels, datasets },
         options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: { padding: { right: 10 } },
-    plugins: { legend: { display: false } },
-    scales: {
-        y: { 
-            // 放大 Y 軸刻度
-            afterFit: (scale) => { scale.width = 45; }, // 寬度稍微拉開一點，容納較大文字
-            beginAtZero: type !== 'hrmin',
-            grid: { color: '#f2f2f2' },
-            ticks: { 
-                font: { size: 12 },    // 從 9 增加到 12
-                color: '#888'          // 顏色調深
-            }
-        },
-        x: { 
-            grid: { display: false },
-            ticks: { 
-                font: { size: 12 },    // 從 9 增加到 12
-                color: '#888'          // 顏色調深
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { right: 10 } }, // 確保右側不貼邊
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { 
+                    afterFit: (scale) => { scale.width = 45; }, // 固定 Y 軸寬度以便與下方 Tag 對齊
+                    beginAtZero: type !== 'hrmin',
+                    grid: { color: '#f2f2f2' },
+                    ticks: { font: { size: 2 }, color: '#888' }
+                },
+                x: { 
+                    grid: { display: false },
+                    ticks: { font: { size: 12 }, color: '#888' }
+                }
             }
         }
-    }
+    });
 }
 
 function renderLegend(type, abnormalLabel) {
