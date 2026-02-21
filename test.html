@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n21</title>
+    <title>Soosyn 健康夥伴 n22</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -260,7 +260,7 @@ function getRandomEndQuestion() {
 
     
 
-// --- 修改後的 sendMessage 函數 ---
+
 // --- 修改後的 sendMessage 函數 ---
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
@@ -643,7 +643,7 @@ function drawSingleChart(container, type, rawData) {
             const yStart = y.getPixelForValue(20);
             const yEnd = y.getPixelForValue(10);
             ctx.save();
-            ctx.fillStyle = '#e0eff1'; // 指定的標準參考範圍底色
+            ctx.fillStyle = '#f0f8f9'; // 指定的標準參考範圍底色
             ctx.fillRect(left, yStart, width, yEnd - yStart);
             ctx.restore();
         }
@@ -709,24 +709,14 @@ function renderLegend(type, abnormalLabel) {
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
     if (type === 'n3') {
-        html += `<div class="legend-row"><div class="bar-sample" style="background:#e0eff1; border:1px solid #ddd"></div> 標準參考(10-20)</div>`;
+        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 標準參考(10-20)</div>`;
     }
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
 }
 
 
-
-
-
-
-
-
-
-
-
-
-    // --- 核心邏輯：雷達圖平衡度 (新增) ---
+// --- 核心邏輯：雷達圖平衡度 (修正版：起始值偏移，不使用區域填滿) ---
     function appendBalanceCard(data) {
         const raw = data.raw_json;
         const indicators = [
@@ -738,15 +728,35 @@ function renderLegend(type, abnormalLabel) {
             { label: '睡眠連續性', val: raw.Battery_wake_minutes_A || 0 },
             { label: '睡眠規律性', val: raw.Battery_OnsetDev_min_A || 0 }
         ];
+
         const lowCount = indicators.filter(i => i.val < 60).length;
         const resultText = lowCount > 3 ? "低平衡度" : indicators.every(i => i.val >= 60) ? "高平衡度" : "中平衡度";
-        const center = 150, radiusOuter = 90, radiusInner = 50;
+        
+        // --- 雷達圖參數設定 ---
+        const center = 150;
+        const radiusMin = 35;   // 數值為 0 時的起始半徑 (達成不從圓心開始)
+        const radiusMid = 65;   // 數值為 60 時的半徑 (內圓界線)
+        const radiusMax = 105;  // 數值為 100 時的半徑 (外圓界線)
+
         const points = indicators.map((ind, i) => {
             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
-            let r = ind.val < 60 ? (ind.val / 60) * radiusInner : radiusInner + ((ind.val - 60) / 40) * (radiusOuter - radiusInner);
-            r = Math.min(r, radiusOuter + 2);
+            let r;
+            
+            // 計算半徑映射：0~60 映射到 radiusMin~radiusMid，60~100 映射到 radiusMid~radiusMax
+            if (ind.val < 60) {
+                r = radiusMin + (ind.val / 60) * (radiusMid - radiusMin);
+            } else {
+                r = radiusMid + ((Math.min(ind.val, 100) - 60) / 40) * (radiusMax - radiusMid);
+            }
+
             const color = ind.val >= 95 ? "#596b75" : ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
-            return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), color, labelX: center + (radiusOuter + 35) * Math.cos(angle), labelY: center + (radiusOuter + 25) * Math.sin(angle) };
+            return { 
+                x: center + r * Math.cos(angle), 
+                y: center + r * Math.sin(angle), 
+                color, 
+                labelX: center + (radiusMax + 25) * Math.cos(angle), 
+                labelY: center + (radiusMax + 20) * Math.sin(angle) 
+            };
         });
 
         const cardHtml = `
@@ -754,18 +764,32 @@ function renderLegend(type, abnormalLabel) {
                 <div class="balance-card" onclick="zoomChart(this)">
                     <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
                     <svg viewBox="0 0 300 320" class="radar-svg">
-                        <circle cx="150" cy="150" r="${radiusOuter}" fill="#f2f2f2" /><circle cx="150" cy="150" r="${radiusInner}" fill="#e6e6e6" /><circle cx="150" cy="150" r="30" fill="white" />
-                        ${indicators.map((_, i) => `<line x1="150" y1="150" x2="${center + radiusOuter * Math.cos((Math.PI * 2 * i / 7) - (Math.PI / 2))}" y2="${center + radiusOuter * Math.sin((Math.PI * 2 * i / 7) - (Math.PI / 2))}" stroke="white" stroke-width="1.5" />`).join('')}
-                        ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${p.color}" /><text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle">${indicators[i].label}</text>`).join('')}
+                        <circle cx="150" cy="150" r="${radiusMax}" fill="#f2f2f2" />
+                        <circle cx="150" cy="150" r="${radiusMid}" fill="#e6e6e6" />
+                        <circle cx="150" cy="150" r="${radiusMin}" fill="white" />
+                        
+                        ${indicators.map((_, i) => {
+                            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
+                            return `<line x1="${center + radiusMin * Math.cos(angle)}" y1="${center + radiusMin * Math.sin(angle)}" 
+                                          x2="${center + radiusMax * Math.cos(angle)}" y2="${center + radiusMax * Math.sin(angle)}" 
+                                          stroke="white" stroke-width="1.5" />`;
+                        }).join('')}
+                        
+                        ${points.map((p, i) => `
+                            <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${p.color}" stroke="white" stroke-width="1" />
+                            <text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${indicators[i].label}</text>
+                        `).join('')}
+                        
                         <text x="150" y="155" class="radar-result-text">${resultText}</text>
                     </svg>
 
-<div class="balance-description">
-                    綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
-                </div>
+                    <div class="balance-description">
+                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規規性，七大項指標評估當天的生理平衡狀態。
+                    </div>
                 </div>
             </div>`;
-        document.getElementById('chat-history').innerHTML += cardHtml; scrollToBottom();
+        document.getElementById('chat-history').innerHTML += cardHtml; 
+        scrollToBottom();
     }
 
     // 其他輔助函數
