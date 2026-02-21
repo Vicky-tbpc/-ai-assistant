@@ -104,9 +104,16 @@
 }
 
 .trend-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+/* 尋找並修改這個區塊 */
 .nav-btn { 
-    padding: 3px 10px; border-radius: 12px; border: 1px solid #ddd; 
-    background: #fff; font-size: 11px; cursor: pointer; color: #777;
+    padding: 6px 15px;      /* 增加內距，讓按鈕變寬變高（原本是 3px 10px） */
+    border-radius: 15px;    /* 配合變大的按鈕增加圓角弧度（原本是 12px） */
+    border: 1px solid #ddd; 
+    background: #fff; 
+    font-size: 14px;        /* 調大字體大小（原本是 11px，建議改為 14px 或更高） */
+    cursor: pointer; 
+    color: #777;
+    font-weight: 500;       /* 增加一點字體重量，更易於閱讀 */
 }
 .nav-btn.active { background: #8699a3; color: white; border-color: #8699a3; }
 
