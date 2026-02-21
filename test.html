@@ -716,7 +716,7 @@ function renderLegend(type, abnormalLabel) {
 }
 
 
-// --- 核心邏輯：雷達圖平衡度 (修正版：起始值偏移，不使用區域填滿) ---
+// --- 核心邏輯：雷達圖平衡度 (修正版：加大畫布避免文字裁切) ---
     function appendBalanceCard(data) {
         const raw = data.raw_json;
         const indicators = [
@@ -732,17 +732,18 @@ function renderLegend(type, abnormalLabel) {
         const lowCount = indicators.filter(i => i.val < 60).length;
         const resultText = lowCount > 3 ? "低平衡度" : indicators.every(i => i.val >= 60) ? "高平衡度" : "中平衡度";
         
-        // --- 雷達圖參數設定 ---
-        const center = 150;
-        const radiusMin = 35;   // 數值為 0 時的起始半徑 (達成不從圓心開始)
-        const radiusMid = 65;   // 數值為 60 時的半徑 (內圓界線)
-        const radiusMax = 105;  // 數值為 100 時的半徑 (外圓界線)
+        // --- 雷達圖參數設定 (加大畫布) ---
+        const centerX = 200;    // 中心點 X 移至 200 (原本 150)
+        const centerY = 190;    // 中心點 Y 移至 190 (原本 150)
+        const radiusMin = 35;   // 數值為 0 時的起始半徑
+        const radiusMid = 65;   // 數值為 60 時的半徑
+        const radiusMax = 105;  // 數值為 100 時的半徑
 
         const points = indicators.map((ind, i) => {
             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
             let r;
             
-            // 計算半徑映射：0~60 映射到 radiusMin~radiusMid，60~100 映射到 radiusMid~radiusMax
+            // 計算半徑映射
             if (ind.val < 60) {
                 r = radiusMin + (ind.val / 60) * (radiusMid - radiusMin);
             } else {
@@ -751,11 +752,12 @@ function renderLegend(type, abnormalLabel) {
 
             const color = ind.val >= 95 ? "#596b75" : ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
             return { 
-                x: center + r * Math.cos(angle), 
-                y: center + r * Math.sin(angle), 
+                x: centerX + r * Math.cos(angle), 
+                y: centerY + r * Math.sin(angle), 
                 color, 
-                labelX: center + (radiusMax + 25) * Math.cos(angle), 
-                labelY: center + (radiusMax + 20) * Math.sin(angle) 
+                // 指標文字位置：距離最大圓再加 40 像素，避免擠壓
+                labelX: centerX + (radiusMax + 40) * Math.cos(angle), 
+                labelY: centerY + (radiusMax + 30) * Math.sin(angle) 
             };
         });
 
@@ -763,35 +765,36 @@ function renderLegend(type, abnormalLabel) {
             <div class="msg-row ai-row">
                 <div class="balance-card" onclick="zoomChart(this)">
                     <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
-                    <svg viewBox="0 0 300 320" class="radar-svg">
-                        <circle cx="150" cy="150" r="${radiusMax}" fill="#f2f2f2" />
-                        <circle cx="150" cy="150" r="${radiusMid}" fill="#e6e6e6" />
-                        <circle cx="150" cy="150" r="${radiusMin}" fill="white" />
+                    <svg viewBox="0 0 400 400" class="radar-svg" style="width: 100%; height: auto;">
+                        <circle cx="${centerX}" cy="${centerY}" r="${radiusMax}" fill="#f2f2f2" />
+                        <circle cx="${centerX}" cy="${centerY}" r="${radiusMid}" fill="#e6e6e6" />
+                        <circle cx="${centerX}" cy="${centerY}" r="${radiusMin}" fill="white" />
                         
                         ${indicators.map((_, i) => {
                             const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
-                            return `<line x1="${center + radiusMin * Math.cos(angle)}" y1="${center + radiusMin * Math.sin(angle)}" 
-                                          x2="${center + radiusMax * Math.cos(angle)}" y2="${center + radiusMax * Math.sin(angle)}" 
+                            return `<line x1="${centerX + radiusMin * Math.cos(angle)}" y1="${centerY + radiusMin * Math.sin(angle)}" 
+                                          x2="${centerX + radiusMax * Math.cos(angle)}" y2="${centerY + radiusMax * Math.sin(angle)}" 
                                           stroke="white" stroke-width="1.5" />`;
                         }).join('')}
                         
                         ${points.map((p, i) => `
                             <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${p.color}" stroke="white" stroke-width="1" />
-                            <text x="${p.labelX}" y="${p.labelY}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${indicators[i].label}</text>
+                            <text x="${p.labelX}" y="${p.labelY}" class="radar-label" 
+                                  text-anchor="middle" dominant-baseline="middle" 
+                                  style="font-size: 14px; fill: #666;">${indicators[i].label}</text>
                         `).join('')}
                         
-                        <text x="150" y="155" class="radar-result-text">${resultText}</text>
+                        <text x="${centerX}" y="${centerY + 5}" class="radar-result-text" text-anchor="middle">${resultText}</text>
                     </svg>
 
                     <div class="balance-description">
-                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規規性，七大項指標評估當天的生理平衡狀態。
+                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
                     </div>
                 </div>
             </div>`;
         document.getElementById('chat-history').innerHTML += cardHtml; 
         scrollToBottom();
     }
-
     // 其他輔助函數
     async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
 } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
