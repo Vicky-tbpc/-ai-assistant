@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n23</title>
+    <title>Soosyn 健康夥伴 n24</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -170,6 +170,24 @@
 }
 
 
+
+/* 新增：生理狀態燈號圓點樣式 */
+.status-dot {
+    display: inline-block;
+    width: 10px;           /* 圓點寬度 */
+    height: 10px;          /* 圓點高度 */
+    border-radius: 50%;    /* 變成正圓 */
+    margin-right: 6px;     /* 與文字的間距 */
+    vertical-align: middle; /* 垂直置中對齊文字 */
+    margin-top: -2px;      /* 針對中文字體微調視覺高度 */
+}
+
+
+/* 確保父層容器垂直對齊 */
+.summary-header span {
+    display: flex;
+    align-items: center;
+}
 
 </style>
 </head>
@@ -897,7 +915,10 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
             <div class="summary-card" onclick="zoomChart(this)">
                 <div class="summary-header">
                     <span>📅 ${data.date} 健康摘要</span>
-                    <span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span>
+                   <span style="color:${lightMap[data.light] || '#ccc'}; display: flex; align-items: center;">
+    <span class="status-dot" style="background-color:${lightMap[data.light] || '#ccc'}"></span>
+    ${data.light}
+</span>
                 </div>
                 
                 <div class="battery-container">
