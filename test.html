@@ -783,7 +783,7 @@ function renderLegend(type, abnormalLabel) {
                         }).join('')}
                         
                         ${points.map((p, i) => `
-                            <circle cx="${p.x}" cy="${p.y}" r="5" fill="${p.color}" stroke="white" stroke-width="1.5" />
+                            <circle cx="${p.x}" cy="${p.y}" r="7" fill="${p.color}" stroke="white" stroke-width="1" />
                             <text x="${p.labelX}" y="${p.labelY}" class="radar-label" 
                                   text-anchor="middle" dominant-baseline="middle" 
                                   style="font-size: 15px; font-weight: 500; fill: #555;">${indicators[i].label}</text>
