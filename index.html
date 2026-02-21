@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n20</title>
+    <title>Soosyn 健康夥伴 n21</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -222,10 +222,10 @@ function getRandomEndQuestion() {
         "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n生理狀態、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
         "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解生理狀態、趨勢圖表，或是生理電量平衡度呢？",
-        "我會與你一起建立好習慣！✨\n現在想從哪個部分開始了解？\n生理狀態、趨勢圖，還是平衡度？",
-        "🌟 維持健康的好習慣很重要！\n想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
+        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解？\n生理狀態、趨勢圖，還是平衡度？",
+        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "總睡眠時間", "N3", "N3深睡比例", "rMSSD", "放鬆恢復", "最低脈搏", "HBI", "缺氧負荷", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？", "rmssd", "n3", "hbi", "綠燈", "紅燈", "黃燈", "黃紅燈", "rMSSD放鬆恢復", "HBI缺氧負荷", "rMSSD 放鬆恢復", "HBI 缺氧負荷", "N3 深睡比例", "N3深睡", "睡眠最低脈搏", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "N3 深睡", "REM 快速動眼期"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -260,63 +260,66 @@ function getRandomEndQuestion() {
 
     
 
+// --- 修改後的 sendMessage 函數 ---
+// --- 修改後的 sendMessage 函數 ---
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
     input.value = ''; 
     appendUserMessage(msg);
 
-    // --- A. 日期提取工具 (預先提取，支援多種格式) ---
-    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
+    // --- A. 定義健康指標關鍵字配置 ---
+    const healthConfigs = [
+        { regex: /睡眠/, field: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間' },
+        { regex: /n3|深睡/i, field: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3' },
+        { regex: /rmssd|放鬆恢復/i, field: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD' },
+        { regex: /hbi|缺氧負荷/i, field: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI' },
+        { regex: /最低脈搏/, field: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏' }
+    ];
 
-    // --- B. 判斷是否為科普詢問 (排除定義、說明、問號) ---
-    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
+    const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
 
-    // 1. 處理「健康摘要」關鍵字 (支援帶日期的組合輸入)
-    if (msg.includes("健康摘要")) {
-        if (formattedDate) {
-            processSummarySearch(formattedDate);
-        } else {
-            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); 
-            showDateActions('summary'); 
-        }
-        return; 
-    }
-
-    // 2. 處理「平衡度」相關關鍵字 (僅在不是詢問定義的情況下進入數據查詢)
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isAskingDefinition) {
-        if (formattedDate) {
-            processBalanceSearch(formattedDate);
-        } else {
-            await appendAiMessage("想查看哪一天的生理電量平衡度呢？ 📅");
-            showDateActions('balance');
-        }
+    // 1. 處理健康指標特定分析 (您要求的新功能)
+    if (matchedConfig) {
+        await processHealthKeyword(matchedConfig);
         return;
     }
 
+    // --- 以下為原有功能邏輯 ---
+    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
+    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
 
+    if (msg.includes("健康摘要")) {
+        if (formattedDate) processSummarySearch(formattedDate);
+        else { await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); showDateActions('summary'); }
+        return; 
+    }
 
-if (msg.includes("趨勢")) {
-    await appendAiMessage("想查看哪一種趨勢圖表呢？ ✨");
-    appendTrendOptions();
-    return;
-}
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isAskingDefinition) {
+        if (formattedDate) processBalanceSearch(formattedDate);
+        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        return;
+    }
 
+    if (msg.includes("趨勢")) {
+        await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
+        appendTrendOptions();
+        return;
+    }
 
-    // 3. 百科關鍵字匹配 (例如：輸入「什麼是平衡度？」或「rMSSD」)
-    const matchedKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
-    if (matchedKeyword) {
-        const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', matchedKeyword).limit(1).single();
+    // 百科關鍵字
+    const wikiKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
+    if (wikiKeyword) {
+        const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', wikiKeyword).limit(1).single();
         if (data) { 
             await appendAiMessage(data.detailed_content); 
             await new Promise(r => setTimeout(r, 600)); 
             await appendAiMessage(getRandomEndQuestion()); 
-        return;
+            return;
         }
     }
 
-    // 4. 特殊流程判定 (自覺異常輸入、命名階段)
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
     if (isNamingPhase) {
         await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
@@ -326,14 +329,69 @@ if (msg.includes("趨勢")) {
         return;
     }
     
-    // 5. 純日期格式匹配 (使用者只傳日期如 "2025/02/19")
     if (formattedDate) {
         processSummarySearch(formattedDate);
     } else {
         await appendAiMessage("收到！正在學習更好地協助你。 ✨");
         await new Promise(r => setTimeout(r, 600));
-        await appendAiMessage(END_QUESTION);
+        await appendAiMessage(getRandomEndQuestion());
     }
+}
+
+// --- 新增：處理健康指標關鍵字比對函數 ---
+async function processHealthKeyword(config) {
+    // 1. 取得今天與昨天的日期字串 (依照使用者電腦/手機目前的日期)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+    // 2. 抓取這兩天的資料
+    const { data: records } = await _supabase.from('health_data')
+        .select('record_date, raw_json')
+        .eq('serial_number', currentSerial)
+        .in('record_date', [todayStr, yesterdayStr]);
+
+    const todayData = records?.find(r => r.record_date === todayStr);
+    const yesterdayData = records?.find(r => r.record_date === yesterdayStr);
+
+    let finalContent = "";
+
+    // 3. 判斷數值邏輯
+    if (!todayData || todayData.raw_json[config.field] === undefined || todayData.raw_json[config.field] === null) {
+        // 若當天沒數值 -> 抓取 title
+        const { data } = await _supabase.from('phrase_library')
+            .select('detailed_content')
+            .eq('title', config.fallbackTitle)
+            .limit(1).single();
+        finalContent = data?.detailed_content || `目前沒有關於${config.fallbackTitle}的詳細資料。`;
+    } else {
+        // 若有數值 -> 進行比較
+        const todayVal = todayData.raw_json[config.field];
+        const yesterdayVal = yesterdayData ? yesterdayData.raw_json[config.field] : null;
+        
+        const randomNum = Math.floor(Math.random() * 3) + 1; // 隨機 1, 2, 3
+        let status = "最佳"; // 預設為最佳 (若無昨天資料也視為最佳)
+
+        if (yesterdayVal !== null) {
+            if (todayVal < yesterdayVal) status = "最差";
+            else status = "最佳";
+        }
+
+        const targetLogicKey = `${config.prefix}${status}${randomNum}`;
+        
+        const { data } = await _supabase.from('phrase_library')
+            .select('detailed_content')
+            .eq('logic_key', targetLogicKey)
+            .limit(1).single();
+            
+        finalContent = data?.detailed_content || `目前的數值比昨天${status === '最佳' ? '進步' : '退步'}，繼續加油！`;
+    }
+
+    // 4. 呈現內容並詢問結尾
+    await appendAiMessage(finalContent);
+    await new Promise(r => setTimeout(r, 800));
+    await appendAiMessage(getRandomEndQuestion());
 }
 
 
@@ -585,7 +643,7 @@ function drawSingleChart(container, type, rawData) {
             const yStart = y.getPixelForValue(20);
             const yEnd = y.getPixelForValue(10);
             ctx.save();
-            ctx.fillStyle = '#f5f1eb'; // 指定的標準參考範圍底色
+            ctx.fillStyle = '#f0f8f9'; // 指定的標準參考範圍底色
             ctx.fillRect(left, yStart, width, yEnd - yStart);
             ctx.restore();
         }
@@ -651,7 +709,7 @@ function renderLegend(type, abnormalLabel) {
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
     if (type === 'n3') {
-        html += `<div class="legend-row"><div class="bar-sample" style="background:#f5f1eb; border:1px solid #ddd"></div> 標準參考(10-20)</div>`;
+        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 標準參考(10-20)</div>`;
     }
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
