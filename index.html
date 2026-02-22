@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n24</title>
+    <title>Soosyn 健康夥伴 n25</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -291,25 +291,44 @@ function getRandomEndQuestion() {
         } else alert("驗證失敗 😅");
     }
 
-    async function initApp(name, aiName) {
-        document.getElementById('app-container').classList.remove('hidden');
-        document.getElementById('display-name').innerText = name;
-        document.getElementById('avatar-char').innerText = name.charAt(0);
-        if (!aiName) {
-            isNamingPhase = true;
-            await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
+ 
+
+
+
+
+
+// --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
+async function initApp(name, aiName) {
+    document.getElementById('app-container').classList.remove('hidden');
+    document.getElementById('display-name').innerText = name;
+    document.getElementById('avatar-char').innerText = name.charAt(0);
+
+    if (!aiName) {
+        isNamingPhase = true;
+        await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
+    } else {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // 【核心修改】：從資料庫檢查當天是否已經填過問卷，而不是檢查 localStorage
+        const { data: existingSurvey } = await _supabase
+            .from('user_daily_surveys')
+            .select('record_date')
+            .eq('serial_number', currentSerial)
+            .eq('record_date', todayStr)
+            .maybeSingle(); // 檢查當天有無資料
+
+        if (!existingSurvey) {
+            // 如果資料庫沒資料，才顯示問卷
+            await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
+            appendStatusOptions();
         } else {
-            const todayStr = new Date().toISOString().split('T')[0];
-            if (localStorage.getItem(`last_summary_${currentSerial}`) !== todayStr) {
-                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
-                appendStatusOptions();
-            } else {
-                await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
-                await new Promise(r => setTimeout(r, 600));
-                await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-            }
+            // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
+            await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
+}
 
     
 
