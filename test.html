@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n23</title>
+    <title>Soosyn 健康夥伴 n26</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -55,7 +55,7 @@
         .battery-val { font-size: 2rem; font-weight: bold; }
         .progress-bg { width: 100%; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 5px; }
-        .analysis-capsule { display: flex; align-items: center; padding: 12px 15px; border-radius: 16px; margin-top: 10px; font-size: 0.88rem; line-height: 1.5; }
+        .analysis-capsule { display: flex; align-items: center; padding: 12px 15px; border-radius: 16px; margin-top: 10px; font-size: 1rem; line-height: 1.5; }
         .capsule-best { background-color: #f0f8f9; color: #4a5a61; border: 1px solid #e0eff1; }
         .capsule-worst { background-color: #fff6f4; color: #6e524d; border: 1px solid #ffe8e3; }
         .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
@@ -104,9 +104,16 @@
 }
 
 .trend-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+/* 尋找並修改這個區塊 */
 .nav-btn { 
-    padding: 3px 10px; border-radius: 12px; border: 1px solid #ddd; 
-    background: #fff; font-size: 11px; cursor: pointer; color: #777;
+    padding: 6px 15px;      /* 增加內距，讓按鈕變寬變高（原本是 3px 10px） */
+    border-radius: 15px;    /* 配合變大的按鈕增加圓角弧度（原本是 12px） */
+    border: 1px solid #ddd; 
+    background: #fff; 
+    font-size: 14px;        /* 調大字體大小（原本是 11px，建議改為 14px 或更高） */
+    cursor: pointer; 
+    color: #777;
+    font-weight: 500;       /* 增加一點字體重量，更易於閱讀 */
 }
 .nav-btn.active { background: #8699a3; color: white; border-color: #8699a3; }
 
@@ -114,15 +121,20 @@
 .chart-item { margin-bottom: 25px; padding-bottom: 10px; border-bottom: 1px solid #f9f9f9; }
 .chart-info-header { display: flex; flex-direction: column; margin-bottom: 8px; }
 .chart-title-row { display: flex; justify-content: space-between; align-items: baseline; }
-/* 3. 調大標題與圖例字體 */
+/* 3. 趨勢圖標題 */
 .chart-title { 
     font-weight: bold; 
     font-size: 18px; /* 從 14px 調大 */
     color: #444; 
 }
-.unit-text { font-size: 10px; color: #999; }
+/* 趨勢圖單位字體 */
+.unit-text { 
+    font-size: 12px; /* 從 10px 調大，建議改為 12px 或 13px */
+    color: #999; 
+    margin-left: 5px; /* 可視需求增加一點與標題的間距 */
+}
 
-/* 圖例調整：橫向排列，平衡視覺 */
+/* 趨勢圖圖例字體調整：橫向排列，平衡視覺 */
 .chart-legend { 
     display: flex; flex-wrap: wrap; gap: 12px; margin-top: 5px; 
     font-size: 12px; color: #888; border-top: 1px dashed #eee; padding-top: 8px;
@@ -142,19 +154,37 @@
 /* 標籤容器，確保它在電量數字上方有足夠間距 */
 .tag-prominent-row {
     margin-bottom: 12px;
-    text-align: left;
+    text-align: right;
 }
 
-/* 強化版的膠囊樣式 */
+/* 強化版的daily tag膠囊樣式 */
 .daily-tag-pill {
     background-color: #8699a3; /* 或是使用更醒目的顏色，例如深藍或橘色 */
     color: white;
-    padding: 4px 12px;
+    padding: 6px 16px;
     border-radius: 20px;
-    font-size: 13px; /* 稍微放大字體 */
+    font-size: 15px; /* 稍微放大字體 */
     font-weight: bold;
     display: inline-block;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* 增加陰影使其立體 */
+   
+}
+
+
+/* 新增：生理狀態燈號圓點樣式 */
+.status-dot {
+    display: inline-block;
+    width: 14px;           /* 圓點寬度 */
+    height: 14px;          /* 圓點高度 */
+    border-radius: 50%;    /* 變成正圓 */
+    margin-right: 6px;     /* 與文字的間距 */
+    vertical-align: middle; /* 垂直置中對齊文字 */
+    margin-top: -2px;      /* 針對中文字體微調視覺高度 */
+}
+
+/* 確保父層容器垂直對齊 */
+.summary-header span {
+    display: flex;
+    align-items: center;
 }
 
 
@@ -168,7 +198,7 @@
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
-            <button class="primary-btn" onclick="login()">登入系統</button>
+            <button class="primary-btn" onclick="login()">登入</button>
         </div>
     </div>
 
@@ -261,25 +291,43 @@ function getRandomEndQuestion() {
         } else alert("驗證失敗 😅");
     }
 
-    async function initApp(name, aiName) {
-        document.getElementById('app-container').classList.remove('hidden');
-        document.getElementById('display-name').innerText = name;
-        document.getElementById('avatar-char').innerText = name.charAt(0);
-        if (!aiName) {
-            isNamingPhase = true;
-            await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
+ 
+
+
+
+
+
+// --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
+async function initApp(name, aiName) {
+    document.getElementById('app-container').classList.remove('hidden');
+    document.getElementById('display-name').innerText = name;
+    document.getElementById('avatar-char').innerText = name.charAt(0);
+
+    if (!aiName) {
+        isNamingPhase = true;
+        await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
+ 
+
+        // 【核心修改】：從資料庫檢查當天是否已經填過問卷，而不是檢查 localStorage
+        const { data: existingSurvey } = await _supabase
+            .from('user_daily_surveys')
+            .select('record_date')
+            .eq('serial_number', currentSerial)
+            .eq('record_date', todayStr)
+            .maybeSingle(); // 檢查當天有無資料
+
+        if (!existingSurvey) {
+            // 如果資料庫沒資料，才顯示問卷
+            await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
+            appendStatusOptions();
         } else {
-            const todayStr = new Date().toISOString().split('T')[0];
-            if (localStorage.getItem(`last_summary_${currentSerial}`) !== todayStr) {
-                await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
-                appendStatusOptions();
-            } else {
-                await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
-                await new Promise(r => setTimeout(r, 600));
-                await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
-            }
+            // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
+            await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
+}
 
     
 
@@ -606,7 +654,7 @@ async function updateTrend(cardId, type, days) {
 function drawSingleChart(container, type, rawData) {
     const config = {
         battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "低於個人平均" },
-        n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/標準範圍" },
+        n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
         hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
@@ -732,7 +780,7 @@ function renderLegend(type, abnormalLabel) {
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
     if (type === 'n3') {
-        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 標準參考(10-20)</div>`;
+        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (10-20)</div>`;
     }
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
@@ -885,7 +933,10 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
             <div class="summary-card" onclick="zoomChart(this)">
                 <div class="summary-header">
                     <span>📅 ${data.date} 健康摘要</span>
-                    <span style="color:${lightMap[data.light] || '#ccc'}">● ${data.light}</span>
+                   <span style="color:${lightMap[data.light] || '#ccc'}; display: flex; align-items: center;">
+    <span class="status-dot" style="background-color:${lightMap[data.light] || '#ccc'}"></span>
+    ${data.light}
+</span>
                 </div>
                 
                 <div class="battery-container">
