@@ -306,7 +306,8 @@ async function initApp(name, aiName) {
     if (!aiName) {
         isNamingPhase = true;
         await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
- 
+    } else {
+        const todayStr = new Date().toISOString().split('T')[0];
 
         // 【核心修改】：從資料庫檢查當天是否已經填過問卷，而不是檢查 localStorage
         const { data: existingSurvey } = await _supabase
@@ -395,10 +396,14 @@ async function sendMessage() {
     if (isNamingPhase) {
         await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
         isNamingPhase = false; 
-        await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
-        showSummaryFlow(true); 
-        return;
-    }
+
+// 修改這裡：取名後不直接看摘要，而是引導進入問卷
+    await appendAiMessage(`太棒了！以後就由我（${msg}）來守護你的健康。 ✨`);
+    await new Promise(r => setTimeout(r, 800));
+    await appendAiMessage(`在看數據前，你今天的感覺比較接近哪一種呢？`);
+    appendStatusOptions(); // 啟動問卷流程
+    return;
+}
     
     if (formattedDate) {
         processSummarySearch(formattedDate);
