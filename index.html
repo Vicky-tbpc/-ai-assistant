@@ -319,7 +319,7 @@ async function initApp(name, aiName) {
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，在看數據前，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -402,7 +402,7 @@ async function sendMessage() {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`在看數據前，你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
