@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n25</title>
+    <title>Soosyn 健康夥伴 n26</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -396,10 +396,16 @@ async function sendMessage() {
     if (isNamingPhase) {
         await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
         isNamingPhase = false; 
-        await appendAiMessage(`太棒了！以後就由我來守護你的健康。來看看我們的健康摘要吧！`);
-        showSummaryFlow(true); 
-        return;
-    }
+
+// 修改這裡：取名後不直接看摘要，而是引導進入問卷
+    await appendAiMessage(`太棒了！從今天起，就由我，${msg}陪你一起守護健康。✨`);
+
+
+    await new Promise(r => setTimeout(r, 800));
+    await appendAiMessage(`在看數據前，你今天的感覺比較接近哪一種呢？`);
+    appendStatusOptions(); // 啟動問卷流程
+    return;
+}
     
     if (formattedDate) {
         processSummarySearch(formattedDate);
