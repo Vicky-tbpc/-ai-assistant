@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n27-2</title>
+    <title>Soosyn 健康夥伴 n27-3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -363,7 +363,6 @@ async function sendMessage() {
     input.value = ''; 
     appendUserMessage(msg);
 
-    // 配置對照表
     const healthConfigs = [
         { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
         { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3', unit: '%' },
@@ -372,11 +371,15 @@ async function sendMessage() {
         { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏', unit: 'bpm' }
     ];
 
+    // 新增：判斷是否為「詢問定義」的模式
+    const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
+
     const targetDateStr = getTargetDate(msg);
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
 
     if (matchedConfig) {
-        await processHealthKeyword(matchedConfig, targetDateStr);
+        // 將判斷結果傳入處理函式
+        await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
         return;
     }
 
@@ -440,14 +443,27 @@ async function sendMessage() {
 }
 
 // 2. 處理健康指標的核心函式
-async function processHealthKeyword(config, targetDateStr) {
+async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     try {
+        // --- 情境 A：使用者是在詢問「定義」（什麼是... 或 帶有問號） ---
+        if (isDefinitionQuery) {
+            const { data } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('title', config.fallbackTitle)
+                .limit(1).maybeSingle();
+            
+            await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細資料。`);
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(getRandomEndQuestion());
+            return; // 結束執行
+        }
+
+        // --- 情境 B：使用者是在詢問「數據」（如：昨天的hbi） ---
         const targetDate = new Date(targetDateStr);
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
         const prevDateStr = prevDate.toISOString().split('T')[0];
 
-        // 抓取這兩天的資料
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
@@ -458,45 +474,33 @@ async function processHealthKeyword(config, targetDateStr) {
         const targetData = records?.find(r => r.record_date === targetDateStr);
         const prevData = records?.find(r => r.record_date === prevDateStr);
 
-        let finalContent = "";
-
         // 判斷是否有當天數值
-        if (!targetData || targetData.raw_json[config.displayField] === undefined) {
-            const { data } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('title', config.fallbackTitle)
-                .limit(1).maybeSingle();
-            finalContent = data?.detailed_content || `目前沒有 ${targetDateStr} 的數據。`;
+        if (!targetData || targetData.raw_json[config.displayField] === undefined || targetData.raw_json[config.displayField] === null) {
+            // 修改處：若詢問數據但沒資料，顯示特定文字
+            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。☁️");
         } else {
-            // A. 抓取顯示用的數值 (TST_min, N3_pct, rMSSD, HBI, HR_min)
             const displayVal = targetData.raw_json[config.displayField];
-            
-            // B. 抓取比較邏輯用的數值 (Battery_..._A)
             const targetCompareVal = targetData.raw_json[config.compareField];
             const prevCompareVal = prevData ? prevData.raw_json[config.compareField] : null;
 
-            // 組合開頭數值顯示
             const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的${config.fallbackTitle}為：**${displayVal} ${config.unit}**<br><br>`;
 
-            // C. 比較邏輯：判定「最佳」或「最差」
             const randomNum = Math.floor(Math.random() * 3) + 1;
             let status = "最佳"; 
             if (prevCompareVal !== null) {
-                // 如果當天比較值 < 前一天比較值，則為最差
                 if (targetCompareVal < prevCompareVal) status = "最差";
             }
 
             const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-            
             const { data } = await _supabase.from('phrase_library')
                 .select('detailed_content')
                 .eq('logic_key', targetLogicKey)
                 .limit(1).maybeSingle();
                 
-            finalContent = valuePrefix + (data?.detailed_content || `目前的數值狀態為：${status}，請繼續保持健康的生活習慣！`);
+            const finalContent = valuePrefix + (data?.detailed_content || `目前的數值狀態為：${status}，請繼續保持健康的生活習慣！`);
+            await appendAiMessage(finalContent);
         }
 
-        await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
 
