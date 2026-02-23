@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n26</title>
+    <title>Soosyn 健康夥伴 n27-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -332,28 +332,51 @@ async function initApp(name, aiName) {
 
     
 
+// 1. 日期判斷工具
+function getTargetDate(msg) {
+    const today = new Date();
+    // 判斷特定日期格式 YYYY/MM/DD 或 YYYY-MM-DD
+    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    if (dateMatch) {
+        return `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+    }
 
-// --- 修改後的 sendMessage 函數 ---
+    if (msg.includes("前天")) {
+        today.setDate(today.getDate() - 2);
+    } else if (msg.includes("昨天") || msg.includes("昨日")) {
+        today.setDate(today.getDate() - 1);
+    } else if (msg.includes("今天") || msg.includes("今日")) {
+        // 保持今天
+    } else {
+        return today.toISOString().split('T')[0];
+    }
+    return today.toISOString().split('T')[0];
+}
+
+
+
+
+// 3. 修改 sendMessage 內的設定
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
     input.value = ''; 
     appendUserMessage(msg);
 
-    // --- A. 定義健康指標關鍵字配置 ---
+    // 配置對照表
     const healthConfigs = [
-        { regex: /睡眠/, field: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間' },
-        { regex: /n3|深睡/i, field: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3' },
-        { regex: /rmssd|放鬆恢復/i, field: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD' },
-        { regex: /hbi|缺氧負荷/i, field: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI' },
-        { regex: /最低脈搏/, field: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏' }
+        { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+        { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3', unit: '%' },
+        { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', compareField: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD', unit: 'ms' },
+        { regex: /hbi|缺氧負荷/i, displayField: 'HBI', compareField: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI', unit: '%min/h' },
+        { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏', unit: 'bpm' }
     ];
 
+    const targetDateStr = getTargetDate(msg);
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
 
-    // 1. 處理健康指標特定分析 (您要求的新功能)
     if (matchedConfig) {
-        await processHealthKeyword(matchedConfig);
+        await processHealthKeyword(matchedConfig, targetDateStr);
         return;
     }
 
@@ -416,60 +439,71 @@ async function sendMessage() {
     }
 }
 
-// --- 新增：處理健康指標關鍵字比對函數 ---
-async function processHealthKeyword(config) {
-    // 1. 取得今天與昨天的日期字串 (依照使用者電腦/手機目前的日期)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+// 2. 處理健康指標的核心函式
+async function processHealthKeyword(config, targetDateStr) {
+    try {
+        const targetDate = new Date(targetDateStr);
+        const prevDate = new Date(targetDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = prevDate.toISOString().split('T')[0];
 
-    // 2. 抓取這兩天的資料
-    const { data: records } = await _supabase.from('health_data')
-        .select('record_date, raw_json')
-        .eq('serial_number', currentSerial)
-        .in('record_date', [todayStr, yesterdayStr]);
+        // 抓取這兩天的資料
+        const { data: records, error } = await _supabase.from('health_data')
+            .select('record_date, raw_json')
+            .eq('serial_number', currentSerial)
+            .in('record_date', [targetDateStr, prevDateStr]);
 
-    const todayData = records?.find(r => r.record_date === todayStr);
-    const yesterdayData = records?.find(r => r.record_date === yesterdayStr);
+        if (error) throw error;
 
-    let finalContent = "";
+        const targetData = records?.find(r => r.record_date === targetDateStr);
+        const prevData = records?.find(r => r.record_date === prevDateStr);
 
-    // 3. 判斷數值邏輯
-    if (!todayData || todayData.raw_json[config.field] === undefined || todayData.raw_json[config.field] === null) {
-        // 若當天沒數值 -> 抓取 title
-        const { data } = await _supabase.from('phrase_library')
-            .select('detailed_content')
-            .eq('title', config.fallbackTitle)
-            .limit(1).single();
-        finalContent = data?.detailed_content || `目前沒有關於${config.fallbackTitle}的詳細資料。`;
-    } else {
-        // 若有數值 -> 進行比較
-        const todayVal = todayData.raw_json[config.field];
-        const yesterdayVal = yesterdayData ? yesterdayData.raw_json[config.field] : null;
-        
-        const randomNum = Math.floor(Math.random() * 3) + 1; // 隨機 1, 2, 3
-        let status = "最佳"; // 預設為最佳 (若無昨天資料也視為最佳)
+        let finalContent = "";
 
-        if (yesterdayVal !== null) {
-            if (todayVal < yesterdayVal) status = "最差";
-            else status = "最佳";
+        // 判斷是否有當天數值
+        if (!targetData || targetData.raw_json[config.displayField] === undefined) {
+            const { data } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('title', config.fallbackTitle)
+                .limit(1).maybeSingle();
+            finalContent = data?.detailed_content || `目前沒有 ${targetDateStr} 的數據。`;
+        } else {
+            // A. 抓取顯示用的數值 (TST_min, N3_pct, rMSSD, HBI, HR_min)
+            const displayVal = targetData.raw_json[config.displayField];
+            
+            // B. 抓取比較邏輯用的數值 (Battery_..._A)
+            const targetCompareVal = targetData.raw_json[config.compareField];
+            const prevCompareVal = prevData ? prevData.raw_json[config.compareField] : null;
+
+            // 組合開頭數值顯示
+            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的${config.fallbackTitle}為：**${displayVal} ${config.unit}**<br><br>`;
+
+            // C. 比較邏輯：判定「最佳」或「最差」
+            const randomNum = Math.floor(Math.random() * 3) + 1;
+            let status = "最佳"; 
+            if (prevCompareVal !== null) {
+                // 如果當天比較值 < 前一天比較值，則為最差
+                if (targetCompareVal < prevCompareVal) status = "最差";
+            }
+
+            const targetLogicKey = `${config.prefix}${status}${randomNum}`;
+            
+            const { data } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('logic_key', targetLogicKey)
+                .limit(1).maybeSingle();
+                
+            finalContent = valuePrefix + (data?.detailed_content || `目前的數值狀態為：${status}，請繼續保持健康的生活習慣！`);
         }
 
-        const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-        
-        const { data } = await _supabase.from('phrase_library')
-            .select('detailed_content')
-            .eq('logic_key', targetLogicKey)
-            .limit(1).single();
-            
-        finalContent = data?.detailed_content || `目前的數值比昨天${status === '最佳' ? '進步' : '退步'}，繼續加油！`;
-    }
+        await appendAiMessage(finalContent);
+        await new Promise(r => setTimeout(r, 800));
+        await appendAiMessage(getRandomEndQuestion());
 
-    // 4. 呈現內容並詢問結尾
-    await appendAiMessage(finalContent);
-    await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(getRandomEndQuestion());
+    } catch (err) {
+        console.error("Error:", err);
+        await appendAiMessage("查詢時發生一點小狀況，請稍後再試。");
+    }
 }
 
 
