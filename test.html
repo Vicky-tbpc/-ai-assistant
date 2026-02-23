@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n27-1</title>
+    <title>Soosyn 健康夥伴 n27-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -332,9 +332,9 @@ async function initApp(name, aiName) {
 
     
 
+// 1. 日期判斷工具
 function getTargetDate(msg) {
     const today = new Date();
-    
     // 判斷特定日期格式 YYYY/MM/DD 或 YYYY-MM-DD
     const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
     if (dateMatch) {
@@ -348,37 +348,33 @@ function getTargetDate(msg) {
     } else if (msg.includes("今天") || msg.includes("今日")) {
         // 保持今天
     } else {
-        // 如果都沒提到日期，預設為今天
         return today.toISOString().split('T')[0];
     }
-    
     return today.toISOString().split('T')[0];
 }
 
 
 
 
-// --- 修改後的 sendMessage 函數 ---
+// 3. 修改 sendMessage 內的設定
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
     input.value = ''; 
     appendUserMessage(msg);
 
-// A. 定義健康指標配置 (包含更多關鍵字變體)
+    // 配置對照表
     const healthConfigs = [
-        { regex: /睡眠|總睡眠/, field: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
-        { regex: /n3|深睡/i, field: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3', unit: '%' },
-        { regex: /rmssd|放鬆恢復/i, field: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD', unit: 'ms' },
-        { regex: /hbi|缺氧負荷/i, field: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI', unit: '%min/h' },
-        { regex: /最低脈搏/, field: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏', unit: 'bpm' }
+        { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+        { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3', unit: '%' },
+        { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', compareField: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD', unit: 'ms' },
+        { regex: /hbi|缺氧負荷/i, displayField: 'HBI', compareField: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI', unit: '%min/h' },
+        { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏', unit: 'bpm' }
     ];
 
-    // B. 先判斷日期
     const targetDateStr = getTargetDate(msg);
-
-    // C. 檢查是否觸發指標關鍵字
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
+
     if (matchedConfig) {
         await processHealthKeyword(matchedConfig, targetDateStr);
         return;
@@ -443,16 +439,15 @@ async function sendMessage() {
     }
 }
 
-// --- 修正後的：處理健康指標關鍵字比對函數 ---
-async function processHealthKeyword(config, targetDateStr) { // 確保這裡接收了 targetDateStr
+// 2. 處理健康指標的核心函式
+async function processHealthKeyword(config, targetDateStr) {
     try {
-        // 1. 計算目標日的「前一天」日期
         const targetDate = new Date(targetDateStr);
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
         const prevDateStr = prevDate.toISOString().split('T')[0];
 
-        // 2. 抓取這兩天的資料
+        // 抓取這兩天的資料
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
@@ -464,31 +459,31 @@ async function processHealthKeyword(config, targetDateStr) { // 確保這裡接�
         const prevData = records?.find(r => r.record_date === prevDateStr);
 
         let finalContent = "";
-        let valuePrefix = "";
 
-        // 3. 判斷數值邏輯
-        if (!targetData || targetData.raw_json[config.field] === undefined || targetData.raw_json[config.field] === null) {
-            // 若目標日沒數值 -> 抓取百科定義 (detailed_content)
+        // 判斷是否有當天數值
+        if (!targetData || targetData.raw_json[config.displayField] === undefined) {
             const { data } = await _supabase.from('phrase_library')
                 .select('detailed_content')
                 .eq('title', config.fallbackTitle)
                 .limit(1).maybeSingle();
-            finalContent = data?.detailed_content || `目前沒有關於 ${targetDateStr} ${config.fallbackTitle} 的數據。`;
+            finalContent = data?.detailed_content || `目前沒有 ${targetDateStr} 的數據。`;
         } else {
-            // 若有數值
-            const targetVal = targetData.raw_json[config.field];
-            const prevVal = prevData ? prevData.raw_json[config.field] : null;
+            // A. 抓取顯示用的數值 (TST_min, N3_pct, rMSSD, HBI, HR_min)
+            const displayVal = targetData.raw_json[config.displayField];
             
-            // 構造數值顯示 (先告訴使用者數值)
-            valuePrefix = `📊 ${targetDateStr.replace(/-/g,'/')} 的${config.fallbackTitle}為：**${targetVal} ${config.unit}**<br><br>`;
+            // B. 抓取比較邏輯用的數值 (Battery_..._A)
+            const targetCompareVal = targetData.raw_json[config.compareField];
+            const prevCompareVal = prevData ? prevData.raw_json[config.compareField] : null;
 
+            // 組合開頭數值顯示
+            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的${config.fallbackTitle}為：**${displayVal} ${config.unit}**<br><br>`;
+
+            // C. 比較邏輯：判定「最佳」或「最差」
             const randomNum = Math.floor(Math.random() * 3) + 1;
             let status = "最佳"; 
-
-            // 比較邏輯：這裏沿用您原本的邏輯
-            if (prevVal !== null) {
-                if (targetVal < prevVal) status = "最差";
-                else status = "最佳";
+            if (prevCompareVal !== null) {
+                // 如果當天比較值 < 前一天比較值，則為最差
+                if (targetCompareVal < prevCompareVal) status = "最差";
             }
 
             const targetLogicKey = `${config.prefix}${status}${randomNum}`;
@@ -498,17 +493,16 @@ async function processHealthKeyword(config, targetDateStr) { // 確保這裡接�
                 .eq('logic_key', targetLogicKey)
                 .limit(1).maybeSingle();
                 
-            finalContent = valuePrefix + (data?.detailed_content || `目前的數值比前一天${status === '最佳' ? '進步' : '退步'}，繼續加油！`);
+            finalContent = valuePrefix + (data?.detailed_content || `目前的數值狀態為：${status}，請繼續保持健康的生活習慣！`);
         }
 
-        // 4. 呈現內容並詢問結尾
         await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
 
     } catch (err) {
-        console.error("處理指標時發生錯誤:", err);
-        await appendAiMessage("抱歉，查詢過程中發生了一點問題 😅");
+        console.error("Error:", err);
+        await appendAiMessage("查詢時發生一點小狀況，請稍後再試。");
     }
 }
 
