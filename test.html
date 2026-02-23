@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n27</title>
+    <title>Soosyn 健康夥伴 n27-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -443,65 +443,73 @@ async function sendMessage() {
     }
 }
 
-// --- 新增：處理健康指標關鍵字比對函數 ---
-async function processHealthKeyword(config) {
-// 1. 計算目標日的「前一天」日期
-    const targetDate = new Date(targetDateStr);
-    const prevDate = new Date(targetDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    const prevDateStr = prevDate.toISOString().split('T')[0];
+// --- 修正後的：處理健康指標關鍵字比對函數 ---
+async function processHealthKeyword(config, targetDateStr) { // 確保這裡接收了 targetDateStr
+    try {
+        // 1. 計算目標日的「前一天」日期
+        const targetDate = new Date(targetDateStr);
+        const prevDate = new Date(targetDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = prevDate.toISOString().split('T')[0];
 
-// 2. 抓取這兩天的資料
-    const { data: records } = await _supabase.from('health_data')
-        .select('record_date, raw_json')
-        .eq('serial_number', currentSerial)
-        .in('record_date', [targetDateStr, prevDateStr]);
+        // 2. 抓取這兩天的資料
+        const { data: records, error } = await _supabase.from('health_data')
+            .select('record_date, raw_json')
+            .eq('serial_number', currentSerial)
+            .in('record_date', [targetDateStr, prevDateStr]);
 
-    const targetData = records?.find(r => r.record_date === targetDateStr);
-    const prevData = records?.find(r => r.record_date === prevDateStr);
+        if (error) throw error;
 
-    let finalContent = "";
-    let valuePrefix = "";
+        const targetData = records?.find(r => r.record_date === targetDateStr);
+        const prevData = records?.find(r => r.record_date === prevDateStr);
 
-// 3. 判斷數值邏輯
-    if (!targetData || targetData.raw_json[config.field] === undefined || targetData.raw_json[config.field] === null) {
-        // 若目標日沒數值 -> 抓取百科定義
-        const { data } = await _supabase.from('phrase_library')
-            .select('detailed_content')
-            .eq('title', config.fallbackTitle)
-            .limit(1).single();
-        finalContent = data?.detailed_content || `目前沒有關於 ${targetDateStr} ${config.fallbackTitle} 的數據或詳細資料。`;
-    } else {
-        // 若有數值
-        const targetVal = targetData.raw_json[config.field];
-        const prevVal = prevData ? prevData.raw_json[config.field] : null;
-        
-        // 先構造數值顯示
-        valuePrefix = `📊 ${targetDateStr.replace(/-/g,'/')} 的${config.fallbackTitle}為：**${targetVal} ${config.unit}**<br><br>`;
+        let finalContent = "";
+        let valuePrefix = "";
 
-        const randomNum = Math.floor(Math.random() * 3) + 1;
-        let status = "最佳"; 
+        // 3. 判斷數值邏輯
+        if (!targetData || targetData.raw_json[config.field] === undefined || targetData.raw_json[config.field] === null) {
+            // 若目標日沒數值 -> 抓取百科定義 (detailed_content)
+            const { data } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('title', config.fallbackTitle)
+                .limit(1).maybeSingle();
+            finalContent = data?.detailed_content || `目前沒有關於 ${targetDateStr} ${config.fallbackTitle} 的數據。`;
+        } else {
+            // 若有數值
+            const targetVal = targetData.raw_json[config.field];
+            const prevVal = prevData ? prevData.raw_json[config.field] : null;
+            
+            // 構造數值顯示 (先告訴使用者數值)
+            valuePrefix = `📊 ${targetDateStr.replace(/-/g,'/')} 的${config.fallbackTitle}為：**${targetVal} ${config.unit}**<br><br>`;
 
-        // 比較邏輯：這裏沿用您原本的邏輯，target < prev 為最差
-        if (prevVal !== null) {
-            if (targetVal < prevVal) status = "最差";
-            else status = "最佳";
+            const randomNum = Math.floor(Math.random() * 3) + 1;
+            let status = "最佳"; 
+
+            // 比較邏輯：這裏沿用您原本的邏輯
+            if (prevVal !== null) {
+                if (targetVal < prevVal) status = "最差";
+                else status = "最佳";
+            }
+
+            const targetLogicKey = `${config.prefix}${status}${randomNum}`;
+            
+            const { data } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('logic_key', targetLogicKey)
+                .limit(1).maybeSingle();
+                
+            finalContent = valuePrefix + (data?.detailed_content || `目前的數值比前一天${status === '最佳' ? '進步' : '退步'}，繼續加油！`);
         }
 
-        const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-        
-        const { data } = await _supabase.from('phrase_library')
-            .select('detailed_content')
-            .eq('logic_key', targetLogicKey)
-            .limit(1).single();
-            
-        finalContent = valuePrefix + (data?.detailed_content || `目前的數值比前一天${status === '最佳' ? '進步' : '退步'}，繼續加油！`);
-    }
+        // 4. 呈現內容並詢問結尾
+        await appendAiMessage(finalContent);
+        await new Promise(r => setTimeout(r, 800));
+        await appendAiMessage(getRandomEndQuestion());
 
-// 4. 呈現內容並詢問結尾
-    await appendAiMessage(finalContent);
-    await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(getRandomEndQuestion());
+    } catch (err) {
+        console.error("處理指標時發生錯誤:", err);
+        await appendAiMessage("抱歉，查詢過程中發生了一點問題 😅");
+    }
 }
 
 
