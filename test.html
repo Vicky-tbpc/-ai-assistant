@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n27-5</title>
+    <title>Soosyn 健康夥伴 n27-6</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -365,9 +365,9 @@ async function sendMessage() {
 
     const healthConfigs = [
         { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm' },
-        { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: ' N3 深睡比例', unit: '%' },
-        { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', compareField: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: ' rMSSD 放鬆恢復', unit: 'ms' },
-        { regex: /hbi|缺氧負荷/i, displayField: 'HBI', compareField: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: ' HBI 缺氧負荷', unit: '%min/h' },
+        { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
+        { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', compareField: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
+        { regex: /hbi|缺氧負荷/i, displayField: 'HBI', compareField: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h' },
         { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
     ];
 
