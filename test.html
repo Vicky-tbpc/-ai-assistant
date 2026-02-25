@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n27-6</title>
+    <title>Soosyn 健康夥伴 n27-6-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -492,7 +492,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             }
 
             // 組合開頭數值顯示 (只定義一次)
-            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的${config.fallbackTitle}為：${displayValStr}<br><br>`;
+            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}<br><br>`;
 
             // 2. 處理比較的邏輯 (使用 Battery_..._A 欄位)
             const targetCompareVal = targetData.raw_json[config.compareField];
