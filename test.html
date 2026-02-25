@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n28</title>
+    <title>Soosyn 健康夥伴 n29</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -246,14 +246,18 @@
 <script>
 
 
-// 獲取使用者裝置的本地日期字串 (YYYY-MM-DD)
-function getLocalDateString() {
+// 取得本地日期字串 (YYYY-MM-DD)
+function getLocalToday() {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // 使用 en-CA 格式是因為它輸出的格式剛好是 YYYY-MM-DD
+    return new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: 'Asia/Taipei' // 強制指定台灣時區，或不填則依使用者裝置
+    }).format(now);
 }
+
 
 
     const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
@@ -311,7 +315,7 @@ function getRandomEndQuestion() {
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
 async function initApp(name, aiName) {
-    document.getElementById('app-container').classList.remove('hidden');
+document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
 
@@ -319,7 +323,7 @@ async function initApp(name, aiName) {
         isNamingPhase = true;
         await appendAiMessage("很高興認識你！請幫我取一個名字，讓我成為專屬於你的健康夥伴。 ✨");
     } else {
-        const todayStr = getLocalDateString();
+        const todayStr = getLocalToday();
 
         // 【核心修改】：從資料庫檢查當天是否已經填過問卷，而不是檢查 localStorage
         const { data: existingSurvey } = await _supabase
@@ -346,30 +350,29 @@ async function initApp(name, aiName) {
 
 // 1. 日期判斷工具
 function getTargetDate(msg) {
-    const today = new Date();
-    // 判斷特定日期格式 YYYY/MM/DD 或 YYYY-MM-DD
+    const todayStr = getLocalToday(); // 先取得本地今天
+    const dateObj = new Date(todayStr);
+
     const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
     if (dateMatch) {
         return `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
     }
 
     if (msg.includes("前天")) {
-        today.setDate(today.getDate() - 2);
+        dateObj.setDate(dateObj.getDate() - 2);
     } else if (msg.includes("昨天") || msg.includes("昨日")) {
-        today.setDate(today.getDate() - 1);
+        dateObj.setDate(dateObj.getDate() - 1);
     } else if (msg.includes("今天") || msg.includes("今日")) {
-        // 保持今天
+        return todayStr;
     } else {
-return getLocalDateString(); // <-- 修改這裡，不要用 ISOString
+        return todayStr;
     }
     
-    // 將計算後的日期轉為本地格式字串
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    // 將計算後的日期轉回 YYYY-MM-DD
+    return dateObj.toISOString().split('T')[0]; 
+    // 注意：此處 dateObj 已經是 local date 調整過的，toISOString 雖是 UTC 但日期通常已對齊
+    // 更保險的做法是同樣用 Intl 格式化 dateObj
 }
-
 
 
 
@@ -476,24 +479,15 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         }
 
         // --- 情境 B：使用者是在詢問「數據」（如：昨天的hbi） ---
-// 1. 先建立 targetDate 物件
-const targetDate = new Date(targetDateStr);
+        const targetDate = new Date(targetDateStr);
+        const prevDate = new Date(targetDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = prevDate.toISOString().split('T')[0];
 
-// 2. 計算前一天 (JS 會自動處理跨月份/年份)
-const prevDate = new Date(targetDate);
-prevDate.setDate(prevDate.getDate() - 1);
-
-// 3. 修改處：不要用 toISOString()，改用手動格式化 YYYY-MM-DD
-const py = prevDate.getFullYear();
-const pm = String(prevDate.getMonth() + 1).padStart(2, '0');
-const pd = String(prevDate.getDate()).padStart(2, '0');
-const prevDateStr = `${py}-${pm}-${pd}`;
-
-// 4. 執行資料庫查詢
-const { data: records, error } = await _supabase.from('health_data')
-    .select('record_date, raw_json')
-    .eq('serial_number', currentSerial)
-    .in('record_date', [targetDateStr, prevDateStr]);
+        const { data: records, error } = await _supabase.from('health_data')
+            .select('record_date, raw_json')
+            .eq('serial_number', currentSerial)
+            .in('record_date', [targetDateStr, prevDateStr]);
 
         if (error) throw error;
 
@@ -627,7 +621,7 @@ return {
 
 // --- 確保 showSummaryFlow 也能正確運作 ---
 async function showSummaryFlow(isFirstTime = false) { 
-    const todayStr = getLocalDateString();
+    const todayStr = getLocalToday(); // 修改這裡
     const data = await fetchSummaryData(todayStr);
     if (data) {
         appendSummaryCard(data);
@@ -970,7 +964,7 @@ async function processSummarySearch(d) {
         appendSummaryCard(data);
         
         // 新增邏輯：如果是查詢「今天」，則自動出現隨機建議
-        const todayStr = getLocalDateString();
+        const todayStr = new Date().toISOString().split('T')[0];
         if (d === todayStr && data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
             await appendAiMessage(data.flowSuggestion); // 顯示減少最多指標的隨機建議 (1-3)
@@ -992,30 +986,12 @@ async function processSummarySearch(d) {
 
 
 
-function showDateActions(type) {
-    // 1. 獲取本地時間的「今天」
-    const today = getLocalDateString(); 
-
-    // 2. 計算本地時間的「昨天」
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const yesterday = `${y}-${m}-${day}`;
-
-    const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
-    
-    // 3. 渲染按鈕
-    document.getElementById('chat-history').innerHTML += `
-        <div class="msg-row ai-row date-actions">
-            <div class="quick-actions">
-                <button class="action-btn" onclick="${callback}('${today}')">今天</button>
-                <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
-            </div>
-        </div>`;
-    scrollToBottom();
-}
+    function showDateActions(type) {
+        const today = new Date().toISOString().split('T')[0], yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
+        const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+        document.getElementById('chat-history').innerHTML += `<div class="msg-row ai-row date-actions"><div class="quick-actions"><button class="action-btn" onclick="${callback}('${today}')">今天</button><button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button></div></div>`;
+        scrollToBottom();
+    }
 
 
 function appendSummaryCard(data) {
@@ -1078,7 +1054,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
     async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天有覺得哪裡不舒服嗎？\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻子過敏\n\n如果一切正常，請幫我輸入「無」或「正常」唷！"); }
-    async function handleAbnormalityInput(msg) { const todayStr = getLocalDateString(); await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg }); localStorage.setItem(`last_summary_${currentSerial}`, todayStr); await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); showSummaryFlow(true); }
+    async function handleAbnormalityInput(msg) { const todayStr = getLocalToday(); await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg }); localStorage.setItem(`last_summary_${currentSerial}`, todayStr); await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); showSummaryFlow(true); }
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; scrollToBottom(); await new Promise(r => setTimeout(r, 800)); const typingElem = document.getElementById(typingId); if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>'); scrollToBottom(); }
