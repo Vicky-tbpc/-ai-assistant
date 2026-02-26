@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n30-3</title>
+    <title>Soosyn 健康夥伴 n30-4</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -474,11 +474,11 @@ async function sendMessage() {
     }
 }
 
-// 2. 處理健康指標的核心函式
+// 2. 處理健康指標的核心函式 (優化比對與建議邏輯)
 async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     document.querySelector('.date-actions')?.remove();
     try {
-        // 處理定義查詢 (什麼是...)
+        // A. 處理百科定義查詢
         if (isDefinitionQuery) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).limit(1).maybeSingle();
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細資料。`);
@@ -487,14 +487,14 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-        // 計算前一天的日期字串
+        // B. 計算前一天的日期
         const targetDate = new Date(targetDateStr);
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
         const py = prevDate.getFullYear(), pm = String(prevDate.getMonth() + 1).padStart(2, '0'), pd = String(prevDate.getDate()).padStart(2, '0');
         const prevDateStr = `${py}-${pm}-${pd}`;
 
-        // 同時抓取目標日與前一日的數據
+        // C. 抓取目標日與前一日數據
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
@@ -516,11 +516,11 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
                 ? `**${Math.floor(rawValToday / 60)}小時${rawValToday % 60}分鐘**` 
                 : `**${rawValToday} ${config.unit}**`;
             
-            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}<br><br>`;
+            let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}`;
 
-            // 比較邏輯
-            let status = "最佳"; 
+            // D. 比對邏輯：僅在有前日數據時計算建議
             if (rawValPrev !== null) {
+                let status = "最佳"; 
                 if (config.inverse) {
                     // 脈搏、缺氧：大於前一天為「最差」
                     status = (rawValToday > rawValPrev) ? "最差" : "最佳";
@@ -528,19 +528,21 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
                     // 深睡、rMSSD、總睡眠：小於前一天為「最差」
                     status = (rawValToday < rawValPrev) ? "最差" : "最佳";
                 }
+
+                // 隨機選取 1-3 號建議
+                const randomNum = Math.floor(Math.random() * 3) + 1;
+                const targetLogicKey = `${config.prefix}${status}${randomNum}`;
+
+                const { data: phraseData } = await _supabase.from('phrase_library')
+                    .select('detailed_content')
+                    .eq('logic_key', targetLogicKey)
+                    .limit(1).maybeSingle();
+                
+                if (phraseData) {
+                    finalContent += `<br><br>${phraseData.detailed_content}`;
+                }
             }
 
-            // 隨機從 1, 2, 3 中挑選一個 logic_key
-            const randomNum = Math.floor(Math.random() * 3) + 1;
-            const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-
-            // 從資料庫抓取對應建議文字
-            const { data: phraseData } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('logic_key', targetLogicKey)
-                .limit(1).maybeSingle();
-            
-            const finalContent = valuePrefix + (phraseData?.detailed_content || `目前的數值表現${status}，請繼續保持健康的生活習慣！`);
             await appendAiMessage(finalContent);
         }
         await new Promise(r => setTimeout(r, 800));
