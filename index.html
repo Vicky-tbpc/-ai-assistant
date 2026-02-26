@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n31-1</title>
+    <title>Soosyn 健康夥伴 n31-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -638,15 +638,17 @@ let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為
 
 
 async function fetchSummaryData(targetDate) {
-    // 1. 獲取個人當前與前一天的數據
+    // 1. 獲取個人當前與前兩筆數據（包含目標日期與前一筆）
     const { data: healths } = await _supabase.from('health_data')
         .select('record_date, raw_json')
         .eq('serial_number', currentSerial)
-        .lte('record_date', targetDate)
+        .lte('record_date', targetDate) // 依然維持 lte，因為需要抓取「前一天」來做增減比較
         .order('record_date', { ascending: false })
         .limit(2);
 
-    if (!healths?.length) return null;
+    if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
+    // 這代表「目標日期當天」沒有數據，直接回傳 null
+    if (!healths?.length || healths[0].record_date !== targetDate) return null;
 
    const current = healths[0];
     const raw = current.raw_json;
@@ -1065,7 +1067,7 @@ async function processSummarySearch(d) {
             await appendAiMessage(getRandomEndQuestion());
         }
     } else {
-        await appendAiMessage("這天沒數據喔~ 😅\n可能是沒有上傳，或資料尚未同步完成。 ☁️");
+        await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
     }
 }
 
