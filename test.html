@@ -384,25 +384,24 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
-  const healthConfigs = [
-    { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
+const healthConfigs = [
+    // 原有指標
     { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    
-    { regex: /睡眠效率/, displayField: 'sleep_efficiency_pct', prefix: '睡眠效率', fallbackTitle: '睡眠效率', unit: '%' },
-    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
+    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+    { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
 
-
+    // 新增指標
     { regex: /生理電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', unit: '' },
-   
+    { regex: /睡眠效率/, displayField: 'sleep_efficiency_pct', prefix: '睡眠效率', fallbackTitle: '睡眠效率', unit: '%' },
     { regex: /n1|n2|淺睡/i, displayField: 'N1N2_pct', prefix: '淺睡', fallbackTitle: 'N1、N2 淺睡期', unit: '%' },
-    { regex: /快速動眼|rem/i, displayField: 'REM_pct', prefix: '快速動眼', fallbackTitle: 'REM 快速動眼期', unit: '%' },
-    { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '睡眠平均血氧飽和度', unit: '%' },
-    { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI 3%、ODI 4%', unit: '次/小時' },
+    { regex: /快速動眼|rem/i, displayField: 'REM_pct', prefix: '快速動眼', fallbackTitle: 'REM快速動眼期', unit: '%' },
+    { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', unit: '%' },
+    { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
     { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
-    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '睡眠平均呼吸頻率', unit: 'rpm' },
-    { regex: /脈搏|pr/i, displayField: 'HR_mean', prefix: '脈搏', fallbackTitle: '睡眠平均脈搏', unit: 'bpm' }
+    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '呼吸', unit: 'rpm' },
+    { regex: /脈搏|pr/i, displayField: 'HR_mean', prefix: '脈搏', fallbackTitle: '脈搏', unit: 'bpm' }
 ];
 
     // 日期偵測
