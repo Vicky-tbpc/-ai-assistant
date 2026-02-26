@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n31-2</title>
+    <title>Soosyn 健康夥伴 n32</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1172,7 +1172,39 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
     async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天有覺得哪裡不舒服嗎？\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻子過敏\n\n如果一切正常，請幫我輸入「無」或「正常」唷！"); }
-    async function handleAbnormalityInput(msg) { const todayStr = getLocalDateString(); await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg }); localStorage.setItem(`last_summary_${currentSerial}`, todayStr); await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); showSummaryFlow(true); }
+    async function handleAbnormalityInput(msg) { 
+const todayStr = getLocalDateString(); 
+await _supabase.from('user_daily_surveys').upsert({ 
+serial_number: currentSerial, 
+record_date: todayStr, 
+subjective_score: tempScore, 
+physical_abnormality: msg 
+}); 
+localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
+
+// 2. 檢查當天是否有健康摘要數據
+    const data = await fetchSummaryData(todayStr);
+if (data) {
+await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
+
+// 顯示圖卡
+        appendSummaryCard(data);
+
+// 顯示後續建議與導引
+        if (data.flowSuggestion) {
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage(data.flowSuggestion);
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+        }
+    } else {
+        // 狀況 B：沒數據 (直接顯示您指定的引導文字)
+        await appendAiMessage("收到了！😊 今天想從哪裡開始呢？趨勢圖表、還是健康摘要呢？");
+    }
+}
+
+
+
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; scrollToBottom(); await new Promise(r => setTimeout(r, 800)); const typingElem = document.getElementById(typingId); if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>'); scrollToBottom(); }
