@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n28</title>
+    <title>Soosyn 健康夥伴 n30</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -380,6 +380,7 @@ async function sendMessage() {
     input.value = ''; 
     appendUserMessage(msg);
 
+    // 關鍵字設定：包含 睡眠、N3、rMSSD、HBI、最低脈搏等
     const healthConfigs = [
         { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm' },
         { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
@@ -388,31 +389,40 @@ async function sendMessage() {
         { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
     ];
 
-    // 新增：判斷是否為「詢問定義」的模式
+    const targetDateStr = getTargetDate(msg); // 取得計算後的日期 (YYYY-MM-DD)
+    const hasRelativeDate = msg.includes("今天") || msg.includes("昨日") || msg.includes("昨天") || msg.includes("今日");
+    const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
-    const targetDateStr = getTargetDate(msg);
-    const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
-
+    // --- 需求 2：指標查詢邏輯 (睡眠、N3、rMSSD 等) ---
     if (matchedConfig) {
-        // 將判斷結果傳入處理函式
-        await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
+        // 如果輸入有帶日期，或是詢問定義，直接執行
+        if (hasRelativeDate || isDefinitionQuery) {
+            await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
+        } else {
+            // 如果沒帶日期，主動詢問並提供按鈕
+            await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
+            showDateActions('metric', matchedConfig);
+        }
         return;
     }
 
-    // --- 以下為原有功能邏輯 ---
-    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
-    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
-
+    // --- 需求 1：健康摘要邏輯 ---
     if (msg.includes("健康摘要")) {
-        if (formattedDate) processSummarySearch(formattedDate);
-        else { await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); showDateActions('summary'); }
+        // 如果輸入有帶日期關鍵字，直接查詢
+        if (hasRelativeDate || msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)) {
+            processSummarySearch(targetDateStr);
+        } else {
+            // 沒帶日期才詢問
+            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
+            showDateActions('summary');
+        }
         return; 
     }
 
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isAskingDefinition) {
-        if (formattedDate) processBalanceSearch(formattedDate);
+    // --- 生理電量平衡度邏輯 ---
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
+        if (hasRelativeDate) processBalanceSearch(targetDateStr);
         else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
         return;
     }
@@ -992,28 +1002,37 @@ async function processSummarySearch(d) {
 
 
 
-function showDateActions(type) {
-    // 1. 獲取本地時間的「今天」
+function showDateActions(type, metricConfig = null) {
     const today = getLocalDateString(); 
-
-    // 2. 計算本地時間的「昨天」
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const yesterday = `${y}-${m}-${day}`;
+    const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+    let html = '';
     
-    // 3. 渲染按鈕
-    document.getElementById('chat-history').innerHTML += `
-        <div class="msg-row ai-row date-actions">
-            <div class="quick-actions">
-                <button class="action-btn" onclick="${callback}('${today}')">今天</button>
-                <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
-            </div>
-        </div>`;
+    // 如果是指標類型 (如：N3, rMSSD)，按鈕點擊後調用 processHealthKeyword
+    if (type === 'metric' && metricConfig) {
+        const configJson = JSON.stringify(metricConfig).replace(/"/g, '&quot;');
+        html = `
+            <div class="msg-row ai-row date-actions">
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="processHealthKeyword(${configJson}, '${today}', false)">今天</button>
+                    <button class="action-btn" onclick="processHealthKeyword(${configJson}, '${yesterday}', false)">昨天</button>
+                </div>
+            </div>`;
+    } else {
+        // 原有的摘要或平衡度查詢
+        const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+        html = `
+            <div class="msg-row ai-row date-actions">
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="${callback}('${today}')">今天</button>
+                    <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
+                </div>
+            </div>`;
+    }
+    
+    document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
 }
 
