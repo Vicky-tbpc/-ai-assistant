@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n30-4</title>
+    <title>Soosyn 健康夥伴 n31-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -384,12 +384,25 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
-  const healthConfigs = [
+const healthConfigs = [
+    // 原有指標
     { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
     { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
+    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+    
+
+    // 新增指標
+    { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' },
+    { regex: /睡眠效率/, displayField: 'sleep_efficiency_pct', prefix: '睡眠效率', fallbackTitle: '睡眠效率', unit: '%' },
+    { regex: /n1|n2|淺睡/i, displayField: 'N1N2_pct', prefix: '淺睡', fallbackTitle: 'N1、N2 淺睡期', unit: '%' },
+    { regex: /快速動眼|rem/i, displayField: 'REM_pct', prefix: '快速動眼', fallbackTitle: 'REM快速動眼期', unit: '%' },
+    { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', displayLabel: '睡眠平均血氧飽和度', unit: '%' },
+    { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
+    { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
+    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '呼吸', displayLabel: '睡眠平均呼吸頻率', unit: 'rpm' },
+    { regex: /脈搏|pr/i, displayField: 'HR_mean', prefix: '脈搏', fallbackTitle: '脈搏', displayLabel: '睡眠平均脈搏', unit: 'bpm' }
 ];
 
     // 日期偵測
@@ -478,77 +491,145 @@ async function sendMessage() {
 async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     document.querySelector('.date-actions')?.remove();
     try {
-        // A. 處理百科定義查詢
+        // --- 處理百科定義查詢 ---
         if (isDefinitionQuery) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).limit(1).maybeSingle();
-            await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細資料。`);
+            await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細百科資料。`);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
             return;
         }
 
-        // B. 計算前一天的日期
+        // --- 準備資料抓取 ---
         const targetDate = new Date(targetDateStr);
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
-        const py = prevDate.getFullYear(), pm = String(prevDate.getMonth() + 1).padStart(2, '0'), pd = String(prevDate.getDate()).padStart(2, '0');
-        const prevDateStr = `${py}-${pm}-${pd}`;
+        const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
-        // C. 抓取目標日與前一日數據
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
             .in('record_date', [targetDateStr, prevDateStr]);
 
         if (error) throw error;
-
         const targetData = records?.find(r => r.record_date === targetDateStr);
         const prevData = records?.find(r => r.record_date === prevDateStr);
 
-        if (!targetData || targetData.raw_json[config.displayField] === undefined) {
-            await appendAiMessage("這天沒數據喔~ 😅 可能是資料尚未同步完成。☁️");
-        } else {
-            const rawValToday = targetData.raw_json[config.displayField];
-            const rawValPrev = prevData ? prevData.raw_json[config.displayField] : null;
-
-            // 格式化顯示數值
-            let displayValStr = config.displayField === 'TST_min' 
-                ? `**${Math.floor(rawValToday / 60)}小時${rawValToday % 60}分鐘**` 
-                : `**${rawValToday} ${config.unit}**`;
-            
-            let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}`;
-
-            // D. 比對邏輯：僅在有前日數據時計算建議
-            if (rawValPrev !== null) {
-                let status = "最佳"; 
-                if (config.inverse) {
-                    // 脈搏、缺氧：大於前一天為「最差」
-                    status = (rawValToday > rawValPrev) ? "最差" : "最佳";
-                } else {
-                    // 深睡、rMSSD、總睡眠：小於前一天為「最差」
-                    status = (rawValToday < rawValPrev) ? "最差" : "最佳";
-                }
-
-                // 隨機選取 1-3 號建議
-                const randomNum = Math.floor(Math.random() * 3) + 1;
-                const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-
-                const { data: phraseData } = await _supabase.from('phrase_library')
-                    .select('detailed_content')
-                    .eq('logic_key', targetLogicKey)
-                    .limit(1).maybeSingle();
-                
-                if (phraseData) {
-                    finalContent += `<br><br>${phraseData.detailed_content}`;
-                }
-            }
-
-            await appendAiMessage(finalContent);
+        // --- 無資料處理 ---
+        if (!targetData) {
+            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(getRandomEndQuestion());
+            return;
         }
+
+        const raw = targetData.raw_json;
+        const prevRaw = prevData?.raw_json;
+        let displayValStr = "";
+        let logicStatus = ""; // 用於決定抓取哪種建議 (佳/差/平...)
+        let rangeHint = "";   // 範圍提示文字
+
+        // --- 根據不同指標執行特定判斷邏輯 ---
+        const val = raw[config.displayField];
+
+        switch(config.prefix) {
+            case '生理電量':
+                displayValStr = `**${val}**`;
+                if (prevRaw && prevRaw.Personal_Battery_weighted_round !== undefined) {
+                    logicStatus = (val > prevRaw.Personal_Battery_weighted_round) ? "佳" : "差";
+                }
+                break;
+
+            case '睡眠效率':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（良好：≥ 85%，不佳：≤ 75%）";
+                if (val >= 85) logicStatus = "佳";
+                else if (val <= 75) logicStatus = "差";
+                else logicStatus = "平";
+                break;
+
+            case '淺睡':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：50%~65%）";
+                if (val > 65) logicStatus = "過多";
+                else if (val < 50) logicStatus = "過少";
+                else logicStatus = "佳";
+                break;
+
+            case '快速動眼':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：10%~25%）";
+                if (val > 25) logicStatus = "過多";
+                else if (val < 10) logicStatus = "過少";
+                else logicStatus = "佳";
+                break;
+
+            case '血氧':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：> 95%）";
+                logicStatus = (val > 95) ? "佳" : "差";
+                break;
+
+            case 'ODI':
+                displayValStr = `**ODI 3%: ${raw.ODI3_total}, ODI 4%: ${raw.ODI4_total}** ${config.unit}`;
+                rangeHint = "（標準參考範圍：每小時 < 5次）";
+                logicStatus = (raw.ODI3_total >= 5 || raw.ODI4_total >= 5) ? "差" : "佳";
+                break;
+
+            case 'T88':
+                displayValStr = `**T90: ${raw.T90_pct}%, T89: ${raw.T89_pct}%, T88: ${raw.T88_pct}%**`;
+                rangeHint = "（標準參考範圍：T90 ≤ 5%、T89 ≤ 4%、T88 ≤ 3%）";
+                logicStatus = (raw.T90_pct > 5 || raw.T89_pct > 4 || raw.T88_pct > 3) ? "差" : "佳";
+                break;
+
+            case '呼吸':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：12-25 rpm）";
+                if (val > 25) logicStatus = "快";
+                else if (val < 12) logicStatus = "慢";
+                else logicStatus = "佳";
+                break;
+
+            case '脈搏':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：60-100 bpm）";
+                if (val < 60) logicStatus = "低";
+                else if (val > 100) logicStatus = "高";
+                else logicStatus = "佳";
+                break;
+
+            default: 
+                // 處理原本的 N3, rMSSD, HBI, 總睡眠
+                displayValStr = config.displayField === 'TST_min' ? `**${Math.floor(val/60)}小時${val%60}分鐘**` : `**${val}${config.unit}**`;
+                if (prevRaw && prevRaw[config.displayField] !== undefined) {
+                    const prevVal = prevRaw[config.displayField];
+                    logicStatus = config.inverse ? (val > prevVal ? "最差" : "最佳") : (val < prevVal ? "最差" : "最佳");
+                }
+        }
+
+        // 優先使用 displayLabel，若無則使用 fallbackTitle
+const label = config.displayLabel || config.fallbackTitle;
+let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+        if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
+
+        if (logicStatus) {
+            const randomNum = Math.floor(Math.random() * 3) + 1;
+            const targetLogicKey = `${config.prefix}${logicStatus}${randomNum}`;
+            
+            const { data: phraseData } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('logic_key', targetLogicKey)
+                .limit(1).maybeSingle();
+            
+            if (phraseData) finalContent += `<br><br>${phraseData.detailed_content}`;
+        }
+
+        await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
+
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Query Error:", err);
         await appendAiMessage("查詢時發生一點小狀況，請稍後再試。");
     }
 }
