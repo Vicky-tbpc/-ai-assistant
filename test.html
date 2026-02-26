@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n30</title>
+    <title>Soosyn 健康夥伴 n30-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -444,7 +444,8 @@ async function sendMessage() {
             return;
         }
     }
-
+// 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
+    document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
     if (isNamingPhase) {
         await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
@@ -463,14 +464,17 @@ async function sendMessage() {
     if (formattedDate) {
         processSummarySearch(formattedDate);
     } else {
-        await appendAiMessage("收到！正在學習更好地協助你。 ✨");
-        await new Promise(r => setTimeout(r, 600));
-        await appendAiMessage(getRandomEndQuestion());
+      await appendAiMessage("收到！正在學習更好地協助你。 ✨");
+    await new Promise(r => setTimeout(r, 600));
+    // getRandomEndQuestion() 會隨機抽選您列出的那四個問句之一
+    await appendAiMessage(getRandomEndQuestion());
     }
 }
 
 // 2. 處理健康指標的核心函式
 async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
+// --- 新增：點選按鈕後立即移除按鈕列 ---
+    document.querySelector('.date-actions')?.remove();
     try {
         // --- 情境 A：使用者是在詢問「定義」（什麼是... 或 帶有問號） ---
         if (isDefinitionQuery) {
