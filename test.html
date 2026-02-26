@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n30-3</title>
+    <title>Soosyn 健康夥伴 n30-4</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -384,13 +384,13 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
- const healthConfigs = [
-        { regex: /最低脈搏/, jsonField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', higherIsBetter: false },
-        { regex: /n3|深睡/i, jsonField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%', higherIsBetter: true },
-        { regex: /rmssd|放鬆恢復/i, jsonField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms', higherIsBetter: true },
-        { regex: /hbi|缺氧負荷/i, jsonField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', higherIsBetter: false },
-        { regex: /睡眠|總睡眠/, jsonField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘', higherIsBetter: true }
-    ];
+const healthConfigs = [
+    { regex: /最低脈搏/, jsonField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '最低脈搏', unit: 'bpm', higherIsBetter: false },
+    { regex: /n3|深睡/i, jsonField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%', higherIsBetter: true },
+    { regex: /rmssd|放鬆恢復/i, jsonField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms', higherIsBetter: true },
+    { regex: /hbi|缺氧負荷/i, jsonField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', higherIsBetter: false },
+    { regex: /睡眠|總睡眠/, jsonField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘', higherIsBetter: true }
+];
 
     // 日期偵測
     const absDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
@@ -478,32 +478,26 @@ async function sendMessage() {
 async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     document.querySelector('.date-actions')?.remove();
     try {
-        // --- 情境 A：百科定義查詢 ---
         if (isDefinitionQuery) {
-            const { data } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('title', config.fallbackTitle)
-                .limit(1).maybeSingle();
+            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).maybeSingle();
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細資料。`);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
             return;
         }
 
-        // --- 情境 B：數據比較查詢 ---
         const targetDate = new Date(targetDateStr);
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
-        const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+        const prevDateStr = prevDate.toISOString().split('T')[0];
 
-        // 同時抓取目標日與前一日的 raw_json
+        // 抓取目標日與前一日數據
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
             .in('record_date', [targetDateStr, prevDateStr]);
 
         if (error) throw error;
-
         const todayRec = records?.find(r => r.record_date === targetDateStr);
         const yesterdayRec = records?.find(r => r.record_date === prevDateStr);
 
@@ -512,9 +506,8 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-        // 解析 JSON 資料
         const getVal = (rec) => {
-            if (!rec || !rec.raw_json) return null;
+            if (!rec?.raw_json) return null;
             const json = typeof rec.raw_json === 'string' ? JSON.parse(rec.raw_json) : rec.raw_json;
             return json[config.jsonField];
         };
@@ -522,48 +515,49 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         const currentVal = getVal(todayRec);
         const prevVal = getVal(yesterdayRec);
 
-        if (currentVal === null || currentVal === undefined) {
+        if (currentVal === null) {
             await appendAiMessage(`找不到 ${targetDateStr} 的 ${config.fallbackTitle} 數據。`);
             return;
         }
 
+        // --- 核心比較與建議詞句邏輯 ---
         let insightText = "";
-        // 執行數值比較與 logic_key 生成
-        if (prevVal !== null && prevVal !== undefined) {
-            // 判斷是否為「最佳（較好）」或「最差（較差）」
-            // 對於 HR_min 和 HBI，越低越好 (current <= prevVal)
-            // 對於 N3, rMSSD, TST_min，越高越好 (current >= prevVal)
-            const isBetter = config.higherIsBetter ? (currentVal >= prevVal) : (currentVal <= prevVal);
-            const statusLabel = isBetter ? "最佳" : "最差";
-            const randomIndex = Math.floor(Math.random() * 3) + 1; // 隨機 1~3
-            const logicKey = `${config.prefix}${statusLabel}${randomIndex}`;
+        if (prevVal !== null) {
+            let status = "";
+            if (config.higherIsBetter) {
+                // N3, rMSSD, 總睡眠：大於前一天為最佳
+                status = (currentVal > prevVal) ? "最佳" : (currentVal < prevVal ? "最差" : "");
+            } else {
+                // 最低脈搏, HBI：大於前一天為最差
+                status = (currentVal > prevVal) ? "最差" : (currentVal < prevVal ? "最佳" : "");
+            }
 
-            // 從 phrase_library 抓取對應 logic_key 的片語
-            const { data: phraseData } = await _supabase.from('phrase_library')
-                .select('content')
-                .eq('logic_key', logicKey)
-                .maybeSingle();
-
-            if (phraseData?.content) {
-                insightText = `\n\n${phraseData.content}`;
+            if (status) {
+                const randomIndex = Math.floor(Math.random() * 3) + 1;
+                const logicKey = `${config.prefix}${status}${randomIndex}`;
+                const { data: phraseData } = await _supabase.from('phrase_library').select('content').eq('logic_key', logicKey).maybeSingle();
+                if (phraseData?.content) insightText = `\n\n${phraseData.content}`;
             }
         }
 
-        // 顯示數值格式化 (總睡眠時間轉為 小時+分鐘)
-        let displayVal = `${currentVal} ${config.unit}`;
+        // 格式化數值顯示
+        let displayVal = `*${currentVal} ${config.unit}*`;
         if (config.jsonField === 'TST_min') {
-            displayVal = `${Math.floor(currentVal / 60)} 小時 ${currentVal % 60} 分鐘`;
+            displayVal = `*${Math.floor(currentVal / 60)} 小時 ${currentVal % 60} 分鐘*`;
+        } else if (config.jsonField === 'N3_pct') {
+            displayVal = `*${currentVal} %*`;
         }
 
-        const responseMsg = `📅 ${targetDateStr} 的 ${config.fallbackTitle} 是：\n*${displayVal}*${insightText}`;
+        // 組合最終回覆
+        const responseMsg = `📅 ${targetDateStr} 的 ${config.fallbackTitle} 是：${displayVal}${insightText}`;
         await appendAiMessage(responseMsg);
         
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
 
     } catch (err) {
-        console.error("Health Keyword Error:", err);
-        await appendAiMessage("抱歉，查詢數據時發生一點問題。 ☁️");
+        console.error("Error:", err);
+        await appendAiMessage("抱歉，查詢時發生一點問題。 ☁️");
     }
 }
 
