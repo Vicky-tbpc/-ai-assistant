@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n30-2</title>
+    <title>Soosyn 健康夥伴 n30-3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -384,12 +384,12 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
-    const healthConfigs = [
-        { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm' },
-        { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
-        { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', compareField: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
-        { regex: /hbi|缺氧負荷/i, displayField: 'HBI', compareField: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h' },
-        { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
+ const healthConfigs = [
+        { regex: /最低脈搏/, jsonField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', higherIsBetter: false },
+        { regex: /n3|深睡/i, jsonField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%', higherIsBetter: true },
+        { regex: /rmssd|放鬆恢復/i, jsonField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms', higherIsBetter: true },
+        { regex: /hbi|缺氧負荷/i, jsonField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', higherIsBetter: false },
+        { regex: /睡眠|總睡眠/, jsonField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘', higherIsBetter: true }
     ];
 
     // 日期偵測
@@ -474,97 +474,96 @@ async function sendMessage() {
     }
 }
 
-// 2. 處理健康指標的核心函式
+// 2. 處理健康指標的核心函式 (優化比較邏輯與片語抓取)
 async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
-// --- 新增：點選按鈕後立即移除按鈕列 ---
     document.querySelector('.date-actions')?.remove();
     try {
-        // --- 情境 A：使用者是在詢問「定義」（什麼是... 或 帶有問號） ---
+        // --- 情境 A：百科定義查詢 ---
         if (isDefinitionQuery) {
             const { data } = await _supabase.from('phrase_library')
                 .select('detailed_content')
                 .eq('title', config.fallbackTitle)
                 .limit(1).maybeSingle();
-            
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細資料。`);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
-            return; // 結束執行
+            return;
         }
 
-        // --- 情境 B：使用者是在詢問「數據」（如：昨天的hbi） ---
-// 1. 先建立 targetDate 物件
-const targetDate = new Date(targetDateStr);
+        // --- 情境 B：數據比較查詢 ---
+        const targetDate = new Date(targetDateStr);
+        const prevDate = new Date(targetDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
-// 2. 計算前一天 (JS 會自動處理跨月份/年份)
-const prevDate = new Date(targetDate);
-prevDate.setDate(prevDate.getDate() - 1);
-
-// 3. 修改處：不要用 toISOString()，改用手動格式化 YYYY-MM-DD
-const py = prevDate.getFullYear();
-const pm = String(prevDate.getMonth() + 1).padStart(2, '0');
-const pd = String(prevDate.getDate()).padStart(2, '0');
-const prevDateStr = `${py}-${pm}-${pd}`;
-
-// 4. 執行資料庫查詢
-const { data: records, error } = await _supabase.from('health_data')
-    .select('record_date, raw_json')
-    .eq('serial_number', currentSerial)
-    .in('record_date', [targetDateStr, prevDateStr]);
+        // 同時抓取目標日與前一日的 raw_json
+        const { data: records, error } = await _supabase.from('health_data')
+            .select('record_date, raw_json')
+            .eq('serial_number', currentSerial)
+            .in('record_date', [targetDateStr, prevDateStr]);
 
         if (error) throw error;
 
-        const targetData = records?.find(r => r.record_date === targetDateStr);
-        const prevData = records?.find(r => r.record_date === prevDateStr);
+        const todayRec = records?.find(r => r.record_date === targetDateStr);
+        const yesterdayRec = records?.find(r => r.record_date === prevDateStr);
 
-        // 判斷是否有當天數值
-        if (!targetData || targetData.raw_json[config.displayField] === undefined || targetData.raw_json[config.displayField] === null) {
-            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。☁️");
-        } else {
-            // 1. 處理顯示數值的邏輯
-            const rawVal = targetData.raw_json[config.displayField];
-            let displayValStr = "";
-
-            // 判斷是否為總睡眠時間 (TST_min)，進行單位換算
-            if (config.displayField === 'TST_min') {
-                const hours = Math.floor(rawVal / 60);
-                const mins = rawVal % 60;
-                displayValStr = `**${hours}小時${mins}分鐘**`;
-            } else {
-                displayValStr = `**${rawVal} ${config.unit}**`;
-            }
-
-            // 組合開頭數值顯示 (只定義一次)
-            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}<br><br>`;
-
-            // 2. 處理比較的邏輯 (使用 Battery_..._A 欄位)
-            const targetCompareVal = targetData.raw_json[config.compareField];
-            const prevCompareVal = prevData ? prevData.raw_json[config.compareField] : null;
-
-            const randomNum = Math.floor(Math.random() * 3) + 1;
-            let status = "最佳"; 
-            if (prevCompareVal !== null) {
-                // 原邏輯：今天比昨天小則為最差
-                if (targetCompareVal < prevCompareVal) status = "最差";
-            }
-
-            // 3. 從資料庫抓取對應文字
-            const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-            const { data } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('logic_key', targetLogicKey)
-                .limit(1).maybeSingle();
-                
-            const finalContent = valuePrefix + (data?.detailed_content || `目前的數值狀態為：${status}，請繼續保持健康的生活習慣！`);
-            await appendAiMessage(finalContent);
+        if (!todayRec) {
+            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+            return;
         }
 
+        // 解析 JSON 資料
+        const getVal = (rec) => {
+            if (!rec || !rec.raw_json) return null;
+            const json = typeof rec.raw_json === 'string' ? JSON.parse(rec.raw_json) : rec.raw_json;
+            return json[config.jsonField];
+        };
+
+        const currentVal = getVal(todayRec);
+        const prevVal = getVal(yesterdayRec);
+
+        if (currentVal === null || currentVal === undefined) {
+            await appendAiMessage(`找不到 ${targetDateStr} 的 ${config.fallbackTitle} 數據。`);
+            return;
+        }
+
+        let insightText = "";
+        // 執行數值比較與 logic_key 生成
+        if (prevVal !== null && prevVal !== undefined) {
+            // 判斷是否為「最佳（較好）」或「最差（較差）」
+            // 對於 HR_min 和 HBI，越低越好 (current <= prevVal)
+            // 對於 N3, rMSSD, TST_min，越高越好 (current >= prevVal)
+            const isBetter = config.higherIsBetter ? (currentVal >= prevVal) : (currentVal <= prevVal);
+            const statusLabel = isBetter ? "最佳" : "最差";
+            const randomIndex = Math.floor(Math.random() * 3) + 1; // 隨機 1~3
+            const logicKey = `${config.prefix}${statusLabel}${randomIndex}`;
+
+            // 從 phrase_library 抓取對應 logic_key 的片語
+            const { data: phraseData } = await _supabase.from('phrase_library')
+                .select('content')
+                .eq('logic_key', logicKey)
+                .maybeSingle();
+
+            if (phraseData?.content) {
+                insightText = `\n\n${phraseData.content}`;
+            }
+        }
+
+        // 顯示數值格式化 (總睡眠時間轉為 小時+分鐘)
+        let displayVal = `${currentVal} ${config.unit}`;
+        if (config.jsonField === 'TST_min') {
+            displayVal = `${Math.floor(currentVal / 60)} 小時 ${currentVal % 60} 分鐘`;
+        }
+
+        const responseMsg = `📅 ${targetDateStr} 的 ${config.fallbackTitle} 是：\n*${displayVal}*${insightText}`;
+        await appendAiMessage(responseMsg);
+        
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
 
     } catch (err) {
-        console.error("Error:", err);
-        await appendAiMessage("查詢時發生一點小狀況，請稍後再試。");
+        console.error("Health Keyword Error:", err);
+        await appendAiMessage("抱歉，查詢數據時發生一點問題。 ☁️");
     }
 }
 
