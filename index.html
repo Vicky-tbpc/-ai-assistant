@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n28</title>
+    <title>Soosyn 健康夥伴 n30-4</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -380,39 +380,52 @@ async function sendMessage() {
     input.value = ''; 
     appendUserMessage(msg);
 
-    const healthConfigs = [
-        { regex: /最低脈搏/, displayField: 'HR_min', compareField: 'Battery_HR_min_A', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm' },
-        { regex: /n3|深睡/i, displayField: 'N3_pct', compareField: 'Battery_N3_pct_A', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
-        { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', compareField: 'Battery_rMSSD_A', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
-        { regex: /hbi|缺氧負荷/i, displayField: 'HBI', compareField: 'Battery_HBI_A', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h' },
-        { regex: /睡眠|總睡眠/, displayField: 'TST_min', compareField: 'Battery_TST_min_A', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
-    ];
+    // 每次發送新訊息時，先嘗試移除舊的按鈕列
+    document.querySelector('.date-actions')?.remove();
 
-    // 新增：判斷是否為「詢問定義」的模式
+    // 指標配置與 regex (包含您要求的所有關鍵字)
+  const healthConfigs = [
+    { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
+    { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
+    { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
+    { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
+    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' }
+];
+
+    // 日期偵測
+    const absDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    const hasRelativeDate = msg.includes("今天") || msg.includes("昨日") || msg.includes("昨天") || msg.includes("今日");
+    const hasAnyDate = absDateMatch || hasRelativeDate;
+    
+    const targetDateStr = getTargetDate(msg); 
+    const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
-    const targetDateStr = getTargetDate(msg);
-    const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
-
+    // --- 需求 1 & 2：指標查詢邏輯 ---
     if (matchedConfig) {
-        // 將判斷結果傳入處理函式
-        await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
+        if (hasAnyDate || isDefinitionQuery) {
+            await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
+        } else {
+            await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
+            showDateActions('metric', matchedConfig);
+        }
         return;
     }
 
-    // --- 以下為原有功能邏輯 ---
-    const dateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-    const formattedDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : null;
-    const isAskingDefinition = msg.includes("什麼是") || msg.includes("介紹") || msg.includes("說明") || msg.includes("？") || msg.includes("?");
-
+    // --- 需求 1 & 2：健康摘要邏輯 ---
     if (msg.includes("健康摘要")) {
-        if (formattedDate) processSummarySearch(formattedDate);
-        else { await appendAiMessage("想查看哪一天的健康摘要呢？ 📅"); showDateActions('summary'); }
+        if (hasAnyDate) {
+            processSummarySearch(targetDateStr);
+        } else {
+            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
+            showDateActions('summary');
+        }
         return; 
     }
 
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isAskingDefinition) {
-        if (formattedDate) processBalanceSearch(formattedDate);
+    // --- 生理電量平衡度 ---
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
+        if (hasAnyDate) processBalanceSearch(targetDateStr);
         else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
         return;
     }
@@ -434,7 +447,8 @@ async function sendMessage() {
             return;
         }
     }
-
+// 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
+    document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
     if (isNamingPhase) {
         await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
@@ -450,6 +464,7 @@ async function sendMessage() {
     return;
 }
     
+// 如果單獨輸入日期 (無關鍵字)
     if (formattedDate) {
         processSummarySearch(formattedDate);
     } else {
@@ -459,92 +474,79 @@ async function sendMessage() {
     }
 }
 
-// 2. 處理健康指標的核心函式
+// 2. 處理健康指標的核心函式 (優化比對與建議邏輯)
 async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
+    document.querySelector('.date-actions')?.remove();
     try {
-        // --- 情境 A：使用者是在詢問「定義」（什麼是... 或 帶有問號） ---
+        // A. 處理百科定義查詢
         if (isDefinitionQuery) {
-            const { data } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('title', config.fallbackTitle)
-                .limit(1).maybeSingle();
-            
+            const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).limit(1).maybeSingle();
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細資料。`);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
-            return; // 結束執行
+            return;
         }
 
-        // --- 情境 B：使用者是在詢問「數據」（如：昨天的hbi） ---
-// 1. 先建立 targetDate 物件
-const targetDate = new Date(targetDateStr);
+        // B. 計算前一天的日期
+        const targetDate = new Date(targetDateStr);
+        const prevDate = new Date(targetDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const py = prevDate.getFullYear(), pm = String(prevDate.getMonth() + 1).padStart(2, '0'), pd = String(prevDate.getDate()).padStart(2, '0');
+        const prevDateStr = `${py}-${pm}-${pd}`;
 
-// 2. 計算前一天 (JS 會自動處理跨月份/年份)
-const prevDate = new Date(targetDate);
-prevDate.setDate(prevDate.getDate() - 1);
-
-// 3. 修改處：不要用 toISOString()，改用手動格式化 YYYY-MM-DD
-const py = prevDate.getFullYear();
-const pm = String(prevDate.getMonth() + 1).padStart(2, '0');
-const pd = String(prevDate.getDate()).padStart(2, '0');
-const prevDateStr = `${py}-${pm}-${pd}`;
-
-// 4. 執行資料庫查詢
-const { data: records, error } = await _supabase.from('health_data')
-    .select('record_date, raw_json')
-    .eq('serial_number', currentSerial)
-    .in('record_date', [targetDateStr, prevDateStr]);
+        // C. 抓取目標日與前一日數據
+        const { data: records, error } = await _supabase.from('health_data')
+            .select('record_date, raw_json')
+            .eq('serial_number', currentSerial)
+            .in('record_date', [targetDateStr, prevDateStr]);
 
         if (error) throw error;
 
         const targetData = records?.find(r => r.record_date === targetDateStr);
         const prevData = records?.find(r => r.record_date === prevDateStr);
 
-        // 判斷是否有當天數值
-        if (!targetData || targetData.raw_json[config.displayField] === undefined || targetData.raw_json[config.displayField] === null) {
-            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。☁️");
+        if (!targetData || targetData.raw_json[config.displayField] === undefined) {
+            await appendAiMessage("這天沒數據喔~ 😅 可能是資料尚未同步完成。☁️");
         } else {
-            // 1. 處理顯示數值的邏輯
-            const rawVal = targetData.raw_json[config.displayField];
-            let displayValStr = "";
+            const rawValToday = targetData.raw_json[config.displayField];
+            const rawValPrev = prevData ? prevData.raw_json[config.displayField] : null;
 
-            // 判斷是否為總睡眠時間 (TST_min)，進行單位換算
-            if (config.displayField === 'TST_min') {
-                const hours = Math.floor(rawVal / 60);
-                const mins = rawVal % 60;
-                displayValStr = `**${hours}小時${mins}分鐘**`;
-            } else {
-                displayValStr = `**${rawVal} ${config.unit}**`;
-            }
+            // 格式化顯示數值
+            let displayValStr = config.displayField === 'TST_min' 
+                ? `**${Math.floor(rawValToday / 60)}小時${rawValToday % 60}分鐘**` 
+                : `**${rawValToday} ${config.unit}**`;
+            
+            let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}`;
 
-            // 組合開頭數值顯示 (只定義一次)
-            const valuePrefix = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${config.fallbackTitle} 為：${displayValStr}<br><br>`;
+            // D. 比對邏輯：僅在有前日數據時計算建議
+            if (rawValPrev !== null) {
+                let status = "最佳"; 
+                if (config.inverse) {
+                    // 脈搏、缺氧：大於前一天為「最差」
+                    status = (rawValToday > rawValPrev) ? "最差" : "最佳";
+                } else {
+                    // 深睡、rMSSD、總睡眠：小於前一天為「最差」
+                    status = (rawValToday < rawValPrev) ? "最差" : "最佳";
+                }
 
-            // 2. 處理比較的邏輯 (使用 Battery_..._A 欄位)
-            const targetCompareVal = targetData.raw_json[config.compareField];
-            const prevCompareVal = prevData ? prevData.raw_json[config.compareField] : null;
+                // 隨機選取 1-3 號建議
+                const randomNum = Math.floor(Math.random() * 3) + 1;
+                const targetLogicKey = `${config.prefix}${status}${randomNum}`;
 
-            const randomNum = Math.floor(Math.random() * 3) + 1;
-            let status = "最佳"; 
-            if (prevCompareVal !== null) {
-                // 原邏輯：今天比昨天小則為最差
-                if (targetCompareVal < prevCompareVal) status = "最差";
-            }
-
-            // 3. 從資料庫抓取對應文字
-            const targetLogicKey = `${config.prefix}${status}${randomNum}`;
-            const { data } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('logic_key', targetLogicKey)
-                .limit(1).maybeSingle();
+                const { data: phraseData } = await _supabase.from('phrase_library')
+                    .select('detailed_content')
+                    .eq('logic_key', targetLogicKey)
+                    .limit(1).maybeSingle();
                 
-            const finalContent = valuePrefix + (data?.detailed_content || `目前的數值狀態為：${status}，請繼續保持健康的生活習慣！`);
+                if (phraseData) {
+                    finalContent += `<br><br>${phraseData.detailed_content}`;
+                }
+            }
+
             await appendAiMessage(finalContent);
         }
-
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
-
     } catch (err) {
         console.error("Error:", err);
         await appendAiMessage("查詢時發生一點小狀況，請稍後再試。");
@@ -992,28 +994,37 @@ async function processSummarySearch(d) {
 
 
 
-function showDateActions(type) {
-    // 1. 獲取本地時間的「今天」
+function showDateActions(type, metricConfig = null) {
     const today = getLocalDateString(); 
-
-    // 2. 計算本地時間的「昨天」
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const yesterday = `${y}-${m}-${day}`;
+    const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+    let html = '';
     
-    // 3. 渲染按鈕
-    document.getElementById('chat-history').innerHTML += `
-        <div class="msg-row ai-row date-actions">
-            <div class="quick-actions">
-                <button class="action-btn" onclick="${callback}('${today}')">今天</button>
-                <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
-            </div>
-        </div>`;
+    if (type === 'metric' && metricConfig) {
+        // 指標類型 (N3, rMSSD 等)
+        const configJson = JSON.stringify(metricConfig).replace(/"/g, '&quot;');
+        html = `
+            <div class="msg-row ai-row date-actions">
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="processHealthKeyword(${configJson}, '${today}', false)">今天</button>
+                    <button class="action-btn" onclick="processHealthKeyword(${configJson}, '${yesterday}', false)">昨天</button>
+                </div>
+            </div>`;
+    } else {
+        // 摘要或平衡度類型
+        const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
+        html = `
+            <div class="msg-row ai-row date-actions">
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="${callback}('${today}')">今天</button>
+                    <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
+                </div>
+            </div>`;
+    }
+    
+    document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
 }
 
