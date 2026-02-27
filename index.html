@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n35</title>
+    <title>Soosyn 健康夥伴 n34</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -260,11 +260,7 @@ function getLocalDateString() {
     const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-
-
     let currentSerial = "";
-let currentNickname = ""; // 新增這行
-    let currentAiName = "";   // 新增這行
     let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
 
     // 指標配置
@@ -303,10 +299,7 @@ function getRandomEndQuestion() {
             currentSerial = serial;
             document.getElementById('login-overlay').classList.add('hidden');
             if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
-            } else {
-                // 【修正 2】：傳入資料庫抓到的暱稱與 AI 名字
-                initApp(data.nickname, data.ai_name);
-            }
+            else initApp(data.nickname, data.ai_name);
         } else alert("驗證失敗 😅");
     }
 
@@ -318,11 +311,6 @@ function getRandomEndQuestion() {
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
 async function initApp(name, aiName) {
-// 【關鍵修正 3】：將傳入的值存入全域變數，供 callGeminiAPI 使用
-        currentNickname = name;
-        currentAiName = aiName;
-
-
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -1299,42 +1287,49 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 
 // --- 3. 呼叫你的 gemini_11-2.JS API ---
 async function callGeminiAPI(prompt) {
-        const typingId = 'typing-' + Date.now();
-        const history = document.getElementById('chat-history');
-        
-        // 顯示動畫
-        history.innerHTML += `
-            <div class="msg-row ai-row" id="${typingId}">
-                <div class="ai-bubble">
-                    <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-                    <small style="color: #888; display: block; margin-top: 5px; font-size: 10px;">${currentAiName || 'Soosyn'} 正在搜尋中...</small>
+ // 1. 生成一個唯一的 ID 用來控制打字動畫
+    const typingId = 'typing-' + Date.now();
+    const history = document.getElementById('chat-history');
+    
+    // 2. 顯示打字動畫 (複用你原本 html 裡的 CSS class)
+    history.innerHTML += `
+        <div class="msg-row ai-row" id="${typingId}">
+            <div class="ai-bubble">
+                <div class="typing-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
                 </div>
-            </div>`;
-        scrollToBottom();
+                <small style="color: #888; display: block; margin-top: 5px;">Soosyn 正在搜尋中...</small>
+            </div>
+        </div>
+    `;
+    scrollToBottom();  
 
-        try {
-            const res = await fetch('/api/gemini', { // ⚠️ 請確認你的 Vercel 檔案名稱是 gemini.js
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    prompt: prompt,
-                    nickname: currentNickname || "朋友", // 現在這裡有值了！
-                    ai_name: currentAiName || "Soosyn"   // 現在這裡有值了！
-                })
-            });
 
-            const data = await res.json();
-            const typingElem = document.getElementById(typingId);
-            if (typingElem) typingElem.remove();
+ // 這裡對接到你放在 /api/gemini 的 Vercel Function
+    try {
+        const res = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt })
+        });
+        const data = await res.json();
 
-            return data.text || "抱歉，我現在有點詞窮。";
-        } catch (e) {
-            console.error("API Error:", e); // 這行可以在 F12 控制台看到報錯原因
-            const typingElem = document.getElementById(typingId);
-            if (typingElem) typingElem.remove();
-            return "連線至 AI 伺服器失敗。";
-        }
+// 3. 移除動畫
+        const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.remove();
+
+
+
+        return data.text || "抱歉，目前 AI 暫時無法回應。";
+    } catch (e) {
+       const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.remove();
+        return "連線至 AI 伺服器失敗。";
     }
+}
+
 
 
 </script>
