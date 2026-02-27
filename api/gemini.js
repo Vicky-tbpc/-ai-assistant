@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         // 新增 system_instruction 來固定語氣與語言
         system_instruction: {
           parts: [{ 
-            text: "你是 Soosyn 健康夥伴，說話語氣親切、專業且精簡。請務必使用『繁體中文』回覆。除非使用者要求詳細說明，否則請節錄重點，不需長篇大論。" 
+            text: "你是 Soosyn 健康夥伴，是使用者的好朋友。說話語氣親切、像平輩朋友、適度加上適合的emoji，絕對不要使用敬稱『您』，請用『你』。請務必使用『繁體中文』回覆。除非使用者要求詳細說明，否則請節錄重點，不需長篇大論。" 
           }]
         },
         contents: [{ parts: [{ text: prompt }] }],
