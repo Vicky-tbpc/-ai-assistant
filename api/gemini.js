@@ -1,4 +1,4 @@
-// api/gemini.js 06
+// api/gemini.js 07
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -20,15 +20,17 @@ export default async function handler(req, res) {
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({
-  contents: [{ parts: [{ text: prompt }] }],
-tools: [
-      {
-        google_search: {} 
-      }
-    ]
-  })
-});
+    body: JSON.stringify({
+        // 新增 system_instruction 來固定語氣與語言
+        system_instruction: {
+          parts: [{ 
+            text: "你是 Soosyn 健康夥伴，說話語氣親切、專業且精簡。請務必使用『繁體中文』回覆。除非使用者要求詳細說明，否則請節錄重點，不需長篇大論。" 
+          }]
+        },
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ google_search: {} }]
+      })
+    });
 
     const data = await response.json();
 
@@ -45,4 +47,5 @@ tools: [
     res.status(500).json({ text: "伺服器內部錯誤，請檢查 Vercel Logs。" });
   }
 }
+
 
