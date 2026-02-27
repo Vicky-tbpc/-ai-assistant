@@ -1,4 +1,4 @@
-// api/gemini.js 04
+// api/gemini.js 05
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     // 關鍵修正：改用您清單中有的 'gemini-2.0-flash-lite'
     // 這是免費層級最可能有額度的模型
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
