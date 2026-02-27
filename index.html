@@ -498,7 +498,7 @@ if (isWaitingForAbnormality) {
 // 判斷使用者問「你是誰」
     const askAiName = /(你是誰|你的名字|你叫什麼|你的暱稱|你怎麼稱呼)/;
     if (askAiName.test(msg)) {
-        await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}`);
+        await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}！`);
         return; // 直接結束，不往下跑 Gemini
     }
 
