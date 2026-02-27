@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n37</title>
+    <title>Soosyn 健康夥伴 n38</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -420,7 +420,15 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
-    // --- 需求 1 & 2：指標查詢邏輯 ---
+ // --- 生理電量平衡度 ---
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
+        if (hasAnyDate) processBalanceSearch(targetDateStr);
+        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        return;
+    }   
+
+
+// --- 需求 1 & 2：指標查詢邏輯 ---
     if (matchedConfig) {
         if (hasAnyDate || isDefinitionQuery) {
             await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
@@ -442,12 +450,7 @@ const healthConfigs = [
         return; 
     }
 
-    // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
-        if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
-        return;
-    }
+    
 
     if (msg.includes("趨勢")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
