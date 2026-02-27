@@ -390,7 +390,7 @@ const healthConfigs = [
     { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+    { regex: /睡眠時間|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
     
 
     // 新增指標
@@ -1306,4 +1306,5 @@ async function callGeminiAPI(prompt) {
 </script>
 </body>
 </html>
+
 
