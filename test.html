@@ -819,20 +819,19 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 同時抓取生理數據與兩份主觀問卷數據
-    const [healthRes, feedbackRes, surveyRes] = await Promise.all([
+const [healthRes, feedbackRes, surveyRes] = await Promise.all([
         _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).order('record_date', { ascending: false }).limit(days),
         _supabase.from('daily_feedback').select('record_date, self_score').eq('serial_number', currentSerial).order('record_date', { ascending: false }).limit(days),
         _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).order('record_date', { ascending: false }).limit(days)
     ]);
 
-    if (healthRes.error) {
-        card.querySelector('.trend-content').innerHTML = "讀取失敗，請檢查控制台。";
-        return;
-    }
+    // 除錯用：打開瀏覽器控制台 (F12) 看看有沒有抓到資料
+    console.log("Health Data:", healthRes.data);
+    console.log("Feedback Data:", feedbackRes.data);
+    console.log("Survey Data:", surveyRes.data);
 
-    if (!healthRes.data || healthRes.data.length === 0) {
-        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+if (healthRes.error || !healthRes.data || healthRes.data.length === 0) {
+        card.querySelector('.trend-content').innerHTML = healthRes.error ? "讀取失敗" : "暫無數據 😅";
         return;
     }
 
@@ -843,13 +842,36 @@ async function updateTrend(cardId, type, days) {
     // 後放 survey (若有值會蓋掉上面的)
     surveyRes.data?.forEach(d => { if(d.subjective_score) subjectiveMap[d.record_date] = d.subjective_score; });
 
-    // 3. 將主觀分數合併進 sortedData
-    const sortedData = healthRes.data.reverse().map(d => ({
-        ...d,
-        subjective_score: subjectiveMap[d.record_date] || null
-    }));
+    // 處理 daily_feedback
+    if (feedbackRes.data) {
+        feedbackRes.data.forEach(d => {
+            const dateKey = d.record_date.slice(0, 10); // 只取 2024-01-01 這部分
+            subjectiveMap[dateKey] = d.self_score;
+        });
+    }
 
-    const container = card.querySelector('.trend-content');
+    // 處理 user_daily_surveys (優先級高，會覆蓋 feedback)
+    if (surveyRes.data) {
+        surveyRes.data.forEach(d => {
+            const dateKey = d.record_date.slice(0, 10);
+            if (d.subjective_score !== null && d.subjective_score !== undefined) {
+                subjectiveMap[dateKey] = d.subjective_score;
+            }
+        });
+    }
+
+
+
+// 3. 將主觀分數合併進 sortedData
+    const sortedData = healthRes.data.reverse().map(d => {
+        const dateKey = d.record_date.slice(0, 10);
+        return {
+            ...d,
+            subjective_score: subjectiveMap[dateKey] || null
+        };
+    });
+
+const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
 
     const typesToRender = type === 'all' ? ['battery', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
