@@ -8,8 +8,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-   // 1. 取得暱稱
-    const { prompt, nickname, ai_name } = req.body; 
+    const { prompt } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
@@ -21,26 +20,29 @@ export default async function handler(req, res) {
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+      body: JSON.stringify({
         // 新增 system_instruction 來固定語氣與語言
        system_instruction: {
           parts: [{ 
-            text: `你現在的角色是「${ai_name}」，是一個親切的健康夥伴。
+            text: `你現在的角色是一個親切的健康夥伴。
                    你是使用者的平輩好朋友，絕對不要使用敬稱『您』，請用『你』。
-                   請務必使用『繁體中文』回覆。
-                   使用者暱稱是「${nickname}」，打招呼時請親切地稱呼他。
-                   自稱時請使用你的名字「${ai_name}」（例如：嘿 ${nickname}！我是你的夥伴 ${ai_name}）。
+                   請務必使用『繁體中文』回覆，適度加上合適的emoji。
+                  
                    除非要求詳細說明，否則請節錄重點。
                    請直接回答問題，不要輸出任何內心思考或思緒筆記。`
           }]
         },
-   contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ google_search: {} }],
-        generationConfig: {
-          thinking: false // 順便確保關閉思緒筆記
-        }
-      })
-    });
+
+
+
+ contents: [{ parts: [{ text: prompt }] }],
+tools: [
+      {
+        google_search: {} 
+      }
+    ]
+  })
+});
 
     const data = await response.json();
 
