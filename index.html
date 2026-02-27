@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n35</title>
+    <title>Soosyn 健康夥伴 n34</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -261,8 +261,6 @@ function getLocalDateString() {
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentSerial = "";
-let userNickname = "";   // 新增：儲存使用者暱稱
-let aiPartnerName = "";  // 新增：儲存 AI 名字
     let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
 
     // 指標配置
@@ -313,10 +311,6 @@ function getRandomEndQuestion() {
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
 async function initApp(name, aiName) {
-userNickname = name;      // 儲存進全域變數
-    aiPartnerName = aiName;   // 儲存進全域變數
-
-
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -1318,13 +1312,7 @@ async function callGeminiAPI(prompt) {
         const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-prompt: prompt,
-                nickname: userNickname,   // 傳送使用者暱稱
-                ai_name: aiPartnerName    // 傳送 AI 名字
-
-
-})
+            body: JSON.stringify({ prompt: prompt })
         });
         const data = await res.json();
 
