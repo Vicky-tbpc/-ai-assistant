@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n31-1</title>
+    <title>Soosyn 健康夥伴 n35</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -259,6 +259,9 @@ function getLocalDateString() {
     const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
     const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let userNickname = "";
+let assistantName = "";
 
     let currentSerial = "";
     let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
@@ -311,6 +314,9 @@ function getRandomEndQuestion() {
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
 async function initApp(name, aiName) {
+userNickname = name;      // 存入全域變數
+    assistantName = aiName;   // 存入全域變數
+
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -390,7 +396,7 @@ const healthConfigs = [
     { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+    { regex: /睡眠時間|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
     
 
     // 新增指標
@@ -460,11 +466,23 @@ const healthConfigs = [
             return;
         }
     }
+
+// --- 關鍵修改點：在最後的 else 區塊插入 Gemini 轉接邏輯 ---
+if (isWaitingForAbnormality) { 
+        isWaitingForAbnormality = false; 
+        await handleAbnormalityInput(msg); 
+        return; 
+    }
+
+
+
 // 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
-    if (isNamingPhase) {
-        await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+  if (isNamingPhase) {
+    assistantName = msg; // 更新全域變數
+    await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+    // ... 後續維持原本的歡迎詞
         isNamingPhase = false; 
 
 // 修改這裡：取名後不直接看摘要，而是引導進入問卷
@@ -476,14 +494,33 @@ const healthConfigs = [
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
+
+// 判斷使用者問「你是誰」
+    const askAiName = /(你是誰|你的名字|你怎麼稱呼)/;
+    if (askAiName.test(msg)) {
+        await appendAiMessage(`我是你的健康夥伴 ${assistantName || 'Soosyn'}`);
+        return; // 直接結束，不往下跑 Gemini
+    }
+
+    // 判斷使用者問「我是誰」
+    const askUserName = /(我是誰|我的名字|我叫什麼)/;
+    if (askUserName.test(msg)) {
+        await appendAiMessage(`你是 ${userNickname}，我們一起保持健康吧！`);
+        return; // 直接結束，不往下跑 Gemini
+    }
+
+
+
+
+
     
-// 如果單獨輸入日期 (無關鍵字)
-    if (formattedDate) {
+// 這裡原本是處理單獨日期或顯示「收到！正在學習...」的地方
+    if (typeof formattedDate !== 'undefined' && formattedDate) {
         processSummarySearch(formattedDate);
     } else {
-        await appendAiMessage("收到！正在學習更好地協助你。 ✨");
-        await new Promise(r => setTimeout(r, 600));
-        await appendAiMessage(getRandomEndQuestion());
+        // 【取代點】：原本的 appendAiMessage("收到！...");
+        // 改為呼叫我們上一題寫的 Gemini 轉接與同意檢查流程
+        handleGeminiTransfer(msg);
     }
 }
 
@@ -638,15 +675,17 @@ let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為
 
 
 async function fetchSummaryData(targetDate) {
-    // 1. 獲取個人當前與前一天的數據
+    // 1. 獲取個人當前與前兩筆數據（包含目標日期與前一筆）
     const { data: healths } = await _supabase.from('health_data')
         .select('record_date, raw_json')
         .eq('serial_number', currentSerial)
-        .lte('record_date', targetDate)
+        .lte('record_date', targetDate) // 依然維持 lte，因為需要抓取「前一天」來做增減比較
         .order('record_date', { ascending: false })
         .limit(2);
 
-    if (!healths?.length) return null;
+    if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
+    // 這代表「目標日期當天」沒有數據，直接回傳 null
+    if (!healths?.length || healths[0].record_date !== targetDate) return null;
 
    const current = healths[0];
     const raw = current.raw_json;
@@ -1065,7 +1104,7 @@ async function processSummarySearch(d) {
             await appendAiMessage(getRandomEndQuestion());
         }
     } else {
-        await appendAiMessage("這天沒數據喔~ 😅\n可能是沒有上傳，或資料尚未同步完成。 ☁️");
+        await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
     }
 }
 
@@ -1112,7 +1151,7 @@ function showDateActions(type, metricConfig = null) {
 
 function appendSummaryCard(data) {
     const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
-    const lightMap = { '紅燈': '#ff0000', '黃紅燈': '#ff8000', '黃燈': '#ffe632', '綠燈': '#3caa28' };
+    const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
 const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
 
 
@@ -1170,7 +1209,39 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
     async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天有覺得哪裡不舒服嗎？\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻子過敏\n\n如果一切正常，請幫我輸入「無」或「正常」唷！"); }
-    async function handleAbnormalityInput(msg) { const todayStr = getLocalDateString(); await _supabase.from('user_daily_surveys').upsert({ serial_number: currentSerial, record_date: todayStr, subjective_score: tempScore, physical_abnormality: msg }); localStorage.setItem(`last_summary_${currentSerial}`, todayStr); await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); showSummaryFlow(true); }
+    async function handleAbnormalityInput(msg) { 
+const todayStr = getLocalDateString(); 
+await _supabase.from('user_daily_surveys').upsert({ 
+serial_number: currentSerial, 
+record_date: todayStr, 
+subjective_score: tempScore, 
+physical_abnormality: msg 
+}); 
+localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
+
+// 2. 檢查當天是否有健康摘要數據
+    const data = await fetchSummaryData(todayStr);
+if (data) {
+await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
+
+// 顯示圖卡
+        appendSummaryCard(data);
+
+// 顯示後續建議與導引
+        if (data.flowSuggestion) {
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage(data.flowSuggestion);
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+        }
+    } else {
+        // 狀況 B：沒數據 (直接顯示您指定的引導文字)
+        await appendAiMessage("收到了！😊 今天想從哪裡開始呢？趨勢圖表、還是健康摘要呢？");
+    }
+}
+
+
+
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; scrollToBottom(); await new Promise(r => setTimeout(r, 800)); const typingElem = document.getElementById(typingId); if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>'); scrollToBottom(); }
@@ -1180,7 +1251,123 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
     function logout() { location.reload(); }
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-    function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
+  function saveNickname() {
+    const n = document.getElementById('new-nickname').value.trim();
+    if(n) {
+        userNickname = n; // 更新全域變數
+        _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => {
+            document.getElementById('nickname-overlay').classList.add('hidden');
+            initApp(n, assistantName);
+        });
+    }
+}
+
+
+// --- 1. 檢查與處理 Gemini 流程 ---
+async function handleGeminiTransfer(userInput) {
+    try {
+        // 先查詢資料庫是否已經有同意紀錄
+        const { data: permission, error } = await _supabase
+            .from('user_ai_permissions')
+            .select('is_agreed')
+            .eq('serial_number', currentSerial)
+            .single();
+
+        if (permission && permission.is_agreed) {
+            // A. 如果已經同意過，直接發送給 Gemini
+            const aiResponse = await callGeminiAPI(userInput);
+            appendAiMessage(aiResponse);
+        } else {
+            // B. 如果沒紀錄或未同意，顯示詢問介面
+            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將部分資訊傳送至 AI 處理)");
+            
+            // 動態產生同意/不同意按鈕
+            const chatHistory = document.getElementById('chat-history');
+            const btnContainerId = 'consent-btns-' + Date.now();
+            chatHistory.innerHTML += `
+                <div class="msg-row ai-row" id="${btnContainerId}">
+                    <div style="margin-left: 45px; display: flex; gap: 10px;">
+                        <button onclick="saveConsent('${userInput}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#ccc; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">不同意</button>
+                    </div>
+                </div>
+            `;
+            scrollToBottom();
+        }
+    } catch (err) {
+        console.error("Consent check error:", err);
+    }
+}
+
+// --- 2. 儲存同意結果並執行 ---
+async function saveConsent(originalPrompt, agreed, btnId) {
+    // 隱藏按鈕避免重複點擊
+    const btnElem = document.getElementById(btnId);
+    if (btnElem) btnElem.remove();
+
+    if (agreed) {
+        // 寫入 Supabase 新表
+        await _supabase.from('user_ai_permissions').upsert({
+            serial_number: currentSerial,
+            is_agreed: true,
+            agreed_at: new Date()
+        });
+
+        appendAiMessage("感謝您的同意，正在為您尋找答案...");
+        const response = await callGeminiAPI(originalPrompt);
+        appendAiMessage(response);
+    } else {
+        appendAiMessage("好的，我將不會使用 AI 處理此問題。");
+    }
+}
+
+// --- 3. 呼叫你的 gemini_11-2.JS API ---
+async function callGeminiAPI(prompt) {
+ // 1. 生成一個唯一的 ID 用來控制打字動畫
+    const typingId = 'typing-' + Date.now();
+    const history = document.getElementById('chat-history');
+    
+    // 2. 顯示打字動畫 (複用你原本 html 裡的 CSS class)
+    history.innerHTML += `
+        <div class="msg-row ai-row" id="${typingId}">
+            <div class="ai-bubble">
+                <div class="typing-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <small style="color: #888; display: block; margin-top: 5px;">正在搜尋中...</small>
+            </div>
+        </div>
+    `;
+    scrollToBottom();  
+
+
+ // 這裡對接到你放在 /api/gemini 的 Vercel Function
+    try {
+        const res = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt })
+        });
+        const data = await res.json();
+
+// 3. 移除動畫
+        const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.remove();
+
+
+
+        return data.text || "抱歉，目前 AI 暫時無法回應。";
+    } catch (e) {
+       const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.remove();
+        return "連線至 AI 伺服器失敗。";
+    }
+}
+
+
+
 </script>
 </body>
 </html>
