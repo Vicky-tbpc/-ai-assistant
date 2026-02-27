@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n34</title>
+    <title>Soosyn 健康夥伴 n35</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -259,6 +259,9 @@ function getLocalDateString() {
     const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
     const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let userNickname = "";
+let assistantName = "";
 
     let currentSerial = "";
     let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
@@ -311,6 +314,9 @@ function getRandomEndQuestion() {
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
 async function initApp(name, aiName) {
+userNickname = name;      // 存入全域變數
+    assistantName = aiName;   // 存入全域變數
+
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -473,8 +479,10 @@ if (isWaitingForAbnormality) {
 // 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
-    if (isNamingPhase) {
-        await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+  if (isNamingPhase) {
+    assistantName = msg; // 更新全域變數
+    await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+    // ... 後續維持原本的歡迎詞
         isNamingPhase = false; 
 
 // 修改這裡：取名後不直接看摘要，而是引導進入問卷
@@ -486,6 +494,25 @@ if (isWaitingForAbnormality) {
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
+
+// 判斷使用者問「你是誰」
+    const askAiName = /(你是誰|你的名字|你叫什麼|你的暱稱|你怎麼稱呼)/;
+    if (askAiName.test(msg)) {
+        await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}`);
+        return; // 直接結束，不往下跑 Gemini
+    }
+
+    // 判斷使用者問「我是誰」
+    const askUserName = /(我是誰|我的名字|我的暱稱|我怎麼稱呼|我叫什麼)/;
+    if (askUserName.test(msg)) {
+        await appendAiMessage(`你是 ${userNickname} 😄，我們一起保持健康吧！`);
+        return; // 直接結束，不往下跑 Gemini
+    }
+
+
+
+
+
     
 // 這裡原本是處理單獨日期或顯示「收到！正在學習...」的地方
     if (typeof formattedDate !== 'undefined' && formattedDate) {
@@ -1224,7 +1251,16 @@ await appendAiMessage("收到了！來看看健康摘要吧！ ✨");
     function logout() { location.reload(); }
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-    function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
+  function saveNickname() {
+    const n = document.getElementById('new-nickname').value.trim();
+    if(n) {
+        userNickname = n; // 更新全域變數
+        _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => {
+            document.getElementById('nickname-overlay').classList.add('hidden');
+            initApp(n, assistantName);
+        });
+    }
+}
 
 
 // --- 1. 檢查與處理 Gemini 流程 ---
