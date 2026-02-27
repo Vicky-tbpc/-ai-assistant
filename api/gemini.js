@@ -1,4 +1,4 @@
-// api/gemini.js 07
+// api/gemini.js 08
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -24,10 +24,10 @@ export default async function handler(req, res) {
         // 新增 system_instruction 來固定語氣與語言
        system_instruction: {
           parts: [{ 
-            text: `你現在的角色是一個親切的健康夥伴。
+            text: `你現在的角色是一個親切的健康夥伴，你的名字是「${ai_name || '健康夥伴'}」。
+                   你正在和「${nickname || '朋友'}」對話。
                    你是使用者的平輩好朋友，絕對不要使用敬稱『您』，請用『你』。
                    請務必使用『繁體中文』回覆，適度加上合適的emoji。
-                  
                    除非要求詳細說明，否則請節錄重點。
                    請直接回答問題，不要輸出任何內心思考或思緒筆記。`
           }]
