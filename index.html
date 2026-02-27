@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n32</title>
+    <title>Soosyn 健康夥伴 n33</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -390,7 +390,7 @@ const healthConfigs = [
     { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    { regex: /睡眠|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+    { regex: /睡眠時間|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
     
 
     // 新增指標
@@ -460,6 +460,16 @@ const healthConfigs = [
             return;
         }
     }
+
+// --- 關鍵修改點：在最後的 else 區塊插入 Gemini 轉接邏輯 ---
+if (isWaitingForAbnormality) { 
+        isWaitingForAbnormality = false; 
+        await handleAbnormalityInput(msg); 
+        return; 
+    }
+
+
+
 // 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
@@ -477,13 +487,13 @@ const healthConfigs = [
     return;
 }
     
-// 如果單獨輸入日期 (無關鍵字)
-    if (formattedDate) {
+// 這裡原本是處理單獨日期或顯示「收到！正在學習...」的地方
+    if (typeof formattedDate !== 'undefined' && formattedDate) {
         processSummarySearch(formattedDate);
     } else {
-        await appendAiMessage("收到！正在學習更好地協助你。 ✨");
-        await new Promise(r => setTimeout(r, 600));
-        await appendAiMessage(getRandomEndQuestion());
+        // 【取代點】：原本的 appendAiMessage("收到！...");
+        // 改為呼叫我們上一題寫的 Gemini 轉接與同意檢查流程
+        handleGeminiTransfer(msg);
     }
 }
 
@@ -1215,6 +1225,84 @@ await appendAiMessage("收到了！來看看健康摘要吧！ ✨");
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
     function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
+
+
+// --- 1. 檢查與處理 Gemini 流程 ---
+async function handleGeminiTransfer(userInput) {
+    try {
+        // 先查詢資料庫是否已經有同意紀錄
+        const { data: permission, error } = await _supabase
+            .from('user_ai_permissions')
+            .select('is_agreed')
+            .eq('serial_number', currentSerial)
+            .single();
+
+        if (permission && permission.is_agreed) {
+            // A. 如果已經同意過，直接發送給 Gemini
+            const aiResponse = await callGeminiAPI(userInput);
+            appendAiMessage(aiResponse);
+        } else {
+            // B. 如果沒紀錄或未同意，顯示詢問介面
+            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將部分資訊傳送至 AI 處理)");
+            
+            // 動態產生同意/不同意按鈕
+            const chatHistory = document.getElementById('chat-history');
+            const btnContainerId = 'consent-btns-' + Date.now();
+            chatHistory.innerHTML += `
+                <div class="msg-row ai-row" id="${btnContainerId}">
+                    <div style="margin-left: 45px; display: flex; gap: 10px;">
+                        <button onclick="saveConsent('${userInput}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#ccc; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">不同意</button>
+                    </div>
+                </div>
+            `;
+            scrollToBottom();
+        }
+    } catch (err) {
+        console.error("Consent check error:", err);
+    }
+}
+
+// --- 2. 儲存同意結果並執行 ---
+async function saveConsent(originalPrompt, agreed, btnId) {
+    // 隱藏按鈕避免重複點擊
+    const btnElem = document.getElementById(btnId);
+    if (btnElem) btnElem.remove();
+
+    if (agreed) {
+        // 寫入 Supabase 新表
+        await _supabase.from('user_ai_permissions').upsert({
+            serial_number: currentSerial,
+            is_agreed: true,
+            agreed_at: new Date()
+        });
+
+        appendAiMessage("感謝您的同意，正在為您尋找答案...");
+        const response = await callGeminiAPI(originalPrompt);
+        appendAiMessage(response);
+    } else {
+        appendAiMessage("好的，我將不會使用 AI 處理此問題。");
+    }
+}
+
+// --- 3. 呼叫你的 gemini_11-2.JS API ---
+async function callGeminiAPI(prompt) {
+    // 這裡對接到你放在 /api/gemini 的 Vercel Function
+    try {
+        const res = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt })
+        });
+        const data = await res.json();
+        return data.text || "抱歉，目前 AI 暫時無法回應。";
+    } catch (e) {
+        return "連線至 AI 伺服器失敗。";
+    }
+}
+
+
+
 </script>
 </body>
 </html>
