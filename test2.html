@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n33</title>
+    <title>Soosyn 健康夥伴 n34</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1287,7 +1287,27 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 
 // --- 3. 呼叫你的 gemini_11-2.JS API ---
 async function callGeminiAPI(prompt) {
-    // 這裡對接到你放在 /api/gemini 的 Vercel Function
+ // 1. 生成一個唯一的 ID 用來控制打字動畫
+    const typingId = 'typing-' + Date.now();
+    const history = document.getElementById('chat-history');
+    
+    // 2. 顯示打字動畫 (複用你原本 html 裡的 CSS class)
+    history.innerHTML += `
+        <div class="msg-row ai-row" id="${typingId}">
+            <div class="ai-bubble">
+                <div class="typing-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <small style="color: #888; display: block; margin-top: 5px;">Soosyn 正在搜尋中...</small>
+            </div>
+        </div>
+    `;
+    scrollToBottom();  
+
+
+ // 這裡對接到你放在 /api/gemini 的 Vercel Function
     try {
         const res = await fetch('/api/gemini', {
             method: 'POST',
@@ -1295,8 +1315,17 @@ async function callGeminiAPI(prompt) {
             body: JSON.stringify({ prompt: prompt })
         });
         const data = await res.json();
+
+// 3. 移除動畫
+        const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.remove();
+
+
+
         return data.text || "抱歉，目前 AI 暫時無法回應。";
     } catch (e) {
+       const typingElem = document.getElementById(typingId);
+        if (typingElem) typingElem.remove();
         return "連線至 AI 伺服器失敗。";
     }
 }
@@ -1306,5 +1335,4 @@ async function callGeminiAPI(prompt) {
 </script>
 </body>
 </html>
-
 
