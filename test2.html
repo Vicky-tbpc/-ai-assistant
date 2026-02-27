@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n34</title>
+    <title>Soosyn 健康夥伴 n35</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1312,7 +1312,13 @@ async function callGeminiAPI(prompt) {
         const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
+           body: JSON.stringify({ 
+                prompt: prompt,
+                // --- 新增這行，傳送暱稱 ---
+                nickname: currentNickname || "朋友",
+                // --- 新增這行，傳送 AI 的名字 ---
+                ai_name: currentAiName || "Soosyn" 
+            })
         });
         const data = await res.json();
 
