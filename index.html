@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n35</title>
+    <title>Soosyn 健康夥伴 n37</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -819,25 +819,44 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 修正：移除查詢中的 Daily_Tag，因為它在 raw_json 裡面
-    const { data, error } = await _supabase.from('health_data')
+    // 1. 抓取生理數據 (health_data)
+    const { data: healthData, error } = await _supabase.from('health_data')
         .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
         .order('record_date', { ascending: false })
         .limit(days);
 
-    if (error) {
-        console.error("資料讀取錯誤:", error);
-        card.querySelector('.trend-content').innerHTML = "讀取失敗，請檢查控制台。";
+    if (error || !healthData || healthData.length === 0) {
+        card.querySelector('.trend-content').innerHTML = error ? "讀取失敗" : "暫無數據 😅";
         return;
     }
 
-    if (!data || data.length === 0) {
-        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
-        return;
+    const sortedData = healthData.reverse();
+    const dateRange = sortedData.map(d => d.record_date);
+
+    // 2. 抓取個人感受數據 (從兩個表抓)
+    const [feedbackRes, surveyRes] = await Promise.all([
+        _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', dateRange),
+        _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', dateRange)
+    ]);
+
+    // 3. 建立日期索引的感受數據地圖 (優先序：daily_feedback > user_daily_surveys)
+    const subjectiveMap = {};
+    
+    // 先塞 survey 的數據 (備案)
+    if (surveyRes.data) {
+        surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
+    }
+    // 再塞 feedback 的數據 (若有則覆蓋，符合優先權)
+    if (feedbackRes.data) {
+        feedbackRes.data.forEach(d => {
+            const val = d.raw_json?.["自評電量"];
+            if (val !== undefined && val !== null) {
+                subjectiveMap[d.record_date] = Number(val);
+            }
+        });
     }
 
-    const sortedData = data.reverse();
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
 
@@ -847,7 +866,8 @@ async function updateTrend(cardId, type, days) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
-        drawSingleChart(chartBox, t, sortedData);
+        // 將 subjectiveMap 傳入
+        drawSingleChart(chartBox, t, sortedData, subjectiveMap);
     }
 }
 
@@ -857,10 +877,10 @@ async function updateTrend(cardId, type, days) {
 
 
 
-
-function drawSingleChart(container, type, rawData) {
+function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
         battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "低於個人平均" },
+     
         n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
@@ -872,6 +892,11 @@ function drawSingleChart(container, type, rawData) {
     const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
+
+
+
+// 準備個人感受數據
+const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 
     // 計算平均值邏輯 (保持不變)
     dailyValues.forEach((val, i) => {
@@ -929,6 +954,7 @@ function drawSingleChart(container, type, rawData) {
 
     const datasets = [
         {
+            label: '當日數值',             
             type: 'line',
             data: dailyValues,
             borderColor: '#999999',
@@ -939,6 +965,26 @@ function drawSingleChart(container, type, rawData) {
             zIndex: 10
         }
     ];
+
+
+// 如果是生理電量，新增一條「個人感受」曲線
+    if (type === 'battery') {
+        datasets.push({
+            label: '個人感受',
+            type: 'line',
+            data: subjectiveValues,
+            borderColor: '#a79d8c', // 大地色/褐色
+            borderWidth: 2,
+            borderDash: [5, 3], // 虛線區分
+            pointBackgroundColor: '#a79d8c',
+            pointRadius: 3,
+            spanGaps: true, // 沒填問卷時連起來
+            zIndex: 5
+        });
+    }
+
+
+
 
     if (type === 'rmssd' || type === 'hrmin') {
         datasets.push({
@@ -986,6 +1032,14 @@ function renderLegend(type, abnormalLabel) {
         <div class="legend-row"><div class="dot-sample" style="background:#596b75"></div> 當日數值</div>
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
+
+
+// 生理電量特有圖例
+    if (type === 'battery') {
+        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 個人感受</div>`;
+    }
+
+
     if (type === 'n3') {
         html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (10-20)</div>`;
     }
