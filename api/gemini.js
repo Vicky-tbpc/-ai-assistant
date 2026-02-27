@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     // 關鍵修正：改用您清單中有的 'gemini-2.0-flash-lite'
     // 這是免費層級最可能有額度的模型
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -45,3 +45,4 @@ tools: [
     res.status(500).json({ text: "伺服器內部錯誤，請檢查 Vercel Logs。" });
   }
 }
+
