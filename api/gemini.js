@@ -1,4 +1,4 @@
-// api/gemini.js 05
+// api/gemini.js 06
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -22,18 +22,13 @@ export default async function handler(req, res) {
       headers: { "Content-Type": "application/json" },
      body: JSON.stringify({
   contents: [{ parts: [{ text: prompt }] }],
-  tools: [
-    {
-      google_search_retrieval: {
-        dynamic_retrieval_config: {
-          mode: "MODE_DYNAMIC", // <-- 這裡補上 MODE_
-          dynamic_threshold: 0.3, // 偵測到需要搜尋時自動啟動
-        },
-      },
-    },
-  ],
-})
-    });
+tools: [
+      {
+        google_search: {} 
+      }
+    ]
+  })
+});
 
     const data = await response.json();
 
