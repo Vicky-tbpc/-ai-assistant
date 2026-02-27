@@ -1,4 +1,4 @@
-// api/gemini.js 03
+// api/gemini.js 04
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     {
       google_search_retrieval: {
         dynamic_retrieval_config: {
-          mode: "DYNAMIC",
+          mode: "MODE_DYNAMIC", // <-- 這裡補上 MODE_
           dynamic_threshold: 0.3, // 偵測到需要搜尋時自動啟動
         },
       },
