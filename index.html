@@ -337,7 +337,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -479,7 +479,7 @@ if (isWaitingForAbnormality) {
 
 
 
-// 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
+// 在處理任何新訊息邏輯前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
   if (isNamingPhase) {
@@ -493,7 +493,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
@@ -1336,7 +1336,7 @@ async function handleGeminiTransfer(userInput) {
             appendAiMessage(aiResponse);
         } else {
             // B. 如果沒紀錄或未同意，顯示詢問介面
-            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將部分資訊傳送至 AI 處理)");
+            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
             // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
@@ -1395,7 +1395,7 @@ async function callGeminiAPI(prompt) {
                     <div class="dot"></div>
                     <div class="dot"></div>
                 </div>
-                <small style="color: #888; display: block; margin-top: 5px;">正在搜尋中...</small>
+                <small style="color: #888; display: block; margin-top: 5px;">正在思考中...</small>
             </div>
         </div>
     `;
