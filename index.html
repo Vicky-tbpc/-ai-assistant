@@ -499,7 +499,7 @@ if (isWaitingForAbnormality) {
 }
 
 // 判斷使用者問「你是誰」
-    const askAiName = /(你是誰|你的名字|你叫什麼|你的暱稱|你怎麼稱呼)/;
+    const askAiName = /(你是誰|妳是誰|您是誰|你的名字|妳的名字|您的名字|你叫什麼|妳叫什麼|您叫什麼|你的暱稱|妳的暱稱|您的暱稱|你怎麼稱呼|妳怎麼稱呼|您怎麼稱呼)/;
     if (askAiName.test(msg)) {
         await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}！`);
         return; // 直接結束，不往下跑 Gemini
@@ -882,7 +882,7 @@ async function updateTrend(cardId, type, days) {
 
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
-        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "低於個人平均" },
+        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
      
         n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
@@ -973,7 +973,7 @@ const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 // 如果是生理電量，新增一條「個人感受」曲線
     if (type === 'battery') {
         datasets.push({
-            label: '主觀感受',
+            label: '體感數值',
             type: 'line',
             data: subjectiveValues,
             borderColor: '#a79d8c', // 大地色/褐色
@@ -1039,7 +1039,7 @@ function renderLegend(type, abnormalLabel) {
 
 // 生理電量特有圖例
     if (type === 'battery') {
-        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 主觀感受</div>`;
+        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
 
 
