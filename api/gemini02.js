@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    const { prompt, serial_number, record_date, user_vitals } = req.body; // 假設你多傳了 vital 資料
+    const { prompt, serial_number, record_date } = req.body;
     
     // 從環境變數讀取 Key (記得去 Vercel 設定)
     const geminiKey = process.env.GEMINI_API_KEY;
@@ -31,13 +31,6 @@ export default async function handler(req, res) {
 
     // 2. 組合給 Gemini 的指令
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-
-const promptText = `
-使用者當前自測資料：${JSON.stringify(user_vitals)}
-資料庫歷史 raw_json 資料：${healthData}
-使用者提出的問題：${prompt}
-`;
-
 
     const response = await fetch(geminiUrl, {
       method: "POST",
@@ -80,9 +73,10 @@ const promptText = `
                    除非要求詳細說明，否則請節錄重點。
                    請直接回答問題，不要輸出任何內心思考或思緒筆記。` 
           }]
-        }
-        contents: [{ parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }]
-
+        },
+        contents: [{ 
+          parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }] 
+        }]
       })
     });
 
