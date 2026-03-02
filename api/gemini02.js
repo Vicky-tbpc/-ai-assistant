@@ -81,8 +81,10 @@ const promptText = `
                    請直接回答問題，不要輸出任何內心思考或思緒筆記。` 
           }]
         },
-        contents: [{ 
-          parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }] 
+        contents: [{ parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }],
+tools: [
+      {
+        google_search: {}  
         }]
       })
     });
