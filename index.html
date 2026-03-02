@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n39-1</title>
+    <title>Soosyn 健康夥伴 n39-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -980,7 +980,7 @@ const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 // 如果是生理電量，新增一條「個人感受」曲線
     if (type === 'battery') {
         datasets.push({
-            label: '主觀感受',
+            label: '體感數值',
             type: 'line',
             data: subjectiveValues,
             borderColor: '#a79d8c', // 大地色/褐色
@@ -1046,7 +1046,7 @@ function renderLegend(type, abnormalLabel) {
 
 // 生理電量特有圖例
     if (type === 'battery') {
-        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 主觀感受</div>`;
+        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
 
 
