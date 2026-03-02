@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n37</title>
+    <title>Soosyn 健康夥伴 n39</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -293,7 +293,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
         "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期", "生理電量"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -337,7 +337,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -420,7 +420,15 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
-    // --- 需求 1 & 2：指標查詢邏輯 ---
+ // --- 生理電量平衡度 ---
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡")) && !isDefinitionQuery) {
+        if (hasAnyDate) processBalanceSearch(targetDateStr);
+        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        return;
+    }   
+
+
+// --- 需求 1 & 2：指標查詢邏輯 ---
     if (matchedConfig) {
         if (hasAnyDate || isDefinitionQuery) {
             await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
@@ -442,12 +450,7 @@ const healthConfigs = [
         return; 
     }
 
-    // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
-        if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
-        return;
-    }
+    
 
     if (msg.includes("趨勢")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
@@ -476,7 +479,7 @@ if (isWaitingForAbnormality) {
 
 
 
-// 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
+// 在處理任何新訊息邏輯前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
   if (isNamingPhase) {
@@ -490,13 +493,13 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
 
 // 判斷使用者問「你是誰」
-    const askAiName = /(你是誰|你的名字|你叫什麼|你的暱稱|你怎麼稱呼)/;
+    const askAiName = /(你是誰|妳是誰|您是誰|你的名字|妳的名字|您的名字|你名字|妳名字|您名字|你 名字|妳 名字|您 名字|你叫什麼|妳叫什麼|您叫什麼|你的暱稱|妳的暱稱|您的暱稱|你怎麼稱呼|妳怎麼稱呼|您怎麼稱呼)/;
     if (askAiName.test(msg)) {
         await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}！`);
         return; // 直接結束，不往下跑 Gemini
@@ -879,7 +882,7 @@ async function updateTrend(cardId, type, days) {
 
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
-        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "低於個人平均" },
+        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
      
         n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
@@ -970,7 +973,7 @@ const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 // 如果是生理電量，新增一條「個人感受」曲線
     if (type === 'battery') {
         datasets.push({
-            label: '個人感受',
+            label: '體感數值',
             type: 'line',
             data: subjectiveValues,
             borderColor: '#a79d8c', // 大地色/褐色
@@ -1036,7 +1039,7 @@ function renderLegend(type, abnormalLabel) {
 
 // 生理電量特有圖例
     if (type === 'battery') {
-        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 個人感受</div>`;
+        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
 
 
@@ -1333,7 +1336,7 @@ async function handleGeminiTransfer(userInput) {
             appendAiMessage(aiResponse);
         } else {
             // B. 如果沒紀錄或未同意，顯示詢問介面
-            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將部分資訊傳送至 AI 處理)");
+            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
             // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
@@ -1341,8 +1344,10 @@ async function handleGeminiTransfer(userInput) {
             chatHistory.innerHTML += `
                 <div class="msg-row ai-row" id="${btnContainerId}">
                     <div style="margin-left: 45px; display: flex; gap: 10px;">
-                        <button onclick="saveConsent('${userInput}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">同意並查詢</button>
-                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#ccc; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">不同意</button>
+                        <button onclick="saveConsent('${userInput}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; 
+font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#a79d8c; color:white; border:none; 
+font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">不同意</button>
                     </div>
                 </div>
             `;
@@ -1378,8 +1383,11 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 // --- 3. 呼叫你的 gemini_11-2.JS API ---
 async function callGeminiAPI(prompt) {
  // 1. 生成一個唯一的 ID 用來控制打字動畫
-    const typingId = 'typing-' + Date.now();
-    const history = document.getElementById('chat-history');
+   const prompt = document.getElementById("gemini-prompt").value;
+    const serial_number = document.getElementById("serial_number").value; // 確保有抓到序號
+    const record_date = document.getElementById("record_date").value;     // 確保有抓到日期
+
+    if (!prompt) return alert("請輸入問題");
     
     // 2. 顯示打字動畫 (複用你原本 html 裡的 CSS class)
     history.innerHTML += `
@@ -1390,7 +1398,7 @@ async function callGeminiAPI(prompt) {
                     <div class="dot"></div>
                     <div class="dot"></div>
                 </div>
-                <small style="color: #888; display: block; margin-top: 5px;">正在搜尋中...</small>
+                <small style="color: #888; display: block; margin-top: 5px;">正在思考中...</small>
             </div>
         </div>
     `;
@@ -1398,14 +1406,19 @@ async function callGeminiAPI(prompt) {
 
 
  // 這裡對接到你放在 /api/gemini 的 Vercel Function
-    try {
-        const res = await fetch('/api/gemini', {
+try {
+        // 這裡的 URL 記得要改成你在 Vercel 上的檔案路徑
+        // 假設你的檔名是 gemini_07_改語氣.js，路徑通常是 /api/gemini_07_改語氣
+        const res = await fetch('/api/gemini02', { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
+            body: JSON.stringify({ 
+                prompt: prompt,
+                serial_number: serial_number,
+                record_date: record_date
+            })
         });
         const data = await res.json();
-
 // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
