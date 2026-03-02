@@ -1380,35 +1380,46 @@ async function saveConsent(originalPrompt, agreed, btnId) {
     }
 }
 
-// --- 3. 呼叫你的 gemini_11-2.JS API ---
-async function callGeminiAPI(prompt) {
- // 1. 生成一個唯一的 ID 用來控制打字動畫
-   const prompt = document.getElementById("gemini-prompt").value;
-    const serial_number = document.getElementById("serial_number").value; // 確保有抓到序號
-    const record_date = document.getElementById("record_date").value;     // 確保有抓到日期
-
-    if (!prompt) return alert("請輸入問題");
+// 1. 修改後的呼叫函數：增加序號和日期參數
+async function askGemini() {
+    const promptInput = document.getElementById('gemini-prompt');
+    const prompt = promptInput.value.trim();
     
-    // 2. 顯示打字動畫 (複用你原本 html 裡的 CSS class)
+    // 這裡要抓到畫面上輸入的序號與日期
+    const serial_number = document.getElementById('serial_number').value;
+    const record_date = document.getElementById('record_date').value;
+
+    if (!prompt) return;
+    if (!serial_number || !record_date) {
+        alert("請先填寫序號和日期，Gemini 才能幫你分析數據喔！");
+        return;
+    }
+
+    addMessageToChat('user', prompt);
+    promptInput.value = '';
+
+    // 把序號和日期傳給 API
+    const response = await callGeminiAPI(prompt, serial_number, record_date);
+    addMessageToChat('ai', response);
+}
+
+// 2. 修改後的 API 傳送邏輯
+async function callGeminiAPI(prompt, serial_number, record_date) {
+    const typingId = 'typing-' + Date.now();
+    const history = document.getElementById('chat-history');
+    
     history.innerHTML += `
         <div class="msg-row ai-row" id="${typingId}">
             <div class="ai-bubble">
-                <div class="typing-dots">
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                </div>
-                <small style="color: #888; display: block; margin-top: 5px;">正在思考中...</small>
+                <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                <small style="color: #888; display: block; margin-top: 5px;">正在分析你的健康數據...</small>
             </div>
         </div>
     `;
     scrollToBottom();  
 
-
- // 這裡對接到你放在 /api/gemini 的 Vercel Function
-try {
-        // 這裡的 URL 記得要改成你在 Vercel 上的檔案路徑
-        // 假設你的檔名是 gemini_07_改語氣.js，路徑通常是 /api/gemini_07_改語氣
+    try {
+        // 注意：這裡的路徑要跟你在 Vercel api 資料夾內的檔名一致
         const res = await fetch('/api/gemini02', { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1419,20 +1430,17 @@ try {
             })
         });
         const data = await res.json();
-// 3. 移除動畫
+
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
-
-
         return data.text || "抱歉，目前 AI 暫時無法回應。";
     } catch (e) {
-       const typingElem = document.getElementById(typingId);
+        const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
-        return "連線至 AI 伺服器失敗。";
+        return "連線至 AI 伺服器失敗，請確認 Vercel 設定。";
     }
 }
-
 
 
 </script>
