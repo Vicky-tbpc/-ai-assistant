@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n35</title>
+    <title>Soosyn 健康夥伴 n39-3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -259,6 +259,9 @@ function getLocalDateString() {
     const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
     const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let userNickname = "";
+let assistantName = "";
 
     let currentSerial = "";
     let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
@@ -311,6 +314,9 @@ function getRandomEndQuestion() {
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
 async function initApp(name, aiName) {
+userNickname = name;      // 存入全域變數
+    assistantName = aiName;   // 存入全域變數
+
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
@@ -414,7 +420,18 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
-    // --- 需求 1 & 2：指標查詢邏輯 ---
+    
+    // --- 生理電量平衡度 ---
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
+        if (hasAnyDate) processBalanceSearch(targetDateStr);
+        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        return;
+    }
+
+
+
+
+// --- 需求 1 & 2：指標查詢邏輯 ---
     if (matchedConfig) {
         if (hasAnyDate || isDefinitionQuery) {
             await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
@@ -425,7 +442,11 @@ const healthConfigs = [
         return;
     }
 
-    // --- 需求 1 & 2：健康摘要邏輯 ---
+    
+
+
+
+// --- 需求 1 & 2：健康摘要邏輯 ---
     if (msg.includes("健康摘要")) {
         if (hasAnyDate) {
             processSummarySearch(targetDateStr);
@@ -436,12 +457,7 @@ const healthConfigs = [
         return; 
     }
 
-    // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
-        if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
-        return;
-    }
+
 
     if (msg.includes("趨勢")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
@@ -473,8 +489,10 @@ if (isWaitingForAbnormality) {
 // 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
-    if (isNamingPhase) {
-        await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+  if (isNamingPhase) {
+    assistantName = msg; // 更新全域變數
+    await _supabase.from('user_credentials').update({ ai_name: msg }).eq('serial_number', currentSerial);
+    // ... 後續維持原本的歡迎詞
         isNamingPhase = false; 
 
 // 修改這裡：取名後不直接看摘要，而是引導進入問卷
@@ -486,6 +504,25 @@ if (isWaitingForAbnormality) {
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
+
+// 判斷使用者問「你是誰」
+    const askAiName = /(你是誰|妳是誰|您是誰|你的名字|你叫什麼|你的暱稱|你怎麼稱呼)/;
+    if (askAiName.test(msg)) {
+        await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}！`);
+        return; // 直接結束，不往下跑 Gemini
+    }
+
+    // 判斷使用者問「我是誰」
+    const askUserName = /(我是誰|我的名字|我的暱稱|我怎麼稱呼|我叫什麼)/;
+    if (askUserName.test(msg)) {
+        await appendAiMessage(`你是 ${userNickname} 😄，我們一起保持健康吧！`);
+        return; // 直接結束，不往下跑 Gemini
+    }
+
+
+
+
+
     
 // 這裡原本是處理單獨日期或顯示「收到！正在學習...」的地方
     if (typeof formattedDate !== 'undefined' && formattedDate) {
@@ -792,25 +829,44 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 修正：移除查詢中的 Daily_Tag，因為它在 raw_json 裡面
-    const { data, error } = await _supabase.from('health_data')
+    // 1. 抓取生理數據 (health_data)
+    const { data: healthData, error } = await _supabase.from('health_data')
         .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
         .order('record_date', { ascending: false })
         .limit(days);
 
-    if (error) {
-        console.error("資料讀取錯誤:", error);
-        card.querySelector('.trend-content').innerHTML = "讀取失敗，請檢查控制台。";
+    if (error || !healthData || healthData.length === 0) {
+        card.querySelector('.trend-content').innerHTML = error ? "讀取失敗" : "暫無數據 😅";
         return;
     }
 
-    if (!data || data.length === 0) {
-        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
-        return;
+    const sortedData = healthData.reverse();
+    const dateRange = sortedData.map(d => d.record_date);
+
+    // 2. 抓取個人感受數據 (從兩個表抓)
+    const [feedbackRes, surveyRes] = await Promise.all([
+        _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', dateRange),
+        _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', dateRange)
+    ]);
+
+    // 3. 建立日期索引的感受數據地圖 (優先序：daily_feedback > user_daily_surveys)
+    const subjectiveMap = {};
+    
+    // 先塞 survey 的數據 (備案)
+    if (surveyRes.data) {
+        surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
+    }
+    // 再塞 feedback 的數據 (若有則覆蓋，符合優先權)
+    if (feedbackRes.data) {
+        feedbackRes.data.forEach(d => {
+            const val = d.raw_json?.["自評電量"];
+            if (val !== undefined && val !== null) {
+                subjectiveMap[d.record_date] = Number(val);
+            }
+        });
     }
 
-    const sortedData = data.reverse();
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
 
@@ -820,7 +876,8 @@ async function updateTrend(cardId, type, days) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
-        drawSingleChart(chartBox, t, sortedData);
+        // 將 subjectiveMap 傳入
+        drawSingleChart(chartBox, t, sortedData, subjectiveMap);
     }
 }
 
@@ -830,10 +887,10 @@ async function updateTrend(cardId, type, days) {
 
 
 
-
-function drawSingleChart(container, type, rawData) {
+function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
-        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "低於個人平均" },
+        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
+     
         n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
@@ -845,6 +902,11 @@ function drawSingleChart(container, type, rawData) {
     const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
+
+
+
+// 準備個人感受數據
+const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 
     // 計算平均值邏輯 (保持不變)
     dailyValues.forEach((val, i) => {
@@ -902,6 +964,7 @@ function drawSingleChart(container, type, rawData) {
 
     const datasets = [
         {
+            label: '當日數值',             
             type: 'line',
             data: dailyValues,
             borderColor: '#999999',
@@ -912,6 +975,26 @@ function drawSingleChart(container, type, rawData) {
             zIndex: 10
         }
     ];
+
+
+// 如果是生理電量，新增一條「個人感受」曲線
+    if (type === 'battery') {
+        datasets.push({
+            label: '體感數值',
+            type: 'line',
+            data: subjectiveValues,
+            borderColor: '#a79d8c', // 大地色/褐色
+            borderWidth: 2,
+            borderDash: [5, 3], // 虛線區分
+            pointBackgroundColor: '#a79d8c',
+            pointRadius: 3,
+            spanGaps: true, // 沒填問卷時連起來
+            zIndex: 5
+        });
+    }
+
+
+
 
     if (type === 'rmssd' || type === 'hrmin') {
         datasets.push({
@@ -959,6 +1042,14 @@ function renderLegend(type, abnormalLabel) {
         <div class="legend-row"><div class="dot-sample" style="background:#596b75"></div> 當日數值</div>
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
+
+
+// 生理電量特有圖例
+    if (type === 'battery') {
+        html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
+    }
+
+
     if (type === 'n3') {
         html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (10-20)</div>`;
     }
@@ -1224,7 +1315,16 @@ await appendAiMessage("收到了！來看看健康摘要吧！ ✨");
     function logout() { location.reload(); }
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
-    function saveNickname() { const n = document.getElementById('new-nickname').value.trim(); if(n) { _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => { document.getElementById('nickname-overlay').classList.add('hidden'); initApp(n, null); }); } }
+  function saveNickname() {
+    const n = document.getElementById('new-nickname').value.trim();
+    if(n) {
+        userNickname = n; // 更新全域變數
+        _supabase.from('user_credentials').update({ nickname: n }).eq('serial_number', currentSerial).then(() => {
+            document.getElementById('nickname-overlay').classList.add('hidden');
+            initApp(n, assistantName);
+        });
+    }
+}
 
 
 // --- 1. 檢查與處理 Gemini 流程 ---
@@ -1243,7 +1343,7 @@ async function handleGeminiTransfer(userInput) {
             appendAiMessage(aiResponse);
         } else {
             // B. 如果沒紀錄或未同意，顯示詢問介面
-            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將部分資訊傳送至 AI 處理)");
+            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
             // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
@@ -1251,8 +1351,10 @@ async function handleGeminiTransfer(userInput) {
             chatHistory.innerHTML += `
                 <div class="msg-row ai-row" id="${btnContainerId}">
                     <div style="margin-left: 45px; display: flex; gap: 10px;">
-                        <button onclick="saveConsent('${userInput}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">同意並查詢</button>
-                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#ccc; color:white; border:none; padding:8px 15px; border-radius:10px; cursor:pointer;">不同意</button>
+                        <button onclick="saveConsent('${userInput}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; 
+font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#a79d8c; color:white; border:none; 
+font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">不同意</button>
                     </div>
                 </div>
             `;
@@ -1300,7 +1402,7 @@ async function callGeminiAPI(prompt) {
                     <div class="dot"></div>
                     <div class="dot"></div>
                 </div>
-                <small style="color: #888; display: block; margin-top: 5px;">Soosyn 正在搜尋中...</small>
+                <small style="color: #888; display: block; margin-top: 5px;">正在思考中...</small>
             </div>
         </div>
     `;
@@ -1312,13 +1414,7 @@ async function callGeminiAPI(prompt) {
         const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ 
-                prompt: prompt,
-                // --- 新增這行，傳送暱稱 ---
-                nickname: currentNickname || "朋友",
-                // --- 新增這行，傳送 AI 的名字 ---
-                ai_name: currentAiName || "Soosyn" 
-            })
+            body: JSON.stringify({ prompt: prompt })
         });
         const data = await res.json();
 
