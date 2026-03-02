@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n39</title>
+    <title>Soosyn 健康夥伴 n39-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1343,7 +1343,7 @@ async function handleGeminiTransfer(userInput) {
             appendAiMessage(aiResponse);
         } else {
             // B. 如果沒紀錄或未同意，顯示詢問介面
-            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將部分資訊傳送至 AI 處理)");
+            appendAiMessage("這超出了我的基礎功能。您是否同意讓 Soosyn AI (Gemini) 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
             // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
@@ -1402,7 +1402,7 @@ async function callGeminiAPI(prompt) {
                     <div class="dot"></div>
                     <div class="dot"></div>
                 </div>
-                <small style="color: #888; display: block; margin-top: 5px;">正在搜尋中...</small>
+                <small style="color: #888; display: block; margin-top: 5px;">正在思考中...</small>
             </div>
         </div>
     `;
