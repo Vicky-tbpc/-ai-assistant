@@ -80,12 +80,9 @@ const promptText = `
                    除非要求詳細說明，否則請節錄重點。
                    請直接回答問題，不要輸出任何內心思考或思緒筆記。` 
           }]
-        },
-        contents: [{ parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }],
-tools: [
-      {
-        google_search: {}  
-        }]
+        }
+        contents: [{ parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }]
+
       })
     });
 
