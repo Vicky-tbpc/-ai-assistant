@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n39-2</title>
+    <title>Soosyn 健康夥伴 n38</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -293,7 +293,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
         "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理電量", "生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡度", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡度？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡度", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期", "生理電量"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -337,7 +337,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -420,15 +420,12 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
-    
-    // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡度")) && !isDefinitionQuery) {
+ // --- 生理電量平衡度 ---
+    if ((msg.includes("平衡度") || msg.includes("生理電量平衡")) && !isDefinitionQuery) {
         if (hasAnyDate) processBalanceSearch(targetDateStr);
         else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
         return;
-    }
-
-
+    }   
 
 
 // --- 需求 1 & 2：指標查詢邏輯 ---
@@ -442,11 +439,7 @@ const healthConfigs = [
         return;
     }
 
-    
-
-
-
-// --- 需求 1 & 2：健康摘要邏輯 ---
+    // --- 需求 1 & 2：健康摘要邏輯 ---
     if (msg.includes("健康摘要")) {
         if (hasAnyDate) {
             processSummarySearch(targetDateStr);
@@ -457,7 +450,7 @@ const healthConfigs = [
         return; 
     }
 
-
+    
 
     if (msg.includes("趨勢")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
@@ -486,7 +479,7 @@ if (isWaitingForAbnormality) {
 
 
 
-// 在處理任何新訊息逻辑前，先移除畫面上可能殘留的日期按鈕
+// 在處理任何新訊息邏輯前，先移除畫面上可能殘留的日期按鈕
     document.querySelector('.date-actions')?.remove();
     if (isWaitingForAbnormality) { isWaitingForAbnormality = false; await handleAbnormalityInput(msg); return; }
   if (isNamingPhase) {
@@ -500,13 +493,13 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`在看健康摘要前，你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
 
 // 判斷使用者問「你是誰」
-    const askAiName = /(你是誰|你的名字|你叫什麼|你的暱稱|你怎麼稱呼)/;
+    const askAiName = /(你是誰|妳是誰|您是誰|你的名字|妳的名字|您的名字|你名字|妳名字|您名字|你 名字|妳 名字|您 名字|你叫什麼|妳叫什麼|您叫什麼|你的暱稱|妳的暱稱|您的暱稱|你怎麼稱呼|妳怎麼稱呼|您怎麼稱呼)/;
     if (askAiName.test(msg)) {
         await appendAiMessage(`😄 我是你的健康夥伴 ${assistantName || 'Soosyn'}！`);
         return; // 直接結束，不往下跑 Gemini
