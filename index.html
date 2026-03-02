@@ -889,7 +889,7 @@ async function updateTrend(cardId, type, days) {
 
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
-        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "低於個人平均" },
+        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
      
         n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
