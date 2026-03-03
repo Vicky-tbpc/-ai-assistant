@@ -1,91 +1,100 @@
-// gemini_09
+// api/gemini.js 10
 export default async function handler(req, res) {
-  // 設定 CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     const { prompt, serial_number, record_date } = req.body;
-    
-    // 從環境變數讀取 Key (記得去 Vercel 設定)
-    const geminiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // 請確保 Vercel 環境變數名稱正確
 
-    // 1. 從 Supabase 抓取數據
-    // 注意：我們用 serial_number 和 record_date 當條件
-    const supabaseFetchUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&record_date=eq.${record_date}&select=raw_json`;
-    
-    const dbRes = await fetch(supabaseFetchUrl, {
-      headers: {
-        "apikey": supabaseKey,
-        "Authorization": `Bearer ${supabaseKey}`
-      }
+    if (!apiKey) return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
+
+    // --- 1. 根據 prompt 判斷日期範圍並讀取 Supabase ---
+    let healthContext = "";
+    let isRangeQuery = prompt.includes("週") || prompt.includes("月") || prompt.includes("最近");
+    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json`;
+
+    if (isRangeQuery) {
+      const days = prompt.includes("月") ? 30 : (prompt.includes("週") ? 7 : 5);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${startDateStr}&order=record_date.desc`;
+    } else {
+      queryUrl += `&record_date=eq.${record_date}`;
+    }
+
+    const sbRes = await fetch(queryUrl, {
+      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
-    
-    const dbData = await dbRes.json();
-    const healthData = dbData.length > 0 ? JSON.stringify(dbData[0].raw_json) : "找不到相關數據";
+    const dataList = await sbRes.json();
 
-    // 2. 組合給 Gemini 的指令
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+    // --- 2. 處理無數據情況 ---
+    if (!dataList || dataList.length === 0) {
+      return res.status(200).json({ text: "這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。☁️" });
+    }
 
-    const response = await fetch(geminiUrl, {
+    // --- 3. 格式化數據給 Gemini (包含 TST 轉換) ---
+    healthContext = dataList.map(item => {
+      const raw = item.raw_json || {};
+      const tst = raw.TST_min || 0;
+      const hours = Math.floor(tst / 60);
+      const minutes = tst % 60;
+      return `日期：${item.record_date}
+- 總睡眠時間：${hours}小時${minutes}分鐘
+- 深層睡眠比例 (N3)：${raw.N3_pct || 0}%
+- 睡眠效率：${raw.sleep_efficiency_pct || 0}%
+- 淺睡期 (N1N2)：${raw.N1N2_pct || 0}%
+- 快速動眼期 (REM)：${raw.REM_pct || 0}%`;
+    }).join('\n\n');
+
+    // --- 4. 呼叫 Gemini ---
+    // 修正：模型名稱建議使用 'gemini-1.5-flash' 或 'gemini-2.0-flash'
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const geminiRes = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: {
           parts: [{ 
-            text: `你現在的角色是一個具備專業醫學知識、親切的健康夥伴。
-                 使用者會提供一份 JSON 數據，請參考以下定義進行分析：
-                   【呼吸與血氧】 
-- SpO2_mean/min: 平均/最低血氧。低於 95% 需注意。 
-- ODI3/ODI4_per_hour: 睡眠期間，每小時氧氣飽和度下降3%、4%的頻率。
-                       標準參考範圍：ODI 3%、ODI 4% 每小時<5次。 
-- RR_mean: 睡眠平均呼吸頻率。單位：rpm，需標準參考範圍：12-25 rpm。 
--T90_pct/T89_pct/T88_pct: 睡眠期間，血氧濃度小於90%/89%/88%的時間百分比。
-                          標準參考範圍：T90 ≤ 5%、T89 ≤ 4%、T88 ≤ 3%。
--HBI: HBI 缺氧負荷，HBI 缺氧負荷反映昨晚呼吸是否順暢，數值偏高可能代表身體在睡眠中承受較多缺氧壓力。
+            text: `你是一個具備專業醫學知識且親切的健康夥伴。
+你是使用者的平輩好朋友，絕對不要使用敬稱『您』，請用『你』。
+請務必使用『繁體中文』回覆，適度加上合適的emoji。
 
-【心律與壓力 (HRV)】 
-- SDNN: 整體心率變異性和心臟適應能力，基準範圍：32–93 ms。理想範圍：> 93 ms，體力好、壓力低。
-          關注範圍：< 32 ms ，重度壓力、疾病狀態。
--rMSSD: 副交感神經和恢復調節能力。理想範圍：> 60 ms，副交感高度活躍，極佳恢復力。
-          基準範圍：19 - 60 ms。關注範圍：< 19 ms，睡眠狀態極差，恢復力極低。
--HR_mean/'HR_min: 睡眠平均脈搏/睡眠最低脈搏，標準參考範圍：60-100 bpm。 
+【數據參考標準】：
+- N3深層睡眠：10%-20% 為標準。
+- 睡眠效率：≥ 85% 為良好，≤ 75% 為不佳。
+- N1N2淺睡：50%-65% 為標準。
+- REM快速動眼：10%-25% 為標準。
 
-【睡眠品質】 
-- TST_min: 總睡眠分鐘數，請轉換成多少小時多少分鐘說明。 
-- N3_pct: 深層睡眠比例（越高越好），標準參考範圍：10%-20%。 
-- sleep_efficiency_pct: 睡眠效率，良好：睡眠效率 ≥ 85%，不佳：睡眠效率 ≤ 75%。
--N1N2_pct: N1、N2 淺睡期，標準參考範圍：50%~65%。
--REM_pct: REM快速動眼期，標準參考範圍：10%~25%。
-
-
-
-
-                   你是使用者的平輩好朋友，請根據這些 raw_json 數據，並以平易近人的口吻給出建議。
-                   ，絕對不要使用敬稱『您』，請用『你』。
-                   請務必使用『繁體中文』回覆，適度加上合適的emoji。
-                  
-                   除非要求詳細說明，否則請節錄重點。
-                   請直接回答問題，不要輸出任何內心思考或思緒筆記。` 
+【回覆規則】：
+1. 根據提供的健康數據進行分析。
+2. 節錄重點，長度約 3 到 5 句話。
+3. 絕對不要在回覆中輸出 TST_min, N3_pct 等程式代碼。
+4. 不要輸出任何內心思考或筆記。
+5. 若有多天數據，請總結趨勢。`
           }]
         },
         contents: [{ 
-          parts: [{ text: `根據這份數據，回答我的問題：${prompt}` }] 
-        }]
+          parts: [{ text: `這是使用者的健康數據：\n${healthContext}\n\n使用者問題：${prompt}` }] 
+        }],
+        tools: [{ google_search: {} }]
       })
     });
 
-    const result = await response.json();
-    const replyText = result.candidates?.[0]?.content?.parts?.[0]?.text || "Gemini 暫時罷工了...";
-
-    res.status(200).json({ text: replyText });
+    const geminiData = await geminiRes.json();
+    const resultText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "AI 目前沒有回傳內容。";
+    res.status(200).json({ text: resultText });
 
   } catch (error) {
-    res.status(500).json({ text: "發生錯誤：" + error.message });
+    console.error(error);
+    res.status(500).json({ text: "伺服器內部錯誤，請檢查 Vercel Logs。" });
   }
 }
