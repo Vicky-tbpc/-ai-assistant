@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       const minutes = tst % 60;
       return `日期：${item.record_date}
 - 總睡眠時間：${hours}小時${minutes}分鐘
-- 深層睡眠比例 (N3)：${raw.N3_pct || 0}%
+- 深層睡眠 (N3 深睡比例)：${raw.N3_pct || 0}%
 - 睡眠效率：${raw.sleep_efficiency_pct || 0}%
 - 淺睡期 (N1N2)：${raw.N1N2_pct || 0}%
 - 快速動眼期 (REM)：${raw.REM_pct || 0}%`;
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
 請務必使用『繁體中文』回覆，適度加上合適的emoji。
 
 【數據參考標準】：
-- N3深層睡眠：10%-20% 為標準。
+- 深層睡眠 (N3 深睡比例)：10%-20% 為標準。
 - 睡眠效率：≥ 85% 為良好，≤ 75% 為不佳。
 - N1N2淺睡：50%-65% 為標準。
 - REM快速動眼：10%-25% 為標準。
