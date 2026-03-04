@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n38</title>
+    <title>Soosyn 健康夥伴 n41</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -293,7 +293,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
         "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期", "生理電量"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -393,17 +393,16 @@ async function sendMessage() {
 const healthConfigs = [
     // 原有指標
     { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
-    { regex: /n3|深睡/i, displayField: 'N3_pct', prefix: 'Battery N3', fallbackTitle: 'N3 深睡比例', unit: '%' },
+   
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    { regex: /睡眠時間|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+   
     
 
     // 新增指標
     { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' },
-    { regex: /睡眠效率/, displayField: 'sleep_efficiency_pct', prefix: '睡眠效率', fallbackTitle: '睡眠效率', unit: '%' },
-    { regex: /n1|n2|淺睡/i, displayField: 'N1N2_pct', prefix: '淺睡', fallbackTitle: 'N1、N2 淺睡期', unit: '%' },
-    { regex: /快速動眼|rem/i, displayField: 'REM_pct', prefix: '快速動眼', fallbackTitle: 'REM快速動眼期', unit: '%' },
+    
+    
     { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', displayLabel: '睡眠平均血氧飽和度', unit: '%' },
     { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
     { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
@@ -1380,51 +1379,61 @@ async function saveConsent(originalPrompt, agreed, btnId) {
     }
 }
 
-// --- 3. 呼叫你的 gemini_11-2.JS API ---
+// --- 修改後的呼叫 Gemini API 函式 ---
+let chatHistory = [];
+
 async function callGeminiAPI(prompt) {
- // 1. 生成一個唯一的 ID 用來控制打字動畫
     const typingId = 'typing-' + Date.now();
-    const history = document.getElementById('chat-history');
+    const historyElem = document.getElementById('chat-history');
     
-    // 2. 顯示打字動畫 (複用你原本 html 裡的 CSS class)
+    // 顯示打字動畫
     history.innerHTML += `
         <div class="msg-row ai-row" id="${typingId}">
             <div class="ai-bubble">
-                <div class="typing-dots">
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                </div>
-                <small style="color: #888; display: block; margin-top: 5px;">正在思考中...</small>
+                <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                <small style="color: #888; display: block; margin-top: 5px;">正在分析你的健康數據...</small>
             </div>
         </div>
     `;
-    scrollToBottom();  
+    scrollToBottom();
 
+    // 取得當前訊息中提到的日期，若無則預設為今天
+    const targetDateStr = getTargetDate(prompt); 
 
- // 這裡對接到你放在 /api/gemini 的 Vercel Function
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini03', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
+            body: JSON.stringify({ 
+                prompt: prompt,
+                serial_number: currentSerial, // 帶入登入後的序號
+                record_date: targetDateStr,    // 帶入判斷出的日期
+            })
         });
         const data = await res.json();
 
-// 3. 移除動畫
+        // --- 記憶功能：更新對話紀錄 ---
+        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+        chatHistory.push({ role: "model", parts: [{ text: data.text }] });
+
+        // 限制紀錄長度，避免傳輸資料過大 (例如只留最近 10 次對話)
+        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+
+
+        
+        // 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
-
-
-        return data.text || "抱歉，目前 AI 暫時無法回應。";
-    } catch (e) {
-       const typingElem = document.getElementById(typingId);
+        return data.text;
+    } catch (err) {
+        console.error("API Error:", err);
+        const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
-        return "連線至 AI 伺服器失敗。";
+        return "抱歉，我現在連不上線，請稍後再試。 😅";
     }
 }
-
 
 
 </script>
