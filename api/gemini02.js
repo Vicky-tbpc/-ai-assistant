@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     // history 格式應為: [{role: "user", parts:[{text: "..."}]}, {role: "model", parts:[{text: "..."}]}]
     const contents = [...history, { role: "user", parts: [{ text: `[目前參考日期：${record_date}]\n[該日健康數據：\n${healthContext}]\n\n使用者問題：${prompt}` }] }];
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const geminiRes = await fetch(apiUrl, {
       method: "POST",
