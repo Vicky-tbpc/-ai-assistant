@@ -293,7 +293,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
         "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "REM ", "快速動眼期", "REM快速動眼期", "REM 快速動眼期", "生理電量"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
     async function login() {
         const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
@@ -396,14 +396,13 @@ const healthConfigs = [
    
     { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
     { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-    { regex: /睡眠時間|總睡眠/, displayField: 'TST_min', prefix: 'Battery 總睡眠時間', fallbackTitle: '總睡眠時間', unit: '分鐘' },
+   
     
 
     // 新增指標
     { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' },
-    { regex: /睡眠效率/, displayField: 'sleep_efficiency_pct', prefix: '睡眠效率', fallbackTitle: '睡眠效率', unit: '%' },
-    { regex: /n1|n2|淺睡/i, displayField: 'N1N2_pct', prefix: '淺睡', fallbackTitle: 'N1、N2 淺睡期', unit: '%' },
-    { regex: /快速動眼|rem/i, displayField: 'REM_pct', prefix: '快速動眼', fallbackTitle: 'REM快速動眼期', unit: '%' },
+    
+    
     { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', displayLabel: '睡眠平均血氧飽和度', unit: '%' },
     { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
     { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
