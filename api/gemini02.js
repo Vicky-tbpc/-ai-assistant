@@ -1,4 +1,4 @@
-// api/gemini.js 11
+// api/gemini.js 12
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -15,30 +15,63 @@ export default async function handler(req, res) {
 
     if (!apiKey) return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
 
-    // --- 1. 從 Supabase 抓取資料 (預設抓取，供分析使用) ---
-    let healthContext = "目前無數據";
-    const queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&record_date=eq.${record_date}&select=record_date,raw_json`;
+    // --- 1. 判斷是否為範圍查詢並構建 Supabase URL ---
+    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
     
+    const now = new Date();
+    let isRangeQuery = false;
+
+    if (prompt.includes("去年")) {
+      const lastYear = now.getFullYear() - 1;
+      queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
+      isRangeQuery = true;
+    } else if (prompt.includes("上個月")) {
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${firstDayLastMonth}&record_date=lte.${lastDayLastMonth}`;
+      isRangeQuery = true;
+    } else if (prompt.includes("月")) {
+      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
+      isRangeQuery = true;
+    } else if (prompt.includes("週")) {
+      const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7)).toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${sevenDaysAgo}`;
+      isRangeQuery = true;
+    } else if (prompt.includes("最近")) {
+      queryUrl += `&limit=5`; // 直接抓最近 5 筆
+      isRangeQuery = true;
+    } else {
+      // 預設查詢單一日期
+      queryUrl += `&record_date=eq.${record_date}`;
+    }
+
+    // --- 2. 執行資料庫讀取 ---
     const sbRes = await fetch(queryUrl, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
     const dataList = await sbRes.json();
 
+    // --- 3. 格式化數據 Context ---
+    let healthContext = "找不到相關數據。";
     if (dataList && dataList.length > 0) {
-      const raw = dataList[0].raw_json || {};
-      const tst = raw.TST_min || 0;
-      healthContext = `日期：${dataList[0].record_date}
-- 睡眠時長：${Math.floor(tst / 60)}小時${tst % 60}分鐘
-- N3深睡：${raw.N3_pct || 0}%
-- 效率：${raw.sleep_efficiency_pct || 0}%
-- 淺睡：${raw.N1N2_pct || 0}%
-- REM：${raw.REM_pct || 0}%`;
+      healthContext = dataList.map(item => {
+        const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0;
+        return `日期:${item.record_date}, 
+                睡眠時長:${Math.floor(tst/60)}時${tst%60}分, 
+                N3深睡:${raw.N3_pct||0}%, 
+                效率:${raw.sleep_efficiency_pct||0}%, 
+                淺睡:${raw.N1N2_pct||0}%, 
+                REM:${raw.REM_pct||0}%`;
+      }).join('\n');
     }
 
-    // --- 2. 構建 Gemini 請求 ---
-    // 將歷史紀錄轉換為 Gemini 的 contents 格式
-    // history 格式應為: [{role: "user", parts:[{text: "..."}]}, {role: "model", parts:[{text: "..."}]}]
-    const contents = [...history, { role: "user", parts: [{ text: `[目前參考日期：${record_date}]\n[該日健康數據：\n${healthContext}]\n\n使用者問題：${prompt}` }] }];
+    // --- 4. 呼叫 Gemini API ---
+    const contents = [...history, { 
+      role: "user", 
+      parts: [{ text: `[系統提供數據庫內容]:\n${healthContext}\n\n[使用者當前問題]: ${prompt}` }] 
+    }];
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -48,11 +81,11 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         system_instruction: {
           parts: [{ 
-            text: `你是一個具備專業醫學知識且親切的健康夥伴。你是使用者的平輩好朋友，絕對不要使用敬稱『您』，請用『你』。
-                   請務必使用『繁體中文』回覆，適度加上合適的emoji。
-
-
-                   【數據參考標準】：
+            text: `你是一位具備專業醫學知識且親切的睡眠健康夥伴，請用『你』稱呼對方，嚴禁使用『您』。
+                   使用『繁體中文』回覆，適度加上合適的emoji。
+            
+            
+                    【數據參考標準】：
                     - 睡眠時長：建議大於7小時。
                     - N3深睡：10%-20% 為標準。
                     - 效率：≥ 85% 為良好，≤ 75% 為不佳。
@@ -60,13 +93,14 @@ export default async function handler(req, res) {
                     - REM：10%-25% 為標準。
 
 
-                   【任務邏輯優先順序】：
-                   1. 如果使用者詢問的是「名詞解釋」（例如：什麼是REM？N3代表什麼？），請直接專業地解釋該名詞，**不要**輸出數據分析或使用者的個人資料。
-                   2. 如果使用者詢問的是「如何改善/提升/調整/優化」（例如：怎麼增加深睡？如何改善效率？），請針對問題提供具體的健康建議，**不要**輸出數據分析。
-                   3. 如果使用者詢問的是「睡眠狀況」、「我這天的睡眠」或關於數據的分析，請利用提供的 [健康數據] 進行 3 到 5 句的重點分析。
-                   4. 請根據歷史對談內容（History）保持對話流暢度。如果使用者沒提到日期，請預設參考最近一次對話的日期。
-
-                   【限制】：絕對不要在回覆中出現 TST_min, N3_pct 等程式代碼。回覆請簡短有力。`
+           【運作邏輯】：
+            1. **名詞解釋優先**：若問名詞解釋（如：什麼是N3？），直接說明，不需分析數據。
+            2. **建議優先**：若問如何改善（如：怎麼睡更好？），提供具體建議，不需分析數據。
+            3. **數據分析**：若詢問睡眠狀況/最近表現，請利用 [系統提供數據庫內容] 進行摘要。
+               - 若數據有多筆，請觀察趨勢（例如：這週你的深睡比例有下降趨勢喔）。
+               - 節錄重點，約 3-5 句話。
+            4. **無數據處理**：若數據內容為空，請親切回答：『這段時間沒看到數據喔~ 😅 可能是沒上傳或還沒同步。☁️』
+            5. **禁止輸出代碼**：絕對不要在回覆中顯示 TST_min, raw_json, N3_pct 等代碼名稱。`
           }]
         },
         contents: contents
@@ -80,6 +114,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ text: "伺服器忙碌中，請稍後再試。 😅" });
+    res.status(500).json({ text: "系統有點忙碌，等我一下喔！ 😅" });
   }
 }
