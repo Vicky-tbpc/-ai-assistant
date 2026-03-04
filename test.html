@@ -1381,9 +1381,11 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 }
 
 // --- 修改後的呼叫 Gemini API 函式 ---
+let chatHistory = [];
+
 async function callGeminiAPI(prompt) {
     const typingId = 'typing-' + Date.now();
-    const history = document.getElementById('chat-history');
+    const historyElem = document.getElementById('chat-history');
     
     // 顯示打字動畫
     history.innerHTML += `
@@ -1406,11 +1408,21 @@ async function callGeminiAPI(prompt) {
             body: JSON.stringify({ 
                 prompt: prompt,
                 serial_number: currentSerial, // 帶入登入後的序號
-                record_date: targetDateStr    // 帶入判斷出的日期
+                record_date: targetDateStr,    // 帶入判斷出的日期
             })
         });
         const data = await res.json();
 
+        // --- 記憶功能：更新對話紀錄 ---
+        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+        chatHistory.push({ role: "model", parts: [{ text: data.text }] });
+
+        // 限制紀錄長度，避免傳輸資料過大 (例如只留最近 10 次對話)
+        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+
+
+        
         // 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
