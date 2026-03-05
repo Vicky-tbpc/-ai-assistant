@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n41</title>
+    <title>Soosyn 健康夥伴 n42</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1379,25 +1379,27 @@ async function saveConsent(originalPrompt, agreed, btnId) {
     }
 }
 
-// --- 修改後的呼叫 Gemini API 函式 ---
+// --- 修正後的呼叫 Gemini API 函式 ---
 let chatHistory = [];
 
 async function callGeminiAPI(prompt) {
     const typingId = 'typing-' + Date.now();
-    const historyElem = document.getElementById('chat-history');
+    const historyElem = document.getElementById('chat-history'); // 確保變數名稱統一
     
-    // 顯示打字動畫
-    history.innerHTML += `
-        <div class="msg-row ai-row" id="${typingId}">
-            <div class="ai-bubble">
-                <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-                <small style="color: #888; display: block; margin-top: 5px;">正在分析你的健康數據...</small>
+    // 1. 顯示打字動畫 (修正變數名稱，並改用 insertAdjacentHTML 確保穩定性)
+    if (historyElem) {
+        historyElem.insertAdjacentHTML('beforeend', `
+            <div class="msg-row ai-row" id="${typingId}">
+                <div class="ai-bubble">
+                    <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                    <small style="color: #888; display: block; margin-top: 5px;">正在分析你的健康數據...</small>
+                </div>
             </div>
-        </div>
-    `;
+        `);
+    }
     scrollToBottom();
 
-    // 取得當前訊息中提到的日期，若無則預設為今天
+    // 取得當前訊息中提到的日期
     const targetDateStr = getTargetDate(prompt); 
 
     try {
@@ -1406,23 +1408,21 @@ async function callGeminiAPI(prompt) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 prompt: prompt,
-                serial_number: currentSerial, // 帶入登入後的序號
-                record_date: targetDateStr,    // 帶入判斷出的日期
+                serial_number: currentSerial,
+                record_date: targetDateStr,
+                history: chatHistory // 重要：要把對話紀錄傳給後端，記憶功能才會動！
             })
         });
         const data = await res.json();
 
-        // --- 記憶功能：更新對話紀錄 ---
+        // 2. 記憶功能：更新對話紀錄
         chatHistory.push({ role: "user", parts: [{ text: prompt }] });
         chatHistory.push({ role: "model", parts: [{ text: data.text }] });
 
-        // 限制紀錄長度，避免傳輸資料過大 (例如只留最近 10 次對話)
+        // 限制紀錄長度 (例如只留最近 10 次對話)
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
-
-
-        
-        // 移除動畫
+        // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
