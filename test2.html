@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n44</title>
+    <title>Soosyn 健康夥伴 n45</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -265,22 +265,37 @@
 <script>
 
 
-window.onload = function() {
-    // 檢查是否有儲存的帳密
+window.addEventListener('DOMContentLoaded', async () => {
+    // 1. 先從 localStorage 抓取資料
     const savedSerial = localStorage.getItem('saved_serial');
     const savedPw = localStorage.getItem('saved_pw');
-    
+    const isManualLogout = sessionStorage.getItem('manualLogout') === 'true';
+
+    // 2. 如果有存過的資料，就「填寫」到欄位上（滿足需求 1 & 2）
     if (savedSerial && savedPw) {
         document.getElementById('serial').value = savedSerial;
         document.getElementById('pw').value = savedPw;
         document.getElementById('remember-me').checked = true;
-        
-        // 如果有儲存，直接嘗試登入 (非 LINE 環境下的自動登入)
-        if (!liff.isInClient()) {
-            login(); 
+    } else {
+        // 如果沒有存過的資料，確保欄位是空的
+        document.getElementById('serial').value = '';
+        document.getElementById('pw').value = '';
+        document.getElementById('remember-me').checked = false;
+    }
+
+    // 3. 判斷是否要執行「自動登入」
+    // 如果不是手動登出，且有資料，才執行登入
+    if (!isManualLogout) {
+        // 如果在 LINE App 內，執行 LINE 自動登入
+        if (liff.isInClient()) {
+            await initLIFF(); 
+        } 
+        // 如果是在一般瀏覽器且有儲存帳密，執行自動登入
+        else if (savedSerial && savedPw) {
+            login();
         }
     }
-};
+});
 
 
 
@@ -402,6 +417,8 @@ function getRandomEndQuestion() {
         }
 
         document.getElementById('login-overlay').classList.add('hidden');
+if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+        else initApp(data.nickname, data.ai_name);
         
         // 檢查是否需要綁定 LINE (如果剛好在 LINE 內但沒綁定過)
         if (liff.isInClient() && !data.line_user_id) {
@@ -1446,7 +1463,20 @@ await appendAiMessage("收到了！來看看健康摘要吧！ ✨");
     function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
     function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-    function logout() { location.reload(); }
+    
+function logout() {
+    if (confirm("確定要登出嗎？")) {
+        // 1. 在 sessionStorage 標記「這是手動登出」
+        // 這會防止頁面重新整理後立即觸發自動登入
+        sessionStorage.setItem('manualLogout', 'true');
+
+        // 2. 重新整理頁面，讓所有變數重置
+        location.reload();
+    }
+}
+
+
+
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
   function saveNickname() {
