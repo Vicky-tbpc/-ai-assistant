@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n44</title>
+    <title>Soosyn 健康夥伴 n45</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
     <style>
         :root {
@@ -196,21 +195,6 @@
 </head>
 <body>
 
-<div id="line-bind-modal" class="modal-overlay hidden" style="z-index: 3000;">
-    <div class="modal-card">
-        <h3 style="color: #00b900;">連動 LINE 帳號</h3>
-        <p style="font-size: 14px; color: #666; text-align: left;">綁定後，你可以透過 LINE 接收專屬的健康提醒。是否同意綁定此帳號？</p>
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button id="btn-agree-bind" class="primary-btn" style="background-color: #00b900;">同意綁定</button>
-            <button id="btn-deny-bind" class="primary-btn" style="background-color: #ccc;">暫不綁定</button>
-        </div>
-    </div>
-</div>
-
-
-
-
-
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
@@ -219,6 +203,20 @@
             <button class="primary-btn" onclick="login()">登入</button>
         </div>
     </div>
+
+<div id="line-bind-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+        <div style="font-size: 40px; margin-bottom: 10px;">💬</div>
+        <h3 style="color: var(--tbp-blue); margin-top: 0;">綁定 LINE ID</h3>
+        <p style="color: #666; font-size: 14px; line-height: 1.6;">
+            綁定後，您可以直接透過 LINE 接收<br>
+            每日健康摘要與異常警示通知！
+        </p>
+        <button class="primary-btn" onclick="executeLineBind(true)" style="background: #06C755;">同意並綁定</button>
+        <button onclick="executeLineBind(false)" style="margin-top:15px; background:none; border:none; color:#888; cursor:pointer; font-size: 14px;">暫時不要，繼續登入</button>
+    </div>
+</div>
+
 
     <div id="nickname-overlay" class="modal-overlay hidden">
         <div class="modal-card">
@@ -262,69 +260,6 @@
     </div>
 
 <script>
-
-
-const MY_LIFF_ID = '2009332392-Vkb01ZzL'; // 請替換成你的 LIFF ID
-
-async function checkAndHandleLineBinding() {
-    // 1. 先從 Supabase 檢查 line_user_id 是否已經有資料
-    const { data: userData } = await _supabase
-        .from('user_credentials')
-        .select('line_user_id')
-        .eq('serial_number', currentSerial)
-        .single();
-
-    // 2. 如果已經綁定過，或是不在 LINE App 裡面開啟，就直接跳過
-    await liff.init({ liffId: MY_LIFF_ID });
-    if ((userData && userData.line_user_id) || !liff.isInClient()) {
-        return; 
-    }
-
-    // 3. 顯示詢問視窗，並等待使用者決定 (使用 Promise 確保流程暫停)
-    return new Promise((resolve) => {
-        document.getElementById('line-bind-modal').classList.remove('hidden');
-
-        // 同意綁定
-        document.getElementById('btn-agree-bind').onclick = async () => {
-            try {
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                    return;
-                }
-                const profile = await liff.getProfile();
-                const lineId = profile.userId;
-
-                await _supabase
-                    .from('user_credentials')
-                    .update({ line_user_id: lineId })
-                    .eq('serial_number', currentSerial);
-
-                alert('綁定成功！');
-                document.getElementById('line-bind-modal').classList.add('hidden');
-                resolve();
-            } catch (err) {
-                console.error('綁定失敗', err);
-                document.getElementById('line-bind-modal').classList.add('hidden');
-                resolve();
-            }
-        };
-
-        // 不同意綁定
-        document.getElementById('btn-deny-bind').onclick = () => {
-            document.getElementById('line-bind-modal').classList.add('hidden');
-            resolve();
-        };
-    });
-}
-
-
-
-
-
-
-
-
-
 
 
 // 獲取使用者裝置的本地日期字串 (YYYY-MM-DD)
@@ -376,16 +311,82 @@ function getRandomEndQuestion() {
     ];
     const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
-    async function login() {
-        const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
-        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
-        if (data) {
-            currentSerial = serial;
-            document.getElementById('login-overlay').classList.add('hidden');
-            if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
-            else initApp(data.nickname, data.ai_name);
-        } else alert("驗證失敗 😅");
+
+
+let lineUserId = null;
+let pendingUserData = null; // 暫存登入成功的資料
+
+// A. 頁面載入時初始化 LIFF
+async function initLiff() {
+    try {
+        // 請填入你的 LIFF ID
+        await liff.init({ liffId: "2009332392-Vkb01ZzL" });
+        if (liff.isLoggedIn()) {
+            const profile = await liff.getProfile();
+            lineUserId = profile.userId;
+        }
+    } catch (err) {
+        console.error("LIFF 初始化失敗", err);
     }
+}
+initLiff();
+
+// B. 修改原本的登入函式
+async function login() {
+    const serial = document.getElementById('serial').value;
+    const pw = document.getElementById('pw').value;
+
+    // 1. 驗證帳密
+    const { data, error } = await _supabase
+        .from('user_credentials')
+        .select('*')
+        .eq('serial_number', serial)
+        .eq('password', pw)
+        .single();
+
+    if (error || !data) {
+        alert("驗證失敗 😅");
+        return;
+    }
+
+    currentSerial = serial;
+    pendingUserData = data;
+
+    // 2. 判斷是否要彈出綁定詢問
+    // 條件：在 LINE 內開啟(有lineUserId) 且 資料庫內還沒有綁定(line_user_id為空)
+    if (lineUserId && !data.line_user_id) {
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('line-bind-overlay').classList.remove('hidden');
+    } else {
+        // 如果已經綁定過或是非 LINE 環境，直接進入原本流程
+        proceedToApp();
+    }
+}
+
+// C. 執行綁定或跳過
+async function executeLineBind(isAgreed) {
+    if (isAgreed && lineUserId) {
+        // 更新資料庫中的 line_user_id
+        await _supabase
+            .from('user_credentials')
+            .update({ line_user_id: lineUserId })
+            .eq('serial_number', currentSerial);
+        alert("綁定成功！");
+    }
+    
+    document.getElementById('line-bind-overlay').classList.add('hidden');
+    proceedToApp();
+}
+
+// D. 原本的 initApp 進入流程
+function proceedToApp() {
+    document.getElementById('login-overlay').classList.add('hidden');
+    if (!pendingUserData.nickname) {
+        document.getElementById('nickname-overlay').classList.remove('hidden');
+    } else {
+        initApp(pendingUserData.nickname, pendingUserData.ai_name);
+    }
+}
 
  
 
@@ -401,14 +402,6 @@ userNickname = name;      // 存入全域變數
     document.getElementById('app-container').classList.remove('hidden');
     document.getElementById('display-name').innerText = name;
     document.getElementById('avatar-char').innerText = name.charAt(0);
-
-
-// --- 新增：檢查 LINE 綁定 (這會卡住後面的流程，直到使用者點選按鈕) ---
-    if (aiName) { // 只有已經取過名字的使用者才在這邊檢查
-        await checkAndHandleLineBinding();
-    }
-    //
-
 
     if (!aiName) {
         isNamingPhase = true;
