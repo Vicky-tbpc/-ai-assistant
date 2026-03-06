@@ -324,7 +324,7 @@ let tempUser = null;   // 全域變數，存登入後的資料
 // 頁面啟動就執行 LIFF 初始化
 async function initLiff() {
     try {
-        await liff.init({ liffId: "你的LIFF_ID" }); // 這裡要換成你的 ID
+        await liff.init({ liffId: "2009332392-Vkb01ZzL" }); // 這裡要換成你的 ID
         if (liff.isLoggedIn()) {
             const profile = await liff.getProfile();
             lineUserId = profile.userId;
