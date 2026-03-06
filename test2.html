@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n43</title>
+    <title>Soosyn 健康夥伴 n44</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -200,6 +200,10 @@
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
+<div style="display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 14px; color: #666;">
+    <input type="checkbox" id="remember-me" style="width: 16px; height: 16px;">
+    <label for="remember-me">記住序號與密碼</label>
+</div>
             <button class="primary-btn" onclick="login()">登入</button>
         </div>
     </div>
@@ -261,15 +265,64 @@
 <script>
 
 
+window.onload = function() {
+    // 檢查是否有儲存的帳密
+    const savedSerial = localStorage.getItem('saved_serial');
+    const savedPw = localStorage.getItem('saved_pw');
+    
+    if (savedSerial && savedPw) {
+        document.getElementById('serial').value = savedSerial;
+        document.getElementById('pw').value = savedPw;
+        document.getElementById('remember-me').checked = true;
+        
+        // 如果有儲存，直接嘗試登入 (非 LINE 環境下的自動登入)
+        if (!liff.isInClient()) {
+            login(); 
+        }
+    }
+};
+
+
+
+
 // 初始化 LIFF
 async function initLIFF() {
     try {
-        await liff.init({ liffId: "2009332392-Vkb01ZzL" }); // 👈 請在此處輸入你的 LIFF ID
-        console.log("LIFF 初始化成功");
+        await liff.init({ liffId: "你的_LIFF_ID" });
+        
+        if (liff.isInClient()) {
+            // 如果在 LINE 內，取得 Profile 並嘗試自動登入
+            const profile = await liff.getProfile();
+            const lineUserId = profile.userId;
+            
+            // 向 Supabase 查詢是否有此 line_user_id
+            const { data, error } = await _supabase
+                .from('user_credentials')
+                .select('*')
+                .eq('line_user_id', lineUserId)
+                .single();
+
+            if (data) {
+                console.log("LINE 自動登入成功");
+                currentSerial = data.serial_number;
+                document.getElementById('login-overlay').classList.add('hidden');
+                
+                if (!data.nickname) {
+                    document.getElementById('nickname-overlay').classList.remove('hidden');
+                } else {
+                    initApp(data.nickname, data.ai_name);
+                }
+            } else {
+                console.log("此 LINE 帳號尚未綁定，請手動登入一次以進行綁定。");
+            }
+        }
     } catch (error) {
-        console.error("LIFF 初始化失敗", error);
+        console.error("LIFF 初始化或自動登入失敗", error);
     }
 }
+
+
+
 initLIFF(); // 頁面載入時執行
 
 
@@ -325,26 +378,43 @@ function getRandomEndQuestion() {
     const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
  async function login() {
-    const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
-    const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+    const serial = document.getElementById('serial').value;
+    const pw = document.getElementById('pw').value;
+    const rememberMe = document.getElementById('remember-me').checked;
+
+    const { data, error } = await _supabase
+        .from('user_credentials')
+        .select('*')
+        .eq('serial_number', serial)
+        .eq('password', pw)
+        .single();
     
     if (data) {
         currentSerial = serial;
+        
+        // --- 處理功能 2：記住帳號密碼 ---
+        if (rememberMe) {
+            localStorage.setItem('saved_serial', serial);
+            localStorage.setItem('saved_pw', pw);
+        } else {
+            localStorage.removeItem('saved_serial');
+            localStorage.removeItem('saved_pw');
+        }
+
         document.getElementById('login-overlay').classList.add('hidden');
         
-        // 進入 App 主邏輯
-        if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
-        else initApp(data.nickname, data.ai_name);
-
-        // --- 新增：LINE 綁定檢查邏輯 ---
-        // 條件：1. 在 LINE App 內 2. 資料庫還沒有 line_user_id
+        // 檢查是否需要綁定 LINE (如果剛好在 LINE 內但沒綁定過)
         if (liff.isInClient() && !data.line_user_id) {
-            setTimeout(() => {
-                document.getElementById('line-binding-overlay').classList.remove('hidden');
-            }, 1000); // 稍微延遲彈出，體驗較佳
+            document.getElementById('line-binding-overlay').classList.remove('hidden');
+        }
+
+        if (!data.nickname) {
+            document.getElementById('nickname-overlay').classList.remove('hidden');
+        } else {
+            initApp(data.nickname, data.ai_name);
         }
     } else {
-        alert("驗證失敗 😅");
+        alert("驗證失敗，請檢查序號或密碼 😅");
     }
 }
  
