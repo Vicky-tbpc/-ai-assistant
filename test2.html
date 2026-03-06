@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n43</title>
+    <title>Soosyn 健康夥伴 n44</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
-<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
     <style>
         :root {
@@ -196,6 +196,21 @@
 </head>
 <body>
 
+<div id="line-bind-modal" class="modal-overlay hidden" style="z-index: 3000;">
+    <div class="modal-card">
+        <h3 style="color: #00b900;">連動 LINE 帳號</h3>
+        <p style="font-size: 14px; color: #666; text-align: left;">綁定後，你可以透過 LINE 接收專屬的健康提醒。是否同意綁定此帳號？</p>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button id="btn-agree-bind" class="primary-btn" style="background-color: #00b900;">同意綁定</button>
+            <button id="btn-deny-bind" class="primary-btn" style="background-color: #ccc;">暫不綁定</button>
+        </div>
+    </div>
+</div>
+
+
+
+
+
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
@@ -249,41 +264,62 @@
 <script>
 
 
-// 在 SUPABASE_URL 定義附近加入
-const LIFF_ID = "2009332392-Vkb01ZzL"; // 替換成你申請到的 LIFF ID
+const MY_LIFF_ID = '2009332392-Vkb01ZzL'; // 請替換成你的 LIFF ID
 
-// 新增綁定 LINE ID 的函式
-async function bindLineAccount() {
-    try {
-        // 1. 初始化 LIFF
-        await liff.init({ liffId: LIFF_ID });
+async function checkAndHandleLineBinding() {
+    // 1. 先從 Supabase 檢查 line_user_id 是否已經有資料
+    const { data: userData } = await _supabase
+        .from('user_credentials')
+        .select('line_user_id')
+        .eq('serial_number', currentSerial)
+        .single();
 
-        // 2. 判斷是否在 LINE 環境或已登入
-        if (!liff.isLoggedIn()) {
-            // 如果是在外部瀏覽器開啟且沒登入，可以引導登入（可選）
-            // liff.login(); 
-            return;
-        }
-
-        // 3. 取得 LINE 個人檔案
-        const profile = await liff.getProfile();
-        const lineUserId = profile.userId;
-
-        // 4. 更新到 Supabase (對應當前的 serial_number)
-        const { error } = await _supabase
-            .from('user_credentials')
-            .update({ line_user_id: lineUserId })
-            .eq('serial_number', currentSerial);
-
-        if (error) {
-            console.error("綁定 LINE 失敗:", error);
-        } else {
-            console.log("LINE 帳號綁定成功:", lineUserId);
-        }
-    } catch (err) {
-        console.error("LIFF 初始化或取得資料出錯:", err);
+    // 2. 如果已經綁定過，或是不在 LINE App 裡面開啟，就直接跳過
+    await liff.init({ liffId: MY_LIFF_ID });
+    if ((userData && userData.line_user_id) || !liff.isInClient()) {
+        return; 
     }
+
+    // 3. 顯示詢問視窗，並等待使用者決定 (使用 Promise 確保流程暫停)
+    return new Promise((resolve) => {
+        document.getElementById('line-bind-modal').classList.remove('hidden');
+
+        // 同意綁定
+        document.getElementById('btn-agree-bind').onclick = async () => {
+            try {
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                const profile = await liff.getProfile();
+                const lineId = profile.userId;
+
+                await _supabase
+                    .from('user_credentials')
+                    .update({ line_user_id: lineId })
+                    .eq('serial_number', currentSerial);
+
+                alert('綁定成功！');
+                document.getElementById('line-bind-modal').classList.add('hidden');
+                resolve();
+            } catch (err) {
+                console.error('綁定失敗', err);
+                document.getElementById('line-bind-modal').classList.add('hidden');
+                resolve();
+            }
+        };
+
+        // 不同意綁定
+        document.getElementById('btn-deny-bind').onclick = () => {
+            document.getElementById('line-bind-modal').classList.add('hidden');
+            resolve();
+        };
+    });
 }
+
+
+
+
 
 
 
@@ -367,8 +403,11 @@ userNickname = name;      // 存入全域變數
     document.getElementById('avatar-char').innerText = name.charAt(0);
 
 
-// 【新增】：登入成功進入 App 後，嘗試進行 LINE 綁定
-    bindLineAccount();
+// --- 新增：檢查 LINE 綁定 (這會卡住後面的流程，直到使用者點選按鈕) ---
+    if (aiName) { // 只有已經取過名字的使用者才在這邊檢查
+        await checkAndHandleLineBinding();
+    }
+    //
 
 
     if (!aiName) {
