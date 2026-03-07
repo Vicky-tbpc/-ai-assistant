@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n45</title>
+    <title>Soosyn 健康夥伴 n44</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -200,10 +200,12 @@
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
-<div style="display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 14px; color: #666;">
-    <input type="checkbox" id="remember-me" style="width: 16px; height: 16px;">
-    <label for="remember-me">記住序號與密碼</label>
+
+<div style="text-align: left; margin: 10px 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666;">
+    <input type="checkbox" id="remember-me" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
+    <label for="remember-me" style="cursor: pointer;">記住序號與密碼</label>
 </div>
+
             <button class="primary-btn" onclick="login()">登入</button>
         </div>
     </div>
@@ -265,37 +267,20 @@
 <script>
 
 
-window.addEventListener('DOMContentLoaded', async () => {
-    // 1. 先從 localStorage 抓取資料
+// 頁面載入完成後檢查是否有儲存的帳密
+document.addEventListener('DOMContentLoaded', () => {
     const savedSerial = localStorage.getItem('saved_serial');
     const savedPw = localStorage.getItem('saved_pw');
-    const isManualLogout = sessionStorage.getItem('manualLogout') === 'true';
+    const isRemember = localStorage.getItem('remember_me') === 'true';
 
-    // 2. 如果有存過的資料，就「填寫」到欄位上（滿足需求 1 & 2）
-    if (savedSerial && savedPw) {
+    if (isRemember && savedSerial && savedPw) {
         document.getElementById('serial').value = savedSerial;
         document.getElementById('pw').value = savedPw;
         document.getElementById('remember-me').checked = true;
-    } else {
-        // 如果沒有存過的資料，確保欄位是空的
-        document.getElementById('serial').value = '';
-        document.getElementById('pw').value = '';
-        document.getElementById('remember-me').checked = false;
-    }
-
-    // 3. 判斷是否要執行「自動登入」
-    // 如果不是手動登出，且有資料，才執行登入
-    if (!isManualLogout) {
-        // 如果在 LINE App 內，執行 LINE 自動登入
-        if (liff.isInClient()) {
-            await initLIFF(); 
-        } 
-        // 如果是在一般瀏覽器且有儲存帳密，執行自動登入
-        else if (savedSerial && savedPw) {
-            login();
-        }
     }
 });
+
+
 
 
 
@@ -303,41 +288,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 // 初始化 LIFF
 async function initLIFF() {
     try {
-        await liff.init({ liffId: "2009332392-Vkb01ZzL" });
-        
-        if (liff.isInClient()) {
-            // 如果在 LINE 內，取得 Profile 並嘗試自動登入
-            const profile = await liff.getProfile();
-            const lineUserId = profile.userId;
-            
-            // 向 Supabase 查詢是否有此 line_user_id
-            const { data, error } = await _supabase
-                .from('user_credentials')
-                .select('*')
-                .eq('line_user_id', lineUserId)
-                .single();
-
-            if (data) {
-                console.log("LINE 自動登入成功");
-                currentSerial = data.serial_number;
-                document.getElementById('login-overlay').classList.add('hidden');
-                
-                if (!data.nickname) {
-                    document.getElementById('nickname-overlay').classList.remove('hidden');
-                } else {
-                    initApp(data.nickname, data.ai_name);
-                }
-            } else {
-                console.log("此 LINE 帳號尚未綁定，請手動登入一次以進行綁定。");
-            }
-        }
+        await liff.init({ liffId: "2009332392-Vkb01ZzL" }); // 👈 請在此處輸入你的 LIFF ID
+        console.log("LIFF 初始化成功");
     } catch (error) {
-        console.error("LIFF 初始化或自動登入失敗", error);
+        console.error("LIFF 初始化失敗", error);
     }
 }
-
-
-
 initLIFF(); // 頁面載入時執行
 
 
@@ -392,49 +348,41 @@ function getRandomEndQuestion() {
     ];
     const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
- async function login() {
+async function login() {
     const serial = document.getElementById('serial').value;
     const pw = document.getElementById('pw').value;
-    const rememberMe = document.getElementById('remember-me').checked;
-
-    const { data, error } = await _supabase
-        .from('user_credentials')
-        .select('*')
-        .eq('serial_number', serial)
-        .eq('password', pw)
-        .single();
+    const isRemember = document.getElementById('remember-me').checked; // 取得勾選狀態
+    
+    const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
     
     if (data) {
-        currentSerial = serial;
-        
-        // --- 處理功能 2：記住帳號密碼 ---
-        if (rememberMe) {
+        // --- 新增：處理記住密碼邏輯 ---
+        if (isRemember) {
             localStorage.setItem('saved_serial', serial);
             localStorage.setItem('saved_pw', pw);
+            localStorage.setItem('remember_me', 'true');
         } else {
+            // 如果沒勾選，就清除儲存的資訊
             localStorage.removeItem('saved_serial');
             localStorage.removeItem('saved_pw');
+            localStorage.setItem('remember_me', 'false');
         }
 
+        currentSerial = serial;
         document.getElementById('login-overlay').classList.add('hidden');
-if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
-        else initApp(data.nickname, data.ai_name);
         
-        // 檢查是否需要綁定 LINE (如果剛好在 LINE 內但沒綁定過)
-        if (liff.isInClient() && !data.line_user_id) {
-            document.getElementById('line-binding-overlay').classList.remove('hidden');
-        }
+        if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+        else initApp(data.nickname, data.ai_name);
 
-        if (!data.nickname) {
-            document.getElementById('nickname-overlay').classList.remove('hidden');
-        } else {
-            initApp(data.nickname, data.ai_name);
+        if (liff.isInClient() && !data.line_user_id) {
+            setTimeout(() => {
+                document.getElementById('line-binding-overlay').classList.remove('hidden');
+            }, 1000);
         }
     } else {
-        alert("驗證失敗，請檢查序號或密碼 😅");
+        alert("驗證失敗 😅");
     }
 }
- 
 
 
 // 執行綁定動作
@@ -1463,20 +1411,7 @@ await appendAiMessage("收到了！來看看健康摘要吧！ ✨");
     function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
     function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
-    
-function logout() {
-    if (confirm("確定要登出嗎？")) {
-        // 1. 在 sessionStorage 標記「這是手動登出」
-        // 這會防止頁面重新整理後立即觸發自動登入
-        sessionStorage.setItem('manualLogout', 'true');
-
-        // 2. 重新整理頁面，讓所有變數重置
-        location.reload();
-    }
-}
-
-
-
+    function logout() { location.reload(); }
     function openPwModal() { document.getElementById('pw-overlay').classList.remove('hidden'); }
     function closePwModal() { document.getElementById('pw-overlay').classList.add('hidden'); }
   function saveNickname() {
