@@ -12,7 +12,9 @@ export default async function handler(req, res) {
   //   return res.status(401).end('Unauthorized');
   // }
 
-  const today = new Date().toISOString().split('T')[0]; // 格式: 2024-05-20
+  // 修改後
+const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+console.log('正在檢查台灣日期：', today);
 
   try {
     // 1. 取得所有有 LINE ID 的使用者
