@@ -63,10 +63,11 @@ async function sendLineReminder(lineUserId) {
       to: lineUserId,
       messages: [{
         type: 'text',
-        text: `早安！灰盾提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/test2.html`
+        text: `早安！提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/test2.html`
       }]
     })
   });
   
   return response.ok ? 'success' : 'failed';
 }
+
