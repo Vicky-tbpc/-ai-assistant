@@ -1,20 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
-// 初始化 Supabase (建議使用 Service Role Key 以跳過 RLS)
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export default async function handler(req, res) {
-  // 安全檢查：確保只有 Vercel Cron 可以觸發
-  // if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return res.status(401).end('Unauthorized');
-  // }
-
-  // 修改後
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
-console.log('正在檢查台灣日期：', today);
+module.exports = async function (req, res) {
+  // 強制取得台北時間日期
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
   try {
     // 1. 取得所有有 LINE ID 的使用者
@@ -25,7 +18,7 @@ console.log('正在檢查台灣日期：', today);
 
     if (userError) throw userError;
 
-    // 2. 取得今天已經填寫過資料的序號清單
+    // 2. 取得今天已經填寫過資料的序號
     const { data: surveys, error: surveyError } = await supabase
       .from('user_daily_surveys')
       .select('serial_number')
@@ -35,41 +28,45 @@ console.log('正在檢查台灣日期：', today);
 
     const finishedSerials = new Set(surveys.map(s => s.serial_number));
 
-    // 3. 篩選出今天還沒填寫的使用者
+    // 3. 篩選未填寫者
     const pendingUsers = users.filter(u => !finishedSerials.has(u.serial_number));
 
-    // 4. 批次發送 LINE 通知
+    // 4. 發送通知
+    const results = [];
     for (const user of pendingUsers) {
-      await sendLineReminder(user.line_user_id);
+      const result = await sendLineReminder(user.line_user_id);
+      results.push({ user: user.serial_number, status: result });
     }
 
-    return res.status(200).json({ 
-      message: `通知發送完成，共發送 ${pendingUsers.length} 位。` 
+    res.status(200).json({ 
+      date: today,
+      total_pending: pendingUsers.length,
+      results: results 
     });
 
   } catch (error) {
-    console.error('Cron Error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('API Error:', error.message);
+    res.status(500).json({ error: error.message });
   }
-}
+};
 
 async function sendLineReminder(lineUserId) {
   const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   
-  const message = {
-    to: lineUserId,
-    messages: [{
-      type: 'text',
-      text: `早安！灰盾提醒你：今天還沒紀錄健康狀況喔 😊\n\n請點擊連結登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/test2.html`
-    }]
-  };
-
-  await fetch('https://api.line.me/v2/bot/message/push', {
+  const response = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${lineToken}`
     },
-    body: JSON.stringify(message)
+    body: JSON.stringify({
+      to: lineUserId,
+      messages: [{
+        type: 'text',
+        text: `早安！灰盾提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/test2.html`
+      }]
+    })
   });
+  
+  return response.ok ? 'success' : 'failed';
 }
