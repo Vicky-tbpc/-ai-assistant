@@ -1,9 +1,7 @@
 {
-  "name": "ai-assistant-line-bot",
+  "name": "ai-assistant",
   "version": "1.0.0",
-  "description": "Daily health reminder via LINE",
-  "main": "api/daily-reminder.js",
   "dependencies": {
-    "@supabase/supabase-js": "^2.40.0"
+    "@supabase/supabase-js": "^2.39.0"
   }
 }
