@@ -614,7 +614,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選 ①、②、③、④、⑤ 按鈕回饋~`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
