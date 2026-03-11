@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n44</title>
+    <title>Soosyn 健康夥伴 n45</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -384,6 +384,21 @@ async function login() {
     }
 }
 
+document.addEventListener('keydown', (event) => {
+    // 1. 檢查按下的鍵是否為 Enter
+    if (event.key === 'Enter') {
+        const loginOverlay = document.getElementById('login-overlay');
+        
+        // 2. 檢查登入畫面是否「正在顯示」
+        // (假設你的登入畫面 ID 是 login-overlay，且隱藏時會加上 .hidden 類別)
+        if (loginOverlay && !loginOverlay.classList.contains('hidden')) {
+            // 預防萬一，如果是在輸入框按 Enter，可以取消預設行為
+            // event.preventDefault(); 
+            login();
+        }
+    }
+});
+
 
 // 執行綁定動作
 async function bindLineAccount() {
@@ -444,7 +459,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -599,7 +614,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
