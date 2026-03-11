@@ -384,21 +384,19 @@ async function login() {
     }
 }
 
-// 在頁面載入後自動幫序號跟密碼欄位綁定 Enter 鍵
-document.addEventListener('DOMContentLoaded', () => {
-    const inputs = ['serial', 'pw'];
-    inputs.forEach(id => {
-        const elem = document.getElementById(id);
-        if (elem) {
-            elem.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') login();
-            });
+document.addEventListener('keydown', (event) => {
+    // 檢查按下的是不是 Enter
+    if (event.key === 'Enter') {
+        // 為了避免登入後在聊天室按 Enter 也觸發登入，
+        // 我們檢查登入視窗是否還「顯示」著（假設你的登入層 ID 是 login-overlay）
+        const loginOverlay = document.getElementById('login-overlay'); 
+        
+        // 如果登入介面沒有被隱藏 (沒有 hidden class)，就執行登入
+        if (loginOverlay && !loginOverlay.classList.contains('hidden')) {
+            login();
         }
-    });
+    }
 });
-
-
-
 
 
 // 執行綁定動作
