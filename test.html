@@ -385,14 +385,15 @@ async function login() {
 }
 
 document.addEventListener('keydown', (event) => {
-    // 檢查按下的是不是 Enter
+    // 1. 檢查按下的鍵是否為 Enter
     if (event.key === 'Enter') {
-        // 為了避免登入後在聊天室按 Enter 也觸發登入，
-        // 我們檢查登入視窗是否還「顯示」著（假設你的登入層 ID 是 login-overlay）
-        const loginOverlay = document.getElementById('login-overlay'); 
+        const loginOverlay = document.getElementById('login-overlay');
         
-        // 如果登入介面沒有被隱藏 (沒有 hidden class)，就執行登入
+        // 2. 檢查登入畫面是否「正在顯示」
+        // (假設你的登入畫面 ID 是 login-overlay，且隱藏時會加上 .hidden 類別)
         if (loginOverlay && !loginOverlay.classList.contains('hidden')) {
+            // 預防萬一，如果是在輸入框按 Enter，可以取消預設行為
+            // event.preventDefault(); 
             login();
         }
     }
