@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n42</title>
+    <title>Soosyn 健康夥伴 n45</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
     <style>
         :root {
             --tbp-blue: #8699a3; 
@@ -198,9 +200,28 @@
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
             <input type="text" id="serial" placeholder="序號">
             <input type="password" id="pw" placeholder="密碼">
+
+<div style="text-align: left; margin: 10px 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666;">
+    <input type="checkbox" id="remember-me" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
+    <label for="remember-me" style="cursor: pointer;">記住序號與密碼</label>
+</div>
+
             <button class="primary-btn" onclick="login()">登入</button>
         </div>
     </div>
+
+<div id="line-binding-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+        <h3 style="color: #00b900;">連結 LINE 帳號</h3>
+        <p style="font-size: 14px; color: #666; text-align: left; line-height: 1.6;">
+            為了讓你能在 LINE 收到個人化的健康通知與服務，我們需要將你的序號與 LINE 帳號進行綁定。是否同意授權？
+        </p>
+        <button class="primary-btn" style="background: #00b900;" onclick="bindLineAccount()">同意並綁定</button>
+        <button class="secondary-btn" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; background: white; color: #888; cursor: pointer; font-weight: bold; margin-top: 10px;" onclick="closeBindingModal()">以後再說</button>
+    </div>
+</div>
+
+
 
     <div id="nickname-overlay" class="modal-overlay hidden">
         <div class="modal-card">
@@ -244,6 +265,38 @@
     </div>
 
 <script>
+
+
+// 頁面載入完成後檢查是否有儲存的帳密
+document.addEventListener('DOMContentLoaded', () => {
+    const savedSerial = localStorage.getItem('saved_serial');
+    const savedPw = localStorage.getItem('saved_pw');
+    const isRemember = localStorage.getItem('remember_me') === 'true';
+
+    if (isRemember && savedSerial && savedPw) {
+        document.getElementById('serial').value = savedSerial;
+        document.getElementById('pw').value = savedPw;
+        document.getElementById('remember-me').checked = true;
+    }
+});
+
+
+
+
+
+
+// 初始化 LIFF
+async function initLIFF() {
+    try {
+        await liff.init({ liffId: "2009332392-Vkb01ZzL" }); // 👈 請在此處輸入你的 LIFF ID
+        console.log("LIFF 初始化成功");
+    } catch (error) {
+        console.error("LIFF 初始化失敗", error);
+    }
+}
+initLIFF(); // 頁面載入時執行
+
+
 
 
 // 獲取使用者裝置的本地日期字串 (YYYY-MM-DD)
@@ -295,19 +348,89 @@ function getRandomEndQuestion() {
     ];
     const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
-    async function login() {
-        const serial = document.getElementById('serial').value, pw = document.getElementById('pw').value;
-        const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
-        if (data) {
-            currentSerial = serial;
-            document.getElementById('login-overlay').classList.add('hidden');
-            if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
-            else initApp(data.nickname, data.ai_name);
-        } else alert("驗證失敗 😅");
+async function login() {
+    const serial = document.getElementById('serial').value;
+    const pw = document.getElementById('pw').value;
+    const isRemember = document.getElementById('remember-me').checked; // 取得勾選狀態
+    
+    const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
+    
+    if (data) {
+        // --- 新增：處理記住密碼邏輯 ---
+        if (isRemember) {
+            localStorage.setItem('saved_serial', serial);
+            localStorage.setItem('saved_pw', pw);
+            localStorage.setItem('remember_me', 'true');
+        } else {
+            // 如果沒勾選，就清除儲存的資訊
+            localStorage.removeItem('saved_serial');
+            localStorage.removeItem('saved_pw');
+            localStorage.setItem('remember_me', 'false');
+        }
+
+        currentSerial = serial;
+        document.getElementById('login-overlay').classList.add('hidden');
+        
+        if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+        else initApp(data.nickname, data.ai_name);
+
+        if (liff.isInClient() && !data.line_user_id) {
+            setTimeout(() => {
+                document.getElementById('line-binding-overlay').classList.remove('hidden');
+            }, 1000);
+        }
+    } else {
+        alert("驗證失敗 😅");
     }
+}
 
- 
+// 在頁面載入後自動幫序號跟密碼欄位綁定 Enter 鍵
+document.addEventListener('DOMContentLoaded', () => {
+    const inputs = ['serial', 'pw'];
+    inputs.forEach(id => {
+        const elem = document.getElementById(id);
+        if (elem) {
+            elem.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') login();
+            });
+        }
+    });
+});
 
+
+
+
+
+// 執行綁定動作
+async function bindLineAccount() {
+    try {
+        // 取得 LINE Profile (包含 userId)
+        const profile = await liff.getProfile();
+        const lineUserId = profile.userId;
+
+        // 更新 Supabase 資料表
+        const { error } = await _supabase
+            .from('user_credentials')
+            .update({ line_user_id: lineUserId })
+            .eq('serial_number', currentSerial);
+
+        if (!error) {
+            alert("✅ LINE 帳號綁定成功！");
+            document.getElementById('line-binding-overlay').classList.add('hidden');
+        } else {
+            console.error("Supabase 更新失敗:", error);
+            alert("綁定時發生錯誤，請稍後再試。");
+        }
+    } catch (err) {
+        console.error("取得 LINE Profile 失敗:", err);
+        alert("無法取得 LINE 資訊，請確保在 LINE App 中開啟。");
+    }
+}
+
+// 關閉綁定視窗
+function closeBindingModal() {
+    document.getElementById('line-binding-overlay').classList.add('hidden');
+}
 
 
 
