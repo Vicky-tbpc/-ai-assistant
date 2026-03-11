@@ -459,7 +459,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -614,7 +614,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選 ①、②、③、④、⑤ 按鈕回饋~`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
