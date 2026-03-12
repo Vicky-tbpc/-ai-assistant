@@ -142,7 +142,7 @@ async function getRandomPhrase(base) {
 
   const { data } = await supabase
     .from('phrase_library')
-    .select('logic_key') // 請確認你資料表存文字的欄位名稱
+    .select('detailed_content') // 請確認你資料表存文字的欄位名稱
     .in('logic_key', keys);
 
   if (!data || data.length === 0) return null;
@@ -169,3 +169,4 @@ async function sendLineMessage(lineUserId, text) {
     return `error: ${e.message}`;
   }
 }
+
