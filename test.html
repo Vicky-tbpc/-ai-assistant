@@ -461,7 +461,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -1391,7 +1391,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
 
 // 產生 5 個不適症狀按鈕
 function appendAbnormalityOptions() {
-    const options = ["沒有", "體溫偏高", "心跳較快", "鼻子過敏", "其他"];
+    const options = ["✅ 沒有", "🌡️ 體溫偏高", "💓 心跳較快", "🤧 鼻子過敏", "✏️ 其他"];
     let html = '<div class="msg-row ai-row" id="abnormality-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
     
     options.forEach(opt => {
@@ -1427,7 +1427,7 @@ async function handleStatusSelection(text, score) {
     appendUserMessage(text);
     tempScore = score;
     // 原本直接設定 isWaitingForAbnormality = true 改為顯示按鈕
-    await appendAiMessage("今天有覺得哪裡不舒服嗎？您可以直接點選下方按鈕，或是點選「其他」自行輸入唷！");
+    await appendAiMessage("今天有覺得哪裡不舒服嗎？請直接點選下方按鈕，或是點選「其他」自行輸入唷！");
     appendAbnormalityOptions();
 }
     
