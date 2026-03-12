@@ -1389,18 +1389,28 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
 
-// 產生 5 個不適症狀按鈕
 function appendAbnormalityOptions() {
-    const options = ["✅ 沒有", "🌡️ 體溫偏高", "💓 心跳較快", "🤧 鼻子過敏", "✏️ 其他"];
+    // 定義選項：包含顯示用的 text 與判斷用的 value
+    const options = [
+        { text: "✅ 沒有", val: "沒有" },
+        { text: "🌡️ 體溫偏高", val: "體溫偏高" },
+        { text: "💓 心跳較快", val: "心跳較快" },
+        { text: "🤧 鼻子過敏", val: "鼻子過敏" },
+        { text: "✏️ 其他", val: "其他" }
+    ];
+
     let html = '<div class="msg-row ai-row" id="abnormality-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
     
     options.forEach(opt => {
-        html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleAbnormalitySelection('${opt}')">${opt}</button>`;
+        // 顯示 opt.text，但 onclick 傳入 opt.val
+        html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleAbnormalitySelection('${opt.val}')">${opt.text}</button>`;
     });
     
     document.getElementById('chat-history').innerHTML += html + '</div></div>';
     scrollToBottom();
 }
+
+
 
 // 處理按鈕選後的行為
 async function handleAbnormalitySelection(choice) {
@@ -1427,7 +1437,7 @@ async function handleStatusSelection(text, score) {
     appendUserMessage(text);
     tempScore = score;
     // 原本直接設定 isWaitingForAbnormality = true 改為顯示按鈕
-    await appendAiMessage("今天有覺得哪裡不舒服嗎？請直接點選下方按鈕，或是點選「其他」自行輸入唷！");
+    await appendAiMessage("今天有覺得哪裡不舒服嗎？\n請直接點選下方按鈕，或是點選「其他」自行輸入唷！");
     appendAbnormalityOptions();
 }
     
