@@ -6,34 +6,27 @@ const supabase = createClient(
 );
 
 module.exports = async function (req, res) {
-  // 強制取得台北時間日期 (YYYY-MM-DD)
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterday = yesterdayDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
-  const debugLog = []; // 用來存放除錯資訊
+  const debugLog = [];
 
   try {
-    // 1. 取得所有有 LINE ID 的使用者
     const { data: users, error: userError } = await supabase
       .from('user_credentials')
       .select('serial_number, line_user_id')
       .not('line_user_id', 'is', null);
 
     if (userError) throw userError;
-    
-    debugLog.push({ step: "1. Fetch Users", count: users?.length || 0, users });
 
-    // 2. 取得今天與昨天的健康資料
     const { data: healthData, error: healthError } = await supabase
       .from('health_data')
       .select('serial_number, record_date, raw_json')
       .in('record_date', [today, yesterday]);
 
     if (healthError) throw healthError;
-    
-    debugLog.push({ step: "2. Fetch Health Data", count: healthData?.length || 0 });
 
     const results = [];
     const metrics = ['Battery_TST_min_A', 'Battery_N3_pct_A', 'Battery_rMSSD_A', 'Battery_HBI_A', 'Battery_HR_min_A'];
@@ -42,18 +35,13 @@ module.exports = async function (req, res) {
       const userToday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === today);
       const userYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === yesterday);
 
-      // 檢查今天是否有資料
       if (!userToday || !userToday.raw_json) {
         debugLog.push({ serial: user.serial_number, status: "Skipped", reason: `今天 (${today}) 沒資料` });
         continue;
       }
 
       let targetMetric = '';
-      let calculationType = '';
-
-      // 邏輯判斷：比較今天與昨天
       if (userYesterday && userYesterday.raw_json) {
-        calculationType = "Compare with yesterday";
         let minDiff = Infinity;
         metrics.forEach(m => {
           const diff = (userToday.raw_json[m] || 0) - (userYesterday.raw_json[m] || 0);
@@ -63,7 +51,6 @@ module.exports = async function (req, res) {
           }
         });
       } else {
-        calculationType = "No yesterday data, find lowest today";
         let minValue = Infinity;
         metrics.forEach(m => {
           const val = userToday.raw_json[m] || 0;
@@ -74,99 +61,70 @@ module.exports = async function (req, res) {
         });
       }
 
-      // 取得 TST_min 並判定 Logic Key
-      const tstMin = userToday.raw_json.TST_min;
+      const tstMin = userToday.raw_json.TST_min || 0;
+      const logicKeys = getLogicKeys(targetMetric, tstMin);
       
-      // 除錯：檢查是否缺少關鍵欄位
-      if (targetMetric === 'Battery_TST_min_A' && tstMin === undefined) {
-        debugLog.push({ serial: user.serial_number, status: "Error", reason: "raw_json 缺少 TST_min 欄位" });
-        continue;
-      }
+      // 從 phrase_library 抓取資料，欄位改為 detailed_content
+      const { data: phrases } = await supabase
+        .from('phrase_library')
+        .select('detailed_content')
+        .in('logic_key', logicKeys);
 
-      const logicKeyBase = getLogicKeyBase(targetMetric, tstMin);
-      
-      // 取得隨機訊息
-      const message = await getRandomPhrase(logicKeyBase);
-      
-      if (!message) {
+      if (!phrases || phrases.length === 0) {
         debugLog.push({ 
           serial: user.serial_number, 
           status: "Error", 
-          reason: `在 phrase_library 找不到對應的 LogicKey: ${logicKeyBase}` 
+          reason: `找不到對應的 LogicKeys: ${logicKeys.join(', ')}` 
         });
         continue;
       }
 
-      // 發送 LINE 通知
+      // 隨機選一個內容
+      const message = phrases[Math.floor(Math.random() * phrases.length)].detailed_content;
       const sendStatus = await sendLineMessage(user.line_user_id, message);
       
       results.push({
         serial: user.serial_number,
         metric: targetMetric,
-        logicKeyBase,
-        calc: calculationType,
         send: sendStatus
       });
     }
 
-    res.status(200).json({
-      date: today,
-      debug: debugLog,
-      results: results
-    });
+    res.status(200).json({ date: today, debug: debugLog, results });
 
   } catch (error) {
-    res.status(500).json({ error: error.message, debug: debugLog });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// 輔助函式：判斷 Logic Key 基底
-function getLogicKeyBase(metric, tstMin) {
+// 根據指標與睡眠分鐘數，回傳對應的 3 個 logic_key 陣列
+function getLogicKeys(metric, tstMin) {
+  let base = '';
   switch (metric) {
     case 'Battery_TST_min_A':
-      return tstMin < 420 ? '總睡眠睡前提醒123' : '總睡眠睡前提醒456';
-    case 'Battery_N3_pct_A': return 'N3睡前提醒';
-    case 'Battery_rMSSD_A': return 'rMSSD睡前提醒';
-    case 'Battery_HBI_A': return 'HBI睡前提醒';
-    case 'Battery_HR_min_A': return '最低脈搏睡前提醒';
-    default: return '';
+      base = tstMin < 420 ? '總睡眠睡前提醒' : '總睡眠睡前提醒';
+      return tstMin < 420 ? ['總睡眠睡前提醒1', '總睡眠睡前提醒2', '總睡眠睡前提醒3'] 
+                          : ['總睡眠睡前提醒4', '總睡眠睡前提醒5', '總睡眠睡前提醒6'];
+    case 'Battery_N3_pct_A': base = 'N3睡前提醒'; break;
+    case 'Battery_rMSSD_A': base = 'rMSSD睡前提醒'; break;
+    case 'Battery_HBI_A': base = 'HBI睡前提醒'; break;
+    case 'Battery_HR_min_A': base = '最低脈搏睡前提醒'; break;
   }
+  return [`${base}1`, `${base}2`, `${base}3`];
 }
 
-// 輔助函式：從 Library 隨機抓取文字
-async function getRandomPhrase(base) {
-  let keys = [];
-  if (base === '總睡眠睡前提醒123') keys = ['總睡眠睡前提醒1', '總睡眠睡前提醒2', '總睡眠睡前提醒3'];
-  else if (base === '總睡眠睡前提醒456') keys = ['總睡眠睡前提醒4', '總睡眠睡前提醒5', '總睡眠睡前提醒6'];
-  else keys = [`${base}1`, `${base}2`, `${base}3`];
-
-  const { data } = await supabase
-    .from('phrase_library')
-    .select('detailed_content') // 請確認你資料表存文字的欄位名稱
-    .in('logic_key', keys);
-
-  if (!data || data.length === 0) return null;
-  return data[Math.floor(Math.random() * data.length)].content;
-}
-
-// 輔助函式：發送 LINE 訊息
 async function sendLineMessage(lineUserId, text) {
   const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  try {
-    const response = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${lineToken}`
-      },
-      body: JSON.stringify({
-        to: lineUserId,
-        messages: [{ type: 'text', text }]
-      })
-    });
-    return response.ok ? 'success' : `failed: ${response.status}`;
-  } catch (e) {
-    return `error: ${e.message}`;
-  }
+  const response = await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${lineToken}`
+    },
+    body: JSON.stringify({
+      to: lineUserId,
+      messages: [{ type: 'text', text }]
+    })
+  });
+  return response.ok ? 'success' : 'failed';
 }
-
