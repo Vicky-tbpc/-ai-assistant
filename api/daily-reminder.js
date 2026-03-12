@@ -1,3 +1,4 @@
+// daily-reminder_02
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -31,19 +32,21 @@ module.exports = async function (req, res) {
     // 3. 篩選未填寫者
     const pendingUsers = users.filter(u => !finishedSerials.has(u.serial_number));
 
-    // 4. 發送通知
-    const results = [];
-    for (const user of pendingUsers) {
-      const result = await sendLineReminder(user.line_user_id);
-      results.push({ user: user.serial_number, status: result });
-    }
+// 4. 改用 Promise.all 平行發送通知，速度會快非常多
+const results = await Promise.all(pendingUsers.map(async (user) => {
+  try {
+    const result = await sendLineReminder(user.line_user_id);
+    return { user: user.serial_number, status: result };
+  } catch (e) {
+    return { user: user.serial_number, status: 'error', message: e.message };
+  }
+}));
 
-    res.status(200).json({ 
-      date: today,
-      total_pending: pendingUsers.length,
-      results: results 
-    });
-
+res.status(200).json({ 
+  date: today,
+  total_pending: pendingUsers.length,
+  results: results 
+});
   } catch (error) {
     console.error('API Error:', error.message);
     res.status(500).json({ error: error.message });
