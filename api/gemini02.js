@@ -15,37 +15,31 @@ export default async function handler(req, res) {
 
     if (!apiKey) return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
 
-    // --- 1. 判斷是否為範圍查詢並構建 Supabase URL ---
+   // --- 1. 判斷查詢範圍並構建 Supabase URL ---
     let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
     
     const now = new Date();
-    let isRangeQuery = false;
+    // 基準日期：優先使用傳入的 record_date，若無則用今天
+    const baseDate = record_date ? new Date(record_date) : new Date();
 
     if (prompt.includes("去年")) {
       const lastYear = now.getFullYear() - 1;
       queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
-      isRangeQuery = true;
     } else if (prompt.includes("上個月")) {
       const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
       const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${firstDayLastMonth}&record_date=lte.${lastDayLastMonth}`;
-      isRangeQuery = true;
     } else if (prompt.includes("月")) {
       const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
-      isRangeQuery = true;
-    } else if (prompt.includes("週")) {
-      const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7)).toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${sevenDaysAgo}`;
-      isRangeQuery = true;
-    } else if (prompt.includes("最近")) {
-      queryUrl += `&limit=5`; // 直接抓最近 5 筆
-      isRangeQuery = true;
     } else {
-      // 預設查詢單一日期
-      queryUrl += `&record_date=eq.${record_date}`;
+      // 【核心改動】：預設抓取目標日期往前推 7 天的資料，Gemini 才能算 7 日平均
+      const sevenDaysAgo = new Date(baseDate);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
+      const endDateStr = baseDate.toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
     }
-
     // --- 2. 執行資料庫讀取 ---
     const sbRes = await fetch(queryUrl, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
@@ -67,6 +61,7 @@ export default async function handler(req, res) {
 
 rMSSD放鬆恢復:${raw.rMSSD||0}ms,
 HBI缺氧負荷:${raw.HBI||0}%min/h,
+睡眠平均脈搏:${raw.HR_mean||0}bpm,
 睡眠最低脈搏:${raw.HR_min||0}bpm
 
 
@@ -103,16 +98,19 @@ HBI缺氧負荷:${raw.HBI||0}%min/h,
 - rMSSD放鬆恢復：個人7日移動平均正負百分之10 為標準。
 - HBI缺氧負荷：個人7日移動平均 為標準。
 - 睡眠最低脈搏：個人7日移動平均正負5 為標準。
+- 睡眠平均脈搏：60-100bpm 為標準。
+**動態基準計算**：當 [系統提供數據庫內容] 包含多日數據時，請針對 rMSSD、HBI、睡眠最低脈搏，先行計算過去 7 筆數據的平均值，並將此平均值作為該使用者的「個人標準」來進行比對分析。
 
 
            【運作邏輯】：
-            1. **名詞解釋優先**：若問名詞解釋（如：什麼是N3？），直接說明，不需分析數據。
-            2. **建議優先**：若問如何改善（如：怎麼睡更好？），提供具體建議，不需分析數據。
-            3. **數據分析**：若詢問睡眠狀況/最近表現，請利用 [系統提供數據庫內容] 進行摘要。
+            1. **計算與對比**：分析最近一筆數據時，請對比你算出的「個人 7 日平均值」。例如：『你今天的 rMSSD 為 45ms，比起你過去一週的平均值稍微低了一點喔。』
+            2. **名詞解釋優先**：若問名詞解釋（如：什麼是N3？），直接說明，不需分析數據。
+            3. **建議優先**：若問如何改善（如：怎麼睡更好？），提供具體建議，不需分析數據。
+            4. **數據分析**：若詢問睡眠狀況/最近表現，請利用 [系統提供數據庫內容] 進行摘要。
                - 若數據有多筆，請觀察趨勢（例如：這週你的深睡比例有下降趨勢喔）。
                - 節錄重點，約 3-5 句話。
-            4. **無數據處理**：若數據內容為空，請親切回答：『這段時間沒看到數據喔~ 😅 可能是沒上傳或還沒同步。☁️』
-            5. **禁止輸出代碼**：絕對不要在回覆中顯示 TST_min, raw_json, N3_pct 等代碼名稱。`
+            5. **無數據處理**：若數據內容為空，請親切回答：『這段時間沒看到數據喔~ 😅 可能是沒上傳或還沒同步。☁️』
+            6. **禁止輸出代碼**：絕對不要在回覆中顯示 TST_min, raw_json, N3_pct 等代碼名稱。`
           }]
         },
         contents: contents
