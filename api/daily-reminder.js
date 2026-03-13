@@ -1,4 +1,4 @@
-// daily-reminder_03
+// daily-reminder_04
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -7,17 +7,16 @@ const supabase = createClient(
 );
 
 module.exports = async function (req, res) {
-  // --- 身分驗證與防誤觸邏輯 ---
-  const authHeader = req.headers['x-vercel-cron'];
+  // 檢查是否為 Vercel Cron 觸發，或是手動帶參數測試
+  const isCron = req.headers['x-vercel-cron'] === '1' || req.headers['user-agent'] === 'vercel-cron/1.0';
   const isManual = req.query && req.query.manual === 'true';
 
-  if (!authHeader && !isManual) {
+  if (!isCron && !isManual) {
     return res.status(401).json({ 
       status: "Unauthorized",
-      message: "此 API 僅限排程執行。如需手動測試，請在網址後方加上 ?manual=true" 
+      message: "Access Denied" 
     });
   }
-  // ---------------------------
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
