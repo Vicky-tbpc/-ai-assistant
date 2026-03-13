@@ -1,4 +1,4 @@
-// daily-reminder_02
+// daily-reminder_03
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -6,7 +6,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+
 module.exports = async function (req, res) {
+  // --- 身分驗證與防誤觸邏輯 ---
+  const authHeader = req.headers['x-vercel-cron'];
+  const isManual = req.query && req.query.manual === 'true';
+
+  if (!authHeader && !isManual) {
+    return res.status(401).json({ 
+      status: "Unauthorized",
+      message: "此 API 僅限排程執行。如需手動測試，請在網址後方加上 ?manual=true" 
+    });
+  }
+  // ---------------------------
+
+
+
   // 強制取得台北時間日期
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
