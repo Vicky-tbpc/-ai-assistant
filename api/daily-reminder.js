@@ -1,4 +1,5 @@
-// daily-reminder_04
+// daily-reminder_01
+
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -7,20 +8,11 @@ const supabase = createClient(
 );
 
 module.exports = async function (req, res) {
-  // 檢查是否為 Vercel Cron 觸發，或是手動帶參數測試
-  const isCron = req.headers['x-vercel-cron'] === '1' || req.headers['user-agent'] === 'vercel-cron/1.0';
-  const isManual = req.query && req.query.manual === 'true';
-
-  if (!isCron && !isManual) {
-    return res.status(401).json({ 
-      status: "Unauthorized",
-      message: "Access Denied" 
-    });
-  }
-
+  // 強制取得台北時間日期
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
   try {
+    // 1. 取得所有有 LINE ID 的使用者
     const { data: users, error: userError } = await supabase
       .from('user_credentials')
       .select('serial_number, line_user_id')
@@ -28,6 +20,7 @@ module.exports = async function (req, res) {
 
     if (userError) throw userError;
 
+    // 2. 取得今天已經填寫過資料的序號
     const { data: surveys, error: surveyError } = await supabase
       .from('user_daily_surveys')
       .select('serial_number')
@@ -36,22 +29,23 @@ module.exports = async function (req, res) {
     if (surveyError) throw surveyError;
 
     const finishedSerials = new Set(surveys.map(s => s.serial_number));
+
+    // 3. 篩選未填寫者
     const pendingUsers = users.filter(u => !finishedSerials.has(u.serial_number));
 
-    const results = await Promise.all(pendingUsers.map(async (user) => {
-      try {
-        const result = await sendLineReminder(user.line_user_id);
-        return { user: user.serial_number, status: result };
-      } catch (e) {
-        return { user: user.serial_number, status: 'error', message: e.message };
-      }
-    }));
+    // 4. 發送通知
+    const results = [];
+    for (const user of pendingUsers) {
+      const result = await sendLineReminder(user.line_user_id);
+      results.push({ user: user.serial_number, status: result });
+    }
 
     res.status(200).json({ 
       date: today,
       total_pending: pendingUsers.length,
       results: results 
     });
+
   } catch (error) {
     console.error('API Error:', error.message);
     res.status(500).json({ error: error.message });
@@ -71,10 +65,11 @@ async function sendLineReminder(lineUserId) {
       to: lineUserId,
       messages: [{
         type: 'text',
-        text: `早安！提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/`
+        text: `早安！提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/test2.html`
       }]
     })
   });
   
   return response.ok ? 'success' : 'failed';
 }
+
