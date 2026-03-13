@@ -1,3 +1,5 @@
+// sleep-reminder_02
+
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -6,6 +8,20 @@ const supabase = createClient(
 );
 
 module.exports = async function (req, res) {
+
+// --- 新增：身分驗證與防誤觸邏輯 ---
+  const authHeader = req.headers['x-vercel-cron'];
+  const isManual = req.query && req.query.manual === 'true';
+
+  if (!authHeader && !isManual) {
+    return res.status(401).json({ 
+      status: "Unauthorized",
+      message: "此 API 僅限排程執行。如需手動測試，請在網址後方加上 ?manual=true" 
+    });
+  }
+  // --------------------------------
+
+
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
