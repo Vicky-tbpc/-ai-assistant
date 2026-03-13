@@ -517,10 +517,6 @@ async function sendMessage() {
 const healthConfigs = [
     // 原有指標
    
-   
-  
-   
-    
 
     // 新增指標
     { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' },
@@ -529,8 +525,8 @@ const healthConfigs = [
     { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', displayLabel: '睡眠平均血氧飽和度', unit: '%' },
     { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
     { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
-    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '呼吸', displayLabel: '睡眠平均呼吸頻率', unit: 'rpm' },
-    { regex: /脈搏|pr/i, displayField: 'HR_mean', prefix: '脈搏', fallbackTitle: '脈搏', displayLabel: '睡眠平均脈搏', unit: 'bpm' }
+    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '呼吸', displayLabel: '睡眠平均呼吸頻率', unit: 'rpm' }
+   
 ];
 
     // 日期偵測
