@@ -6,7 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-
 module.exports = async function (req, res) {
   // --- 身分驗證與防誤觸邏輯 ---
   const authHeader = req.headers['x-vercel-cron'];
@@ -20,13 +19,9 @@ module.exports = async function (req, res) {
   }
   // ---------------------------
 
-
-
-  // 強制取得台北時間日期
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
   try {
-    // 1. 取得所有有 LINE ID 的使用者
     const { data: users, error: userError } = await supabase
       .from('user_credentials')
       .select('serial_number, line_user_id')
@@ -34,7 +29,6 @@ module.exports = async function (req, res) {
 
     if (userError) throw userError;
 
-    // 2. 取得今天已經填寫過資料的序號
     const { data: surveys, error: surveyError } = await supabase
       .from('user_daily_surveys')
       .select('serial_number')
@@ -43,25 +37,22 @@ module.exports = async function (req, res) {
     if (surveyError) throw surveyError;
 
     const finishedSerials = new Set(surveys.map(s => s.serial_number));
-
-    // 3. 篩選未填寫者
     const pendingUsers = users.filter(u => !finishedSerials.has(u.serial_number));
 
-// 4. 改用 Promise.all 平行發送通知，速度會快非常多
-const results = await Promise.all(pendingUsers.map(async (user) => {
-  try {
-    const result = await sendLineReminder(user.line_user_id);
-    return { user: user.serial_number, status: result };
-  } catch (e) {
-    return { user: user.serial_number, status: 'error', message: e.message };
-  }
-}));
+    const results = await Promise.all(pendingUsers.map(async (user) => {
+      try {
+        const result = await sendLineReminder(user.line_user_id);
+        return { user: user.serial_number, status: result };
+      } catch (e) {
+        return { user: user.serial_number, status: 'error', message: e.message };
+      }
+    }));
 
-res.status(200).json({ 
-  date: today,
-  total_pending: pendingUsers.length,
-  results: results 
-});
+    res.status(200).json({ 
+      date: today,
+      total_pending: pendingUsers.length,
+      results: results 
+    });
   } catch (error) {
     console.error('API Error:', error.message);
     res.status(500).json({ error: error.message });
@@ -88,4 +79,3 @@ async function sendLineReminder(lineUserId) {
   
   return response.ok ? 'success' : 'failed';
 }
-
