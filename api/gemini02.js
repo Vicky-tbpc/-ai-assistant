@@ -46,30 +46,31 @@ export default async function handler(req, res) {
     });
     const dataList = await sbRes.json();
 
-    // --- 3. 格式化數據 Context ---
-    let healthContext = "找不到相關數據。";
-    if (dataList && dataList.length > 0) {
-      healthContext = dataList.map(item => {
-        const raw = item.raw_json || {};
-        const tst = raw.TST_min || 0;
-        return `日期:${item.record_date}, 
-                睡眠時長:${Math.floor(tst/60)}時${tst%60}分, 
-                N3深睡:${raw.N3_pct||0}%, 
-                效率:${raw.sleep_efficiency_pct||0}%, 
-                淺睡:${raw.N1N2_pct||0}%, 
-                REM:${raw.REM_pct||0}%,
+// --- 3. 格式化數據 Context (加上整數處理) ---
+let healthContext = "找不到相關數據。";
+if (dataList && dataList.length > 0) {
+  healthContext = dataList.map(item => {
+    const raw = item.raw_json || {};
+    const tst = raw.TST_min || 0;
 
-rMSSD放鬆恢復:${raw.rMSSD||0}ms,
-HBI缺氧負荷:${raw.HBI||0}%min/h,
-睡眠平均脈搏:${raw.HR_mean||0}bpm,
-睡眠最低脈搏:${raw.HR_min||0}bpm
+    // 先在裡面處理好數值，這樣 return 的時候比較乾淨
+    const hrMean = Math.round(raw.HR_mean || 0);
+    const hrMin = Math.round(raw.HR_min || 0);
+    const hbi = Math.round(raw.HBI || 0);
+    const rMssd = Math.round(raw.rMSSD || 0);
 
-
-
-
-`;
-      }).join('\n');
-    }
+    return `日期:${item.record_date}, 
+            睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分, 
+            N3深睡:${raw.N3_pct || 0}%, 
+            效率:${raw.sleep_efficiency_pct || 0}%, 
+            淺睡:${raw.N1N2_pct || 0}%, 
+            REM:${raw.REM_pct || 0}%,
+            rMSSD放鬆恢復:${rMssd}ms,
+            HBI缺氧負荷:${hbi}%min/h,
+            睡眠平均脈搏:${hrMean}bpm,
+            睡眠最低脈搏:${hrMin}bpm`;
+  }).join('\n');
+}
 
     // --- 4. 呼叫 Gemini API ---
     const contents = [...history, { 
@@ -99,7 +100,8 @@ HBI缺氧負荷:${raw.HBI||0}%min/h,
 - HBI缺氧負荷：個人7日移動平均 為標準。
 - 睡眠最低脈搏：個人7日移動平均正負5 為標準。
 - 睡眠平均脈搏：60-100bpm 為標準。
-**動態基準計算**：當 [系統提供數據庫內容] 包含多日數據時，請針對 rMSSD、HBI、睡眠最低脈搏，先行計算過去 7 筆數據的平均值，並將此平均值作為該使用者的「個人標準」來進行比對分析。
+- **動態基準計算**：當 [系統提供數據庫內容] 包含多日數據時，請針對 rMSSD、HBI、睡眠最低脈搏，先行計算過去 7 筆數據的平均值，並將此平均值作為該使用者的「個人標準」來進行比對分析。
+- **數值格式要求**：所有提到的數據、平均值、計算結果，請一律「取整數（四捨五入）」，不要顯示小數點。
 
 
            【運作邏輯】：
