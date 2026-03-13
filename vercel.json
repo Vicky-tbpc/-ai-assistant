@@ -6,10 +6,11 @@
     },
     {
       "path": "/api/sleep-reminder",
-      "schedule": "30 12 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
+
 
 
 
