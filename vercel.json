@@ -2,15 +2,11 @@
   "crons": [
     {
       "path": "/api/daily-reminder",
-      "schedule": "40 5 * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/sleep-reminder",
-      "schedule": "0 6 * * *"
+      "schedule": "30 12 * * *"
     }
   ]
 }
-
-
-
-
