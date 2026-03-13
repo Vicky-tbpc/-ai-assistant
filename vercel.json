@@ -1,8 +1,9 @@
 {
   "crons": [
     {
-      "path": "/api/sleep-reminder",
-      "schedule": "30 12 * * *"
+      "path": "/api/daily-reminder",
+      "schedule": "0 1 * * *"
     }
   ]
 }
+
