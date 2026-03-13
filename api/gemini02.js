@@ -1,4 +1,4 @@
-// api/gemini.js 12
+// api/gemini.js 13
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -63,7 +63,16 @@ export default async function handler(req, res) {
                 N3深睡:${raw.N3_pct||0}%, 
                 效率:${raw.sleep_efficiency_pct||0}%, 
                 淺睡:${raw.N1N2_pct||0}%, 
-                REM:${raw.REM_pct||0}%`;
+                REM:${raw.REM_pct||0}%,
+
+rMSSD放鬆恢復:${raw.rMSSD||0}ms,
+HBI缺氧負荷:${raw.HBI||0}%min/h,
+睡眠最低脈搏:${raw.HR_min||0}bpm
+
+
+
+
+`;
       }).join('\n');
     }
 
@@ -91,6 +100,9 @@ export default async function handler(req, res) {
                     - 效率：≥ 85% 為良好，≤ 75% 為不佳。
                     - 淺睡：50%-65% 為標準。
                     - REM：10%-25% 為標準。
+- rMSSD放鬆恢復：個人7日移動平均正負百分之10 為標準。
+- HBI缺氧負荷：個人7日移動平均 為標準。
+- 睡眠最低脈搏：個人7日移動平均正負5 為標準。
 
 
            【運作邏輯】：
