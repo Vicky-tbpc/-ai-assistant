@@ -47,17 +47,22 @@ export default async function handler(req, res) {
     const dataList = await sbRes.json();
 
 // --- 3. 格式化數據 Context (加上整數處理) ---
+const todayStr = new Date().toISOString().split('T')[0]; // 取得今天的日期字串
 let healthContext = "找不到相關數據。";
 if (dataList && dataList.length > 0) {
   healthContext = dataList.map(item => {
     const raw = item.raw_json || {};
     const tst = raw.TST_min || 0;
 
-    // 先在裡面處理好數值，這樣 return 的時候比較乾淨
+// 確保所有數值都從 raw 裡面拿，避免 undefined
     const hrMean = Math.round(raw.HR_mean || 0);
     const hrMin = Math.round(raw.HR_min || 0);
-    const hbi = Math.round(raw.HBI || 0);
     const rMssd = Math.round(raw.rMSSD || 0);
+    const hbi = Math.round(raw.HBI || 0);
+    const spo2 = Math.round(raw.SpO2_mean || 0);
+    const rr = Math.round(raw.RR_mean || 0);
+    const odi3 = Math.round(raw.ODI3_total || 0);
+    const odi4 = Math.round(raw.ODI4_total || 0);
 
     return `日期:${item.record_date}, 
             睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分, 
@@ -68,15 +73,22 @@ if (dataList && dataList.length > 0) {
             rMSSD放鬆恢復:${rMssd}ms,
             HBI缺氧負荷:${hbi}%min/h,
             睡眠平均脈搏:${hrMean}bpm,
-            睡眠最低脈搏:${hrMin}bpm`;
+            睡眠最低脈搏:${hrMin}bpm,
+            睡眠平均血氧飽和度:${spo2}%,
+            睡眠平均呼吸頻率:${rr}rpm,
+            ODI 3%:${odi3}次/小時,
+            ODI 4%:${odi4}次/小時,
+            T90:${raw.T90_pct || 0}%,
+            T89:${raw.T89_pct || 0}%,
+            T88:${raw.T88_pct || 0}%`;
   }).join('\n');
 }
 
     // --- 4. 呼叫 Gemini API ---
     const contents = [...history, { 
       role: "user", 
-      parts: [{ text: `[系統提供數據庫內容]:\n${healthContext}\n\n[使用者當前問題]: ${prompt}` }] 
-    }];
+parts: [{ text: `[系統時間]: 今天是 ${todayStr}\n[系統提供數據庫內容]:\n${healthContext}\n\n[使用者當前問題]: ${prompt}` }] 
+}];
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -100,20 +112,29 @@ if (dataList && dataList.length > 0) {
 - HBI缺氧負荷：個人7日移動平均 為標準。
 - 睡眠最低脈搏：個人7日移動平均正負5 為標準。
 - 睡眠平均脈搏：60-100bpm 為標準。
+- 睡眠平均血氧飽和度：>95% 為標準。
+- 睡眠平均呼吸頻率：12-25rpm 為標準。
+- ODI 3%/ODI 4%：<5次/小時 為標準。
+- T90：≤ 5% 為標準。
+- T89：≤ 4% 為標準。
+- T88：≤ 3% 為標準。
 - **動態基準計算**：當 [系統提供數據庫內容] 包含多日數據時，請針對 rMSSD、HBI、睡眠最低脈搏，先行計算過去 7 筆數據的平均值，並將此平均值作為該使用者的「個人標準」來進行比對分析。
-- **數值格式要求**：所有提到的數據、平均值、計算結果，請一律「取整數（四捨五入）」，不要顯示小數點。
+- **數值格式要求**：脈搏、血氧、呼吸、ODI 取整數；其餘四捨五入至小數點後 1 位。
 
 
            【運作邏輯】：
+            1. **日期檢查 (最重要)**：請對比 [系統當前日期] 與 [系統提供數據庫內容] 中最新一筆的日期。
+                       - 若日期相符，才稱之為「今天」。
+                       - 若不符，請說「我看到你今天還沒有數據，先幫你回顧最近一次 (${dataList[0]?.record_date || '某日'}) 的表現」。
             1. **計算與對比**：分析最近一筆數據時，請對比你算出的「個人 7 日平均值」。例如：『你今天的 rMSSD 為 45ms，比起你過去一週的平均值稍微低了一點喔。』
             2. **名詞解釋優先**：若問名詞解釋（如：什麼是N3？），直接說明，不需分析數據。
             3. **建議優先**：若問如何改善（如：怎麼睡更好？），提供具體建議，不需分析數據。
             4. **數據分析**：若詢問睡眠狀況/最近表現，請利用 [系統提供數據庫內容] 進行摘要。
                - 若數據有多筆，請觀察趨勢（例如：這週你的深睡比例有下降趨勢喔）。
-               - 節錄重點，約 3-5 句話。
+               - 總字數控制在 **250-300 字左右**，確保直接切入重點，避免贅句。
             5. **無數據處理**：若數據內容為空，請親切回答：『這段時間沒看到數據喔~ 😅 可能是沒上傳或還沒同步。☁️』
             6. **禁止輸出代碼**：絕對不要在回覆中顯示 TST_min, raw_json, N3_pct 等代碼名稱。`
-          }]
+ }]
         },
         contents: contents
       })
