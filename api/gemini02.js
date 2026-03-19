@@ -1,4 +1,4 @@
-// api/gemini.js 19
+// api/gemini.js 17
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -15,17 +15,11 @@ export default async function handler(req, res) {
 
     if (!apiKey) return res.status(500).json({ text: "伺服器錯誤：找不到 API Key" });
 
-    // --- 1. 抓取「絕對最新日期」 (解決 AI 誤判最新日期的問題) ---
-    const latestCheckUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date&order=record_date.desc&limit=1`;
-    const latestCheckRes = await fetch(latestCheckUrl, {
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
-    });
-    const latestCheckData = await latestCheckRes.json();
-    const trueLatestDate = latestCheckData[0]?.record_date || "無資料";
-
-    // --- 2. 構建數據查詢 URL (維持原有的 7 日查詢邏輯) ---
+   // --- 1. 判斷查詢範圍並構建 Supabase URL ---
     let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
+    
     const now = new Date();
+    // 基準日期：優先使用傳入的 record_date，若無則用今天
     const baseDate = record_date ? new Date(record_date) : new Date();
 
     if (prompt.includes("去年")) {
@@ -35,14 +29,18 @@ export default async function handler(req, res) {
       const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
       const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${firstDayLastMonth}&record_date=lte.${lastDayLastMonth}`;
+    } else if (prompt.includes("月")) {
+      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
     } else {
+      // 【核心改動】：預設抓取目標日期往前推 7 天的資料，Gemini 才能算 7 日平均
       const sevenDaysAgo = new Date(baseDate);
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
       const endDateStr = baseDate.toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
     }
-
+    // --- 2. 執行資料庫讀取 ---
     const sbRes = await fetch(queryUrl, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
@@ -87,19 +85,11 @@ if (dataList && dataList.length > 0) {
 }
 
     // --- 4. 呼叫 Gemini API ---
-    // 將動態日期資訊放入 prompt 而不是 system_instruction
-    const dynamicContext = `
-[系統時間]: 今天是 ${todayStr}
-[資料庫最新日期]: ${trueLatestDate}
-[使用者詢問目標日期]: ${record_date || '未指定'}
-[系統提供數據庫內容]:
-${healthContext}
+    const contents = [...history, { 
+      role: "user", 
+parts: [{ text: `[系統時間]: 今天是 ${todayStr}\n[系統提供數據庫內容]:\n${healthContext}\n\n[使用者當前問題]: ${prompt}` }] 
+}];
 
-[使用者當前問題]: ${prompt}`;
-
-    const contents = [...history, { role: "user", parts: [{ text: dynamicContext }] }];
-
-    // 注意：Gemini 2.0 目前正式名稱為 gemini-2.0-flash (非 2.5)
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const geminiRes = await fetch(apiUrl, {
@@ -138,15 +128,14 @@ ${healthContext}
            【輸出格式】：
            - 數值：脈搏、血氧、呼吸、ODI 取整數；其餘四捨五入至小數點後 1 位。
            - 日期格式：統一使用「月/日」。`
-          }]
+ }]
         },
-        contents: contents,
-        generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+        contents: contents
       })
     });
 
     const geminiData = await geminiRes.json();
-    const resultText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我現在沒辦法分析數據，請稍後再試。";
+    const resultText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "AI 目前沒有回傳內容，請稍後再試。";
     
     res.status(200).json({ text: resultText });
 
