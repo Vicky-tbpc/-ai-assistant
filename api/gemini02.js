@@ -61,7 +61,7 @@ export default async function handler(req, res) {
             效率:${raw.sleep_efficiency_pct || 0}%, 
             淺睡:${raw.N1N2_pct || 0}%, 
             REM:${raw.REM_pct || 0}%,
-            rMSSD放鬆恢復:${rMssd}ms,
+            rMSSD放鬆恢復:${rMSSD}ms,
             HBI缺氧負荷:${hbi}%min/h,
             睡眠平均脈搏:${hrMean}bpm,
             睡眠最低脈搏:${hrMin}bpm,
