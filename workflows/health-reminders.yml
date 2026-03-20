@@ -1,0 +1,25 @@
+name: Scheduled API Reminders
+
+on:
+  schedule:
+    # 早上 09:05 台北時間 (01:05 UTC)
+    - cron: '5 1 * * *'
+    # 晚上 20:35 台北時間 (12:35 UTC)
+    - cron: '35 12 * * *'
+  workflow_dispatch: # 允許手動點擊按鈕測試
+
+jobs:
+  trigger-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Daily Reminder (Morning)
+        if: github.event.schedule == '5 1 * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          curl -X GET "https://ai-assistant-eight-puce.vercel.app/api/daily-reminder" \
+          -H "Content-Type: application/json"
+
+      - name: Trigger Sleep Reminder (Night)
+        if: github.event.schedule == '35 12 * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          curl -X GET "https://ai-assistant-eight-puce.vercel.app/api/sleep-reminder" \
+          -H "Content-Type: application/json"
