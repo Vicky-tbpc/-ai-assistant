@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n46</title>
+    <title>Soosyn 健康夥伴 n49</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -313,6 +313,25 @@ function getLocalDateString() {
     const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
+
+// 修改後的前端記錄函式
+async function logConversation(userMsg, aiMsg, type, targetDate = null) {
+    if (!currentSerial) return;
+    try {
+        await _supabase.from('chat_logs').insert([{
+            serial_number: currentSerial,
+            user_message: userMsg,
+            ai_response: aiMsg,
+            interaction_type: type,
+            target_date: targetDate // 傳入當前查詢的日期
+        }]);
+    } catch (err) {
+        console.error("Log failed:", err);
+    }
+}
+
+
+
     let userNickname = "";
 let assistantName = "";
 
@@ -516,22 +535,10 @@ async function sendMessage() {
     // 指標配置與 regex (包含您要求的所有關鍵字)
 const healthConfigs = [
     // 原有指標
-    { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
    
-    { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
-    { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-   
-    
 
     // 新增指標
-    { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' },
-    
-    
-    { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', displayLabel: '睡眠平均血氧飽和度', unit: '%' },
-    { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
-    { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
-    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '呼吸', displayLabel: '睡眠平均呼吸頻率', unit: 'rpm' },
-    { regex: /脈搏|pr/i, displayField: 'HR_mean', prefix: '脈搏', fallbackTitle: '脈搏', displayLabel: '睡眠平均脈搏', unit: 'bpm' }
+    { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' }
 ];
 
     // 日期偵測
@@ -587,6 +594,10 @@ const healthConfigs = [
         const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', wikiKeyword).limit(1).single();
         if (data) { 
             await appendAiMessage(data.detailed_content); 
+
+// 👇 新增這行：記錄百科關鍵字對話
+            logConversation(msg, data.detailed_content, 'keyword');
+
             await new Promise(r => setTimeout(r, 600)); 
             await appendAiMessage(getRandomEndQuestion()); 
             return;
@@ -658,6 +669,11 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         if (isDefinitionQuery) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).limit(1).maybeSingle();
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細百科資料。`);
+            
+
+// 👇 新增這行：記錄指標定義對話
+            logConversation(msg, aiReply, 'keyword');
+
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
             return;
@@ -913,7 +929,12 @@ async function startTrendFlow(type, name) {
     document.getElementById('trend-options-container')?.remove();
     appendUserMessage(name);
     await appendAiMessage(`正在準備你的 ${name}...`);
-    renderTrendCard(type, 7); // 預設顯示 7 日
+    
+
+// 👈 新增這行：記錄查詢趨勢圖
+    logConversation(`點擊按鈕查詢: ${name}`, reply + " [系統回傳趨勢圖表]", 'trend');
+
+renderTrendCard(type, 7); // 預設顯示 7 日
 }
 
 async function renderTrendCard(type, days) {
@@ -1255,7 +1276,14 @@ function renderLegend(type, abnormalLabel) {
 
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
+    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); 
+
+
+// 👈 新增這行：記錄查詢平衡度
+        logConversation(`查詢 ${d} 生理電量平衡度`, "[系統回傳平衡度雷達圖]", 'balance');
+
+await new Promise(r => setTimeout(r, 600)); 
+await appendAiMessage(getRandomEndQuestion());
 } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
     
 
@@ -1270,6 +1298,11 @@ async function processSummarySearch(d) {
     const data = await fetchSummaryData(d);
     if (data) {
         appendSummaryCard(data);
+
+// 👈 新增這行：記錄查詢健康摘要 (將 AI 回覆記錄為系統動作)
+        logConversation(`查詢 ${d} 健康摘要`, "[系統回傳健康摘要圖卡]", 'summary');
+
+
         
         // 新增邏輯：如果是查詢「今天」，則自動出現隨機建議
         const todayStr = getLocalDateString();
@@ -1613,6 +1646,10 @@ async function callGeminiAPI(prompt) {
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
+
+// 👇 新增這行：記錄 Gemini 對話到資料庫
+        logConversation(prompt, data.text, 'gemini');
+
         return data.text;
     } catch (err) {
         console.error("API Error:", err);
@@ -1626,4 +1663,3 @@ async function callGeminiAPI(prompt) {
 </script>
 </body>
 </html>
-
