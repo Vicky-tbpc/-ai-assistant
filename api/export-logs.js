@@ -6,7 +6,7 @@ export default async function handler(req, res) {
 
   try {
     // 1. 從 Supabase 抓取所有對話紀錄
-    const sbRes = await fetch(`${supabaseUrl}/rest/v1/chat_logs?select=*&order=created_at.desc`, {
+    const sbRes = await fetch(`${supabaseUrl}/rest/v1/chat_logs?select=*&order=created_at.asc`, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
     const allLogs = await sbRes.json();
