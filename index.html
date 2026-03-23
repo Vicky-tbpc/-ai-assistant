@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n48</title>
+    <title>Soosyn 健康夥伴 n49</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1574,6 +1574,12 @@ async function callGeminiAPI(prompt) {
     }
     scrollToBottom();
 
+
+    const now = new Date();
+    const currentDate = now.toLocaleDateString('en-CA'); // 格式：YYYY-MM-DD
+    const currentTime = now.toTimeString().split(' ')[0]; // 格式：HH:mm:ss
+
+
     // 取得當前訊息中提到的日期
     const targetDateStr = getTargetDate(prompt); 
 
@@ -1585,7 +1591,10 @@ async function callGeminiAPI(prompt) {
                 prompt: prompt,
                 serial_number: currentSerial,
                 record_date: targetDateStr,
-                history: chatHistory // 重要：要把對話紀錄傳給後端，記憶功能才會動！
+                history: chatHistory, // 重要：要把對話紀錄傳給後端，記憶功能才會動！
+                // --- 新增這兩行 ---
+                local_date: currentDate,     
+                local_time: currentTime
             })
         });
         const data = await res.json();
