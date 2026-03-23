@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理者後台 | 健康夥伴管理系統 06</title>
+    <title>管理者後台 07</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -86,6 +86,14 @@
             </div>
             <div id="phrase-status" class="status-msg"></div>
         </div>
+
+<div class="tool-section" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+    <h3>對話紀錄管理</h3>
+    <p style="color: #666; font-size: 0.9rem;">將資料庫中所有對話紀錄匯出為 Excel 檔案（依使用者序號自動分頁）。</p>
+    <button onclick="exportChatLogs()" id="exportBtn" style="background-color: #6c838f; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
+        🚀 立即匯出對話紀錄 (.xlsx)
+    </button>
+</div>
 
         <table>
             <thead>
@@ -282,7 +290,38 @@
             };
             reader.readAsArrayBuffer(fileInput.files[0]);
         }
-    </script>
+   
+
+// 匯出對話紀錄功能
+function exportChatLogs() {
+    const btn = document.getElementById('exportBtn');
+    const originalText = btn.innerText;
+
+    // 變更按鈕狀態，增加使用者體驗
+    btn.innerText = '⌛ 正在準備檔案...';
+    btn.style.opacity = '0.7';
+    btn.disabled = true;
+
+    try {
+        // 直接導向 API 路徑，瀏覽器會偵測到 Content-Disposition 並自動下載
+        // 因為你的 HTML 與 API 在同一個專案（同網域），建議用相對路徑
+        window.location.href = '/api/export-logs';
+
+        // 設定一個延遲，讓按鈕在幾秒後恢復（因為跳轉下載不會重新整理頁面）
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.opacity = '1';
+            btn.disabled = false;
+        }, 3000);
+    } catch (err) {
+        console.error("匯出失敗:", err);
+        alert("匯出失敗，請檢查網路或 API 狀態。");
+        btn.innerText = originalText;
+        btn.style.opacity = '1';
+        btn.disabled = false;
+    }
+}
+
+ </script>
 </body>
 </html>
-
