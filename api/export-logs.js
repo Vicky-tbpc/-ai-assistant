@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
     // 6. 設定 Response Header，讓瀏覽器觸發下載
-    const fileName = `Health_Logs_${new Date().toLocaleDateString('en-CA')}.xlsx`;
+    const fileName = `Chat_Logs_${new Date().toLocaleDateString('en-CA')}.xlsx`;
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     
