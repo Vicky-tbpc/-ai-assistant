@@ -2,6 +2,7 @@
   "name": "soosyn-assistant",
   "version": "1.0.0",
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "xlsx": "^0.18.5"
   }
 }
