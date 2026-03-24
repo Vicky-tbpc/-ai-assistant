@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n49</title>
+    <title>Soosyn 健康夥伴 n50</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -563,7 +563,7 @@ const healthConfigs = [
 
     
 
-    if (msg.includes("趨勢")) {
+    if (msg.includes("趨勢圖")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
         appendTrendOptions();
         return;
@@ -1584,7 +1584,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini03', {
+        const res = await fetch('/api/ollama_api', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
