@@ -1,19 +1,19 @@
-const { createClient } = require('@supabase/supabase-js');
+// sleep-reminder_02
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-module.exports = async function (req, res) {
+export default async function handler(req, res) {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterday = yesterdayDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
-  const debugLog = [];
-
   try {
+    // 1. 取得所有有 LINE ID 的使用者
     const { data: users, error: userError } = await supabase
       .from('user_credentials')
       .select('serial_number, line_user_id')
@@ -21,6 +21,7 @@ module.exports = async function (req, res) {
 
     if (userError) throw userError;
 
+    // 2. 取得今天與昨天的健康數據
     const { data: healthData, error: healthError } = await supabase
       .from('health_data')
       .select('serial_number, record_date, raw_json')
@@ -28,81 +29,81 @@ module.exports = async function (req, res) {
 
     if (healthError) throw healthError;
 
-    const results = [];
     const metrics = ['Battery_TST_min_A', 'Battery_N3_pct_A', 'Battery_rMSSD_A', 'Battery_HBI_A', 'Battery_HR_min_A'];
 
-    for (const user of users) {
-      const userToday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === today);
-      const userYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === yesterday);
+    // 3. 使用 Promise.all 平行處理所有使用者的任務
+    const results = await Promise.all(users.map(async (user) => {
+      try {
+        const userToday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === today);
+        const userYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === yesterday);
 
-      if (!userToday || !userToday.raw_json) {
-        debugLog.push({ serial: user.serial_number, status: "Skipped", reason: `今天 (${today}) 沒資料` });
-        continue;
+        if (!userToday || !userToday.raw_json) {
+          return { serial: user.serial_number, status: "Skipped", reason: "今天沒資料" };
+        }
+
+        // --- 計算邏輯開始 ---
+        let targetMetric = '';
+        if (userYesterday && userYesterday.raw_json) {
+          let minDiff = Infinity;
+          metrics.forEach(m => {
+            const diff = (userToday.raw_json[m] || 0) - (userYesterday.raw_json[m] || 0);
+            if (diff < minDiff) {
+              minDiff = diff;
+              targetMetric = m;
+            }
+          });
+        } else {
+          let minValue = Infinity;
+          metrics.forEach(m => {
+            const val = userToday.raw_json[m] || 0;
+            if (val < minValue) {
+              minValue = val;
+              targetMetric = m;
+            }
+          });
+        }
+
+        const tstMin = userToday.raw_json.TST_min || 0;
+        const logicKeys = getLogicKeys(targetMetric, tstMin);
+        
+        // 抓取詞句
+        const { data: phrases } = await supabase
+          .from('phrase_library')
+          .select('detailed_content')
+          .in('logic_key', logicKeys);
+
+        if (!phrases || phrases.length === 0) {
+          return { serial: user.serial_number, status: "Error", reason: "找不到對應詞句" };
+        }
+
+        const message = phrases[Math.floor(Math.random() * phrases.length)].detailed_content;
+        const sendStatus = await sendLineMessage(user.line_user_id, message);
+        
+        return {
+          serial: user.serial_number,
+          metric: targetMetric,
+          status: sendStatus
+        };
+        // --- 計算邏輯結束 ---
+
+      } catch (err) {
+        // 捕捉單一使用者處理過程中的錯誤，確保不影響其他人
+        return { serial: user.serial_number, status: "Error", message: err.message };
       }
+    }));
 
-      let targetMetric = '';
-      if (userYesterday && userYesterday.raw_json) {
-        let minDiff = Infinity;
-        metrics.forEach(m => {
-          const diff = (userToday.raw_json[m] || 0) - (userYesterday.raw_json[m] || 0);
-          if (diff < minDiff) {
-            minDiff = diff;
-            targetMetric = m;
-          }
-        });
-      } else {
-        let minValue = Infinity;
-        metrics.forEach(m => {
-          const val = userToday.raw_json[m] || 0;
-          if (val < minValue) {
-            minValue = val;
-            targetMetric = m;
-          }
-        });
-      }
-
-      const tstMin = userToday.raw_json.TST_min || 0;
-      const logicKeys = getLogicKeys(targetMetric, tstMin);
-      
-      // 從 phrase_library 抓取資料，欄位改為 detailed_content
-      const { data: phrases } = await supabase
-        .from('phrase_library')
-        .select('detailed_content')
-        .in('logic_key', logicKeys);
-
-      if (!phrases || phrases.length === 0) {
-        debugLog.push({ 
-          serial: user.serial_number, 
-          status: "Error", 
-          reason: `找不到對應的 LogicKeys: ${logicKeys.join(', ')}` 
-        });
-        continue;
-      }
-
-      // 隨機選一個內容
-      const message = phrases[Math.floor(Math.random() * phrases.length)].detailed_content;
-      const sendStatus = await sendLineMessage(user.line_user_id, message);
-      
-      results.push({
-        serial: user.serial_number,
-        metric: targetMetric,
-        send: sendStatus
-      });
-    }
-
-    res.status(200).json({ date: today, debug: debugLog, results });
+    res.status(200).json({ date: today, results });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-};
+}
 
-// 根據指標與睡眠分鐘數，回傳對應的 3 個 logic_key 陣列
+// 根據指標與睡眠分鐘數，回傳對應的 logic_key 陣列
 function getLogicKeys(metric, tstMin) {
   let base = '';
   switch (metric) {
     case 'Battery_TST_min_A':
-      base = tstMin < 420 ? '總睡眠睡前提醒' : '總睡眠睡前提醒';
       return tstMin < 420 ? ['總睡眠睡前提醒1', '總睡眠睡前提醒2', '總睡眠睡前提醒3'] 
                           : ['總睡眠睡前提醒4', '總睡眠睡前提醒5', '總睡眠睡前提醒6'];
     case 'Battery_N3_pct_A': base = 'N3睡前提醒'; break;
