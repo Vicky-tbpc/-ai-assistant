@@ -1,12 +1,13 @@
-// daily-reminder_02
-const { createClient } = require('@supabase/supabase-js');
+// daily-reminder_03
+import { createClient } from '@supabase/supabase-js'; // 改用 import
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-module.exports = async function (req, res) {
+// 改用 export default
+export default async function handler(req, res) {
   // 強制取得台北時間日期
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
@@ -73,4 +74,3 @@ async function sendLineReminder(lineUserId) {
   
   return response.ok ? 'success' : 'failed';
 }
-
