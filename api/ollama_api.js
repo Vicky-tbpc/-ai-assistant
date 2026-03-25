@@ -1,4 +1,4 @@
-// api/ollama_api.js 01
+// api/ollama_api.js 02 qwen2.5:14b
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -11,8 +11,8 @@ export default async function handler(req, res) {
     const { prompt, serial_number, record_date, history = [], local_date, local_time } = req.body;
 
     // 從 Vercel 環境變數取得穿透網址與模型名稱
-    const ollamaUrl = "https://allied-mesh-tourism-vol.trycloudflare.com"; // 例如 https://xxx.trycloudflare.com
-    const modelName = "llama4"; // 指定地端模型
+    const ollamaUrl = "https://planning-instead-knives-essex.trycloudflare.com"; // 例如 https://xxx.trycloudflare.com
+    const modelName = "qwen2.5:14b"; // 指定地端模型
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
