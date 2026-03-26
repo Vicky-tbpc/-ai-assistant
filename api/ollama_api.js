@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
     // 從 Vercel 環境變數取得穿透網址與模型名稱
     const ollamaUrl = "https://planning-instead-knives-essex.trycloudflare.com"; // 例如 https://xxx.trycloudflare.com
-    const modelName = "cwchang/llama-3-taiwan-8b-instruct-128k:latest"; // 指定地端模型
+    const modelName = "qwen2.5:14b"; // 指定地端模型
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
