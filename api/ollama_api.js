@@ -134,9 +134,7 @@ export default async function handler(req, res) {
 
         此外，你的 HBI 缺氧負荷 6%min/h，且 ODI 3% 達 6 次/小時，這已超過建議標準（ODI > 5 次），並略高於平均，建議你多留意呼吸狀況。⚠️
 
-        不過，rMSSD 放鬆恢復高達 80ms，顯著優於平均值，表示你的身體在有限睡眠時間裡，仍盡力修復！💪
-
-        要不要一起檢視一下最近的狀態呢？✨」`;
+        不過，rMSSD 放鬆恢復高達 80ms，顯著優於平均值，表示你的身體在有限睡眠時間裡，仍盡力修復！💪`;
 
     // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
     const formattedHistory = history.map(h => ({
