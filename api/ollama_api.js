@@ -160,8 +160,9 @@ export default async function handler(req, res) {
         stream: false,
         options: { temperature: 0.7,  // 調到 0.7 - 0.8 左右，這會讓它說話更靈活
         top_p: 0.9  // 讓用詞更精練且不失多樣性
-      })
-    });
+    } // 修正這裡的括號
+  })
+});
 
     if (!ollamaRes.ok) throw new Error("Ollama 連線失敗");
 
