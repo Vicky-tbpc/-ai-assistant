@@ -59,7 +59,6 @@ export default async function handler(req, res) {
     const dataList = await sbRes.json();
 
      // --- 3. 格式化數據 Context ---
-    const todayStr = new Date().toISOString().split('T')[0];
     let healthContext = "找不到相關數據。";
     if (dataList && dataList.length > 0) {
       healthContext = dataList.map(item => {
