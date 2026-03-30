@@ -1,4 +1,4 @@
-// api/ollama_api.js 02 qwen2.5:14b
+// api/ollama_api.js 03 qwen2.5:14b
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -16,37 +16,47 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!ollamaUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 Ollama 穿透網址" });
+   if (!ollamaUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 Ollama 穿透網址" });
 
-    // --- 1. 判斷查詢範圍並構建 Supabase URL ---
-    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
+    // === 【重點修改 1：精準計算使用者裝置的今天與昨天】 ===
+    // 優先使用前端傳過來的裝置日期，避免伺服器時區誤差
+    const todayStr = local_date || new Date().toISOString().split('T')[0];
+    
+    // 計算昨天
+    const todayObj = new Date(todayStr);
+    const yesterdayObj = new Date(todayObj);
+    yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+    const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
 
-    const now = new Date();
-    const baseDate = record_date ? new Date(record_date) : new Date();
+    // --- 1. 判斷查詢範圍並構建 Supabase URL ---
+    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
 
-    if (prompt.includes("去年")) {
-      const lastYear = now.getFullYear() - 1;
-      queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
-    } else if (prompt.includes("上個月")) {
-      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${firstDayLastMonth}&record_date=lte.${lastDayLastMonth}`;
-    } else if (prompt.includes("月")) {
-      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
-    } else {
-      const sevenDaysAgo = new Date(baseDate);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
-      const endDateStr = baseDate.toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
-    }
+    // 基準日期也使用 todayStr
+    const baseDate = record_date ? new Date(record_date) : new Date(todayStr);
 
-    // --- 2. 執行資料庫讀取 ---
-    const sbRes = await fetch(queryUrl, {
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
-    });
-    const dataList = await sbRes.json();
+    if (prompt.includes("去年")) {
+      const lastYear = baseDate.getFullYear() - 1;
+      queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
+    } else if (prompt.includes("上個月")) {
+      const firstDayLastMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1).toISOString().split('T')[0];
+      const lastDayLastMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 0).toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${firstDayLastMonth}&record_date=lte.${lastDayLastMonth}`;
+    } else if (prompt.includes("月")) {
+      const thirtyDaysAgo = new Date(new Date(baseDate).setDate(baseDate.getDate() - 30)).toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
+    } else {
+      const sevenDaysAgo = new Date(baseDate);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
+      const endDateStr = baseDate.toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
+    }
+
+    // --- 2. 執行資料庫讀取 ---
+    const sbRes = await fetch(queryUrl, {
+      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+    });
+    const dataList = await sbRes.json();
 
      // --- 3. 格式化數據 Context ---
     const todayStr = new Date().toISOString().split('T')[0];
@@ -87,7 +97,7 @@ export default async function handler(req, res) {
     // --- 4. 準備 Ollama 的訊息格式 ---
     const systemInstruction = `### 角色設定
            你是一位溫暖、專業且具備敏銳洞察力的睡眠健康夥伴。你不是冷冰冰的數據產生器，而是一個會為使用者的睡眠狀況感到開心或擔憂的好友。
-           請用『繁體中文』回答，嚴禁使用敬稱『您』，一律用『你』。
+           請用『繁體中文』回答。
 
            ### 溝通風格規範（核心修改）
            1. **拒絕報表感**：禁止連續使用「你的 [指標] 是 [數值]」這種句式。請將數據融入自然對話中。
@@ -97,6 +107,8 @@ export default async function handler(req, res) {
            3. **口語化銜接**：多使用「不過」、「其實」、「值得注意的是」、「看得出來」等轉折詞。
            4. **Emoji 使用**：在句首或關鍵語氣處加入 Emoji (😴, 💪, ✨, 📈, ⚠️, 🌿, 👋, 👀, 🌱)，增加溫度。
            5. **嚴禁敬稱**：一律使用「你」，維持平輩朋友的語氣。
+           6. **【極重要】嚴格核對日期**：當使用者問「昨天」或提及特定日期時，你必須精準核對資料庫內容中的 \`日期\`。如果資料庫中沒有使用者詢問的那一天（例如使用者問昨天 03/29，但資料庫最新只有 03/26），你必須老實告訴使用者「我這邊沒有你 03/29 的睡眠紀錄喔」，並主動告知「目前最新的一份紀錄是 03/26 的」。絕對不能指鹿為馬，把最新的資料直接當作昨天或指定日期的資料來回答！
+
 
            【核心指令：三路徑意圖過濾】
            請根據 [使用者當前問題] 與 [對話歷史紀錄 (History)] 判斷路徑：
@@ -143,11 +155,19 @@ export default async function handler(req, res) {
       content: h.parts[0].text
     }));
 
-    const messages = [
-      { role: "system", content: systemInstruction },
-      ...formattedHistory,
-      { role: "user", content: `[系統時間]: 今天是 ${todayStr}\n[系統提供數據庫內容]:\n${healthContext}\n\n[使用者當前問題]: ${prompt}` }
-    ];
+   // === 【重點修改 3：在 User 訊息中提供清晰的今天與昨天日期對照】 ===
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...formattedHistory,
+      { 
+        role: "user", 
+        content: `[系統時間通知]：今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+[資料庫撈取到的數據內容]：
+${healthContext}
+
+[使用者當前問題]：${prompt}` 
+      }
+    ];
 
     // --- 5. 呼叫 Ollama API ---
     const ollamaRes = await fetch(`${ollamaUrl}/api/chat`, {
