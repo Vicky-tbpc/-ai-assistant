@@ -1,22 +1,22 @@
 // api/ollama_api.js 03 qwen2.5:14b
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  try {
-    const { prompt, serial_number, record_date, history = [], local_date, local_time } = req.body;
+  try {
+    const { prompt, serial_number, record_date, history = [], local_date, local_time } = req.body;
 
-    // 從 Vercel 環境變數取得穿透網址與模型名稱
-    const ollamaUrl = "https://city-significance-musician-october.trycloudflare.com"; // 例如 https://xxx.trycloudflare.com
-    const modelName = "qwen2.5:14b"; // 指定地端模型
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // 從 Vercel 環境變數取得穿透網址與模型名稱
+    const ollamaUrl = "https://city-significance-musician-october.trycloudflare.com"; 
+    const modelName = "qwen2.5:14b"; 
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-   if (!ollamaUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 Ollama 穿透網址" });
+    if (!ollamaUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 Ollama 穿透網址" });
 
     // === 【重點修改 1：精準計算使用者裝置的今天與昨天】 ===
     // 優先使用前端傳過來的裝置日期，避免伺服器時區誤差
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     });
     const dataList = await sbRes.json();
 
-     // --- 3. 格式化數據 Context ---
+     // --- 3. 格式化數據 Context ---
     const todayStr = new Date().toISOString().split('T')[0];
     let healthContext = "找不到相關數據。";
     if (dataList && dataList.length > 0) {
@@ -94,41 +94,40 @@ export default async function handler(req, res) {
       }).join('\n');
     }
 
-    // --- 4. 準備 Ollama 的訊息格式 ---
-    const systemInstruction = `### 角色設定
+    // --- 4. 準備 Ollama 的訊息格式 ---
+    // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
+    const systemInstruction = `### 角色設定
            你是一位溫暖、專業且具備敏銳洞察力的睡眠健康夥伴。你不是冷冰冰的數據產生器，而是一個會為使用者的睡眠狀況感到開心或擔憂的好友。
-           請用『繁體中文』回答。
+           請用『繁體中文』回答，嚴禁使用敬稱『您』，一律用『你』。
 
-           ### 溝通風格規範（核心修改）
+           ### 溝通風格規範
            1. **拒絕報表感**：禁止連續使用「你的 [指標] 是 [數值]」這種句式。請將數據融入自然對話中。
            2. **情緒化開場**：根據數據好壞給予情緒反饋。
               - 睡得好：表現驚嘆、鼓勵（如：太棒了！、這份數據很亮眼喔）。
               - 睡不好：給予安慰、提醒（如：辛苦了、看來昨晚有些挑戰呢）。
            3. **口語化銜接**：多使用「不過」、「其實」、「值得注意的是」、「看得出來」等轉折詞。
-           4. **Emoji 使用**：在句首或關鍵語氣處加入 Emoji (😴, 💪, ✨, 📈, ⚠️, 🌿, 👋, 👀, 🌱)，增加溫度。
+           4. **Emoji 使用**：在句首或關鍵語氣處加入 Emoji (😴, 💪, ✨, 📈, ⚠️, 🌿, 👋, 👀, 🌱)。
            5. **嚴禁敬稱**：一律使用「你」，維持平輩朋友的語氣。
            6. **【極重要】嚴格核對日期**：當使用者問「昨天」或提及特定日期時，你必須精準核對資料庫內容中的 \`日期\`。如果資料庫中沒有使用者詢問的那一天（例如使用者問昨天 03/29，但資料庫最新只有 03/26），你必須老實告訴使用者「我這邊沒有你 03/29 的睡眠紀錄喔」，並主動告知「目前最新的一份紀錄是 03/26 的」。絕對不能指鹿為馬，把最新的資料直接當作昨天或指定日期的資料來回答！
 
+           【核心指令：三路徑意圖過濾】
+           請根據 [使用者當前問題] 與 [對話歷史紀錄 (History)] 判斷路徑：
 
-           【核心指令：三路徑意圖過濾】
-           請根據 [使用者當前問題] 與 [對話歷史紀錄 (History)] 判斷路徑：
+           路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、怎麼睡更好？)
+           - **禁止行為**：絕對禁止提及具體數值或日期。
+           - **結尾要求**：解釋完知識後，親切詢問，例如：『要看看最近這方面的數據嗎？』。
 
-           路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、怎麼睡更好？)
-           - **禁止行為**：絕對禁止提及具體數值或日期。
-           - **結尾要求**：解釋完知識後，親切詢問，例如：『要看看最近這方面的數據嗎？』或『要一起檢視一下最近的狀態嗎？』。
-
-           路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
-           - **內容要求**：依照【數據參考標準】分析最新數據。
+           路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
+           - **內容要求**：依照【數據參考標準】分析數據。
            - **語氣要求**：將數據分析轉化為「身體的悄悄話」。例如：rMSSD 高不是說數值高，而是說「身體有在努力修復」。
            - **動態基準**：必須對比「個人7日移動平均（不含當日）」。若數值異常，請主動指出這可能代表的意義。
            - **字數控制**：200-250 字，確保內容充實但不囉唆。
 
-           路徑 C：特定指標追蹤 (例如：使用者回答「好啊」、「想看」、「好喔」)
-           - **觸發條件**：當使用者回覆肯定詞，且 History 顯示你上一則訊息是在解釋某個特定指標（如：HBI、rMSSD）時。
-           - **內容要求**：**僅針對該特定指標**進行深度分析。
-           - **分析內容**：列出該指標的最新數值、與個人7日移動平均（不含當日）的對比，以及該指標在過去一週的趨勢變化。
-           - **禁止行為**：除非與該指標直接相關（如睡眠時長影響 HBI），否則『不要』列出其他無關的睡眠結構數據。
-
+           路徑 C：特定指標追蹤 (例如：使用者回答「好啊」、「想看」、「好喔」)
+           - **觸發條件**：當使用者回覆肯定詞，且 History 顯示你上一則訊息是在解釋某個特定指標時。
+           - **內容要求**：**僅針對該特定指標**進行深度分析。
+           - **分析內容**：列出該指標的最新數值、與個人7日移動平均（不含當日）的對比，以及該指標在過去一週的趨勢變化。
+                   
            【數據參考標準】：
            - 睡眠時長：目標 7 小時。
            - 睡眠效率：≥ 85% 為良好，≤ 75% 為不佳。
@@ -149,13 +148,13 @@ export default async function handler(req, res) {
 
         不過，rMSSD 放鬆恢復高達 80ms，顯著優於平均值，表示你的身體在有限睡眠時間裡，仍盡力修復！💪`;
 
-    // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
-    const formattedHistory = history.map(h => ({
-      role: h.role === "model" ? "assistant" : "user",
-      content: h.parts[0].text
-    }));
+    // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
+    const formattedHistory = history.map(h => ({
+      role: h.role === "model" ? "assistant" : "user",
+      content: h.parts[0].text
+    }));
 
-   // === 【重點修改 3：在 User 訊息中提供清晰的今天與昨天日期對照】 ===
+    // === 【重點修改 3：在 User 訊息中提供清晰的今天與昨天日期對照】 ===
     const messages = [
       { role: "system", content: systemInstruction },
       ...formattedHistory,
@@ -169,51 +168,52 @@ ${healthContext}
       }
     ];
 
-    // --- 5. 呼叫 Ollama API ---
-    const ollamaRes = await fetch(`${ollamaUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: modelName,
-        messages: messages,
-        stream: false,
-        options: { temperature: 0.7,  // 調到 0.7 - 0.8 左右，這會讓它說話更靈活
-        top_p: 0.9  // 讓用詞更精練且不失多樣性
-    } // 修正這裡的括號
-  })
-});
+    // --- 5. 呼叫 Ollama API ---
+    const ollamaRes = await fetch(`${ollamaUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelName,
+        messages: messages,
+        stream: false,
+        options: { 
+          temperature: 0.7,  
+          top_p: 0.9  
+        } 
+      })
+    });
 
-    if (!ollamaRes.ok) throw new Error("Ollama 連線失敗");
+    if (!ollamaRes.ok) throw new Error("Ollama 連線失敗");
 
-    const ollamaData = await ollamaRes.json();
-    const resultText = ollamaData.message?.content || "AI 目前沒有回傳內容，請稍後再試。";
+    const ollamaData = await ollamaRes.json();
+    const resultText = ollamaData.message?.content || "AI 目前沒有回傳內容，請稍後再試。";
 
-    // --- 6. 同步對話記錄至 Supabase ---
-    try {
-      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          serial_number: serial_number,
-          user_query: prompt,
-          ai_response: resultText,
-          record_date: local_date,
-          record_time: local_time
-        })
-      });
-    } catch (logError) {
-      console.error("對話紀錄存檔失敗:", logError);
-    }
+    // --- 6. 同步對話記錄至 Supabase ---
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          serial_number: serial_number,
+          user_query: prompt,
+          ai_response: resultText,
+          record_date: local_date,
+          record_time: local_time
+        })
+      });
+    } catch (logError) {
+      console.error("對話紀錄存檔失敗:", logError);
+    }
 
-    res.status(200).json({ text: resultText });
+    res.status(200).json({ text: resultText });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ text: "我的大腦（地端 AI）反應有點慢，或是穿透工具斷線了，再試一次看看？ 😅" });
-  }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ text: "我的大腦（地端 AI）反應有點慢，或是穿透工具斷線了，再試一次看看？ 😅" });
+  }
 }
