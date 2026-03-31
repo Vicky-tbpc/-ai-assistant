@@ -1,4 +1,4 @@
-// api/ollama_api.js 03 qwen2.5:14b
+// api/ollama_api.js 04
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -202,7 +202,8 @@ ${healthContext}
           user_query: prompt,
           ai_response: resultText,
           record_date: local_date,
-          record_time: local_time
+          record_time: local_time,
+          ai_model: 'Ollama' // <--- 新增這一行，也可以寫 'Qwen-2.5-14b' 方便區分模型
         })
       });
     } catch (logError) {
