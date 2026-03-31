@@ -27,6 +27,7 @@ export default async function handler(req, res) {
         '時間': log.record_time,
         '使用者問題': log.user_query,
         'AI回答': log.ai_response,
+        'AI模型': log.ai_model,
         '系統存檔時間': log.created_at
       });
       return acc;
@@ -42,6 +43,7 @@ export default async function handler(req, res) {
         { wch: 10 }, // 時間
         { wch: 40 }, // 使用者問題
         { wch: 60 }, // AI回答
+        { wch: 12 }, // AI模型
         { wch: 20 }  // 系統存檔時間
       ];
 
