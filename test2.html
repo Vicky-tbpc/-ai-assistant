@@ -926,50 +926,42 @@ async function renderTrendCard(type, days) {
 }
 
 
-
-    async function updateTrend(cardId, type, days) {
+async function updateTrend(cardId, type, days) {
     const card = document.getElementById(cardId);
-    card.querySelectorAll('.nav-btn').forEach(b => {
-        b.classList.remove('active');
-        if(b.innerText.includes(days)) b.classList.add('active');
-    });
+    // ... 前段 nav-btn 處理保持不變 ...
 
-    // 1. 抓取生理數據 (統一使用 rawHealthData)
-    const { data: rawHealthData, error } = await _supabase.from('health_data')
+    // 1. 抓取生理數據 (保持資料庫原始日期)
+    const { data: healthData, error } = await _supabase.from('health_data')
         .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
         .order('record_date', { ascending: false })
         .limit(days);
 
-    // 這裡要檢查 rawHealthData 是否有抓到資料
-    if (error || !rawHealthData || rawHealthData.length === 0) {
+    if (error || !healthData || healthData.length === 0) {
         card.querySelector('.trend-content').innerHTML = error ? "讀取失敗" : "暫無數據 😅";
         return;
     }
 
-    // --- 【修正日期邏輯：將 record_date 加 1 天】 ---
-    const healthData = rawHealthData.map(d => {
-        // 使用 T00:00:00 確保以當地時間解析，避免時區偏移
-        let date = new Date(d.record_date + 'T00:00:00'); 
-        date.setDate(date.getDate() + 1);
-        
-        // 格式化回 YYYY-MM-DD
-        const correctedDate = date.toLocaleDateString('en-CA'); 
-        return { ...d, record_date: correctedDate };
-    });
-    // --------------------------------------------
-
-    // 這裡使用處理過日期的 healthData 進行反轉
     const sortedData = [...healthData].reverse();
-    const dateRange = sortedData.map(d => d.record_date);
+    
+    // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
+    // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
+    const originalDates = sortedData.map(d => d.record_date);
+    const shiftedDates = originalDates.map(dStr => {
+        let d = new Date(dStr + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        return d.toLocaleDateString('en-CA');
+    });
+    const queryDateRange = [...new Set([...originalDates, ...shiftedDates])];
+    // ------------------------------------------
 
-    // 2. 抓取個人感受數據 (使用正確的 dateRange)
+    // 2. 抓取個人感受數據 (使用擴大後的日期範圍)
     const [feedbackRes, surveyRes] = await Promise.all([
-        _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', dateRange),
-        _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', dateRange)
+        _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', queryDateRange),
+        _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', queryDateRange)
     ]);
 
-    // 3. 建立日期索引的感受數據地圖
+    // 3. 建立體感數據地圖 (這部分邏輯不變)
     const subjectiveMap = {};
     if (surveyRes.data) {
         surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
@@ -977,24 +969,23 @@ async function renderTrendCard(type, days) {
     if (feedbackRes.data) {
         feedbackRes.data.forEach(d => {
             const val = d.raw_json?.["自評電量"];
-            if (val !== undefined && val !== null) {
-                subjectiveMap[d.record_date] = Number(val);
-            }
+            if (val !== undefined && val !== null) subjectiveMap[d.record_date] = Number(val);
         });
     }
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-
     const typesToRender = type === 'all' ? ['battery', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
+        // 將原始數據與 map 傳入，讓繪圖函式自己決定日期顯示
         drawSingleChart(chartBox, t, sortedData, subjectiveMap);
     }
 }
+
 
 
 
@@ -1011,8 +1002,36 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
         hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
-    const labels = rawData.map(d => d.record_date.slice(5).replace('-', '/'));
-    const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
+    
+    // --- 【修改：動態決定日期標籤與體感數據對齊】 ---
+    const labels = rawData.map(d => {
+        let displayDate = d.record_date;
+        if (type === 'battery') {
+            let dateObj = new Date(d.record_date + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() + 1);
+            displayDate = dateObj.toLocaleDateString('en-CA');
+        }
+        return displayDate.slice(5).replace('-', '/');
+    });
+
+    const subjectiveValues = rawData.map(d => {
+        if (type === 'battery') {
+            // 生理電量要對齊「隔天」的體感
+            let dateObj = new Date(d.record_date + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() + 1);
+            const nextDayStr = dateObj.toLocaleDateString('en-CA');
+            return subjectiveMap[nextDayStr] || null;
+        } else {
+            // 其他指標如果也要顯示體感（雖然你目前沒畫），則對齊「當天」
+            return subjectiveMap[d.record_date] || null;
+        }
+    });
+
+
+
+
+
+const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
     const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
