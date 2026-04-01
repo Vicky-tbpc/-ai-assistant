@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n44</title>
+    <title>Soosyn 健康夥伴 n52</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -198,12 +198,12 @@
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
-            <input type="text" id="serial" placeholder="序號">
+            <input type="text" id="serial" placeholder="帳號">
             <input type="password" id="pw" placeholder="密碼">
 
 <div style="text-align: left; margin: 10px 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666;">
     <input type="checkbox" id="remember-me" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
-    <label for="remember-me" style="cursor: pointer;">記住序號與密碼</label>
+    <label for="remember-me" style="cursor: pointer;">記住帳號與密碼</label>
 </div>
 
             <button class="primary-btn" onclick="login()">登入</button>
@@ -318,6 +318,8 @@ let assistantName = "";
 
     let currentSerial = "";
     let isNamingPhase = false, isWaitingForAbnormality = false, tempScore = null;
+    let isOtherAbnormality = false; // 用於標記是否點選了「其他」按鈕
+
 
     // 指標配置
     const FIELD_CONFIG = {
@@ -384,6 +386,21 @@ async function login() {
     }
 }
 
+document.addEventListener('keydown', (event) => {
+    // 1. 檢查按下的鍵是否為 Enter
+    if (event.key === 'Enter') {
+        const loginOverlay = document.getElementById('login-overlay');
+        
+        // 2. 檢查登入畫面是否「正在顯示」
+        // (假設你的登入畫面 ID 是 login-overlay，且隱藏時會加上 .hidden 類別)
+        if (loginOverlay && !loginOverlay.classList.contains('hidden')) {
+            // 預防萬一，如果是在輸入框按 Enter，可以取消預設行為
+            // event.preventDefault(); 
+            login();
+        }
+    }
+});
+
 
 // 執行綁定動作
 async function bindLineAccount() {
@@ -444,7 +461,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -499,22 +516,10 @@ async function sendMessage() {
     // 指標配置與 regex (包含您要求的所有關鍵字)
 const healthConfigs = [
     // 原有指標
-    { regex: /最低脈搏/, displayField: 'HR_min', prefix: 'Battery 最低脈搏', fallbackTitle: '睡眠最低脈搏', unit: 'bpm', inverse: true },
    
-    { regex: /rmssd|放鬆恢復/i, displayField: 'rMSSD', prefix: 'Battery rMSSD', fallbackTitle: 'rMSSD 放鬆恢復', unit: 'ms' },
-    { regex: /hbi|缺氧負荷/i, displayField: 'HBI', prefix: 'Battery HBI', fallbackTitle: 'HBI 缺氧負荷', unit: '%min/h', inverse: true },
-   
-    
 
     // 新增指標
-    { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' },
-    
-    
-    { regex: /血氧|spo2/i, displayField: 'SpO2_mean', prefix: '血氧', fallbackTitle: '血氧飽和度', displayLabel: '睡眠平均血氧飽和度', unit: '%' },
-    { regex: /odi/i, displayField: 'ODI_group', prefix: 'ODI', fallbackTitle: 'ODI', unit: '次/小時' },
-    { regex: /t90|t89|t88/i, displayField: 'T_group', prefix: 'T88', fallbackTitle: 'T90、T89、T88', unit: '%' },
-    { regex: /呼吸|rr/i, displayField: 'RR_mean', prefix: '呼吸', fallbackTitle: '呼吸', displayLabel: '睡眠平均呼吸頻率', unit: 'rpm' },
-    { regex: /脈搏|pr/i, displayField: 'HR_mean', prefix: '脈搏', fallbackTitle: '脈搏', displayLabel: '睡眠平均脈搏', unit: 'bpm' }
+    { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' }
 ];
 
     // 日期偵測
@@ -558,7 +563,7 @@ const healthConfigs = [
 
     
 
-    if (msg.includes("趨勢")) {
+    if (msg.includes("趨勢圖")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
         appendTrendOptions();
         return;
@@ -599,7 +604,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`你今天的感覺比較接近哪一種呢？`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
@@ -940,8 +945,19 @@ async function updateTrend(cardId, type, days) {
         return;
     }
 
-    const sortedData = healthData.reverse();
-    const dateRange = sortedData.map(d => d.record_date);
+   // --- 修改點：處理日期位移 ---
+    const processedData = healthData.map(d => {
+        const date = new Date(d.record_date);
+        date.setDate(date.getDate() + 1); // 這裡加 1 天
+        const displayDate = date.toISOString().split('T')[0];
+        return {
+            ...d,
+            display_date: displayDate // 新增一個顯示用的日期欄位
+        };
+    }).reverse(); // 轉回正序
+
+    // 用加過一天的日期去抓感受數據
+    const dateRange = processedData.map(d => d.display_date);
 
     // 2. 抓取個人感受數據 (從兩個表抓)
     const [feedbackRes, surveyRes] = await Promise.all([
@@ -996,9 +1012,18 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
         hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
-    const labels = rawData.map(d => d.record_date.slice(5).replace('-', '/'));
+    
+  // --- 修改點：使用 display_date 作為 X 軸標籤 ---
+    const labels = rawData.map(d => d.display_date.slice(5).replace('-', '/'));
     const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
-    const movingAvgs = [];
+    
+    // --- 修改點：個人感受數據對齊 display_date ---
+    const subjectiveValues = rawData.map(d => subjectiveMap[d.display_date] || null);
+
+  
+
+
+const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
 
@@ -1371,15 +1396,78 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
-    async function handleStatusSelection(text, score) { document.getElementById('status-options-container')?.remove(); appendUserMessage(text); tempScore = score; isWaitingForAbnormality = true; await appendAiMessage("今天有覺得哪裡不舒服嗎？\n\n例如：\n🌡️ 體溫偏高\n💓 心跳較快\n🤧 鼻子過敏\n\n如果一切正常，請幫我輸入「無」或「正常」唷！"); }
-    async function handleAbnormalityInput(msg) { 
+
+function appendAbnormalityOptions() {
+    // 定義選項：包含顯示用的 text 與判斷用的 value
+    const options = [
+        { text: "✅ 沒有", val: "沒有" },
+        { text: "🌡️ 體溫偏高", val: "體溫偏高" },
+        { text: "💓 心跳較快", val: "心跳較快" },
+        { text: "🤧 鼻子過敏", val: "鼻子過敏" },
+        { text: "✏️ 其他", val: "其他" }
+    ];
+
+    let html = '<div class="msg-row ai-row" id="abnormality-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
+    
+    options.forEach(opt => {
+        // 顯示 opt.text，但 onclick 傳入 opt.val
+        html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleAbnormalitySelection('${opt.val}')">${opt.text}</button>`;
+    });
+    
+    document.getElementById('chat-history').innerHTML += html + '</div></div>';
+    scrollToBottom();
+}
+
+
+
+// 處理按鈕選後的行為
+async function handleAbnormalitySelection(choice) {
+    document.getElementById('abnormality-options-container')?.remove();
+    
+    if (choice === '其他') {
+        isOtherAbnormality = true; // 標記接下來的輸入屬於其他
+        isWaitingForAbnormality = true; // 開啟等待輸入狀態
+        await appendAiMessage("請直接在下方輸入你的症狀或不適。");
+    } else {
+        // 直接選擇預設選項
+        appendUserMessage(choice);
+        await handleAbnormalityInput(choice);
+    }
+}
+
+
+
+
+
+
+async function handleStatusSelection(text, score) {
+    document.getElementById('status-options-container')?.remove();
+    appendUserMessage(text);
+    tempScore = score;
+    // 原本直接設定 isWaitingForAbnormality = true 改為顯示按鈕
+    await appendAiMessage("今天有覺得哪裡不舒服嗎？\n請直接點選下方按鈕，或是點選「其他」自行輸入唷！");
+    appendAbnormalityOptions();
+}
+    
+
+async function handleAbnormalityInput(msg) { 
 const todayStr = getLocalDateString(); 
+
+// 如果是從「其他」按鈕進入的，格式化文字為 其他(XXX)
+    let finalAbnormalityText = msg;
+    if (isOtherAbnormality) {
+        finalAbnormalityText = `其他(${msg})`;
+        isOtherAbnormality = false; // 儲存後重置標記
+    }
+
+
 await _supabase.from('user_daily_surveys').upsert({ 
 serial_number: currentSerial, 
 record_date: todayStr, 
 subjective_score: tempScore, 
-physical_abnormality: msg 
+physical_abnormality: finalAbnormalityText
 }); 
+
 localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
 
 // 2. 檢查當天是否有健康摘要數據
@@ -1506,18 +1594,27 @@ async function callGeminiAPI(prompt) {
     }
     scrollToBottom();
 
+
+    const now = new Date();
+    const currentDate = now.toLocaleDateString('en-CA'); // 格式：YYYY-MM-DD
+    const currentTime = now.toTimeString().split(' ')[0]; // 格式：HH:mm:ss
+
+
     // 取得當前訊息中提到的日期
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 prompt: prompt,
                 serial_number: currentSerial,
                 record_date: targetDateStr,
-                history: chatHistory // 重要：要把對話紀錄傳給後端，記憶功能才會動！
+                history: chatHistory, // 重要：要把對話紀錄傳給後端，記憶功能才會動！
+                // --- 新增這兩行 ---
+                local_date: currentDate,     
+                local_time: currentTime
             })
         });
         const data = await res.json();
@@ -1546,4 +1643,3 @@ async function callGeminiAPI(prompt) {
 </script>
 </body>
 </html>
-
