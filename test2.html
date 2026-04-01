@@ -989,9 +989,6 @@ async function updateTrend(cardId, type, days) {
 
 
 
-
-
-
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
         battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
@@ -1014,6 +1011,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
         return displayDate.slice(5).replace('-', '/');
     });
 
+    // 準備體感數據：battery 對齊隔天，其餘對齊當天
     const subjectiveValues = rawData.map(d => {
         if (type === 'battery') {
             // 生理電量要對齊「隔天」的體感
@@ -1037,9 +1035,6 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
     const upperBounds = [];
 
 
-
-// 準備個人感受數據
-const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 
     // 計算平均值邏輯 (保持不變)
     dailyValues.forEach((val, i) => {
