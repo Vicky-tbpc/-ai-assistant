@@ -926,56 +926,54 @@ async function renderTrendCard(type, days) {
 }
 
 
-async function updateTrend(cardId, type, days) {
+
+    async function updateTrend(cardId, type, days) {
     const card = document.getElementById(cardId);
     card.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.remove('active');
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 抓取生理數據 (health_data)
-    const { data: rawhealthData, error } = await _supabase.from('health_data')
+    // 1. 抓取生理數據 (統一使用 rawHealthData)
+    const { data: rawHealthData, error } = await _supabase.from('health_data')
         .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
         .order('record_date', { ascending: false })
         .limit(days);
 
-    if (error || !healthData || healthData.length === 0) {
+    // 這裡要檢查 rawHealthData 是否有抓到資料
+    if (error || !rawHealthData || rawHealthData.length === 0) {
         card.querySelector('.trend-content').innerHTML = error ? "讀取失敗" : "暫無數據 😅";
         return;
     }
 
-    
     // --- 【修正日期邏輯：將 record_date 加 1 天】 ---
     const healthData = rawHealthData.map(d => {
-        let date = new Date(d.record_date + 'T00:00:00'); // 強制以當地時間解析日期字串
+        // 使用 T00:00:00 確保以當地時間解析，避免時區偏移
+        let date = new Date(d.record_date + 'T00:00:00'); 
         date.setDate(date.getDate() + 1);
         
-        // 格式化回 YYYY-MM-DD (en-CA 格式)
+        // 格式化回 YYYY-MM-DD
         const correctedDate = date.toLocaleDateString('en-CA'); 
         return { ...d, record_date: correctedDate };
     });
     // --------------------------------------------
 
-
-
-const sortedData = [...healthData].reverse();
+    // 這裡使用處理過日期的 healthData 進行反轉
+    const sortedData = [...healthData].reverse();
     const dateRange = sortedData.map(d => d.record_date);
 
-    // 2. 抓取個人感受數據 (從兩個表抓)
+    // 2. 抓取個人感受數據 (使用正確的 dateRange)
     const [feedbackRes, surveyRes] = await Promise.all([
         _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', dateRange),
         _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', dateRange)
     ]);
 
-    // 3. 建立日期索引的感受數據地圖 (優先序：daily_feedback > user_daily_surveys)
+    // 3. 建立日期索引的感受數據地圖
     const subjectiveMap = {};
-    
-    // 先塞 survey 的數據 (備案)
     if (surveyRes.data) {
         surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
     }
-    // 再塞 feedback 的數據 (若有則覆蓋，符合優先權)
     if (feedbackRes.data) {
         feedbackRes.data.forEach(d => {
             const val = d.raw_json?.["自評電量"];
@@ -994,11 +992,9 @@ const sortedData = [...healthData].reverse();
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
-        // 將 subjectiveMap 傳入
         drawSingleChart(chartBox, t, sortedData, subjectiveMap);
     }
 }
-
 
 
 
