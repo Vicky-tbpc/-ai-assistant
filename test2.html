@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n51</title>
+    <title>Soosyn 健康夥伴 n52</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -934,7 +934,7 @@ async function updateTrend(cardId, type, days) {
     });
 
     // 1. 抓取生理數據 (health_data)
-    const { data: healthData, error } = await _supabase.from('health_data')
+    const { data: rawhealthData, error } = await _supabase.from('health_data')
         .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
         .order('record_date', { ascending: false })
@@ -959,7 +959,7 @@ async function updateTrend(cardId, type, days) {
 
 
 
-const sortedData = healthData.reverse();
+const sortedData = [...healthData].reverse();
     const dateRange = sortedData.map(d => d.record_date);
 
     // 2. 抓取個人感受數據 (從兩個表抓)
