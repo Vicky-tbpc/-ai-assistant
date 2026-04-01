@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n52</title>
+    <title>Soosyn 健康夥伴 n51</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -945,19 +945,22 @@ async function updateTrend(cardId, type, days) {
         return;
     }
 
-   // --- 修改點：處理日期位移 ---
-    const processedData = healthData.map(d => {
-        const date = new Date(d.record_date);
-        date.setDate(date.getDate() + 1); // 這裡加 1 天
-        const displayDate = date.toISOString().split('T')[0];
-        return {
-            ...d,
-            display_date: displayDate // 新增一個顯示用的日期欄位
-        };
-    }).reverse(); // 轉回正序
+    
+    // --- 【修正日期邏輯：將 record_date 加 1 天】 ---
+    const healthData = rawHealthData.map(d => {
+        let date = new Date(d.record_date + 'T00:00:00'); // 強制以當地時間解析日期字串
+        date.setDate(date.getDate() + 1);
+        
+        // 格式化回 YYYY-MM-DD (en-CA 格式)
+        const correctedDate = date.toLocaleDateString('en-CA'); 
+        return { ...d, record_date: correctedDate };
+    });
+    // --------------------------------------------
 
-    // 用加過一天的日期去抓感受數據
-    const dateRange = processedData.map(d => d.display_date);
+
+
+const sortedData = healthData.reverse();
+    const dateRange = sortedData.map(d => d.record_date);
 
     // 2. 抓取個人感受數據 (從兩個表抓)
     const [feedbackRes, surveyRes] = await Promise.all([
@@ -1012,18 +1015,9 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
         hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
-    
-  // --- 修改點：使用 display_date 作為 X 軸標籤 ---
-    const labels = rawData.map(d => d.display_date.slice(5).replace('-', '/'));
+    const labels = rawData.map(d => d.record_date.slice(5).replace('-', '/'));
     const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
-    
-    // --- 修改點：個人感受數據對齊 display_date ---
-    const subjectiveValues = rawData.map(d => subjectiveMap[d.display_date] || null);
-
-  
-
-
-const movingAvgs = [];
+    const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
 
