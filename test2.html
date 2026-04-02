@@ -482,6 +482,25 @@ function getTargetDate(msg) {
     if (dateMatch) {
         return `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
     }
+// 2. 判斷短年份斜線格式：26/03/30 -> 2026-03-30
+    const shortSlashMatch = msg.match(/(\d{2})\/(\d{2})\/(\d{2})/);
+    if (shortSlashMatch) {
+        return `20${shortSlashMatch[1]}-${shortSlashMatch[2]}-${shortSlashMatch[3]}`;
+    }
+
+    // 3. 判斷純數字格式：20260330 (8碼) 或 260330 (6碼)
+    // 使用 \b 確保是獨立的數字串，不會誤抓到其他序號中的數字
+    const pureNumMatch = msg.match(/\b(\d{8})\b/) || msg.match(/\b(\d{6})\b/);
+    if (pureNumMatch) {
+        const s = pureNumMatch[1];
+        if (s.length === 8) {
+            // 20260330 -> 2026-03-30
+            return `${s.substring(0, 4)}-${s.substring(4, 6)}-${s.substring(6, 8)}`;
+        } else if (s.length === 6) {
+            // 260330 -> 2026-03-30
+            return `20${s.substring(0, 2)}-${s.substring(2, 4)}-${s.substring(4, 6)}`;
+        }
+    }
 
     if (msg.includes("前天")) {
         today.setDate(today.getDate() - 2);
