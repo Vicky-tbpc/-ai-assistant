@@ -551,20 +551,33 @@ const healthConfigs = [
     }
 
 
-// --- 需求：健康摘要邏輯修改 ---
+// --- 需求：健康摘要邏輯修改 (修正版) ---
 if (msg.includes("健康摘要")) {
-    // 1. 先取得使用者提到的日期（例如：2026-03-31）
+    // 1. 取得使用者提到的日期（例如：2026-04-02）
     const targetDateStr = getTargetDate(msg); 
-    
-    // 2. 核心邏輯：將日期減一天（變為 2026-03-30）以抓取前一天的數據
-    const dateObj = new Date(targetDateStr);
-    dateObj.setDate(dateObj.getDate() - 1);
-    const preDateStr = dateObj.toLocaleDateString('en-CA'); // 格式化為 YYYY-MM-DD
 
-    if (hasAnyDate) {
-        // 使用減一天後的日期去抓取資料
-        processSummarySearch(preDateStr, targetDateStr);
+    // 2. 判斷是否有抓到日期：這裡建議直接判斷 targetDateStr 是否有值
+    // 如果 hasAnyDate 是函式，請改用 hasAnyDate(msg)
+    if (targetDateStr && targetDateStr !== "") {
+        
+        // 3. 核心邏輯：將日期減一天
+        // 使用 .replace(/-/g, '/') 確保在不同瀏覽器（如 iOS Safari）解析日期的一致性
+        const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
+        
+        // 檢查日期是否有效
+        if (!isNaN(dateObj.getTime())) {
+            dateObj.setDate(dateObj.getDate() - 1);
+            const preDateStr = dateObj.toLocaleDateString('en-CA'); // 變成 2026-04-01
+
+            // 4. 呼叫搜尋函式：(抓 4/1 的資料, 卡片標題顯示 4/2)
+            processSummarySearch(preDateStr, targetDateStr);
+        } else {
+            // 如果日期解析失敗（例如 getTargetDate 沒回傳正確格式）
+            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
+            showDateActions('summary');
+        }
     } else {
+        // 如果沒抓到日期，顯示日期選擇按鈕
         await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
         showDateActions('summary');
     }
