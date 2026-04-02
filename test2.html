@@ -695,7 +695,7 @@ if (isWaitingForAbnormality) {
 }
 
 // 2. 處理健康指標的核心函式 (優化比對與建議邏輯)
-async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, displayDateStr = null) {
+async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, displayDate = null) {
     document.querySelector('.date-actions')?.remove();
     try {
         // --- 處理百科定義查詢 ---
@@ -816,25 +816,30 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, di
 
         // 優先使用 displayLabel，若無則使用 fallbackTitle
 const showDate = (displayDate || targetDateStr).replace(/-/g, '/');
-    
-    const label = config.displayLabel || config.fallbackTitle;
-    const finalShowDate = (displayDateStr || targetDateStr).replace(/-/g, '/');
-    
-    let finalContent = `📊 **${finalShowDate}** 的 ${label} 為：${displayValStr}`;
-        if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
-        if (logicStatus) {
-            const randomNum = Math.floor(Math.random() * 3) + 1;
-            const targetLogicKey = `${config.prefix}${logicStatus}${randomNum}`;
-            
-            const { data: phraseData } = await _supabase.from('phrase_library')
-                .select('detailed_content')
-                .eq('logic_key', targetLogicKey)
-                .limit(1).maybeSingle();
-            
-            if (phraseData) finalContent += `<br><br>${phraseData.detailed_content}`;
-        }
+const label = config.displayLabel || config.fallbackTitle;
 
+// 2. 組合內容，直接使用上面定義好的 showDate
+let finalContent = `📊 **${showDate}** 的 ${label} 為：${displayValStr}`;
+
+if (rangeHint) {
+    finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
+}
+
+if (logicStatus) {
+    const randomNum = Math.floor(Math.random() * 3) + 1;
+    const targetLogicKey = `${config.prefix}${logicStatus}${randomNum}`;
+    
+    // 使用 await 抓取資料庫內容
+    const { data: phraseData } = await _supabase.from('phrase_library')
+        .select('detailed_content')
+        .eq('logic_key', targetLogicKey)
+        .maybeSingle(); // 使用 maybeSingle 比較安全，避免找不到資料時報錯
+    
+    if (phraseData && phraseData.detailed_content) {
+        finalContent += `<br><br>${phraseData.detailed_content}`;
+    }
+}
         await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
