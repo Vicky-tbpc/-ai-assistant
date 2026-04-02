@@ -559,18 +559,19 @@ const healthConfigs = [
 
 
 // --- 需求 1 & 2：指標查詢邏輯 ---
-   if (matchedConfig) {
+  if (matchedConfig) {
     if (hasAnyDate || isDefinitionQuery) {
-        // 針對「生理電量」指標做日期偏移處理
-        let finalDateStr = targetDateStr;
+        let finalFetchDate = targetDateStr; // 這是原本解析出來的日期 (例如 2026-04-02)
+        let originalInputDate = targetDateStr; // 備份一份作為顯示用
+
         if (matchedConfig.prefix === '生理電量' && !isDefinitionQuery) {
             const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
             dateObj.setDate(dateObj.getDate() - 1);
-            finalDateStr = dateObj.toLocaleDateString('en-CA');
+            finalFetchDate = dateObj.toLocaleDateString('en-CA'); // 變成 2026-04-01
         }
         
         // 呼叫時傳入偏移後的日期，以及原始輸入日期（供顯示用）
-        await processHealthKeyword(matchedConfig, finalDateStr, isDefinitionQuery, targetDateStr);
+        await processHealthKeyword(matchedConfig, finalFetchDate, isDefinitionQuery, originalInputDate);
     } else {
         await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
         showDateActions('metric', matchedConfig);
@@ -690,7 +691,7 @@ if (isWaitingForAbnormality) {
 }
 
 // 2. 處理健康指標的核心函式 (優化比對與建議邏輯)
-async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
+async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, displayDate = null) {
     document.querySelector('.date-actions')?.remove();
     try {
         // --- 處理百科定義查詢 ---
@@ -810,8 +811,10 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         }
 
         // 優先使用 displayLabel，若無則使用 fallbackTitle
-const label = config.displayLabel || config.fallbackTitle;
-let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+const showDate = (displayDate || targetDateStr).replace(/-/g, '/');
+    
+    const label = config.displayLabel || config.fallbackTitle;
+    let finalContent = `📊 **${showDate}** 的 ${label} 為：${displayValStr}`;
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
         if (logicStatus) {
