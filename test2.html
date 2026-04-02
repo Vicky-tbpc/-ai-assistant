@@ -693,25 +693,29 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-        // --- 準備資料抓取 ---
+           // --- 準備資料抓取 ---
         
-        // 【新增點 1】：先備份使用者原本要求的日期 (用於最後顯示標題)
+        // 1. 先備份使用者原本輸入的日期 (顯示標題用)
         const displayDateStr = targetDateStr; 
 
-        // 【新增點 2】：邏輯偏移 - 僅針對「生理電量」進行日期往前推一天的處理
+        // 2. 邏輯偏移：僅針對「生理電量」
         if (config.prefix === '生理電量') {
-            // 使用 replace(/-/g, '/') 確保不同瀏覽器解析日期的一致性
             const tempDate = new Date(targetDateStr.replace(/-/g, '/'));
-            tempDate.setDate(tempDate.getDate() - 1);
-            // 更新查詢用的 targetDateStr (例如從 2026-04-02 變成 2026-04-01)
-            targetDateStr = tempDate.toISOString().split('T')[0];
+            tempDate.setDate(tempDate.getDate() - 1); // 減去一天
+            
+            // 【關鍵修正】：手動組成本地日期字串，避免 toISOString() 的時區問題
+            const y = tempDate.getFullYear();
+            const m = String(tempDate.getMonth() + 1).padStart(2, '0');
+            const d = String(tempDate.getDate()).padStart(2, '0');
+            targetDateStr = `${y}-${m}-${d}`; 
         }
 
-        // 原本的日期計算邏輯會自動套用新的 targetDateStr
+        // 3. 計算用於比較的「前一日」 (在生理電量情況下，這會變成「前兩天」)
         const targetDate = new Date(targetDateStr.replace(/-/g, '/'));
         const prevDate = new Date(targetDate);
-        prevDate.setDate(prevDate.getDate() - 1); // 這會自動變成「前兩天」用於比較趨勢
+        prevDate.setDate(prevDate.getDate() - 1);
         const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+
 
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
@@ -758,8 +762,9 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         }
 
         // 【修改點 3】：顯示標題使用 displayDateStr (使用者輸入的日期)
-        const label = config.displayLabel || config.fallbackTitle;
+         const label = config.displayLabel || config.fallbackTitle;
         let finalContent = `📊 **${displayDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+
         
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
