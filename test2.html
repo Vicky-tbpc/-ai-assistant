@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n53</title>
+    <title>Soosyn 健康夥伴 n54</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -550,27 +550,18 @@ const healthConfigs = [
         return;
     }
 
-    // --- 需求：健康摘要邏輯修改 ---
 if (msg.includes("健康摘要")) {
-    // 1. 先取得使用者提到的日期（例如：2026-03-31）
-    const requestedDate = getTargetDate(msg); 
+    const targetDateStr = getTargetDate(msg); // 使用者點選或輸入的日期 (e.g. 2026-03-31)
     
-    // 2. 核心邏輯：將日期減一天（變為 2026-03-30）以抓取前一天的數據
-    const dateObj = new Date(requestedDate);
+    // 計算前一天
+    const dateObj = new Date(targetDateStr);
     dateObj.setDate(dateObj.getDate() - 1);
-    const dataDateStr = dateObj.toLocaleDateString('en-CA'); // 格式化為 YYYY-MM-DD
+    const prevDateStr = dateObj.toLocaleDateString('en-CA'); // 變成 2026-03-30
 
-    if (hasAnyDate) {
-        // 使用減一天後的日期去抓取資料
-        processSummarySearch(dataDateStr);
-    } else {
-        await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
-        showDateActions('summary');
-    }
-    return; 
-}
-
-    
+    // 呼叫時傳入：(抓資料日期, 顯示日期)
+    processSummarySearch(prevDateStr, targetDateStr);
+    return;
+}    
 
     if (msg.includes("趨勢圖")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
@@ -1280,39 +1271,40 @@ function renderLegend(type, abnormalLabel) {
 } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
     
 
+// 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
+async function processSummarySearch(d, displayDate) {
+    // 如果呼叫時沒傳 displayDate，就預設跟 d 一樣（確保相容性）
+    const finalDisplayDate = displayDate || d;
 
-
-
-// --- 修改後的 processSummarySearch 函數 ---
-async function processSummarySearch(d) {
     document.querySelector('.date-actions')?.remove();
-    await appendAiMessage(`正在查詢 ${d} 健康摘要...`);
     
-    const data = await fetchSummaryData(d);
+    // 1. 顯示使用者詢問的日期（例如 2026-03-31）
+    await appendAiMessage(`正在查詢 ${finalDisplayDate} 健康摘要... 🔍`);
+    
+    // 2. 使用前一天的日期 (d) 去抓資料（例如 2026-03-30）
+    const data = await fetchSummaryData(d); 
+    
     if (data) {
-        appendSummaryCard(data);
+        // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
+        // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
+        appendSummaryCard(finalDisplayDate, data);
         
-        // 新增邏輯：如果是查詢「今天」，則自動出現隨機建議
+        // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
         const todayStr = getLocalDateString();
-        if (d === todayStr && data.flowSuggestion) {
+        if (finalDisplayDate === todayStr && data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
-            await appendAiMessage(data.flowSuggestion); // 顯示減少最多指標的隨機建議 (1-3)
+            await appendAiMessage(data.flowSuggestion); 
             await new Promise(r => setTimeout(r, 800));
-       await appendAiMessage(getRandomEndQuestion());
-} else {
-            // 如果不是今天，則顯示一般結尾
+            await appendAiMessage(getRandomEndQuestion());
+        } else {
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
         }
     } else {
-        await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+        // 如果沒資料，提示時也使用顯示日期比較不容易讓使用者困惑
+        await appendAiMessage(`${finalDisplayDate} 這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️`);
     }
 }
-
-
-
-
-
 
 
 function showDateActions(type, metricConfig = null) {
@@ -1350,7 +1342,7 @@ function showDateActions(type, metricConfig = null) {
 }
 
 
-function appendSummaryCard(data) {
+function appendSummaryCard(dateTitle, data) {
     const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
     const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
 const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
@@ -1367,7 +1359,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         <div class="msg-row ai-row">
             <div class="summary-card" onclick="zoomChart(this)">
                 <div class="summary-header">
-                    <span>📅 ${data.date} 健康摘要</span>
+                    <span>📅 ${dateTitle} 健康摘要</span>
                    <span style="color:${lightMap[data.light] || '#ccc'}; display: flex; align-items: center;">
     <span class="status-dot" style="background-color:${lightMap[data.light] || '#ccc'}"></span>
     ${data.light}
