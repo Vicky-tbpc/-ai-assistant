@@ -559,23 +559,18 @@ const healthConfigs = [
 
 
 // --- 需求 1 & 2：指標查詢邏輯 ---
-// --- 需求 1 & 2：指標查詢邏輯 ---
-if (matchedConfig) {
+   if (matchedConfig) {
     if (hasAnyDate || isDefinitionQuery) {
-        let finalFetchDate = targetDateStr; // 預設抓取使用者輸入的日期
-        let displayDate = targetDateStr;    // 預設顯示使用者輸入的日期
-
-        // 【關鍵修改】：僅針對「生理電量」指標且非百科查詢時，將抓取日期減一天
+        // 針對「生理電量」指標做日期偏移處理
+        let finalDateStr = targetDateStr;
         if (matchedConfig.prefix === '生理電量' && !isDefinitionQuery) {
             const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
-            if (!isNaN(dateObj.getTime())) {
-                dateObj.setDate(dateObj.getDate() - 1);
-                finalFetchDate = dateObj.toLocaleDateString('en-CA'); // 抓取日期變為前一天
-            }
+            dateObj.setDate(dateObj.getDate() - 1);
+            finalDateStr = dateObj.toLocaleDateString('en-CA');
         }
         
-        // 呼叫函式時，傳入 finalFetchDate (抓取用) 與 displayDate (顯示用)
-        await processHealthKeyword(matchedConfig, finalFetchDate, isDefinitionQuery, displayDate);
+        // 呼叫時傳入偏移後的日期，以及原始輸入日期（供顯示用）
+        await processHealthKeyword(matchedConfig, finalDateStr, isDefinitionQuery, targetDateStr);
     } else {
         await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
         showDateActions('metric', matchedConfig);
@@ -679,6 +674,10 @@ if (isWaitingForAbnormality) {
         return; // 直接結束，不往下跑 Gemini
     }
 
+
+
+
+
     
 // 這裡原本是處理單獨日期或顯示「收到！正在學習...」的地方
     if (typeof formattedDate !== 'undefined' && formattedDate) {
@@ -743,6 +742,64 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
                 }
                 break;
 
+            case '睡眠效率':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（良好：≥ 85%，不佳：≤ 75%）";
+                if (val >= 85) logicStatus = "佳";
+                else if (val <= 75) logicStatus = "差";
+                else logicStatus = "平";
+                break;
+
+            case '淺睡':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：50%~65%）";
+                if (val > 65) logicStatus = "過多";
+                else if (val < 50) logicStatus = "過少";
+                else logicStatus = "佳";
+                break;
+
+            case '快速動眼':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：10%~25%）";
+                if (val > 25) logicStatus = "過多";
+                else if (val < 10) logicStatus = "過少";
+                else logicStatus = "佳";
+                break;
+
+            case '血氧':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：> 95%）";
+                logicStatus = (val > 95) ? "佳" : "差";
+                break;
+
+            case 'ODI':
+                displayValStr = `**ODI 3%: ${raw.ODI3_total}, ODI 4%: ${raw.ODI4_total}** ${config.unit}`;
+                rangeHint = "（標準參考範圍：每小時 < 5次）";
+                logicStatus = (raw.ODI3_total >= 5 || raw.ODI4_total >= 5) ? "差" : "佳";
+                break;
+
+            case 'T88':
+                displayValStr = `**T90: ${raw.T90_pct}%, T89: ${raw.T89_pct}%, T88: ${raw.T88_pct}%**`;
+                rangeHint = "（標準參考範圍：T90 ≤ 5%、T89 ≤ 4%、T88 ≤ 3%）";
+                logicStatus = (raw.T90_pct > 5 || raw.T89_pct > 4 || raw.T88_pct > 3) ? "差" : "佳";
+                break;
+
+            case '呼吸':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：12-25 rpm）";
+                if (val > 25) logicStatus = "快";
+                else if (val < 12) logicStatus = "慢";
+                else logicStatus = "佳";
+                break;
+
+            case '脈搏':
+                displayValStr = `**${val}${config.unit}**`;
+                rangeHint = "（標準參考範圍：60-100 bpm）";
+                if (val < 60) logicStatus = "低";
+                else if (val > 100) logicStatus = "高";
+                else logicStatus = "佳";
+                break;
+
             default: 
                 // 處理原本的 N3, rMSSD, HBI, 總睡眠
                 displayValStr = config.displayField === 'TST_min' ? `**${Math.floor(val/60)}小時${val%60}分鐘**` : `**${val}${config.unit}**`;
@@ -753,10 +810,8 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         }
 
         // 優先使用 displayLabel，若無則使用 fallbackTitle
-const showDate = (displayDateStr || targetDateStr).replace(/-/g, '/');
-        
-        const label = config.displayLabel || config.fallbackTitle;
-        let finalContent = `📊 **${showDate}** 的 ${label} 為：${displayValStr}`;
+const label = config.displayLabel || config.fallbackTitle;
+let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
         if (logicStatus) {
