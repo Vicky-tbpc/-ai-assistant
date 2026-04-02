@@ -559,29 +559,15 @@ const healthConfigs = [
 
 
 // --- 需求 1 & 2：指標查詢邏輯 ---
-if (matchedConfig) {
-    if (hasAnyDate(msg) || isDefinitionQuery) {
-        let fetchDate = targetDateStr; // 這是預設要抓資料的日期
-        let displayDate = targetDateStr; // 這是預設要顯示在對話框的日期
-
-        // 關鍵：只要是查詢「生理電量」且不是在查百科定義
-        if (matchedConfig.prefix === '生理電量' && !isDefinitionQuery) {
-            const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
-            if (!isNaN(dateObj.getTime())) {
-                dateObj.setDate(dateObj.getDate() - 1); // 這裡自動把 4/2 變成 4/1
-                fetchDate = dateObj.toLocaleDateString('en-CA'); 
-            }
+    if (matchedConfig) {
+        if (hasAnyDate || isDefinitionQuery) {
+            await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
+        } else {
+            await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
+            showDateActions('metric', matchedConfig);
         }
-        
-        // 這裡呼叫函式，把「抓資料的 4/1」和「顯示用的 4/2」一起傳過去
-        await processHealthKeyword(matchedConfig, fetchDate, isDefinitionQuery, displayDate);
-    } else {
-        // 如果使用者只打「電量」沒打日期，會跳出按鈕
-        await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
-        showDateActions('metric', matchedConfig);
+        return;
     }
-    return;
-}
 
 
 // --- 需求：健康摘要邏輯修改 (修正版) ---
@@ -695,7 +681,7 @@ if (isWaitingForAbnormality) {
 }
 
 // 2. 處理健康指標的核心函式 (優化比對與建議邏輯)
-async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, displayDate = null) {
+async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     document.querySelector('.date-actions')?.remove();
     try {
         // --- 處理百科定義查詢 ---
@@ -708,9 +694,23 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, di
         }
 
         // --- 準備資料抓取 ---
-        const targetDate = new Date(targetDateStr);
+        
+        // 【新增點 1】：先備份使用者原本要求的日期 (用於最後顯示標題)
+        const displayDateStr = targetDateStr; 
+
+        // 【新增點 2】：邏輯偏移 - 僅針對「生理電量」進行日期往前推一天的處理
+        if (config.prefix === '生理電量') {
+            // 使用 replace(/-/g, '/') 確保不同瀏覽器解析日期的一致性
+            const tempDate = new Date(targetDateStr.replace(/-/g, '/'));
+            tempDate.setDate(tempDate.getDate() - 1);
+            // 更新查詢用的 targetDateStr (例如從 2026-04-02 變成 2026-04-01)
+            targetDateStr = tempDate.toISOString().split('T')[0];
+        }
+
+        // 原本的日期計算邏輯會自動套用新的 targetDateStr
+        const targetDate = new Date(targetDateStr.replace(/-/g, '/'));
         const prevDate = new Date(targetDate);
-        prevDate.setDate(prevDate.getDate() - 1);
+        prevDate.setDate(prevDate.getDate() - 1); // 這會自動變成「前兩天」用於比較趨勢
         const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
         const { data: records, error } = await _supabase.from('health_data')
@@ -747,64 +747,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, di
                 }
                 break;
 
-            case '睡眠效率':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（良好：≥ 85%，不佳：≤ 75%）";
-                if (val >= 85) logicStatus = "佳";
-                else if (val <= 75) logicStatus = "差";
-                else logicStatus = "平";
-                break;
-
-            case '淺睡':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：50%~65%）";
-                if (val > 65) logicStatus = "過多";
-                else if (val < 50) logicStatus = "過少";
-                else logicStatus = "佳";
-                break;
-
-            case '快速動眼':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：10%~25%）";
-                if (val > 25) logicStatus = "過多";
-                else if (val < 10) logicStatus = "過少";
-                else logicStatus = "佳";
-                break;
-
-            case '血氧':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：> 95%）";
-                logicStatus = (val > 95) ? "佳" : "差";
-                break;
-
-            case 'ODI':
-                displayValStr = `**ODI 3%: ${raw.ODI3_total}, ODI 4%: ${raw.ODI4_total}** ${config.unit}`;
-                rangeHint = "（標準參考範圍：每小時 < 5次）";
-                logicStatus = (raw.ODI3_total >= 5 || raw.ODI4_total >= 5) ? "差" : "佳";
-                break;
-
-            case 'T88':
-                displayValStr = `**T90: ${raw.T90_pct}%, T89: ${raw.T89_pct}%, T88: ${raw.T88_pct}%**`;
-                rangeHint = "（標準參考範圍：T90 ≤ 5%、T89 ≤ 4%、T88 ≤ 3%）";
-                logicStatus = (raw.T90_pct > 5 || raw.T89_pct > 4 || raw.T88_pct > 3) ? "差" : "佳";
-                break;
-
-            case '呼吸':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：12-25 rpm）";
-                if (val > 25) logicStatus = "快";
-                else if (val < 12) logicStatus = "慢";
-                else logicStatus = "佳";
-                break;
-
-            case '脈搏':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：60-100 bpm）";
-                if (val < 60) logicStatus = "低";
-                else if (val > 100) logicStatus = "高";
-                else logicStatus = "佳";
-                break;
-
+           
             default: 
                 // 處理原本的 N3, rMSSD, HBI, 總睡眠
                 displayValStr = config.displayField === 'TST_min' ? `**${Math.floor(val/60)}小時${val%60}分鐘**` : `**${val}${config.unit}**`;
@@ -814,32 +757,25 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, di
                 }
         }
 
-        // 優先使用 displayLabel，若無則使用 fallbackTitle
-const showDate = (displayDate || targetDateStr).replace(/-/g, '/');
+        // 【修改點 3】：顯示標題使用 displayDateStr (使用者輸入的日期)
+        const label = config.displayLabel || config.fallbackTitle;
+        let finalContent = `📊 **${displayDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+        
+        if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
-const label = config.displayLabel || config.fallbackTitle;
+        if (logicStatus) {
+            const randomNum = Math.floor(Math.random() * 3) + 1;
+            const targetLogicKey = `${config.prefix}${logicStatus}${randomNum}`;
+            
+            const { data: phraseData } = await _supabase.from('phrase_library')
+                .select('detailed_content')
+                .eq('logic_key', targetLogicKey)
+                .limit(1).maybeSingle();
+            
+            if (phraseData) finalContent += `<br><br>${phraseData.detailed_content}`;
+        }
 
-// 2. 組合內容，直接使用上面定義好的 showDate
-let finalContent = `📊 **${showDate}** 的 ${label} 為：${displayValStr}`;
 
-if (rangeHint) {
-    finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
-}
-
-if (logicStatus) {
-    const randomNum = Math.floor(Math.random() * 3) + 1;
-    const targetLogicKey = `${config.prefix}${logicStatus}${randomNum}`;
-    
-    // 使用 await 抓取資料庫內容
-    const { data: phraseData } = await _supabase.from('phrase_library')
-        .select('detailed_content')
-        .eq('logic_key', targetLogicKey)
-        .maybeSingle(); // 使用 maybeSingle 比較安全，避免找不到資料時報錯
-    
-    if (phraseData && phraseData.detailed_content) {
-        finalContent += `<br><br>${phraseData.detailed_content}`;
-    }
-}
         await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
         await appendAiMessage(getRandomEndQuestion());
