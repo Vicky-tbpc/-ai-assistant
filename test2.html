@@ -559,15 +559,29 @@ const healthConfigs = [
 
 
 // --- 需求 1 & 2：指標查詢邏輯 ---
-    if (matchedConfig) {
-        if (hasAnyDate || isDefinitionQuery) {
-            await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
-        } else {
-            await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
-            showDateActions('metric', matchedConfig);
+// --- 需求 1 & 2：指標查詢邏輯 ---
+if (matchedConfig) {
+    if (hasAnyDate || isDefinitionQuery) {
+        let finalFetchDate = targetDateStr; // 預設抓取使用者輸入的日期
+        let displayDate = targetDateStr;    // 預設顯示使用者輸入的日期
+
+        // 【關鍵修改】：僅針對「生理電量」指標且非百科查詢時，將抓取日期減一天
+        if (matchedConfig.prefix === '生理電量' && !isDefinitionQuery) {
+            const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
+            if (!isNaN(dateObj.getTime())) {
+                dateObj.setDate(dateObj.getDate() - 1);
+                finalFetchDate = dateObj.toLocaleDateString('en-CA'); // 抓取日期變為前一天
+            }
         }
-        return;
+        
+        // 呼叫函式時，傳入 finalFetchDate (抓取用) 與 displayDate (顯示用)
+        await processHealthKeyword(matchedConfig, finalFetchDate, isDefinitionQuery, displayDate);
+    } else {
+        await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
+        showDateActions('metric', matchedConfig);
     }
+    return;
+}
 
 
 // --- 需求：健康摘要邏輯修改 (修正版) ---
@@ -739,8 +753,10 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         }
 
         // 優先使用 displayLabel，若無則使用 fallbackTitle
-const label = config.displayLabel || config.fallbackTitle;
-let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+const showDate = (displayDateStr || targetDateStr).replace(/-/g, '/');
+        
+        const label = config.displayLabel || config.fallbackTitle;
+        let finalContent = `📊 **${showDate}** 的 ${label} 為：${displayValStr}`;
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
         if (logicStatus) {
