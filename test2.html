@@ -550,16 +550,25 @@ const healthConfigs = [
         return;
     }
 
-    // --- 需求 1 & 2：健康摘要邏輯 ---
-    if (msg.includes("健康摘要")) {
-        if (hasAnyDate) {
-            processSummarySearch(targetDateStr);
-        } else {
-            await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
-            showDateActions('summary');
-        }
-        return; 
+    // --- 需求：健康摘要邏輯修改 ---
+if (msg.includes("健康摘要")) {
+    // 1. 先取得使用者提到的日期（例如：2026-03-31）
+    const requestedDate = getTargetDate(msg); 
+    
+    // 2. 核心邏輯：將日期減一天（變為 2026-03-30）以抓取前一天的數據
+    const dateObj = new Date(requestedDate);
+    dateObj.setDate(dateObj.getDate() - 1);
+    const dataDateStr = dateObj.toLocaleDateString('en-CA'); // 格式化為 YYYY-MM-DD
+
+    if (hasAnyDate) {
+        // 使用減一天後的日期去抓取資料
+        processSummarySearch(dataDateStr);
+    } else {
+        await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
+        showDateActions('summary');
     }
+    return; 
+}
 
     
 
@@ -651,37 +660,24 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-       
-       // --- 核心邏輯修改：日期位移 ---
-        const uiDisplayDate = targetDateStr; // 使用者想看的日期（例如 03-31）
-        
-        // 1. 實際上要抓取的數據日期（前一天，例如 03-30）
-        const dataDate = new Date(targetDateStr);
-        dataDate.setDate(dataDate.getDate() - 1);
-        const dataDateStr = `${dataDate.getFullYear()}-${String(dataDate.getMonth() + 1).padStart(2, '0')}-${String(dataDate.getDate()).padStart(2, '0')}`;
+        // --- 準備資料抓取 ---
+        const targetDate = new Date(targetDateStr);
+        const prevDate = new Date(targetDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
-        // 2. 用來比較的基準日期（前兩天，例如 03-29）
-        const compareDate = new Date(dataDate);
-        compareDate.setDate(compareDate.getDate() - 1);
-        const compareDateStr = `${compareDate.getFullYear()}-${String(compareDate.getMonth() + 1).padStart(2, '0')}-${String(compareDate.getDate()).padStart(2, '0')}`;
-
-
-        // 修改查詢條件，改抓 dataDateStr 和 compareDateStr
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
             .eq('serial_number', currentSerial)
-            .in('record_date', [dataDateStr, compareDateStr]);
+            .in('record_date', [targetDateStr, prevDateStr]);
 
         if (error) throw error;
-        
-        // 尋找資料時也要改用 dataDateStr
-        const targetData = records?.find(r => r.record_date === dataDateStr);
-        const prevData = records?.find(r => r.record_date === compareDateStr);       
-
+        const targetData = records?.find(r => r.record_date === targetDateStr);
+        const prevData = records?.find(r => r.record_date === prevDateStr);
 
         // --- 無資料處理 ---
         if (!targetData) {
-            await appendAiMessage(`這天（${uiDisplayDate}）沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️`);
+            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
             return;
@@ -771,11 +767,9 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
                 }
         }
 
-
-
         // 優先使用 displayLabel，若無則使用 fallbackTitle
 const label = config.displayLabel || config.fallbackTitle;
-let finalContent = `📊 **${uiDisplayDate.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
         if (logicStatus) {
@@ -801,31 +795,26 @@ let finalContent = `📊 **${uiDisplayDate.replace(/-/g,'/')}** 的 ${label} 為
 }
 
     // --- 核心邏輯：摘要比較與建議 (修正版) ---
-async function fetchSummaryData(targetDate) {
-    // 1. 計算實際要抓取資料的日期 (詢問日 - 1)
-    const dataDate = new Date(targetDate);
-    dataDate.setDate(dataDate.getDate() - 1);
-    const dataDateStr = `${dataDate.getFullYear()}-${String(dataDate.getMonth() + 1).padStart(2, '0')}-${String(dataDate.getDate()).padStart(2, '0')}`;
 
-    // 2. 抓取數據 (資料日 + 資料日前一天)
-    const { data: healths, error } = await _supabase.from('health_data')
+
+async function fetchSummaryData(targetDate) {
+    // 1. 獲取個人當前與前兩筆數據（包含目標日期與前一筆）
+    const { data: healths } = await _supabase.from('health_data')
         .select('record_date, raw_json')
         .eq('serial_number', currentSerial)
-        .lte('record_date', dataDateStr)
+        .lte('record_date', targetDate) // 依然維持 lte，因為需要抓取「前一天」來做增減比較
         .order('record_date', { ascending: false })
         .limit(2);
 
-    // 3. 嚴謹檢查：確保資料存在且第一筆就是我們要的「資料日」
-    if (!healths || healths.length === 0 || healths[0].record_date !== dataDateStr) {
-        return null; 
-    }
+    if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
+    // 這代表「目標日期當天」沒有數據，直接回傳 null
+    if (!healths?.length || healths[0].record_date !== targetDate) return null;
 
-    const current = healths[0];
-    const previous = healths[1]; // 可能為 undefined (如果前一天沒數據)
+   const current = healths[0];
     const raw = current.raw_json;
     const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-    // 4. 計算同儕百分比排名 (拿資料日當天來比)
+    // --- 2. 新增：計算百分比排名邏輯 (整合自 n12) ---
     const { data: allUsersData } = await _supabase.from('health_data')
         .select('raw_json')
         .eq('record_date', current.record_date);
@@ -833,32 +822,24 @@ async function fetchSummaryData(targetDate) {
     let percentage = 0;
     if (allUsersData && allUsersData.length > 0) {
         const totalUsers = allUsersData.length;
+        // 計算有多少人的生理電量低於目前使用者
         const lowerUsers = allUsersData.filter(d => 
-            (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
+            (d.raw_json.Personal_Battery_weighted_round || 0) < currentBattery
         ).length;
         percentage = Math.round((lowerUsers / totalUsers) * 100);
     }
+    // --------------------------------------------
 
-    // 5. 指標增減比較 (拿資料日 vs 資料日前一天)
+    // 3. 指標增減比較邏輯
     let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
-    if (previous) {
+    if (healths[1]) {
         let maxInc = -Infinity, maxDec = Infinity;
         COMPARISON_FIELDS.forEach(k => {
-            const diff = (raw[k] || 0) - (previous.raw_json[k] || 0);
+            const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
             if (diff > maxInc) { maxInc = diff; bestKey = k; }
             if (diff < maxDec) { maxDec = diff; worstKey = k; }
         });
     }
-
-    return {
-        displayDate: targetDate, // 回傳顯示用的日期 (03-31)
-        current,
-        previous,
-        percentage,
-        bestKey,
-        worstKey
-    };
-}
 
     // 4. 從資料庫獲取建議文字與狀態燈號
     const randomIdx = Math.floor(Math.random() * 3) + 1;
