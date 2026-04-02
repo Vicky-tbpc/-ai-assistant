@@ -559,20 +559,24 @@ const healthConfigs = [
 
 
 // --- 需求 1 & 2：指標查詢邏輯 ---
-  if (matchedConfig) {
-    if (hasAnyDate || isDefinitionQuery) {
-        let finalFetchDate = targetDateStr; // 這是原本解析出來的日期 (例如 2026-04-02)
-        let originalInputDate = targetDateStr; // 備份一份作為顯示用
+if (matchedConfig) {
+    if (hasAnyDate(msg) || isDefinitionQuery) {
+        let fetchDate = targetDateStr; // 這是預設要抓資料的日期
+        let displayDate = targetDateStr; // 這是預設要顯示在對話框的日期
 
+        // 關鍵：只要是查詢「生理電量」且不是在查百科定義
         if (matchedConfig.prefix === '生理電量' && !isDefinitionQuery) {
             const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
-            dateObj.setDate(dateObj.getDate() - 1);
-            finalFetchDate = dateObj.toLocaleDateString('en-CA'); // 變成 2026-04-01
+            if (!isNaN(dateObj.getTime())) {
+                dateObj.setDate(dateObj.getDate() - 1); // 這裡自動把 4/2 變成 4/1
+                fetchDate = dateObj.toLocaleDateString('en-CA'); 
+            }
         }
         
-        // 呼叫時傳入偏移後的日期，以及原始輸入日期（供顯示用）
-        await processHealthKeyword(matchedConfig, finalFetchDate, isDefinitionQuery, originalInputDate);
+        // 這裡呼叫函式，把「抓資料的 4/1」和「顯示用的 4/2」一起傳過去
+        await processHealthKeyword(matchedConfig, fetchDate, isDefinitionQuery, displayDate);
     } else {
+        // 如果使用者只打「電量」沒打日期，會跳出按鈕
         await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
         showDateActions('metric', matchedConfig);
     }
@@ -691,7 +695,7 @@ if (isWaitingForAbnormality) {
 }
 
 // 2. 處理健康指標的核心函式 (優化比對與建議邏輯)
-async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, displayDate = null) {
+async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, displayDateStr = null) {
     document.querySelector('.date-actions')?.remove();
     try {
         // --- 處理百科定義查詢 ---
@@ -814,7 +818,9 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery, di
 const showDate = (displayDate || targetDateStr).replace(/-/g, '/');
     
     const label = config.displayLabel || config.fallbackTitle;
-    let finalContent = `📊 **${showDate}** 的 ${label} 為：${displayValStr}`;
+    const finalShowDate = (displayDateStr || targetDateStr).replace(/-/g, '/');
+    
+    let finalContent = `📊 **${finalShowDate}** 的 ${label} 為：${displayValStr}`;
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
         if (logicStatus) {
