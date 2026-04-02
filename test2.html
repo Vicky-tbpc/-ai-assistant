@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n54</title>
+    <title>Soosyn 健康夥伴 n55</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -550,18 +550,28 @@ const healthConfigs = [
         return;
     }
 
+
+// --- 需求：健康摘要邏輯修改 ---
 if (msg.includes("健康摘要")) {
-    const targetDateStr = getTargetDate(msg); // 使用者點選或輸入的日期 (e.g. 2026-03-31)
+    // 1. 先取得使用者提到的日期（例如：2026-03-31）
+    const targetDateStr = getTargetDate(msg); 
     
-    // 計算前一天
+    // 2. 核心邏輯：將日期減一天（變為 2026-03-30）以抓取前一天的數據
     const dateObj = new Date(targetDateStr);
     dateObj.setDate(dateObj.getDate() - 1);
-    const prevDateStr = dateObj.toLocaleDateString('en-CA'); // 變成 2026-03-30
+    const preDateStr = dateObj.toLocaleDateString('en-CA'); // 格式化為 YYYY-MM-DD
 
-    // 呼叫時傳入：(抓資料日期, 顯示日期)
-    processSummarySearch(prevDateStr, targetDateStr);
-    return;
-}    
+    if (hasAnyDate) {
+        // 使用減一天後的日期去抓取資料
+        processSummarySearch(preDateStr, targetDateStr);
+    } else {
+        await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
+        showDateActions('summary');
+    }
+    return; 
+}
+
+
 
     if (msg.includes("趨勢圖")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
