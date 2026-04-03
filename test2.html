@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n56</title>
+    <title>Soosyn 健康夥伴 n57</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -934,7 +934,10 @@ async function renderTrendCard(type, days) {
 
 async function updateTrend(cardId, type, days) {
     const card = document.getElementById(cardId);
-    // ... 前段 nav-btn 處理保持不變 ...
+    card.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.remove('active');
+        if(b.innerText.includes(days)) b.classList.add('active');
+    });
 
     // 1. 抓取生理數據 (保持資料庫原始日期)
     const { data: healthData, error } = await _supabase.from('health_data')
