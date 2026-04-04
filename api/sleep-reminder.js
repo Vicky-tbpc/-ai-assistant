@@ -1,4 +1,4 @@
-// sleep-reminder_02
+// sleep-reminder_03
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -7,10 +7,16 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+  // 取得台北時間的今天、昨天、前天
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+  
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterday = yesterdayDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+
+  const dayBeforeYesterdayDate = new Date();
+  dayBeforeYesterdayDate.setDate(dayBeforeYesterdayDate.getDate() - 2);
+  const dayBeforeYesterday = dayBeforeYesterdayDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 
   try {
     // 1. 取得所有有 LINE ID 的使用者
@@ -21,11 +27,11 @@ export default async function handler(req, res) {
 
     if (userError) throw userError;
 
-    // 2. 取得今天與昨天的健康數據
+    // 2. 取得「昨天」與「前天」的健康數據 (因為昨天的資料才是最新的睡眠結果)
     const { data: healthData, error: healthError } = await supabase
       .from('health_data')
       .select('serial_number, record_date, raw_json')
-      .in('record_date', [today, yesterday]);
+      .in('record_date', [yesterday, dayBeforeYesterday]);
 
     if (healthError) throw healthError;
 
@@ -34,28 +40,31 @@ export default async function handler(req, res) {
     // 3. 使用 Promise.all 平行處理所有使用者的任務
     const results = await Promise.all(users.map(async (user) => {
       try {
-        const userToday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === today);
+        // 修改對應關係：userYesterday 變為本次分析的主體
         const userYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === yesterday);
+        const userBeforeYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === dayBeforeYesterday);
 
-        if (!userToday || !userToday.raw_json) {
-          return { serial: user.serial_number, status: "Skipped", reason: "今天沒資料" };
+        if (!userYesterday || !userYesterday.raw_json) {
+          return { serial: user.serial_number, status: "Skipped", reason: "昨天(最新)沒資料" };
         }
 
-        // --- 計算邏輯開始 ---
+        // --- 計算邏輯：比較「昨天」與「前天」 ---
         let targetMetric = '';
-        if (userYesterday && userYesterday.raw_json) {
+        if (userBeforeYesterday && userBeforeYesterday.raw_json) {
           let minDiff = Infinity;
           metrics.forEach(m => {
-            const diff = (userToday.raw_json[m] || 0) - (userYesterday.raw_json[m] || 0);
+            // 計算退步最多的指標 (昨天 vs 前天)
+            const diff = (userYesterday.raw_json[m] || 0) - (userBeforeYesterday.raw_json[m] || 0);
             if (diff < minDiff) {
               minDiff = diff;
               targetMetric = m;
             }
           });
         } else {
+          // 若無前天資料，則找昨天數值最低的
           let minValue = Infinity;
           metrics.forEach(m => {
-            const val = userToday.raw_json[m] || 0;
+            const val = userYesterday.raw_json[m] || 0;
             if (val < minValue) {
               minValue = val;
               targetMetric = m;
@@ -63,7 +72,8 @@ export default async function handler(req, res) {
           });
         }
 
-        const tstMin = userToday.raw_json.TST_min || 0;
+        // 根據昨天的總睡眠時間與最差指標決定詞句
+        const tstMin = userYesterday.raw_json.TST_min || 0;
         const logicKeys = getLogicKeys(targetMetric, tstMin);
         
         // 抓取詞句
@@ -81,9 +91,11 @@ export default async function handler(req, res) {
         
         return {
           serial: user.serial_number,
+          target_date: yesterday,
           metric: targetMetric,
           status: sendStatus
         };
+
         // --- 計算邏輯結束 ---
 
       } catch (err) {
@@ -92,7 +104,7 @@ export default async function handler(req, res) {
       }
     }));
 
-    res.status(200).json({ date: today, results });
+    res.status(200).json({ execution_date: todayStr, results });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
