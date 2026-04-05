@@ -344,11 +344,11 @@ function getRandomEndQuestion() {
     const CTA_PHRASES = [
         "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是生理電量平衡度呢？",
+        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是睡眠平衡度呢？",
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
         "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "睡眠平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "睡眠平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -550,10 +550,10 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
- // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡")) && !isDefinitionQuery) {
+ // --- 睡眠平衡度 ---
+    if ((msg.includes("平衡度") || msg.includes("睡眠平衡")) && !isDefinitionQuery) {
         if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        else { await appendAiMessage("📊 想查看哪一天的睡眠平衡度呢？"); showDateActions('balance'); }
         return;
     }   
 
@@ -1241,7 +1241,7 @@ function renderLegend(type, abnormalLabel) {
         const cardHtml = `
             <div class="msg-row ai-row">
                 <div class="balance-card" onclick="zoomChart(this)">
-                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
+                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 睡眠平衡度</span></div>
                     <svg viewBox="-70 -55 600 550" class="radar-svg" style="width: 100%; height: auto; display: block;">
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMax}" fill="#f2f2f2" />
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMid}" fill="#e6e6e6" />
@@ -1265,7 +1265,7 @@ function renderLegend(type, abnormalLabel) {
                     </svg>
 
                     <div class="balance-description">
-                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
+                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估睡眠平衡狀態。
                     </div>
                 </div>
             </div>`;
@@ -1276,7 +1276,7 @@ function renderLegend(type, abnormalLabel) {
 
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
+    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
 } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
     
 
