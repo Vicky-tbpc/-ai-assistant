@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const { prompt, serial_number, record_date, history = [], local_date, local_time } = req.body;
 
     // 從 Vercel 環境變數取得穿透網址與模型名稱
-    const ollamaUrl = "https://recorders-ratio-award-futures.trycloudflare.com"; 
+    const ollamaUrl = "https://newbie-indication-representations-decorating.trycloudflare.com"; 
     const modelName = "qwen2.5:14b"; 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
