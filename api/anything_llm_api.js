@@ -18,6 +18,16 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+    // 👇 --- 貼在這裡 ---
+  // 暫時測試用，確認完請刪除，避免 Key 出現在日誌中
+  console.log("正在使用的 URL:", anythingLlmUrl);
+  console.log("Key 的前 4 碼:", apiKey ? apiKey.substring(0, 4) : "未定義"); 
+
+  if (!apiKey) {
+      return res.status(500).json({ text: "錯誤：Vercel 讀不到 ANYHTING_LLM_KEY 環境變數" });
+  }
+  // 👆 --- 結束 ---
+
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
 
     // === 【重點修改 1：精準計算使用者裝置的今天與昨天】 ===
