@@ -169,29 +169,30 @@ ${healthContext}
       }
     ];
 
-    // --- 5. 呼叫 AnythingLLM API ---
-    const response = await fetch(`${anythingLlmUrl}/api/v1/openai/chat/completions`, {
+    // --- 5. 呼叫 AnythingLLM 原生 API ---
+    // 💡 請將 'my-workspace' 換成你地端實際的工作區名稱 (Slug)
+    const workspaceSlug = "my-workspace"; 
+
+    const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        // 同時嘗試三種可能的 Header，確保 AnythingLLM 能辨識
-        "Authorization": `Bearer ${apiKey}`, 
-        "X-Api-Key": apiKey,
-        "api-key": apiKey
+        "Authorization": `Bearer ${apiKey}` 
       },
       body: JSON.stringify({
-        model: modelName,
-        messages: messages,
-        temperature: 0.7,
-        // 加入這行，有助於排除某些版本的驗證問題
-        user: "tBPC_User"
+        message: `[系統指令]：${systemInstruction}\n\n[上下文數據]：\n${healthContext}\n\n[使用者問題]：${prompt}`,
+        mode: "chat" // 使用 chat 模式會參考工作區設定的模型
       })
     });
 
-    if (!response.ok) throw new Error(`AnythingLLM 連線失敗: ${response.status}`);
+    if (!response.ok) {
+      const errorDetail = await response.text();
+      throw new Error(`AnythingLLM 原生連線失敗: ${response.status} - ${errorDetail}`);
+    }
 
     const data = await response.json();
-    const resultText = data.choices[0]?.message?.content || "AI 目前沒有回傳內容。";
+    // 原生 API 的回傳欄位名稱是 textResponse
+    const resultText = data.textResponse || "AI 目前沒有回傳內容。";
 
     // --- 6. 同步對話記錄至 Supabase ---
     try {
