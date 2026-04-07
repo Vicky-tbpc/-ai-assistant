@@ -1,4 +1,4 @@
-// api/gemini.js 18
+// api/gemini.js 19
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -150,8 +150,9 @@ export default async function handler(req, res) {
           serial_number: serial_number,
           user_query: prompt,
           ai_response: resultText,
-          record_date: local_date, // 前端傳來的本地日期
-          record_time: local_time  // 前端傳來的本地時間
+          record_date: local_date,
+          record_time: local_time,
+          ai_model: 'Gemini' // <--- 新增這一行
         })
       });
     } catch (logError) {
