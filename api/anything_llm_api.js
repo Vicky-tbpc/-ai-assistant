@@ -1,4 +1,4 @@
-// anything_llm_api_01
+// anything_llm_api_02
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -60,6 +60,18 @@ export default async function handler(req, res) {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
     const dataList = await sbRes.json();
+
+     // === 【新增：JS 端日期與數據狀態檢查】 ===
+    const latestRecordDate = dataList.length > 0 ? dataList[0].record_date : null;
+    const hasYesterdayData = dataList.some(item => item.record_date === yesterdayStr);
+    // 判斷使用者是否在問昨天或最新資料
+    const isAskingForYesterday = prompt.includes("昨天") || prompt.includes("昨晚") || prompt.includes("最新");
+
+    let dataStatusNotice = "";
+    if (isAskingForYesterday && !hasYesterdayData) {
+        // 如果問昨天但沒資料，準備一段文字「警告」AI
+        dataStatusNotice = `【系統通知】：使用者正在詢問昨天 (${yesterdayStr}) 的紀錄，但資料庫中「沒有」這一天的數據。目前最新的一份數據日期是 ${latestRecordDate || '未知'}。請務必誠實告知使用者，不要套用範例或其他日期的數值。`;
+    }
 
      // --- 3. 格式化數據 Context ---
     let healthContext = "找不到相關數據。";
@@ -141,7 +153,7 @@ export default async function handler(req, res) {
            - 數值：脈搏、血氧、呼吸、ODI 取整數；其餘四捨五入至小數點後 1 位。
            - 日期格式：統一使用「月/日」。
 
-       ### 【輸出範例】（給 Ollama 模仿的標竿）
+       ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
        使用者問：「分析我最新一天的睡眠？」
        你回：
        「你好！看來你 03/26 的睡眠有些挑戰呢。😴 總時長僅 5 小時 1 分，遠低於 7 小時目標與過去一週平均的 6.3 小時。深睡 N3 僅 8%，淺睡達 71% 偏高，睡眠結構需要優化喔。
@@ -171,8 +183,26 @@ ${healthContext}
     ];
 
     // --- 5. 呼叫 AnythingLLM 原生 API ---
-    // 💡 請把這裡換成你剛剛在設定頁面看到的那個 Slug
     const workspaceSlug = "tbpc_medical_ref_database"; 
+
+    // === 【重點：將所有 Context 整合進單一字串傳給 AnythingLLM】 ===
+    const finalCombinedMessage = `
+[系統指令]：
+${systemInstruction}
+
+[日期狀態與警告]：
+今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+${dataStatusNotice}
+
+[資料庫真實數據內容]：
+${healthContext}
+
+[對話歷史紀錄]：
+${formattedHistory.map(h => `${h.role === 'assistant' ? 'AI' : 'User'}: ${h.content}`).join('\n')}
+
+[使用者當前問題]：
+${prompt}
+    `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
@@ -181,8 +211,8 @@ ${healthContext}
         "Authorization": `Bearer ${apiKey}` 
       },
       body: JSON.stringify({
-        // 原生 API 建議把指令跟問題包在一起
-        message: `[系統指令]：${systemInstruction}\n\n[使用者問題]：${prompt}`,
+        // 這裡改用整合後的 finalCombinedMessage
+        message: finalCombinedMessage,
         mode: "chat"
       })
     });
