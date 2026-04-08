@@ -140,18 +140,25 @@ export default async function handler(req, res) {
            - **字數控制**：200-250 字，確保內容充實但不囉唆。
 
            路徑 C：特定指標追蹤 (例如：使用者回答「好啊」、「想看」、「好喔」)
-           - **觸發條件**：當使用者回覆肯定詞，且 History 顯示你上一則訊息是在解釋某個特定指標時。
-           - **內容要求**：**僅針對該特定指標**進行深度分析。
+           - **觸發條件**：當使用者回覆肯定詞，且 History 顯示你上一則訊息是在解釋某個特定指標（如：HBI、rMSSD）時。
+           - **內容要求 (絕對限制)**：**「嚴禁」提及任何與該指標無關的數據**。例如上一則在講 HBI，這則就只能講 HBI 的最新值、平均值與趨勢。
+           - **違規處罰**：如果在此路徑下提到了其他無關指標（如：睡眠時長、N3 等），將視為格式錯誤。請保持專注，只當該指標的專家。
            - **分析內容**：列出該指標的最新數值、與個人7日移動平均（不含當日）的對比，以及該指標在過去一週的趨勢變化。
                    
            【數據參考標準】：
            - 睡眠時長：目標 7 小時。
            - 睡眠效率：≥ 85% 為良好，≤ 75% 為不佳。
            - 結構：N3 (10-20%) 與 REM (10-25%) 與 淺睡 (50-65%) 的比例。
-           - 恢復指標：rMSSD (7日平均±10%)、最低脈搏 (7日平均±5bpm)。
+           - 恢復指標：rMSSD (基準值 = 7日動態平均±10%)、最低脈搏 (基準值 = 7日動態平均±5bpm)。
            - 呼吸風險：若 HBI 超過平均，或 ODI/T90 異常（如 T90>5%、T89>4%、T88>3%、ODI>5次），呼吸頻率不在標準範圍 12-25rpm 之間。
-           - 7日平均的計算邏輯：如果數據不滿7日，有4日的數據則除以4，不要假設其他3日的數據接近平均值或接近0。如果數據不滿7日，不要回答沒有7日的數據，請依據數據庫最新日期的資料計算7日平均。
+           
+           【平均值計算強制規則】（極重要）：
 
+           1. 自動降級處理：若資料庫中的紀錄不滿 7 筆（例如只有 4 筆），請直接以這 4 筆數據的總和除以 4 作為「基準值」。
+           2. 禁止拒絕回答：絕對禁止回覆「因為數據不足 7 日無法計算」或「數據太少無法分析」。
+           3. 禁止虛構：嚴禁假設缺失日期的數值為 0 或接近平均值。
+           4. 主動告知：若數據不足 7 日，請在分析中順口提到「根據你最近 X 天的平均狀況...」，讓使用者知道這是基於有限數據的分析。
+       
        ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
        使用者問：「分析我最新一天的睡眠？」
        你回：
@@ -184,22 +191,20 @@ ${healthContext}
     // --- 5. 呼叫 AnythingLLM 原生 API ---
     const workspaceSlug = "tbpc_medical_ref_database"; 
 
-    // === 【重點：將所有 Context 整合進單一字串傳給 AnythingLLM】 ===
-    const finalCombinedMessage = `
+    // 將所有資訊包進 message，讓 AI 清楚現在的狀況
+    const combinedMessage = `
 [系統指令]：
 ${systemInstruction}
 
-[日期狀態與警告]：
-今天是 ${todayStr}，昨天是 ${yesterdayStr}。
-${dataStatusNotice}
+[今天日期]：${todayStr}，[昨天日期]：${yesterdayStr}
 
 [資料庫真實數據內容]：
 ${healthContext}
 
 [對話歷史紀錄]：
-${formattedHistory.map(h => `${h.role === 'assistant' ? 'AI' : 'User'}: ${h.content}`).join('\n')}
+${formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n')}
 
-[使用者當前問題]：
+[使用者目前的回答]：
 ${prompt}
     `.trim();
 
@@ -210,11 +215,11 @@ ${prompt}
         "Authorization": `Bearer ${apiKey}` 
       },
       body: JSON.stringify({
-    // 確保這裡有把「系統指令」跟「數據」跟「問題」包成一個清楚的結構
-    message: `[系統指令]：${systemInstruction}\n\n[今日數據]：${healthContext}\n\n[使用者問題]：${prompt}`,
-    mode: "chat"
-  })
-});
+        // 關鍵：這裡必須傳送組合後的訊息內容，AI 才能進行路徑判斷
+        message: combinedMessage,
+        mode: "chat"
+      })
+    });
 
     if (!response.ok) {
       const errorDetail = await response.text();
