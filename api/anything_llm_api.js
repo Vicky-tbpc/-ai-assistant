@@ -13,7 +13,7 @@ export default async function handler(req, res) {
      // === 【設定區】 ===
     const anythingLlmUrl = process.env.ANYTHING_LLM_URL;
     const apiKey = process.env.ANYTHING_LLM_KEY;
-    const workspaceSlug = process.env.ANYTHING_LLM_SLUG;
+    
     const modelName = process.env.ANYTHING_LLM_MODEL;
     
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -171,17 +171,21 @@ ${healthContext}
     ];
 
     // --- 5. 呼叫 AnythingLLM 原生 API ---
-const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
-  method: "POST",
-  headers: { 
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${apiKey}` 
-  },
-  body: JSON.stringify({
-    message: `[系統指令]：${systemInstruction}\n\n[數據內容]：\n${healthContext}\n\n[使用者問題]：${prompt}`,
-    mode: "chat"
-  })
-});
+    // 💡 請把這裡換成你剛剛在設定頁面看到的那個 Slug
+    const workspaceSlug = "tbpc_medical_ref_database"; 
+
+    const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}` 
+      },
+      body: JSON.stringify({
+        // 原生 API 建議把指令跟問題包在一起
+        message: `[系統指令]：${systemInstruction}\n\n[使用者問題]：${prompt}`,
+        mode: "chat"
+      })
+    });
 
     if (!response.ok) {
       const errorDetail = await response.text();
