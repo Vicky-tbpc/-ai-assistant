@@ -170,8 +170,8 @@ ${healthContext}
     ];
 
     // --- 5. 呼叫 AnythingLLM 原生 API ---
-    // 💡 請將 'my-workspace' 換成你地端實際的工作區名稱 (Slug)
-    const workspaceSlug = "my-workspace"; 
+    // 💡 請把這裡換成你剛剛在設定頁面看到的那個 Slug
+    const workspaceSlug = "tBPC_Medical_REF_Database"; 
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
@@ -180,8 +180,9 @@ ${healthContext}
         "Authorization": `Bearer ${apiKey}` 
       },
       body: JSON.stringify({
-        message: `[系統指令]：${systemInstruction}\n\n[上下文數據]：\n${healthContext}\n\n[使用者問題]：${prompt}`,
-        mode: "chat" // 使用 chat 模式會參考工作區設定的模型
+        // 原生 API 建議把指令跟問題包在一起
+        message: `[系統指令]：${systemInstruction}\n\n[使用者問題]：${prompt}`,
+        mode: "chat"
       })
     });
 
