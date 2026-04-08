@@ -152,7 +152,7 @@ export default async function handler(req, res) {
           ai_response: resultText,
           record_date: local_date,
           record_time: local_time,
-          ai_model: 'Gemini' // <--- 新增這一行
+          ai_model: 'Gemini-2.5-flash' // <--- 新增這一行
         })
       });
     } catch (logError) {
