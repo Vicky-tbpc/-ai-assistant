@@ -171,8 +171,8 @@ ${healthContext}
 
     // --- 5. 呼叫 AnythingLLM 原生 API ---
     // 💡 請把這裡換成你剛剛在設定頁面看到的那個 Slug
-    const workspaceSlug = "tbpc-medical-ref-database"; 
-
+    const workspaceSlug = "tbpc-medical-ref-database";
+    
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
       headers: { 
