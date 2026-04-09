@@ -1,4 +1,4 @@
-// anything_llm_api_02
+// anything_llm_api_03
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -75,40 +75,91 @@ export default async function handler(req, res) {
 
      // --- 3. 格式化數據 Context ---
     let healthContext = "找不到相關數據。";
-    if (dataList && dataList.length > 0) {
-      healthContext = dataList.map(item => {
-        const raw = item.raw_json || {};
-        const tst = raw.TST_min || 0;
-        const hrMean = Math.round(raw.HR_mean || 0);
-        const hrMin = Math.round(raw.HR_min || 0);
-        const rMssd = Math.round(raw.rMSSD || 0);
-        const hbi = Math.round(raw.HBI || 0);
-        const spo2 = Math.round(raw.SpO2_mean || 0);
-        const rr = Math.round(raw.RR_mean || 0);
-        const odi3 = Math.round(raw.ODI3_total || 0);
-        const odi4 = Math.round(raw.ODI4_total || 0);
+    let avgContext = ""; // 用來存放計算好的平均值區塊
 
-        return `📌【日期：${item.record_date}】 
-                睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分
-                N3深睡:${raw.N3_pct || 0}%
-                效率:${raw.sleep_efficiency_pct || 0}%
-                淺睡:${raw.N1N2_pct || 0}%
-                REM:${raw.REM_pct || 0}%
-                rMSSD放鬆恢復:${rMssd}ms
-                HBI缺氧負荷:${hbi}%min/h
-                睡眠平均脈搏:${hrMean}bpm
-                睡眠最低脈搏:${hrMin}bpm
-                睡眠平均血氧飽和度:${spo2}%
-                睡眠平均呼吸頻率:${rr}rpm
-                ODI 3%:${odi3}次/小時
-                ODI 4%:${odi4}次/小時
-                T90:${raw.T90_pct || 0}%
-                T89:${raw.T89_pct || 0}%
-                T88:${raw.T88_pct || 0}%
-                -------------------`;
-                       }).join('\n');
-                      }
+if (dataList && dataList.length > 0) {
+  const count = dataList.length; // 實際的天數
 
+  // 1. 初始化累加器物件 (將所有指標預設為 0)
+  let sums = {
+    tst: 0, n3: 0, eff: 0, light: 0, rem: 0,
+    rMssd: 0, hbi: 0, hrMean: 0, hrMin: 0,
+    spo2: 0, rr: 0, odi3: 0, odi4: 0,
+    t90: 0, t89: 0, t88: 0
+  };
+
+  // 2. 格式化每日數據，同時累加數值
+  healthContext = dataList.map(item => {
+    const raw = item.raw_json || {};
+    
+    // 取得當日數值並確保是數字型態 (parseFloat)
+    const d = {
+      tst: parseFloat(raw.TST_min) || 0,
+      n3: parseFloat(raw.N3_pct) || 0,
+      eff: parseFloat(raw.sleep_efficiency_pct) || 0,
+      light: parseFloat(raw.N1N2_pct) || 0,
+      rem: parseFloat(raw.REM_pct) || 0,
+      rMssd: parseFloat(raw.rMSSD) || 0,
+      hbi: parseFloat(raw.HBI) || 0,
+      hrMean: parseFloat(raw.HR_mean) || 0,
+      hrMin: parseFloat(raw.HR_min) || 0,
+      spo2: parseFloat(raw.SpO2_mean) || 0,
+      rr: parseFloat(raw.RR_mean) || 0,
+      odi3: parseFloat(raw.ODI3_total) || 0,
+      odi4: parseFloat(raw.ODI4_total) || 0,
+      t90: parseFloat(raw.T90_pct) || 0,
+      t89: parseFloat(raw.T89_pct) || 0,
+      t88: parseFloat(raw.T88_pct) || 0
+    };
+
+    // 執行加總
+    Object.keys(sums).forEach(key => sums[key] += d[key]);
+
+        // 回傳原本要求的每日格式字串
+    return `📌【日期：${item.record_date}】 
+            睡眠時長:${Math.floor(d.tst / 60)}時${Math.round(d.tst % 60)}分
+            N3深睡:${d.n3}%
+            效率:${d.eff}%
+            淺睡:${d.light}%
+            REM:${d.rem}%
+            rMSSD放鬆恢復:${Math.round(d.rMssd)}ms
+            HBI缺氧負荷:${Math.round(d.hbi)}%min/h
+            睡眠平均脈搏:${Math.round(d.hrMean)}bpm
+            睡眠最低脈搏:${Math.round(d.hrMin)}bpm
+            睡眠平均血氧飽和度:${Math.round(d.spo2)}%
+            睡眠平均呼吸頻率:${Math.round(d.rr)}rpm
+            ODI 3%:${Math.round(d.odi3)}次/小時
+            ODI 4%:${Math.round(d.odi4)}次/小時
+            T90:${d.t90}%
+            T89:${d.t89}%
+            T88:${d.t88}%
+            -------------------`;
+  }).join('\n');
+        
+    // 3. 計算平均值 (保留一位小數)
+  const avgs = {};
+  Object.keys(sums).forEach(key => {
+    avgs[key] = (sums[key] / count).toFixed(1);
+  });
+
+  // 4. 生成平均值 Context (給 AI 參考)
+  avgContext = `
+### 【數據基準計算 - 過去 ${count} 日平均值】
+- 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分
+- 💤 N3深睡比例平均：${avgs.n3}%
+- 📈 睡眠效率平均：${avgs.eff}%
+- ☁️ 淺睡比例平均：${avgs.light}%
+- 🎭 REM快速動眼期平均：${avgs.rem}%
+- 🌿 rMSSD放鬆恢復平均：${avgs.rMssd}ms
+- ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h
+- ❤️ 脈搏平均：${avgs.hrMean}bpm / 最低平均：${avgs.hrMin}bpm
+- 🩸 睡眠平均血氧：${avgs.spo2}%
+- 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm
+- 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}
+- 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%
+(⚠️ AI 指導：分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。)`;
+}
+                      
     // --- 4. 準備 Ollama 的訊息格式 ---
     // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
     const systemInstruction = `### 角色設定
@@ -153,13 +204,11 @@ export default async function handler(req, res) {
            - 恢復指標：rMSSD (基準值 = 7日動態平均±10%)、最低脈搏 (基準值 = 7日動態平均±5bpm)。
            - 呼吸風險：若 HBI 超過平均，或 ODI/T90 異常（如 T90>5%、T89>4%、T88>3%、ODI>5次），呼吸頻率不在標準範圍 12-25rpm 之間。
            
-           【平均值計算強制規則】（極重要）：
+           【平均值使用規範】(更新)：
 
-           1. 自動降級處理：若資料庫中的紀錄不滿 7 筆（例如只有 4 筆），請直接以這 4 筆數據的總和除以 4 作為「基準值」。
-           2. 禁止拒絕回答：絕對禁止回覆「因為數據不足 7 日無法計算」或「數據太少無法分析」。
-           3. 禁止虛構：嚴禁假設缺失日期的數值為 0 或接近平均值。
-           4. 主動告知：若數據不足 7 日，請在分析中順口提到「根據你最近 X 天的平均狀況...」，讓使用者知道這是基於有限數據的分析。
-       
+           1. 數據來源：請優先採用 [系統預先計算] 區塊提供的平均值。
+           2. 禁止計算：嚴禁自行將數據清單中的 HBI、ODI 等數值進行加減乘除。如果發現系統提供的平均值與你看到的數值有出入，請以系統提供的平均值為準。
+           
            ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
           使用者問：「分析我最新一天的睡眠？」
           你回：
@@ -204,6 +253,8 @@ ${systemInstruction}
 [日期參考]：
 今天是 ${todayStr}，昨天是 ${yesterdayStr}。
 
+${avgContext}  <-- 這裡把算好的平均值直接餵給 AI
+
 [資料庫真實數據內容]：
 ${healthContext}
 
@@ -216,6 +267,10 @@ ${formattedHistory.length > 0
 ${prompt}
 
 (請嚴格核對日期，若數據中無使用者詢問的日期紀錄，請告知無資料，禁止引用歷史紀錄或其他日期的數值。)
+
+⚠️【特別叮嚀】：
+在進行指標對比時，請「直接使用」上方 [系統預先計算] 提供之平均值 (${hbiAvg})。
+絕對禁止自行將 [資料庫詳細數據] 中的數字進行相加或除法運算，因為你(AI)的計算能力不如系統精確。
     `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
