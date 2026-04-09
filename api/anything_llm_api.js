@@ -1,4 +1,4 @@
-// anything_llm_api_05
+// anything_llm_api_06
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -255,8 +255,24 @@ if (hasJapanese) {
     forcedLanguageInstruction = "⚠️ [CRITICAL] Detected English. You MUST respond in English.";
 } else {
     // 預設為繁體中文，並再次強調不使用「您」
-    forcedLanguageInstruction = "請使用繁體中文回覆，且嚴禁敬稱「您」，一律用「你」。";
+    forcedLanguageInstruction = "請使用繁體中文回覆，嚴禁敬稱「您」，一律用「你」。回覆時請務必對照 [診斷參考依據] 的數值門檻。";
 }
+
+// --- 3.7 定義硬性診斷標準 ---
+const healthStandards = `
+### 📊 睡眠診斷標準 (分析時必須以此為準)
+1. **睡眠時長**：目標 7 小時。
+2. **睡眠效率**：≥ 85% 良好；≤ 75% 不佳。
+3. **睡眠結構**：N3(10-20%)、REM(10-25%)、淺睡(50-65%)。
+4. **恢復指標**：
+   - rMSSD：對比下方 7 日平均值，波動超過 ±10% 視為異常。
+   - 最低脈搏：對比下方 7 日最低平均值，波動超過 ±5bpm 視為異常。
+5. **呼吸風險 (異常判定)**：
+   - HBI：對比下方 7 日平均值，超過平均值視為異常。
+   - T90 > 5% 或 T89 > 4% 或 T88 > 3% 視為嚴重缺氧。
+   - ODI3 ≥ 5 次/小時 或 ODI4 ≥ 5 次/小時 視為呼吸事件頻繁。
+   - 呼吸頻率：正常範圍應在 12-25 rpm。
+`;
 
 // --- 5. 呼叫 AnythingLLM 原生 API ---
     const workspaceSlug = "tbpc_medical_ref_database"; 
@@ -272,6 +288,9 @@ ${systemInstruction}
 ${safeAvgContext} 
 ${safeHealthContext}
 
+[診斷參考依據]
+${healthStandards}  <-- 放在這裡，讓 AI 剛看完數據馬上對照標準
+
 [對話紀錄]
 ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n') : "無"}
 
@@ -281,8 +300,9 @@ ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.conten
 ---
 ### ⚠️ 最終回覆強制指令：
 1. ${forcedLanguageInstruction}
-2. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
-3. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
+2. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
+3. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
+4. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
 `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
