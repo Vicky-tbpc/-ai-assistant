@@ -226,7 +226,7 @@ ${prompt}
       },
       body: JSON.stringify({
         // 關鍵：這裡必須傳送組合後的訊息內容，AI 才能進行路徑判斷
-        message: combinedMessage,
+        message: finalCombinedMessage,
         mode: "chat"
       })
     });
