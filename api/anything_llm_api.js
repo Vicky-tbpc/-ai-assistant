@@ -1,4 +1,4 @@
-// anything_llm_api_01
+// anything_llm_api_02
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -88,25 +88,26 @@ export default async function handler(req, res) {
         const odi3 = Math.round(raw.ODI3_total || 0);
         const odi4 = Math.round(raw.ODI4_total || 0);
 
-        return `日期:${item.record_date}, 
-                睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分, 
-                N3深睡:${raw.N3_pct || 0}%, 
-                效率:${raw.sleep_efficiency_pct || 0}%, 
-                淺睡:${raw.N1N2_pct || 0}%, 
-                REM:${raw.REM_pct || 0}%,
-                rMSSD放鬆恢復:${rMssd}ms,
-                HBI缺氧負荷:${hbi}%min/h,
-                睡眠平均脈搏:${hrMean}bpm,
-                睡眠最低脈搏:${hrMin}bpm,
-                睡眠平均血氧飽和度:${spo2}%,
-                睡眠平均呼吸頻率:${rr}rpm,
-                ODI 3%:${odi3}次/小時,
-                ODI 4%:${odi4}次/小時,
-                T90:${raw.T90_pct || 0}%,
-                T89:${raw.T89_pct || 0}%,
-                T88:${raw.T88_pct || 0}%`;
-      }).join('\n');
-    }
+        return `📌【日期：${item.record_date}】 
+                睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分
+                N3深睡:${raw.N3_pct || 0}%
+                效率:${raw.sleep_efficiency_pct || 0}%
+                淺睡:${raw.N1N2_pct || 0}%
+                REM:${raw.REM_pct || 0}%
+                rMSSD放鬆恢復:${rMssd}ms
+                HBI缺氧負荷:${hbi}%min/h
+                睡眠平均脈搏:${hrMean}bpm
+                睡眠最低脈搏:${hrMin}bpm
+                睡眠平均血氧飽和度:${spo2}%
+                睡眠平均呼吸頻率:${rr}rpm
+                ODI 3%:${odi3}次/小時
+                ODI 4%:${odi4}次/小時
+                T90:${raw.T90_pct || 0}%
+                T89:${raw.T89_pct || 0}%
+                T88:${raw.T88_pct || 0}%
+                -------------------`;
+                       }).join('\n');
+                      }
 
     // --- 4. 準備 Ollama 的訊息格式 ---
     // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
@@ -159,14 +160,18 @@ export default async function handler(req, res) {
            3. 禁止虛構：嚴禁假設缺失日期的數值為 0 或接近平均值。
            4. 主動告知：若數據不足 7 日，請在分析中順口提到「根據你最近 X 天的平均狀況...」，讓使用者知道這是基於有限數據的分析。
        
-       ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
-       使用者問：「分析我最新一天的睡眠？」
-       你回：
-       「你好！看來你 03/26 的睡眠有些挑戰呢。😴 總時長僅 5 小時 1 分，遠低於 7 小時目標與過去一週平均的 6.3 小時。深睡 N3 僅 8%，淺睡達 71% 偏高，睡眠結構需要優化喔。
+           ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
+          使用者問：「分析我最新一天的睡眠？」
+          你回：
+          「你好！看來你 03/26 的睡眠有些挑戰呢。😴 總時長僅 5 小時 1 分，遠低於 7 小時目標與過去一週平均的 6.3 小時。深睡 N3 僅 8%，淺睡達 71% 偏高，睡眠結構需要優化喔。
+           此外，你的 HBI 缺氧負荷 6%min/h，且 ODI 3% 達 6 次/小時，這已超過建議標準（ODI > 5 次），並略高於平均，建議你多留意呼吸狀況。⚠️
+           不過，rMSSD 放鬆恢復高達 80ms，顯著優於平均值，表示你的身體在有限睡眠時間裡，仍盡力修復！💪
 
-        此外，你的 HBI 缺氧負荷 6%min/h，且 ODI 3% 達 6 次/小時，這已超過建議標準（ODI > 5 次），並略高於平均，建議你多留意呼吸狀況。⚠️
-
-        不過，rMSSD 放鬆恢復高達 80ms，顯著優於平均值，表示你的身體在有限睡眠時間裡，仍盡力修復！💪`;
+           ### 數據精準度嚴格規範（新增）：
+           1. **嚴格日期核對**：在回答前，請先在 [資料庫真實數據] 區塊中尋找與使用者問題「完全匹配」的日期紀錄。
+           2. **禁止指鹿為馬**：嚴禁將相鄰日期（如 03/31）的數值用於回答另一個日期（如 04/01）的問題。
+           3. **無資料即告知**：如果指定的日期在數據中只有 03/31 而沒有 04/01，請誠實回覆「目前還沒有 04/01 的資料」，絕對不能用前一天的數據來遞補！
+           `;
 
     // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
     const formattedHistory = history.map(h => ({
@@ -192,20 +197,25 @@ ${healthContext}
     const workspaceSlug = "tbpc_medical_ref_database"; 
 
     // 將所有資訊包進 message，讓 AI 清楚現在的狀況
-    const combinedMessage = `
+    const finalCombinedMessage = `
 [系統指令]：
 ${systemInstruction}
 
-[今天日期]：${todayStr}，[昨天日期]：${yesterdayStr}
+[日期參考]：
+今天是 ${todayStr}，昨天是 ${yesterdayStr}。
 
 [資料庫真實數據內容]：
 ${healthContext}
 
 [對話歷史紀錄]：
-${formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n')}
+${formattedHistory.length > 0 
+  ? formattedHistory.map(h => `${h.role === 'assistant' ? 'AI' : 'User'}: ${h.content}`).join('\n') 
+  : "（目前無歷史對話內容）"}
 
-[使用者目前的回答]：
+[使用者當前問題]：
 ${prompt}
+
+(請嚴格核對日期，若數據中無使用者詢問的日期紀錄，請告知無資料，禁止引用歷史紀錄或其他日期的數值。)
     `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
