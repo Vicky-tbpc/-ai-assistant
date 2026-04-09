@@ -76,6 +76,7 @@ export default async function handler(req, res) {
      // --- 3. 格式化數據 Context ---
     let healthContext = "找不到相關數據。";
     let avgContext = ""; // 用來存放計算好的平均值區塊
+    let avgs = {};
 
 if (dataList && dataList.length > 0) {
   const count = dataList.length; // 實際的天數
@@ -135,12 +136,12 @@ if (dataList && dataList.length > 0) {
             T88:${d.t88}%
             -------------------`;
   }).join('\n');
+
         
     // 3. 計算平均值 (保留一位小數)
-  const avgs = {};
   Object.keys(sums).forEach(key => {
-    avgs[key] = (sums[key] / count).toFixed(1);
-  });
+        avgs[key] = (sums[key] / count).toFixed(1);
+      });
 
   // 4. 生成平均值 Context (給 AI 參考)
   avgContext = `
@@ -157,8 +158,9 @@ if (dataList && dataList.length > 0) {
 - 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm
 - 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}
 - 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%
-(⚠️ AI 指導：分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。)`;
-}
+(⚠️ AI 指導：分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。)
+--------------------------------------------------`;
+    }
                       
     // --- 4. 準備 Ollama 的訊息格式 ---
     // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
@@ -231,20 +233,6 @@ if (dataList && dataList.length > 0) {
       content: h.parts[0].text
     }));
 
-    // === 【重點修改 3：在 User 訊息中提供清晰的今天與昨天日期對照】 ===
-    const messages = [
-      { role: "system", content: systemInstruction },
-      ...formattedHistory,
-      { 
-        role: "user", 
-        content: `[系統時間通知]：今天是 ${todayStr}，昨天是 ${yesterdayStr}。
-[資料庫撈取到的數據內容]：
-${healthContext}
-
-[使用者當前問題]：${prompt}` 
-      }
-    ];
-
     // --- 5. 呼叫 AnythingLLM 原生 API ---
     const workspaceSlug = "tbpc_medical_ref_database"; 
 
@@ -255,6 +243,8 @@ ${systemInstruction}
 
 [日期參考]：
 今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+
+${dataStatusNotice}
 
 ${avgContext}  <-- 這裡把算好的平均值直接餵給 AI
 
@@ -271,10 +261,10 @@ ${prompt}
 
 (請嚴格核對日期，若數據中無使用者詢問的日期紀錄，請告知無資料，禁止引用歷史紀錄或其他日期的數值。)
 
-⚠️【特別叮嚀】：
-在進行指標對比時，請「直接使用」上方 [系統預先計算] 提供之平均值 (HBI平均為 ${avgs.hbi})。
-絕對禁止自行將 [資料庫詳細數據] 中的數字進行相加或除法運算，因為你(AI)的計算能力不如系統精確。
-    `.trim();
+⚠️【重要提醒】：
+1. 分析時請直接引用上方「數據基準計算」區塊提供的平均值。
+2. 若無指定日期數據，請老實告知使用者。
+`.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
