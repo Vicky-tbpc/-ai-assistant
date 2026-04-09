@@ -1,4 +1,4 @@
-// anything_llm_api_03
+// anything_llm_api_04
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -239,35 +239,35 @@ if (dataList && dataList.length > 0) {
     // --- 5. 呼叫 AnythingLLM 原生 API ---
     const workspaceSlug = "tbpc_medical_ref_database"; 
 
-    // 將所有資訊包進 message，讓 AI 清楚現在的狀況
-    const finalCombinedMessage = `
-[系統指令]：
+    // --- 3.5 意圖預判 (JS 端過濾器) ---
+const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋") || /^[a-zA-Z0-9? ]+$/.test(prompt)) && !prompt.includes("我");
+// 如果是 Path A，我們直接把平均值和詳細數據清空，讓 AI 想提也提不到
+const safeAvgContext = isPathA ? "【此查詢不適用數據存取，已屏蔽】" : avgContext;
+const safeHealthContext = isPathA ? "【此查詢不適用數據存取，已屏蔽】" : healthContext;
+
+// --- 5. 呼叫 AnythingLLM 原生 API ---
+// 重新調整 Final Message 結構
+const finalCombinedMessage = `
 ${systemInstruction}
 
-[日期參考]：
-今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+[目前的環境資訊]
+- 使用者所在地日期: ${todayStr} (昨天是 ${yesterdayStr})
+- 數據狀態: ${dataStatusNotice}
 
-${dataStatusNotice}
+[數據區塊]
+${safeAvgContext} 
+${safeHealthContext}
 
-${avgContext}  <-- 這裡把算好的平均值直接餵給 AI
+[對話紀錄]
+${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n') : "無"}
 
-[資料庫真實數據內容]：
-${healthContext}
+[使用者輸入]
+"${prompt}"
 
-[對話歷史紀錄]：
-${formattedHistory.length > 0 
-  ? formattedHistory.map(h => `${h.role === 'assistant' ? 'AI' : 'User'}: ${h.content}`).join('\n') 
-  : "（目前無歷史對話內容）"}
-
-[偵測指令]：請以使用者輸入的語言進行回覆。
-
-[使用者當前問題]：${prompt}
-
-(請嚴格核對日期，若數據中無使用者詢問的日期紀錄，請告知無資料，禁止引用歷史紀錄或其他日期的數值。)
-
-⚠️【重要提醒】：
-1. 分析時請直接引用上方「數據基準計算」區塊提供的平均值。
-2. 若無指定日期數據，請老實告知使用者。
+### ⚠️ 強制指令：
+1. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
+2. 偵測使用者輸入的語系。若使用者使用英文 (如: My recent sleep...)，你必須完全以 English 回覆。
+3. 繁體中文回覆時，嚴禁使用「您」，請使用平輩語氣。
 `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
