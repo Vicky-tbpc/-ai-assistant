@@ -1,4 +1,4 @@
-// anything_llm_api_04
+// anything_llm_api_05
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -236,17 +236,31 @@ if (dataList && dataList.length > 0) {
       content: h.parts[0].text
     }));
 
-    // --- 5. 呼叫 AnythingLLM 原生 API ---
-    const workspaceSlug = "tbpc_medical_ref_database"; 
-
     // --- 3.5 意圖預判 (JS 端過濾器) ---
 const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋") || /^[a-zA-Z0-9? ]+$/.test(prompt)) && !prompt.includes("我");
-// 如果是 Path A，我們直接把平均值和詳細數據清空，讓 AI 想提也提不到
+
 const safeAvgContext = isPathA ? "【此查詢不適用數據存取，已屏蔽】" : avgContext;
 const safeHealthContext = isPathA ? "【此查詢不適用數據存取，已屏蔽】" : healthContext;
 
+// --- 3.6 語系硬核偵測 (針對日文/英文) ---
+// 偵測日文：檢查是否包含平假名 (\u3040-\u309F) 或片假名 (\u30A0-\u30FF)
+const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF]/.test(prompt);
+// 偵測英文：檢查是否整句幾乎由英文字母與標點組成
+const isEnglish = /^[a-zA-Z0-9?\s.,!'"-]+$/.test(prompt);
+
+let forcedLanguageInstruction = "";
+if (hasJapanese) {
+    forcedLanguageInstruction = "⚠️ [CRITICAL] Detected Japanese. You MUST respond in Japanese (日本語).";
+} else if (isEnglish) {
+    forcedLanguageInstruction = "⚠️ [CRITICAL] Detected English. You MUST respond in English.";
+} else {
+    // 預設為繁體中文，並再次強調不使用「您」
+    forcedLanguageInstruction = "請使用繁體中文回覆，且嚴禁敬稱「您」，一律用「你」。";
+}
+
 // --- 5. 呼叫 AnythingLLM 原生 API ---
-// 重新調整 Final Message 結構
+    const workspaceSlug = "tbpc_medical_ref_database"; 
+
 const finalCombinedMessage = `
 ${systemInstruction}
 
@@ -261,13 +275,14 @@ ${safeHealthContext}
 [對話紀錄]
 ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n') : "無"}
 
-[使用者輸入]
+[使用者當前問題]
 "${prompt}"
 
-### ⚠️ 強制指令：
-1. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
-2. 偵測使用者輸入的語系。若使用者使用英文 (如: My recent sleep...)，你必須完全以 English 回覆。
-3. 繁體中文回覆時，嚴禁使用「您」，請使用平輩語氣。
+---
+### ⚠️ 最終回覆強制指令：
+1. ${forcedLanguageInstruction}
+2. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
+3. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
 `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
