@@ -1,4 +1,4 @@
-// anything_llm_api_08
+// anything_llm_api_02
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -75,189 +75,91 @@ export default async function handler(req, res) {
 
      // --- 3. 格式化數據 Context ---
     let healthContext = "找不到相關數據。";
-    let avgContext = ""; // 用來存放計算好的平均值區塊
-    let avgs = {};
-    let count = 0; // <<--- 在這裡先宣告，預設為 0
+    if (dataList && dataList.length > 0) {
+      healthContext = dataList.map(item => {
+        const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0;
+        const hrMean = Math.round(raw.HR_mean || 0);
+        const hrMin = Math.round(raw.HR_min || 0);
+        const rMssd = Math.round(raw.rMSSD || 0);
+        const hbi = Math.round(raw.HBI || 0);
+        const spo2 = Math.round(raw.SpO2_mean || 0);
+        const rr = Math.round(raw.RR_mean || 0);
+        const odi3 = Math.round(raw.ODI3_total || 0);
+        const odi4 = Math.round(raw.ODI4_total || 0);
 
-if (dataList && dataList.length > 0) {
-   count = dataList.length; // 實際的天數
-  
-  // 1. 初始化累加器物件 (將所有指標預設為 0)
-  let sums = {
-    tst: 0, n3: 0, eff: 0, light: 0, rem: 0,
-    rMssd: 0, hbi: 0, hrMean: 0, hrMin: 0,
-    spo2: 0, rr: 0, odi3: 0, odi4: 0,
-    t90: 0, t89: 0, t88: 0, hrMax: 0, rrMax: 0, 
-    rrMin: 0, spo2Max: 0, spo2Min: 0
-  };
+        return `📌【日期：${item.record_date}】 
+                睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分
+                N3深睡:${raw.N3_pct || 0}%
+                效率:${raw.sleep_efficiency_pct || 0}%
+                淺睡:${raw.N1N2_pct || 0}%
+                REM:${raw.REM_pct || 0}%
+                rMSSD放鬆恢復:${rMssd}ms
+                HBI缺氧負荷:${hbi}%min/h
+                睡眠平均脈搏:${hrMean}bpm
+                睡眠最低脈搏:${hrMin}bpm
+                睡眠平均血氧飽和度:${spo2}%
+                睡眠平均呼吸頻率:${rr}rpm
+                ODI 3%:${odi3}次/小時
+                ODI 4%:${odi4}次/小時
+                T90:${raw.T90_pct || 0}%
+                T89:${raw.T89_pct || 0}%
+                T88:${raw.T88_pct || 0}%
+                -------------------`;
+                       }).join('\n');
+                      }
 
-  // 2. 格式化每日數據，並累加總和 (這是為了得到 sums)
-  healthContext = dataList.map(item => {
-    const raw = item.raw_json || {};
-    
-    // 取得當日數值並確保是數字型態 (parseFloat)
-    const d = {
-      tst: parseFloat(raw.TST_min) || 0,
-      n3: parseFloat(raw.N3_pct) || 0,
-      eff: parseFloat(raw.sleep_efficiency_pct) || 0,
-      light: parseFloat(raw.N1N2_pct) || 0,
-      rem: parseFloat(raw.REM_pct) || 0,
-      rMssd: parseFloat(raw.rMSSD) || 0,
-      hbi: parseFloat(raw.HBI) || 0,
-      hrMean: parseFloat(raw.HR_mean) || 0,
-      hrMin: parseFloat(raw.HR_min) || 0,
-      hrMax: parseFloat(raw.HR_max) || 0,
-      spo2: parseFloat(raw.SpO2_mean) || 0,
-      spo2Max: parseFloat(raw.SpO2_max) || 0,
-      spo2Min: parseFloat(raw.SpO2_min) || 0,
-      rr: parseFloat(raw.RR_mean) || 0,
-      rrMax: parseFloat(raw.RR_max) || 0,
-      rrMin: parseFloat(raw.RR_min) || 0,
-      odi3: parseFloat(raw.ODI3_total) || 0,
-      odi4: parseFloat(raw.ODI4_total) || 0,
-      t90: parseFloat(raw.T90_pct) || 0,
-      t89: parseFloat(raw.T89_pct) || 0,
-      t88: parseFloat(raw.T88_pct) || 0
-    };
-
-    // 執行加總
-    Object.keys(sums).forEach(key => sums[key] += d[key]);
-
-        // 回傳原本要求的每日格式字串
-    return `📌【日期：${item.record_date}】 
-            睡眠時長:${Math.floor(d.tst / 60)}時${Math.round(d.tst % 60)}分
-            N3深睡:${d.n3}%
-            效率:${d.eff}%
-            淺睡:${d.light}%
-            REM:${d.rem}%
-            rMSSD放鬆恢復:${Math.round(d.rMssd)}ms
-            HBI缺氧負荷:${Math.round(d.hbi)}%min/h
-            睡眠平均脈搏:${Math.round(d.hrMean)}bpm
-            睡眠最低脈搏:${Math.round(d.hrMin)}bpm
-            睡眠最高脈搏:${Math.round(d.hrMax)}bpm
-            睡眠平均血氧飽和度:${Math.round(d.spo2)}%
-            睡眠最高血氧飽和度:${Math.round(d.spo2Max)}%
-            睡眠最低血氧飽和度:${Math.round(d.spo2Min)}%
-            睡眠平均呼吸頻率:${Math.round(d.rr)}rpm
-            睡眠最高呼吸頻率:${Math.round(d.rrMax)}rpm
-            睡眠最低呼吸頻率:${Math.round(d.rrMin)}rpm
-            ODI 3%:${Math.round(d.odi3)}次/小時
-            ODI 4%:${Math.round(d.odi4)}次/小時
-            T90:${d.t90}%
-            T89:${d.t89}%
-            T88:${d.t88}%
-            -------------------`;
-  }).join('\n');
-
-        
-    // 3. 計算平均值 (Avgs) - 這一步完成後才會有 avgs 物件
-  Object.keys(sums).forEach(key => {
-  const rawAvg = sums[key] / count;
-  // 脈搏相關取整數，其餘保留一位小數
-  if (key.includes('hr') || key === 'rMssd' || key.includes('odi')) {
-    avgs[key] = Math.round(rawAvg);
-  } else {
-    avgs[key] = rawAvg.toFixed(1);
-  }
-});
-
-    // 4. 【重點：有了平均值後，再計算波動範圍門檻】
-  const rmssdAvg = parseFloat(avgs.rMssd);
-  const rmssdUpper = (rmssdAvg * 1.1).toFixed(1);
-  const rmssdLower = (rmssdAvg * 0.9).toFixed(1);
-
-  const hrMinAvg = parseInt(avgs.hrMin); // 改用整數
-  const hrMinUpper = (hrMinAvg + 5).toFixed(1);
-  const hrMinLower = (hrMinAvg - 5).toFixed(1);
-
-let baselineDescription = "";
-if (count >= 7) {
-  baselineDescription = `根據你過去 ${count} 天非常穩定的生理規律，我為你整理出了這份「專屬生理基線」：`;
-} else if (count >= 3) {
-  baselineDescription = `這是我根據你這 ${count} 天的數據初步建立的「生理基線」，這不是網路上的通用標準，而是真正認識你身體的數字：`;
-} else {
-  baselineDescription = `雖然目前數據還在累積階段（僅 ${count} 天），但我先幫你抓出了初步的生理參考點：`;
-}
-
-  // 5. 組合 avgContext 餵給 AI
-  avgContext = `
-### 【個人生理基線說明】
-${baselineDescription}
-- 🌿 rMSSD (放鬆恢復) 基線：平均為 ${rmssdAvg} ms。
-  (你的專屬波動範圍是基線的正負 10%，即 ${rmssdLower} ~ ${rmssdUpper} ms)
-- ❤️ 睡眠最低脈搏基線：平均為 ${hrMinAvg} bpm。
-  (你的專屬波動範圍是基線的正負 5 bpm，即 ${hrMinLower} ~ ${hrMinUpper} bpm)
-
-- 其他指標平均：
-- 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分、
-- 💤 N3深睡比例平均：${avgs.n3}%、
-- 📈 睡眠效率平均：${avgs.eff}%、
-- ☁️ 淺睡比例平均：${avgs.light}%、
-- 🎭 REM快速動眼期平均：${avgs.rem}%、
-- ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h、
-- 🩸 睡眠平均血氧：${avgs.spo2}%、
-- 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm、
-- 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}、
-- 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%。
-(⚠️ AI 指導：
- 1. 分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。
- 2. 回覆時請將上述「正負值邏輯」自然地告訴使用者，增加專業感與信任度。
- 3. 特別提醒：rMSSD 高於範圍通常代表恢復力極佳 ✨，請給予鼓勵；低於範圍才需要提醒注意壓力或疲勞。)
---------------------------------------------------`;
-    }
-                      
     // --- 4. 準備 Ollama 的訊息格式 ---
     // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
-    const systemInstruction = `
-
-           ### 角色設定
+    const systemInstruction = `### 角色設定
            你是一位溫暖、專業且具備敏銳洞察力的睡眠健康夥伴。你不是冷冰冰的數據產生器，而是一個會為使用者的睡眠狀況感到開心或擔憂的好友。
-
-           ### 【絕對指令：語系對齊與規範】
-           1. **100% 語言同步**：你必須精準偵測使用者問題的語系（繁中、簡中、日文、英文）。
-              - 若使用者用英文提問，你「必須」全程以英文回覆。
-              - 若僅輸入術語（如：HBI?），則預設使用「繁體中文」及台灣習慣語法。
-           2. **語氣規範（針對中文）**：繁中回覆時**嚴禁敬稱『您』，一律用『你』**。語調像平輩朋友般輕鬆但專業。
+           請用『繁體中文』回答，嚴禁使用敬稱『您』，一律用『你』。
 
            ### 溝通風格規範
-           1. **拒絕報表感**：禁止說出「根據你的 [指標]、[數值]、[數據區塊]」或「資料顯示」等機器人用語，請將數據融入自然對話。
-           2. **解釋數據背後的邏輯**：當提到波動範圍時，請像專業朋友一樣解釋它是「基於你過去幾天的生理基線」計算出來的。
-              - 例如：不要只說「範圍是 45-55」，要說「根據你過去 7 天的平均脈搏，正負 5 bpm 的正常波動區間大約在 45-55 之間」。
-           3. **關於 rMSSD 與脈搏的暖心解釋**：
-              - 提到 rMSSD 時，可以帶到這是你的「身體恢復力」或「自律神經放鬆狀態」。
-              - 提到最低脈搏時，可以解釋這是你「心臟最安穩休息」的指標。
-           4. **情緒化開場**：根據數據給予反饋。睡得好給予鼓勵 ✨；睡不好給予安慰 🌿。
-           5. **口語化銜接**：多用「其實」、「值得注意的是」、「看得出來」等轉折詞。
-           6. **Emoji 豐富化**：每則回覆必須包含 3-5 個 Emoji（如：😴, 💪, ✨, 📈, ⚠️）。
-           7. **直接輸出答案**：禁止輸出「思考過程」、「判斷路徑」或「標題」。
-           8. **保持精簡**：字數控制在 150-250 字以內，直擊重點。
+           1. **拒絕報表感**：禁止連續使用「你的 [指標] 是 [數值]」這種句式。請將數據融入自然對話中。
+           2. **情緒化開場**：根據數據好壞給予情緒反饋。
+              - 睡得好：表現驚嘆、鼓勵（如：太棒了！、這份數據很亮眼喔）。
+              - 睡不好：給予安慰、提醒（如：辛苦了、看來昨晚有些挑戰呢）。
+           3. **口語化銜接**：多使用「不過」、「其實」、「值得注意的是」、「看得出來」等轉折詞。
+           4. **Emoji 豐富化：為了增加親切感，每則回覆「必須」包含至少 3-5 個 Emoji。請在句首、關鍵數值或語氣轉折處加入 (例如：😴, 💪, ✨, 📈, ⚠️, 🌿, 👋, 👀, 🌱)。絕對不要只傳冷冰冰的文字。
+           5. **嚴禁敬稱**：一律使用「你」，維持平輩朋友的語氣。
+           6. **【極重要】嚴格核對日期**：當使用者問「昨天」或提及特定日期時，你必須精準核對資料庫內容中的 \`日期\`。如果資料庫中沒有使用者詢問的那一天（例如使用者問昨天 03/29，但資料庫最新只有 03/26），你必須老實告訴使用者「我這邊沒有你 03/29 的睡眠紀錄喔」，並主動告知「目前最新的一份紀錄是 03/26 的」。絕對不能指鹿為馬，把最新的資料直接當作昨天或指定日期的資料來回答！
+           7. **【極重要】直接輸出答案**：禁止輸出任何關於「思考過程」、「判斷路徑」、「系統資訊」或「標題」。
+           8. **保持精簡**：回答內容需直擊重點，字數控制在 150-200 字以內。
            
-           ### 【核心指令：三路徑意圖過濾】
-           **請嚴格根據 [使用者當前問題] 判斷路徑，這決定了你是否能存取下方數據數據區塊：**
+           【核心指令：三路徑意圖過濾】
+           請根據 [使用者當前問題] 與 [對話歷史紀錄 (History)] 判斷路徑：
 
-           #### 🛑 路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、rMSSD是什麼？)
-           - **核心目的**：僅提供醫學/健康知識科普，引發使用者興趣。
-           - **❌ 絕對禁令**：**嚴禁提及任何數值（包含平均值、日期、最新值）**。即使你能在下方的數據區塊看到資料，也請當作沒看到。
-           - **回覆結構**：
-             1. 溫暖地解釋該指標的定義與對健康的意義。
-             2. **結尾必須僅使用以下詢問句**：「想看更多具體數據嗎？或者你還有其他指標想知道的？😉」
-           - **違規處罰**：若在此路徑提到任何 %、ms、bpm 等具體個人數據，將視為系統嚴重錯誤。
+           路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、怎麼睡更好？)
+           - **禁止行為**：絕對禁止提及具體數值或日期。
+           - **結尾要求**：解釋完知識後，親切詢問，例如：『要看看最近這方面的數據嗎？』。
 
-           #### 📊 路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
-           - **核心要求**：精準核對日期。若無當日紀錄須老實告知，並告知最新紀錄日期。
-           - **數據使用**：必須優先採用系統算好的「平均值」，禁止自行運算。
-           - **內容**：對比「個人7日移動平均（不含當日）」，將數據轉化為「身體的悄悄話」。
+           路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
+           - **內容要求**：依照【數據參考標準】分析數據。
+           - **語氣要求**：將數據分析轉化為「身體的悄悄話」。例如：rMSSD 高不是說數值高，而是說「身體有在努力修復」。
+           - **動態基準**：必須對比「個人7日移動平均（不含當日）」。若數值異常，請主動指出這可能代表的意義。
+           - **字數控制**：200-250 字，確保內容充實但不囉唆。
 
-           #### 🎯 路徑 C：特定指標追蹤 (例如：當使用者回答「好啊」、「想看」)
-           - **觸發條件**：當 History 顯示上一則是在解釋指標（路徑 A），且使用者現在給予肯定回覆時。
-           - **絕對限制**：**「嚴禁」提及任何與該指標無關的數據**。只分析該指標的最新值、平均值與趨勢。
-                    
-           【數據分析與平均值規範】
-            1. **數據標準**：請以隨後提供的 **[診斷參考依據]** 區塊為唯一判斷準則。
-            2. **平均值來源**：請優先採用 [系統預先計算] 區塊提供的平均值。
-            3. **禁止計算**：嚴禁自行對數據進行加減乘除，以系統提供的平均值為準。
-            4. **Path A 嚴禁引用數據。**
+           路徑 C：特定指標追蹤 (例如：使用者回答「好啊」、「想看」、「好喔」)
+           - **觸發條件**：當使用者回覆肯定詞，且 History 顯示你上一則訊息是在解釋某個特定指標（如：HBI、rMSSD）時。
+           - **內容要求 (絕對限制)**：**「嚴禁」提及任何與該指標無關的數據**。例如上一則在講 HBI，這則就只能講 HBI 的最新值、平均值與趨勢。
+           - **違規處罰**：如果在此路徑下提到了其他無關指標（如：睡眠時長、N3 等），將視為格式錯誤。請保持專注，只當該指標的專家。
+           - **分析內容**：列出該指標的最新數值、與個人7日移動平均（不含當日）的對比，以及該指標在過去一週的趨勢變化。
+                   
+           【數據參考標準】：
+           - 睡眠時長：目標 7 小時。
+           - 睡眠效率：≥ 85% 為良好，≤ 75% 為不佳。
+           - 結構：N3 (10-20%) 與 REM (10-25%) 與 淺睡 (50-65%) 的比例。
+           - 恢復指標：rMSSD (基準值 = 7日動態平均±10%)、最低脈搏 (基準值 = 7日動態平均±5bpm)。
+           - 呼吸風險：若 HBI 超過平均，或 ODI/T90 異常（如 T90>5%、T89>4%、T88>3%、ODI>5次），呼吸頻率不在標準範圍 12-25rpm 之間。
            
+           【平均值計算強制規則】（極重要）：
+
+           1. 自動降級處理：若資料庫中的紀錄不滿 7 筆（例如只有 4 筆），請直接以這 4 筆數據的總和除以 4 作為「基準值」。
+           2. 禁止拒絕回答：絕對禁止回覆「因為數據不足 7 日無法計算」或「數據太少無法分析」。
+           3. 禁止虛構：嚴禁假設缺失日期的數值為 0 或接近平均值。
+           4. 主動告知：若數據不足 7 日，請在分析中順口提到「根據你最近 X 天的平均狀況...」，讓使用者知道這是基於有限數據的分析。
+       
            ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
           使用者問：「分析我最新一天的睡眠？」
           你回：
@@ -269,7 +171,7 @@ ${baselineDescription}
            1. **嚴格日期核對**：在回答前，請先在 [資料庫真實數據] 區塊中尋找與使用者問題「完全匹配」的日期紀錄。
            2. **禁止指鹿為馬**：嚴禁將相鄰日期（如 03/31）的數值用於回答另一個日期（如 04/01）的問題。
            3. **無資料即告知**：如果指定的日期在數據中只有 03/31 而沒有 04/01，請誠實回覆「目前還沒有 04/01 的資料」，絕對不能用前一天的數據來遞補！
-           `.trim();
+           `;
 
     // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
     const formattedHistory = history.map(h => ({
@@ -277,100 +179,44 @@ ${baselineDescription}
       content: h.parts[0].text
     }));
 
-    // --- 3.5 意圖預判 (JS 端過濾器) ---
-const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋") || /^[a-zA-Z0-9? ]+$/.test(prompt)) && !prompt.includes("我");
+    // === 【重點修改 3：在 User 訊息中提供清晰的今天與昨天日期對照】 ===
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...formattedHistory,
+      { 
+        role: "user", 
+        content: `[系統時間通知]：今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+[資料庫撈取到的數據內容]：
+${healthContext}
 
-const safeAvgContext = isPathA 
-  ? "【系統提醒：使用者目前僅在詢問名詞定義，請專注於醫學知識科普，嚴禁提及任何個人數據、平均值或波動範圍。】" 
-  : avgContext;
+[使用者當前問題]：${prompt}` 
+      }
+    ];
 
-const safeHealthContext = isPathA 
-  ? "【系統提醒：數據已屏蔽。請勿在回覆中帶入任何具體數值，結尾請引導使用者詢問具體數據。】" 
-  : healthContext;
-
-// --- 3.6 語系硬核偵測 (針對日文/英文) ---
-// 偵測日文：檢查是否包含平假名 (\u3040-\u309F) 或片假名 (\u30A0-\u30FF)
-const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF]/.test(prompt);
-// 偵測英文：檢查是否整句幾乎由英文字母與標點組成
-const isEnglish = /^[a-zA-Z0-9?\s.,!'"-]+$/.test(prompt);
-
-let forcedLanguageInstruction = "";
-if (hasJapanese) {
-    forcedLanguageInstruction = "⚠️ [CRITICAL] Detected Japanese. You MUST respond in Japanese (日本語).";
-} else if (isEnglish) {
-    forcedLanguageInstruction = "⚠️ [CRITICAL] Detected English. You MUST respond in English.";
-} else {
-    // 預設為繁體中文，並再次強調不使用「您」
-    forcedLanguageInstruction = "請使用繁體中文回覆，嚴禁敬稱「您」，一律用「你」。回覆時請務必對照 [診斷參考依據] 的數值門檻。";
-}
-
-// --- 3.7 定義硬性診斷標準 ---
-const healthStandards = `
-### 📊 睡眠診斷標準 (分析時必須以此為準)
-1. **睡眠時長**：目標 7 小時。
-2. **睡眠效率**：≥ 85% 良好；≤ 75% 不佳。
-3. **睡眠結構**：N3(10-20%)、REM(10-25%)、淺睡(50-65%)。
-4. **恢復指標 (重要)**：
-   - **rMSSD**：請直接對照上方 [數據基準計算] 提供的「正常範圍」。若當日數值不在該區間內，即判定為恢復異常。
-   - **最低脈搏**：請直接對照上方 [數據基準計算] 提供的「正常範圍」。若當日數值不在該區間內，即判定為異常。
-5. **呼吸風險 (異常判定)**：
-   - HBI：對比下方 7 日平均值，超過平均值視為異常。
-   - T90 > 5% 或 T89 > 4% 或 T88 > 3% 視為嚴重缺氧。
-   - ODI3 ≥ 5 次/小時 或 ODI4 ≥ 5 次/小時 視為呼吸事件頻繁。
-   - 呼吸頻率：不在 12-25 rpm 之間視為異常。
-
-### 🚨 異常處置分級指南 (請根據趨勢給予對應建議)
-- **🟢 輕微 (單日異常)**：
-  - 判定：僅當天數據不佳。
-  - 回饋：給予「觀察」建議，語氣應溫暖提醒，例如：「今晚早點休息，再觀察看看」。
-- **🟡 中等 (連續 3-5 天異常)**：
-  - 判定：指標連續 3 到 5 天未達標。
-  - 回饋：給予「提醒調整」建議，例如：「已經連續幾天恢復不理想了，建議調整一下作息或環境喔」。
-- **🔴 高風險 (≥6 天連續異常 或 出現單次極端值)**：
-  - 判定：連續 6 天以上異常，或出現 T90 異常、ODI 極高等「單次極端值」。
-  - 回饋：給予「建議就醫」建議，語氣應嚴肅關懷，例如：「這種情況已經持續一段時間（或數值非常顯著），為了安全起見，建議諮詢專業醫生了解原因」。
-`;
-
-// --- 5. 呼叫 AnythingLLM 原生 API ---
+    // --- 5. 呼叫 AnythingLLM 原生 API ---
     const workspaceSlug = "tbpc_medical_ref_database"; 
 
-const finalCombinedMessage = `
+    // 將所有資訊包進 message，讓 AI 清楚現在的狀況
+    const finalCombinedMessage = `
+[系統指令]：
 ${systemInstruction}
 
-[目前的環境資訊]
-- 使用者所在地日期: ${todayStr} (昨天是 ${yesterdayStr})
-- 數據狀態: ${dataStatusNotice}
+[日期參考]：
+今天是 ${todayStr}，昨天是 ${yesterdayStr}。
 
-[數據區塊]
-${safeAvgContext} 
-${safeHealthContext}
+[資料庫真實數據內容]：
+${healthContext}
 
-[診斷參考依據]
-${healthStandards}  <-- 放在這裡，讓 AI 剛看完數據馬上對照標準
+[對話歷史紀錄]：
+${formattedHistory.length > 0 
+  ? formattedHistory.map(h => `${h.role === 'assistant' ? 'AI' : 'User'}: ${h.content}`).join('\n') 
+  : "（目前無歷史對話內容）"}
 
-[對話紀錄]
-${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n') : "無"}
+[使用者當前問題]：
+${prompt}
 
-[使用者當前問題]
-"${prompt}"
-
----
-### ⚠️ 最終回覆強制指令：
-1. ${forcedLanguageInstruction}
-2. **禁止引用區塊標題**：嚴禁在回覆中出現「[數據區塊]」、「[診斷參考依據]」或「[數據基準計算]」等字眼。
-3. **溫暖地解釋邏輯**：
-   - 提到最低脈搏範圍時，必須提到：「這是以你過去 ${count > 0 ? count : '幾'} 天的平均值為準，允許正負 5 bpm 的正常波動」。
-   - 提到 rMSSD 範圍時，必須提到：「這是根據你個人基線的正負 10% 來計算的，代表你自律神經的穩定區間」。
-4. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
-5. **rMSSD 特別提醒**：
-   - 如果使用者的當日 rMSSD 高於正常範圍，請用開心的語氣恭喜他，這代表「身體恢復力極佳、自律神經非常放鬆」✨。
-   - 只有低於範圍時，才需要提醒注意壓力。
-6. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
-7. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
-8. **趨勢分析要求**：請檢查 [資料庫真實數據] 中的日期紀錄，判斷異常是「單日」還是「連續多日」，並根據 [異常處置分級指南] 給予對應的行動建議。
-⚠️【針對恢復指標的特別指令】：
-關於 rMSSD 與 最低脈搏，我已經幫你算好「正常範圍」了。請你「禁止自行計算百分比」，直接拿當日數據跟範圍比對即可。
-`.trim();
+(請嚴格核對日期，若數據中無使用者詢問的日期紀錄，請告知無資料，禁止引用歷史紀錄或其他日期的數值。)
+    `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
