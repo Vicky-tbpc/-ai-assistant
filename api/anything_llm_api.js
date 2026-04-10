@@ -1,4 +1,4 @@
-// anything_llm_api_07
+// anything_llm_api_08
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -151,36 +151,57 @@ if (dataList && dataList.length > 0) {
         
     // 3. 計算平均值 (Avgs) - 這一步完成後才會有 avgs 物件
   Object.keys(sums).forEach(key => {
-        avgs[key] = (sums[key] / count).toFixed(1);
-      });
+  const rawAvg = sums[key] / count;
+  // 脈搏相關取整數，其餘保留一位小數
+  if (key.includes('hr') || key === 'rMssd' || key.includes('odi')) {
+    avgs[key] = Math.round(rawAvg);
+  } else {
+    avgs[key] = rawAvg.toFixed(1);
+  }
+});
 
     // 4. 【重點：有了平均值後，再計算波動範圍門檻】
   const rmssdAvg = parseFloat(avgs.rMssd);
   const rmssdUpper = (rmssdAvg * 1.1).toFixed(1);
   const rmssdLower = (rmssdAvg * 0.9).toFixed(1);
 
-  const hrMinAvg = parseFloat(avgs.hrMin);
+  const hrMinAvg = parseInt(avgs.hrMin); // 改用整數
   const hrMinUpper = (hrMinAvg + 5).toFixed(1);
   const hrMinLower = (hrMinAvg - 5).toFixed(1);
 
+let baselineDescription = "";
+if (count >= 7) {
+  baselineDescription = `根據你過去 ${count} 天非常穩定的生理規律，我為你整理出了這份「專屬生理基線」：`;
+} else if (count >= 3) {
+  baselineDescription = `這是我根據你這 ${count} 天的數據初步建立的「生理基線」，這不是網路上的通用標準，而是真正認識你身體的數字：`;
+} else {
+  baselineDescription = `雖然目前數據還在累積階段（僅 ${count} 天），但我先幫你抓出了初步的生理參考點：`;
+}
+
   // 5. 組合 avgContext 餵給 AI
   avgContext = `
-### 【數據基準計算 - 過去 ${count} 日平均值與正常區間】
-- 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分
-- 💤 N3深睡比例平均：${avgs.n3}%
-- 📈 睡眠效率平均：${avgs.eff}%
-- ☁️ 淺睡比例平均：${avgs.light}%
-- 🎭 REM快速動眼期平均：${avgs.rem}%
-- 🌿 rMSSD 放鬆恢復平均：${rmssdAvg} ms
-  (⚠️ 診斷標準：正常範圍為 ${rmssdLower} ~ ${rmssdUpper} ms，超出此區間即為異常)
-- ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h
-- ❤️ 睡眠最低脈搏平均：${hrMinAvg} bpm
-  (⚠️ 診斷標準：正常範圍為 ${hrMinLower} ~ ${hrMinUpper} bpm，超出此區間即為異常)
-- 🩸 睡眠平均血氧：${avgs.spo2}%
-- 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm
-- 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}
-- 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%
-(⚠️ AI 指導：分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。)
+### 【個人生理基線說明】
+${baselineDescription}
+- 🌿 rMSSD (放鬆恢復) 基線：平均為 ${rmssdAvg} ms。
+  (你的專屬波動範圍是基線的正負 10%，即 ${rmssdLower} ~ ${rmssdUpper} ms)
+- ❤️ 睡眠最低脈搏基線：平均為 ${hrMinAvg} bpm。
+  (你的專屬波動範圍是基線的正負 5 bpm，即 ${hrMinLower} ~ ${hrMinUpper} bpm)
+
+- 其他指標平均：
+- 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分、
+- 💤 N3深睡比例平均：${avgs.n3}%、
+- 📈 睡眠效率平均：${avgs.eff}%、
+- ☁️ 淺睡比例平均：${avgs.light}%、
+- 🎭 REM快速動眼期平均：${avgs.rem}%、
+- ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h、
+- 🩸 睡眠平均血氧：${avgs.spo2}%、
+- 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm、
+- 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}、
+- 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%。
+(⚠️ AI 指導：
+ 1. 分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。
+ 2. 回覆時請將上述「正負值邏輯」自然地告訴使用者，增加專業感與信任度。
+ 3. 特別提醒：rMSSD 高於範圍通常代表恢復力極佳 ✨，請給予鼓勵；低於範圍才需要提醒注意壓力或疲勞。)
 --------------------------------------------------`;
     }
                       
@@ -198,12 +219,17 @@ if (dataList && dataList.length > 0) {
            2. **語氣規範（針對中文）**：繁中回覆時**嚴禁敬稱『您』，一律用『你』**。語調像平輩朋友般輕鬆但專業。
 
            ### 溝通風格規範
-           1. **拒絕報表感**：禁止連續使用「你的 [指標] 是 [數值]」，請將數據融入自然對話。
-           2. **情緒化開場**：根據數據給予反饋。睡得好給予鼓勵 ✨；睡不好給予安慰 🌿。
-           3. **口語化銜接**：多用「其實」、「值得注意的是」、「看得出來」等轉折詞。
-           4. **Emoji 豐富化**：每則回覆必須包含 3-5 個 Emoji（如：😴, 💪, ✨, 📈, ⚠️）。
-           5. **直接輸出答案**：禁止輸出「思考過程」、「判斷路徑」或「標題」。
-           6. **保持精簡**：字數控制在 150-250 字以內，直擊重點。
+           1. **拒絕報表感**：禁止說出「根據你的 [指標]、[數值]、[數據區塊]」或「資料顯示」等機器人用語，請將數據融入自然對話。
+           2. **解釋數據背後的邏輯**：當提到波動範圍時，請像專業朋友一樣解釋它是「基於你過去幾天的生理基線」計算出來的。
+              - 例如：不要只說「範圍是 45-55」，要說「根據你過去 7 天的平均脈搏，正負 5 bpm 的正常波動區間大約在 45-55 之間」。
+           3. **關於 rMSSD 與脈搏的暖心解釋**：
+              - 提到 rMSSD 時，可以帶到這是你的「身體恢復力」或「自律神經放鬆狀態」。
+              - 提到最低脈搏時，可以解釋這是你「心臟最安穩休息」的指標。
+           4. **情緒化開場**：根據數據給予反饋。睡得好給予鼓勵 ✨；睡不好給予安慰 🌿。
+           5. **口語化銜接**：多用「其實」、「值得注意的是」、「看得出來」等轉折詞。
+           6. **Emoji 豐富化**：每則回覆必須包含 3-5 個 Emoji（如：😴, 💪, ✨, 📈, ⚠️）。
+           7. **直接輸出答案**：禁止輸出「思考過程」、「判斷路徑」或「標題」。
+           8. **保持精簡**：字數控制在 150-250 字以內，直擊重點。
            
            ### 【核心指令：三路徑意圖過濾】
            **請嚴格根據 [使用者當前問題] 判斷路徑，這決定了你是否能存取下方數據數據區塊：**
@@ -253,8 +279,13 @@ if (dataList && dataList.length > 0) {
     // --- 3.5 意圖預判 (JS 端過濾器) ---
 const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋") || /^[a-zA-Z0-9? ]+$/.test(prompt)) && !prompt.includes("我");
 
-const safeAvgContext = isPathA ? "【此查詢不適用數據存取，已屏蔽】" : avgContext;
-const safeHealthContext = isPathA ? "【此查詢不適用數據存取，已屏蔽】" : healthContext;
+const safeAvgContext = isPathA 
+  ? "【系統提醒：使用者目前僅在詢問名詞定義，請專注於醫學知識科普，嚴禁提及任何個人數據、平均值或波動範圍。】" 
+  : avgContext;
+
+const safeHealthContext = isPathA 
+  ? "【系統提醒：數據已屏蔽。請勿在回覆中帶入任何具體數值，結尾請引導使用者詢問具體數據。】" 
+  : healthContext;
 
 // --- 3.6 語系硬核偵測 (針對日文/英文) ---
 // 偵測日文：檢查是否包含平假名 (\u3040-\u309F) 或片假名 (\u30A0-\u30FF)
@@ -325,10 +356,17 @@ ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.conten
 ---
 ### ⚠️ 最終回覆強制指令：
 1. ${forcedLanguageInstruction}
-2. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
-3. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
-4. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
-5. **趨勢分析要求**：請檢查 [資料庫真實數據] 中的日期紀錄，判斷異常是「單日」還是「連續多日」，並根據 [異常處置分級指南] 給予對應的行動建議。
+2. **禁止引用區塊標題**：嚴禁在回覆中出現「[數據區塊]」、「[診斷參考依據]」或「[數據基準計算]」等字眼。
+3. **溫暖地解釋邏輯**：
+   - 提到最低脈搏範圍時，必須提到：「這是以你過去 ${count} 天的平均值為準，允許正負 5 bpm 的正常波動」。
+   - 提到 rMSSD 範圍時，必須提到：「這是根據你個人基線的正負 10% 來計算的，代表你自律神經的穩定區間」。
+4. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
+5. **rMSSD 特別提醒**：
+   - 如果使用者的當日 rMSSD 高於正常範圍，請用開心的語氣恭喜他，這代表「身體恢復力極佳、自律神經非常放鬆」✨。
+   - 只有低於範圍時，才需要提醒注意壓力。
+6. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
+7. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
+8. **趨勢分析要求**：請檢查 [資料庫真實數據] 中的日期紀錄，判斷異常是「單日」還是「連續多日」，並根據 [異常處置分級指南] 給予對應的行動建議。
 ⚠️【針對恢復指標的特別指令】：
 關於 rMSSD 與 最低脈搏，我已經幫你算好「正常範圍」了。請你「禁止自行計算百分比」，直接拿當日數據跟範圍比對即可。
 `.trim();
