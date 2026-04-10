@@ -1,4 +1,4 @@
-// anything_llm_api_06
+// anything_llm_api_07
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -80,16 +80,17 @@ export default async function handler(req, res) {
 
 if (dataList && dataList.length > 0) {
   const count = dataList.length; // 實際的天數
-
+  
   // 1. 初始化累加器物件 (將所有指標預設為 0)
   let sums = {
     tst: 0, n3: 0, eff: 0, light: 0, rem: 0,
     rMssd: 0, hbi: 0, hrMean: 0, hrMin: 0,
     spo2: 0, rr: 0, odi3: 0, odi4: 0,
-    t90: 0, t89: 0, t88: 0
+    t90: 0, t89: 0, t88: 0, hrMax: 0, rrMax: 0, 
+    rrMin: 0, spo2Max: 0, spo2Min: 0
   };
 
-  // 2. 格式化每日數據，同時累加數值
+  // 2. 格式化每日數據，並累加總和 (這是為了得到 sums)
   healthContext = dataList.map(item => {
     const raw = item.raw_json || {};
     
@@ -104,8 +105,13 @@ if (dataList && dataList.length > 0) {
       hbi: parseFloat(raw.HBI) || 0,
       hrMean: parseFloat(raw.HR_mean) || 0,
       hrMin: parseFloat(raw.HR_min) || 0,
+      hrMax: parseFloat(raw.HR_max) || 0,
       spo2: parseFloat(raw.SpO2_mean) || 0,
+      spo2Max: parseFloat(raw.SpO2_max) || 0,
+      spo2Min: parseFloat(raw.SpO2_min) || 0,
       rr: parseFloat(raw.RR_mean) || 0,
+      rrMax: parseFloat(raw.RR_max) || 0,
+      rrMin: parseFloat(raw.RR_min) || 0,
       odi3: parseFloat(raw.ODI3_total) || 0,
       odi4: parseFloat(raw.ODI4_total) || 0,
       t90: parseFloat(raw.T90_pct) || 0,
@@ -127,8 +133,13 @@ if (dataList && dataList.length > 0) {
             HBI缺氧負荷:${Math.round(d.hbi)}%min/h
             睡眠平均脈搏:${Math.round(d.hrMean)}bpm
             睡眠最低脈搏:${Math.round(d.hrMin)}bpm
+            睡眠最高脈搏:${Math.round(d.hrMax)}bpm
             睡眠平均血氧飽和度:${Math.round(d.spo2)}%
+            睡眠最高血氧飽和度:${Math.round(d.spo2Max)}%
+            睡眠最低血氧飽和度:${Math.round(d.spo2Min)}%
             睡眠平均呼吸頻率:${Math.round(d.rr)}rpm
+            睡眠最高呼吸頻率:${Math.round(d.rrMax)}rpm
+            睡眠最低呼吸頻率:${Math.round(d.rrMin)}rpm
             ODI 3%:${Math.round(d.odi3)}次/小時
             ODI 4%:${Math.round(d.odi4)}次/小時
             T90:${d.t90}%
@@ -138,22 +149,33 @@ if (dataList && dataList.length > 0) {
   }).join('\n');
 
         
-    // 3. 計算平均值 (保留一位小數)
+    // 3. 計算平均值 (Avgs) - 這一步完成後才會有 avgs 物件
   Object.keys(sums).forEach(key => {
         avgs[key] = (sums[key] / count).toFixed(1);
       });
 
-  // 4. 生成平均值 Context (給 AI 參考)
+    // 4. 【重點：有了平均值後，再計算波動範圍門檻】
+  const rmssdAvg = parseFloat(avgs.rMssd);
+  const rmssdUpper = (rmssdAvg * 1.1).toFixed(1);
+  const rmssdLower = (rmssdAvg * 0.9).toFixed(1);
+
+  const hrMinAvg = parseFloat(avgs.hrMin);
+  const hrMinUpper = (hrMinAvg + 5).toFixed(1);
+  const hrMinLower = (hrMinAvg - 5).toFixed(1);
+
+  // 5. 組合 avgContext 餵給 AI
   avgContext = `
-### 【數據基準計算 - 過去 ${count} 日平均值】
+### 【數據基準計算 - 過去 ${count} 日平均值與正常區間】
 - 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分
 - 💤 N3深睡比例平均：${avgs.n3}%
 - 📈 睡眠效率平均：${avgs.eff}%
 - ☁️ 淺睡比例平均：${avgs.light}%
 - 🎭 REM快速動眼期平均：${avgs.rem}%
-- 🌿 rMSSD放鬆恢復平均：${avgs.rMssd}ms
+- 🌿 rMSSD 放鬆恢復平均：${rmssdAvg} ms
+  (⚠️ 診斷標準：正常範圍為 ${rmssdLower} ~ ${rmssdUpper} ms，超出此區間即為異常)
 - ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h
-- ❤️ 脈搏平均：${avgs.hrMean}bpm / 最低平均：${avgs.hrMin}bpm
+- ❤️ 睡眠最低脈搏平均：${hrMinAvg} bpm
+  (⚠️ 診斷標準：正常範圍為 ${hrMinLower} ~ ${hrMinUpper} bpm，超出此區間即為異常)
 - 🩸 睡眠平均血氧：${avgs.spo2}%
 - 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm
 - 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}
@@ -256,14 +278,25 @@ const healthStandards = `
 1. **睡眠時長**：目標 7 小時。
 2. **睡眠效率**：≥ 85% 良好；≤ 75% 不佳。
 3. **睡眠結構**：N3(10-20%)、REM(10-25%)、淺睡(50-65%)。
-4. **恢復指標**：
-   - rMSSD：對比下方 7 日平均值，波動超過 ±10% 視為異常。
-   - 最低脈搏：對比下方 7 日最低平均值，波動超過 ±5bpm 視為異常。
+4. **恢復指標 (重要)**：
+   - **rMSSD**：請直接對照上方 [數據基準計算] 提供的「正常範圍」。若當日數值不在該區間內，即判定為恢復異常。
+   - **最低脈搏**：請直接對照上方 [數據基準計算] 提供的「正常範圍」。若當日數值不在該區間內，即判定為異常。
 5. **呼吸風險 (異常判定)**：
    - HBI：對比下方 7 日平均值，超過平均值視為異常。
    - T90 > 5% 或 T89 > 4% 或 T88 > 3% 視為嚴重缺氧。
    - ODI3 ≥ 5 次/小時 或 ODI4 ≥ 5 次/小時 視為呼吸事件頻繁。
-   - 呼吸頻率：正常範圍應在 12-25 rpm。
+   - 呼吸頻率：不在 12-25 rpm 之間視為異常。
+
+### 🚨 異常處置分級指南 (請根據趨勢給予對應建議)
+- **🟢 輕微 (單日異常)**：
+  - 判定：僅當天數據不佳。
+  - 回饋：給予「觀察」建議，語氣應溫暖提醒，例如：「今晚早點休息，再觀察看看」。
+- **🟡 中等 (連續 3-5 天異常)**：
+  - 判定：指標連續 3 到 5 天未達標。
+  - 回饋：給予「提醒調整」建議，例如：「已經連續幾天恢復不理想了，建議調整一下作息或環境喔」。
+- **🔴 高風險 (≥6 天連續異常 或 出現單次極端值)**：
+  - 判定：連續 6 天以上異常，或出現 T90 異常、ODI 極高等「單次極端值」。
+  - 回饋：給予「建議就醫」建議，語氣應嚴肅關懷，例如：「這種情況已經持續一段時間（或數值非常顯著），為了安全起見，建議諮詢專業醫生了解原因」。
 `;
 
 // --- 5. 呼叫 AnythingLLM 原生 API ---
@@ -295,6 +328,9 @@ ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.conten
 2. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
 3. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
 4. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
+5. **趨勢分析要求**：請檢查 [資料庫真實數據] 中的日期紀錄，判斷異常是「單日」還是「連續多日」，並根據 [異常處置分級指南] 給予對應的行動建議。
+⚠️【針對恢復指標的特別指令】：
+關於 rMSSD 與 最低脈搏，我已經幫你算好「正常範圍」了。請你「禁止自行計算百分比」，直接拿當日數據跟範圍比對即可。
 `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
