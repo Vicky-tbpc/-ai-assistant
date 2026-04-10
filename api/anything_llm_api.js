@@ -77,9 +77,10 @@ export default async function handler(req, res) {
     let healthContext = "找不到相關數據。";
     let avgContext = ""; // 用來存放計算好的平均值區塊
     let avgs = {};
+    let count = 0; // <<--- 在這裡先宣告，預設為 0
 
 if (dataList && dataList.length > 0) {
-  const count = dataList.length; // 實際的天數
+   count = dataList.length; // 實際的天數
   
   // 1. 初始化累加器物件 (將所有指標預設為 0)
   let sums = {
@@ -358,7 +359,7 @@ ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.conten
 1. ${forcedLanguageInstruction}
 2. **禁止引用區塊標題**：嚴禁在回覆中出現「[數據區塊]」、「[診斷參考依據]」或「[數據基準計算]」等字眼。
 3. **溫暖地解釋邏輯**：
-   - 提到最低脈搏範圍時，必須提到：「這是以你過去 ${count} 天的平均值為準，允許正負 5 bpm 的正常波動」。
+   - 提到最低脈搏範圍時，必須提到：「這是以你過去 ${count > 0 ? count : '幾'} 天的平均值為準，允許正負 5 bpm 的正常波動」。
    - 提到 rMSSD 範圍時，必須提到：「這是根據你個人基線的正負 10% 來計算的，代表你自律神經的穩定區間」。
 4. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
 5. **rMSSD 特別提醒**：
