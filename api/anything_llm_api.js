@@ -1,4 +1,4 @@
-// anything_llm_api_08
+// anything_llm_api_09
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     
     // 計算昨天
     const todayObj = new Date(todayStr);
+    const currentYear = new Date(todayStr).getFullYear();
     const yesterdayObj = new Date(todayObj);
     yesterdayObj.setDate(yesterdayObj.getDate() - 1);
     const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
@@ -48,10 +49,15 @@ export default async function handler(req, res) {
       const thirtyDaysAgo = new Date(new Date(baseDate).setDate(baseDate.getDate() - 30)).toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
     } else {
-      const sevenDaysAgo = new Date(baseDate);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
+      // 修改抓取天數為 10 天，提供更穩定的生理基線
+      const bufferDays = 10; 
+      const startDateObj = new Date(baseDate);
+      startDateObj.setDate(startDateObj.getDate() - bufferDays);
+
+      const startDateStr = startDateObj.toISOString().split('T')[0];
       const endDateStr = baseDate.toISOString().split('T')[0];
+
+      // 構建 Supabase 查詢 URL
       queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
     }
 
@@ -220,7 +226,7 @@ ${baselineDescription}
            2. **語氣規範（針對中文）**：繁中回覆時**嚴禁敬稱『您』，一律用『你』**。語調像平輩朋友般輕鬆但專業。
 
            ### 溝通風格規範
-           1. **拒絕報表感**：禁止說出「根據你的 [指標]、[數值]、[數據區塊]」或「資料顯示」等機器人用語，請將數據融入自然對話。
+           1. **拒絕報表感**：禁止說出「根據你的 [指標]、[數值]、[資料庫真實數據]」」或「資料顯示」等機器人用語，請將數據融入自然對話。
            2. **解釋數據背後的邏輯**：當提到波動範圍時，請像專業朋友一樣解釋它是「基於你過去幾天的生理基線」計算出來的。
               - 例如：不要只說「範圍是 45-55」，要說「根據你過去 7 天的平均脈搏，正負 5 bpm 的正常波動區間大約在 45-55 之間」。
            3. **關於 rMSSD 與脈搏的暖心解釋**：
@@ -233,11 +239,11 @@ ${baselineDescription}
            8. **保持精簡**：字數控制在 150-250 字以內，直擊重點。
            
            ### 【核心指令：三路徑意圖過濾】
-           **請嚴格根據 [使用者當前問題] 判斷路徑，這決定了你是否能存取下方數據數據區塊：**
+           **請嚴格根據 [使用者當前問題] 判斷路徑，這決定了你是否能存取下方[資料庫真實數據]」：**
 
            #### 🛑 路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、rMSSD是什麼？)
            - **核心目的**：僅提供醫學/健康知識科普，引發使用者興趣。
-           - **❌ 絕對禁令**：**嚴禁提及任何數值（包含平均值、日期、最新值）**。即使你能在下方的數據區塊看到資料，也請當作沒看到。
+           - **❌ 絕對禁令**：**嚴禁提及任何數值（包含平均值、日期、最新值）**。即使你能在下方的[資料庫真實數據]」看到資料，也請當作沒看到。
            - **回覆結構**：
              1. 溫暖地解釋該指標的定義與對健康的意義。
              2. **結尾必須僅使用以下詢問句**：「想看更多具體數據嗎？或者你還有其他指標想知道的？😉」
@@ -338,10 +344,14 @@ const finalCombinedMessage = `
 ${systemInstruction}
 
 [目前的環境資訊]
-- 使用者所在地日期: ${todayStr} (昨天是 ${yesterdayStr})
-- 數據狀態: ${dataStatusNotice}
+- 今天是: ${todayStr} (星期 ${new Date(todayStr).getDay()})
+- 昨天是: ${yesterdayStr}
 
-[數據區塊]
+### 【重要限制：資料來源規範】
+1. **僅限使用下方 [資料庫真實數據] 提供內容**：嚴禁引用任何你不認識的日期或 2023 年的資料（那些是過期文件）。
+2. **日期絕對核對**：如果 [資料庫真實數據] 中沒有該日期，就必須回答「沒看到資料」，絕對禁止自行發明 4/03、4/04 等數值。
+
+[資料庫真實數據] (這才是你該分析的內容)
 ${safeAvgContext} 
 ${safeHealthContext}
 
@@ -356,20 +366,25 @@ ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.conten
 
 ---
 ### ⚠️ 最終回覆強制指令：
-1. ${forcedLanguageInstruction}
-2. **禁止引用區塊標題**：嚴禁在回覆中出現「[數據區塊]」、「[診斷參考依據]」或「[數據基準計算]」等字眼。
-3. **溫暖地解釋邏輯**：
-   - 提到最低脈搏範圍時，必須提到：「這是以你過去 ${count > 0 ? count : '幾'} 天的平均值為準，允許正負 5 bpm 的正常波動」。
-   - 提到 rMSSD 範圍時，必須提到：「這是根據你個人基線的正負 10% 來計算的，代表你自律神經的穩定區間」。
-4. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
-5. **rMSSD 特別提醒**：
-   - 如果使用者的當日 rMSSD 高於正常範圍，請用開心的語氣恭喜他，這代表「身體恢復力極佳、自律神經非常放鬆」✨。
-   - 只有低於範圍時，才需要提醒注意壓力。
-6. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
-7. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
-8. **趨勢分析要求**：請檢查 [資料庫真實數據] 中的日期紀錄，判斷異常是「單日」還是「連續多日」，並根據 [異常處置分級指南] 給予對應的行動建議。
-⚠️【針對恢復指標的特別指令】：
-關於 rMSSD 與 最低脈搏，我已經幫你算好「正常範圍」了。請你「禁止自行計算百分比」，直接拿當日數據跟範圍比對即可。
+
+1. **核心原則**：
+   - ${forcedLanguageInstruction}
+   - 保持平輩朋友語氣，必須包含 3-5 個 Emoji。✨
+   - **禁止引用標題**：回覆中絕對不能出現「[資料庫真實數據]」、「[診斷參考依據]」或「[數據基準計算]」等系統字眼。
+
+2. **數據時效性與精準性**：
+   - **動態年份核對**：今年是 ${currentYear} 年。請確保分析的數據年份與目前時間軸相符。
+   - **時空一致性原則**：在分析「最近趨勢」時，請優先採用 [資料庫真實數據] 中最接近 ${todayStr} 的資料。
+   - **辨識舊資料**：若 [資料庫真實數據] 中包含過去年份（如 ${currentYear - 1} 年）的紀錄，請正確識別並告知使用者這是「去年的數據」；若出現顯然不合理的年份（如 2023 年測試數據），則應自動視為干擾資訊並無視。
+   - **誠實告知**：若 [資料庫真實數據] 標註「已屏蔽」或完全無該日期紀錄，請誠實告知，禁止編造。
+
+3. **專業且口語的解釋邏輯**：
+   - **自然化範圍說明**：不要生硬地報數值，請說：「這是根據你過去 ${count > 0 ? count : '幾'} 天的生理基線計算的，允許正負 5 bpm (或 10% rMSSD) 的正常波動」。
+   - **rMSSD 亮點鼓勵**：當 rMSSD 高於正常範圍，請用開心的語氣恭喜他「身體恢復力極佳、自律神經非常放鬆」💪；僅在低於範圍時提醒壓力。
+
+4. **分析判斷規範**：
+   - **禁止運算**：我已幫你算好「正常範圍」，**請直接對照**，嚴禁自行計算百分比或平均值。
+   - **處置建議**：請根據 [資料庫真實數據] 判定是「單日」還是「連續多日」異常，並嚴格遵循 [異常處置分級指南] 給予對應建議。
 `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
