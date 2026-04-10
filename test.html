@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n50</title>
+    <title>Soosyn 健康夥伴 n57</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -198,12 +198,12 @@
     <div id="login-overlay" class="modal-overlay">
         <div class="modal-card">
             <h2 style="color: var(--tbp-blue);">Soosyn Health Companion</h2>
-            <input type="text" id="serial" placeholder="序號">
+            <input type="text" id="serial" placeholder="帳號">
             <input type="password" id="pw" placeholder="密碼">
 
 <div style="text-align: left; margin: 10px 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666;">
     <input type="checkbox" id="remember-me" style="width: 18px; height: 18px; margin: 0; cursor: pointer;">
-    <label for="remember-me" style="cursor: pointer;">記住序號與密碼</label>
+    <label for="remember-me" style="cursor: pointer;">記住帳號與密碼</label>
 </div>
 
             <button class="primary-btn" onclick="login()">登入</button>
@@ -344,11 +344,11 @@ function getRandomEndQuestion() {
     const CTA_PHRASES = [
         "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是生理電量平衡度呢？",
-        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
-        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
+        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是睡眠平衡度呢？",
+        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是睡眠平衡度？",
+        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -482,6 +482,25 @@ function getTargetDate(msg) {
     if (dateMatch) {
         return `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
     }
+// 2. 判斷短年份斜線格式：26/03/30 -> 2026-03-30
+    const shortSlashMatch = msg.match(/(\d{2})\/(\d{2})\/(\d{2})/);
+    if (shortSlashMatch) {
+        return `20${shortSlashMatch[1]}-${shortSlashMatch[2]}-${shortSlashMatch[3]}`;
+    }
+
+    // 3. 判斷純數字格式：20260330 (8碼) 或 260330 (6碼)
+    // 使用 \b 確保是獨立的數字串，不會誤抓到其他序號中的數字
+    const pureNumMatch = msg.match(/\b(\d{8})\b/) || msg.match(/\b(\d{6})\b/);
+    if (pureNumMatch) {
+        const s = pureNumMatch[1];
+        if (s.length === 8) {
+            // 20260330 -> 2026-03-30
+            return `${s.substring(0, 4)}-${s.substring(4, 6)}-${s.substring(6, 8)}`;
+        } else if (s.length === 6) {
+            // 260330 -> 2026-03-30
+            return `20${s.substring(0, 2)}-${s.substring(2, 4)}-${s.substring(4, 6)}`;
+        }
+    }
 
     if (msg.includes("前天")) {
         today.setDate(today.getDate() - 2);
@@ -531,10 +550,10 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
- // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡")) && !isDefinitionQuery) {
+ // --- 睡眠平衡度 ---
+    if ((msg.includes("睡眠平衡")) && !isDefinitionQuery) {
         if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        else { await appendAiMessage("📊 想查看哪一天的睡眠平衡度呢？"); showDateActions('balance'); }
         return;
     }   
 
@@ -550,18 +569,41 @@ const healthConfigs = [
         return;
     }
 
-    // --- 需求 1 & 2：健康摘要邏輯 ---
-    if (msg.includes("健康摘要")) {
-        if (hasAnyDate) {
-            processSummarySearch(targetDateStr);
+
+// --- 需求：健康摘要邏輯修改 (修正版) ---
+if (msg.includes("健康摘要")) {
+    // 1. 取得使用者提到的日期（例如：2026-04-02）
+    const targetDateStr = getTargetDate(msg); 
+
+    // 2. 判斷是否有抓到日期：這裡建議直接判斷 targetDateStr 是否有值
+    // 如果 hasAnyDate 是函式，請改用 hasAnyDate(msg)
+    if (targetDateStr && targetDateStr !== "") {
+        
+        // 3. 核心邏輯：將日期減一天
+        // 使用 .replace(/-/g, '/') 確保在不同瀏覽器（如 iOS Safari）解析日期的一致性
+        const dateObj = new Date(targetDateStr.replace(/-/g, '/'));
+        
+        // 檢查日期是否有效
+        if (!isNaN(dateObj.getTime())) {
+            dateObj.setDate(dateObj.getDate() - 1);
+            const preDateStr = dateObj.toLocaleDateString('en-CA'); // 變成 2026-04-01
+
+            // 4. 呼叫搜尋函式：(抓 4/1 的資料, 卡片標題顯示 4/2)
+            processSummarySearch(preDateStr, targetDateStr);
         } else {
+            // 如果日期解析失敗（例如 getTargetDate 沒回傳正確格式）
             await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
             showDateActions('summary');
         }
-        return; 
+    } else {
+        // 如果沒抓到日期，顯示日期選擇按鈕
+        await appendAiMessage("想查看哪一天的健康摘要呢？ 📅");
+        showDateActions('summary');
     }
+    return; 
+}
 
-    
+
 
     if (msg.includes("趨勢圖")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
@@ -651,11 +693,29 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-        // --- 準備資料抓取 ---
-        const targetDate = new Date(targetDateStr);
+           // --- 準備資料抓取 ---
+        
+        // 1. 先備份使用者原本輸入的日期 (顯示標題用)
+        const displayDateStr = targetDateStr; 
+
+        // 2. 邏輯偏移：僅針對「生理電量」
+        if (config.prefix === '生理電量') {
+            const tempDate = new Date(targetDateStr.replace(/-/g, '/'));
+            tempDate.setDate(tempDate.getDate() - 1); // 減去一天
+            
+            // 【關鍵修正】：手動組成本地日期字串，避免 toISOString() 的時區問題
+            const y = tempDate.getFullYear();
+            const m = String(tempDate.getMonth() + 1).padStart(2, '0');
+            const d = String(tempDate.getDate()).padStart(2, '0');
+            targetDateStr = `${y}-${m}-${d}`; 
+        }
+
+        // 3. 計算用於比較的「前一日」 (在生理電量情況下，這會變成「前兩天」)
+        const targetDate = new Date(targetDateStr.replace(/-/g, '/'));
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
         const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
+
 
         const { data: records, error } = await _supabase.from('health_data')
             .select('record_date, raw_json')
@@ -691,64 +751,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
                 }
                 break;
 
-            case '睡眠效率':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（良好：≥ 85%，不佳：≤ 75%）";
-                if (val >= 85) logicStatus = "佳";
-                else if (val <= 75) logicStatus = "差";
-                else logicStatus = "平";
-                break;
-
-            case '淺睡':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：50%~65%）";
-                if (val > 65) logicStatus = "過多";
-                else if (val < 50) logicStatus = "過少";
-                else logicStatus = "佳";
-                break;
-
-            case '快速動眼':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：10%~25%）";
-                if (val > 25) logicStatus = "過多";
-                else if (val < 10) logicStatus = "過少";
-                else logicStatus = "佳";
-                break;
-
-            case '血氧':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：> 95%）";
-                logicStatus = (val > 95) ? "佳" : "差";
-                break;
-
-            case 'ODI':
-                displayValStr = `**ODI 3%: ${raw.ODI3_total}, ODI 4%: ${raw.ODI4_total}** ${config.unit}`;
-                rangeHint = "（標準參考範圍：每小時 < 5次）";
-                logicStatus = (raw.ODI3_total >= 5 || raw.ODI4_total >= 5) ? "差" : "佳";
-                break;
-
-            case 'T88':
-                displayValStr = `**T90: ${raw.T90_pct}%, T89: ${raw.T89_pct}%, T88: ${raw.T88_pct}%**`;
-                rangeHint = "（標準參考範圍：T90 ≤ 5%、T89 ≤ 4%、T88 ≤ 3%）";
-                logicStatus = (raw.T90_pct > 5 || raw.T89_pct > 4 || raw.T88_pct > 3) ? "差" : "佳";
-                break;
-
-            case '呼吸':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：12-25 rpm）";
-                if (val > 25) logicStatus = "快";
-                else if (val < 12) logicStatus = "慢";
-                else logicStatus = "佳";
-                break;
-
-            case '脈搏':
-                displayValStr = `**${val}${config.unit}**`;
-                rangeHint = "（標準參考範圍：60-100 bpm）";
-                if (val < 60) logicStatus = "低";
-                else if (val > 100) logicStatus = "高";
-                else logicStatus = "佳";
-                break;
-
+           
             default: 
                 // 處理原本的 N3, rMSSD, HBI, 總睡眠
                 displayValStr = config.displayField === 'TST_min' ? `**${Math.floor(val/60)}小時${val%60}分鐘**` : `**${val}${config.unit}**`;
@@ -758,9 +761,11 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
                 }
         }
 
-        // 優先使用 displayLabel，若無則使用 fallbackTitle
-const label = config.displayLabel || config.fallbackTitle;
-let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+        // 【修改點 3】：顯示標題使用 displayDateStr (使用者輸入的日期)
+         const label = config.displayLabel || config.fallbackTitle;
+        let finalContent = `📊 **${displayDateStr.replace(/-/g,'/')}** 的 ${label} 為：${displayValStr}`;
+
+        
         if (rangeHint) finalContent += `<br><small style="color:#666">${rangeHint}</small>`;
 
         if (logicStatus) {
@@ -774,6 +779,7 @@ let finalContent = `📊 **${targetDateStr.replace(/-/g,'/')}** 的 ${label} 為
             
             if (phraseData) finalContent += `<br><br>${phraseData.detailed_content}`;
         }
+
 
         await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
@@ -933,7 +939,7 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 抓取生理數據 (health_data)
+    // 1. 抓取生理數據 (保持資料庫原始日期)
     const { data: healthData, error } = await _supabase.from('health_data')
         .select('record_date, raw_json') 
         .eq('serial_number', currentSerial)
@@ -945,48 +951,49 @@ async function updateTrend(cardId, type, days) {
         return;
     }
 
-    const sortedData = healthData.reverse();
-    const dateRange = sortedData.map(d => d.record_date);
+    const sortedData = [...healthData].reverse();
+    
+    // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
+    // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
+    const originalDates = sortedData.map(d => d.record_date);
+    const shiftedDates = originalDates.map(dStr => {
+        let d = new Date(dStr + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        return d.toLocaleDateString('en-CA');
+    });
+    const queryDateRange = [...new Set([...originalDates, ...shiftedDates])];
+    // ------------------------------------------
 
-    // 2. 抓取個人感受數據 (從兩個表抓)
+    // 2. 抓取個人感受數據 (使用擴大後的日期範圍)
     const [feedbackRes, surveyRes] = await Promise.all([
-        _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', dateRange),
-        _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', dateRange)
+        _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', queryDateRange),
+        _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', queryDateRange)
     ]);
 
-    // 3. 建立日期索引的感受數據地圖 (優先序：daily_feedback > user_daily_surveys)
+    // 3. 建立體感數據地圖 (這部分邏輯不變)
     const subjectiveMap = {};
-    
-    // 先塞 survey 的數據 (備案)
     if (surveyRes.data) {
         surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
     }
-    // 再塞 feedback 的數據 (若有則覆蓋，符合優先權)
     if (feedbackRes.data) {
         feedbackRes.data.forEach(d => {
             const val = d.raw_json?.["自評電量"];
-            if (val !== undefined && val !== null) {
-                subjectiveMap[d.record_date] = Number(val);
-            }
+            if (val !== undefined && val !== null) subjectiveMap[d.record_date] = Number(val);
         });
     }
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-
     const typesToRender = type === 'all' ? ['battery', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
-        // 將 subjectiveMap 傳入
+        // 將原始數據與 map 傳入，讓繪圖函式自己決定日期顯示
         drawSingleChart(chartBox, t, sortedData, subjectiveMap);
     }
 }
-
-
-
 
 
 
@@ -1001,16 +1008,42 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
         hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
-    const labels = rawData.map(d => d.record_date.slice(5).replace('-', '/'));
-    const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
+    
+    // --- 【修改：動態決定日期標籤與體感數據對齊】 ---
+    const labels = rawData.map(d => {
+        let displayDate = d.record_date;
+        if (type === 'battery') {
+            let dateObj = new Date(d.record_date + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() + 1);
+            displayDate = dateObj.toLocaleDateString('en-CA');
+        }
+        return displayDate.slice(5).replace('-', '/');
+    });
+
+    // 準備體感數據：battery 對齊隔天，其餘對齊當天
+    const subjectiveValues = rawData.map(d => {
+        if (type === 'battery') {
+            // 生理電量要對齊「隔天」的體感
+            let dateObj = new Date(d.record_date + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() + 1);
+            const nextDayStr = dateObj.toLocaleDateString('en-CA');
+            return subjectiveMap[nextDayStr] || null;
+        } else {
+            // 其他指標如果也要顯示體感（雖然你目前沒畫），則對齊「當天」
+            return subjectiveMap[d.record_date] || null;
+        }
+    });
+
+
+
+
+
+const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
     const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
 
 
-
-// 準備個人感受數據
-const subjectiveValues = rawData.map(d => subjectiveMap[d.record_date] || null);
 
     // 計算平均值邏輯 (保持不變)
     dailyValues.forEach((val, i) => {
@@ -1208,7 +1241,7 @@ function renderLegend(type, abnormalLabel) {
         const cardHtml = `
             <div class="msg-row ai-row">
                 <div class="balance-card" onclick="zoomChart(this)">
-                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
+                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 睡眠平衡度</span></div>
                     <svg viewBox="-70 -55 600 550" class="radar-svg" style="width: 100%; height: auto; display: block;">
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMax}" fill="#f2f2f2" />
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMid}" fill="#e6e6e6" />
@@ -1232,7 +1265,7 @@ function renderLegend(type, abnormalLabel) {
                     </svg>
 
                     <div class="balance-description">
-                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
+                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估睡眠平衡狀態。
                     </div>
                 </div>
             </div>`;
@@ -1243,43 +1276,44 @@ function renderLegend(type, abnormalLabel) {
 
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
+    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
 } else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
     
 
+// 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
+async function processSummarySearch(d, displayDate) {
+    // 如果呼叫時沒傳 displayDate，就預設跟 d 一樣（確保相容性）
+    const finalDisplayDate = displayDate || d;
 
-
-
-// --- 修改後的 processSummarySearch 函數 ---
-async function processSummarySearch(d) {
     document.querySelector('.date-actions')?.remove();
-    await appendAiMessage(`正在查詢 ${d} 健康摘要...`);
     
-    const data = await fetchSummaryData(d);
+    // 1. 顯示使用者詢問的日期（例如 2026-03-31）
+    await appendAiMessage(`正在查詢 ${finalDisplayDate} 健康摘要... 🔍`);
+    
+    // 2. 使用前一天的日期 (d) 去抓資料（例如 2026-03-30）
+    const data = await fetchSummaryData(d); 
+    
     if (data) {
-        appendSummaryCard(data);
+        // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
+        // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
+        appendSummaryCard(finalDisplayDate, data);
         
-        // 新增邏輯：如果是查詢「今天」，則自動出現隨機建議
+        // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
         const todayStr = getLocalDateString();
-        if (d === todayStr && data.flowSuggestion) {
+        if (finalDisplayDate === todayStr && data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
-            await appendAiMessage(data.flowSuggestion); // 顯示減少最多指標的隨機建議 (1-3)
+            await appendAiMessage(data.flowSuggestion); 
             await new Promise(r => setTimeout(r, 800));
-       await appendAiMessage(getRandomEndQuestion());
-} else {
-            // 如果不是今天，則顯示一般結尾
+            await appendAiMessage(getRandomEndQuestion());
+        } else {
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
         }
     } else {
-        await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+        // 如果沒資料，提示時也使用顯示日期比較不容易讓使用者困惑
+        await appendAiMessage(`${finalDisplayDate} 這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️`);
     }
 }
-
-
-
-
-
 
 
 function showDateActions(type, metricConfig = null) {
@@ -1317,7 +1351,7 @@ function showDateActions(type, metricConfig = null) {
 }
 
 
-function appendSummaryCard(data) {
+function appendSummaryCard(dateTitle, data) {
     const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
     const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
 const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
@@ -1334,7 +1368,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         <div class="msg-row ai-row">
             <div class="summary-card" onclick="zoomChart(this)">
                 <div class="summary-header">
-                    <span>📅 ${data.date} 健康摘要</span>
+                    <span>📅 ${dateTitle} 健康摘要</span>
                    <span style="color:${lightMap[data.light] || '#ccc'}; display: flex; align-items: center;">
     <span class="status-dot" style="background-color:${lightMap[data.light] || '#ccc'}"></span>
     ${data.light}
@@ -1584,7 +1618,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/anything_llm_api', {
+        const res = await fetch('/api/anything_gemma_api', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
