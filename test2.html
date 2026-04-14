@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n57</title>
+    <title>Soosyn 健康夥伴 n61</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -344,11 +344,11 @@ function getRandomEndQuestion() {
     const CTA_PHRASES = [
         "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是生理電量平衡度呢？",
-        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是平衡度？",
-        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
+        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是睡眠平衡度呢？",
+        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是睡眠平衡度？",
+        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是平衡度", "什麼是生理電量平衡", "睡眠連續性", "睡眠規律性", "平衡度？", "生理電量平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "平衡度", "生理電量平衡", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
+    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -550,10 +550,10 @@ const healthConfigs = [
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
- // --- 生理電量平衡度 ---
-    if ((msg.includes("平衡度") || msg.includes("生理電量平衡")) && !isDefinitionQuery) {
+ // --- 睡眠平衡度 ---
+    if ((msg.includes("睡眠平衡")) && !isDefinitionQuery) {
         if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("🔋 想查看哪一天的生理電量平衡度呢？"); showDateActions('balance'); }
+        else { await appendAiMessage("📊 想查看哪一天的睡眠平衡度呢？"); showDateActions('balance'); }
         return;
     }   
 
@@ -693,7 +693,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-           // --- 準備資料抓取 ---
+              // --- 準備資料抓取 ---
         
         // 1. 先備份使用者原本輸入的日期 (顯示標題用)
         const displayDateStr = targetDateStr; 
@@ -717,14 +717,27 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
 
-        const { data: records, error } = await _supabase.from('health_data')
-            .select('record_date, raw_json')
-            .eq('serial_number', currentSerial)
-            .in('record_date', [targetDateStr, prevDateStr]);
+        // --- 【關鍵修改部分：改向地端要資料】 ---
+let targetData, prevData;
 
-        if (error) throw error;
-        const targetData = records?.find(r => r.record_date === targetDateStr);
-        const prevData = records?.find(r => r.record_date === prevDateStr);
+try {
+    const response = await fetch('http://localhost:5000/api/get-latest-health');
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allData = await response.json();
+
+    // 模擬 Supabase 的 .eq('serial_number', currentSerial) 與 .in('record_date', [...])
+    const userRecords = allData.filter(r => r.serial_number === currentSerial);
+    
+    targetData = userRecords.find(r => r.record_date === targetDateStr);
+    prevData = userRecords.find(r => r.record_date === prevDateStr);
+
+} catch (err) {
+    console.error("讀取失敗:", err);
+    await appendAiMessage("連不到地端 Python 伺服器，請確認 CMD 視窗有沒有開喔！ 🔌");
+    return;
+}
+
 
         // --- 無資料處理 ---
         if (!targetData) {
@@ -738,6 +751,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         const prevRaw = prevData?.raw_json;
         let displayValStr = "";
         let logicStatus = ""; // 用於決定抓取哪種建議 (佳/差/平...)
+
         let rangeHint = "";   // 範圍提示文字
 
         // --- 根據不同指標執行特定判斷邏輯 ---
@@ -791,17 +805,41 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     }
 }
 
-    // --- 核心邏輯：摘要比較與建議 (修正版) ---
+   // --- 核心邏輯：摘要比較與建議 (修正版) ---
 
+// --- 核心邏輯：摘要比較與建議 (修正版) ---
 
 async function fetchSummaryData(targetDate) {
-    // 1. 獲取個人當前與前兩筆數據（包含目標日期與前一筆）
-    const { data: healths } = await _supabase.from('health_data')
-        .select('record_date, raw_json')
-        .eq('serial_number', currentSerial)
-        .lte('record_date', targetDate) // 依然維持 lte，因為需要抓取「前一天」來做增減比較
-        .order('record_date', { ascending: false })
-        .limit(2);
+    
+// --- 1. 改向地端 Python 伺服器獲取整份資料 ---
+let healths = []; // 預設為空陣列，對齊原本 Supabase data 的結構
+
+try {
+    const response = await fetch('http://localhost:5000/api/get-latest-health');
+    
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allData = await response.json();
+
+    // --- 2. 模擬 Supabase 的過濾與排序邏輯 ---
+    healths = allData
+        // .eq('serial_number', currentSerial) -> 篩選序號
+        // .lte('record_date', targetDate) -> 篩選日期小於等於目標日
+        .filter(item => 
+            item.serial_number === currentSerial && 
+            item.record_date <= targetDate
+        )
+        // .order('record_date', { ascending: false }) -> 日期降冪排序
+        .sort((a, b) => b.record_date.localeCompare(a.record_date))
+        // .limit(2) -> 只取前兩筆 (今天與前一筆)
+        .slice(0, 2);
+
+} catch (err) {
+    console.error("讀取地端資料發生錯誤:", err);
+    // 這裡可以根據需求決定要不要提示使用者 CMD 沒開
+}
+
+// 接下來你原本後續使用 healths 的邏輯（例如 if (!healths?.length) ...）完全不用改
 
     if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
     // 這代表「目標日期當天」沒有數據，直接回傳 null
@@ -811,10 +849,25 @@ async function fetchSummaryData(targetDate) {
     const raw = current.raw_json;
     const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-    // --- 2. 新增：計算百分比排名邏輯 (整合自 n12) ---
-    const { data: allUsersData } = await _supabase.from('health_data')
-        .select('raw_json')
-        .eq('record_date', current.record_date);
+    // --- 改向地端 Python 伺服器獲取整份資料 ---
+let allUsersData = [];
+
+try {
+    const response = await fetch('http://localhost:5000/api/get-latest-health');
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allData = await response.json();
+
+    // --- 模擬 Supabase 的 .eq('record_date', current.record_date) ---
+    // 找出所有與 current.record_date 相同的紀錄 (不分序號)
+    if (Array.isArray(allData)) {
+        allUsersData = allData.filter(item => item.record_date === current.record_date);
+    }
+
+} catch (err) {
+    console.error("計算排名時讀取地端資料失敗:", err);
+    // 如果讀取失敗，allUsersData 會是空陣列，後續排名邏輯會自動處理（通常顯示為 0%）
+}
 
     let percentage = 0;
     if (allUsersData && allUsersData.length > 0) {
@@ -825,6 +878,7 @@ async function fetchSummaryData(targetDate) {
         ).length;
         percentage = Math.round((lowerUsers / totalUsers) * 100);
     }
+
     // --------------------------------------------
 
     // 3. 指標增減比較邏輯
@@ -939,17 +993,39 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 抓取生理數據 (保持資料庫原始日期)
-    const { data: healthData, error } = await _supabase.from('health_data')
-        .select('record_date, raw_json') 
-        .eq('serial_number', currentSerial)
-        .order('record_date', { ascending: false })
-        .limit(days);
+    // 1. 將原本的 Supabase 呼叫註解掉或替換掉
+let healthData = [];
+try {
+    // 呼叫地端 Python 伺服器 (假設你的 Python 跑在 5000 port)
+    const response = await fetch('http://localhost:5000/api/get-latest-health');
+    
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allJsonData = await response.json();
 
-    if (error || !healthData || healthData.length === 0) {
-        card.querySelector('.trend-content').innerHTML = error ? "讀取失敗" : "暫無數據 😅";
-        return;
-    }
+    // 2. 篩選與排序邏輯 (這部分原本是在 Supabase 伺服器端做，現在改到前端做)
+    healthData = allJsonData
+        .filter(item => item.serial_number === currentSerial) // 篩選序號
+        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
+        .slice(0, days) // 取得最近的幾天
+        .map(item => ({
+            record_date: item.record_date,
+            raw_json: item.raw_json
+        }));
+
+} catch (err) {
+    console.error("讀取地端資料錯誤:", err);
+    card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
+    return;
+}
+
+// 3. 檢查是否有資料 (保留你原本的判斷邏輯)
+if (healthData.length === 0) {
+    card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+    return;
+}
+
+// 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
 
     const sortedData = [...healthData].reverse();
     
@@ -1241,7 +1317,7 @@ function renderLegend(type, abnormalLabel) {
         const cardHtml = `
             <div class="msg-row ai-row">
                 <div class="balance-card" onclick="zoomChart(this)">
-                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 生理電量平衡度</span></div>
+                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 睡眠平衡度</span></div>
                     <svg viewBox="-70 -55 600 550" class="radar-svg" style="width: 100%; height: auto; display: block;">
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMax}" fill="#f2f2f2" />
                         <circle cx="${centerX}" cy="${centerY}" r="${radiusMid}" fill="#e6e6e6" />
@@ -1265,7 +1341,7 @@ function renderLegend(type, abnormalLabel) {
                     </svg>
 
                     <div class="balance-description">
-                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估當天的生理平衡狀態。
+                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估睡眠平衡狀態。
                     </div>
                 </div>
             </div>`;
@@ -1276,8 +1352,37 @@ function renderLegend(type, abnormalLabel) {
 
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 生理電量平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
-} else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
+async function processBalanceSearch(d) {
+    document.querySelector('.date-actions')?.remove();
+    await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`);
+
+    try {
+        // 1. 改向地端 Python 伺服器要資料
+        const response = await fetch('http://localhost:5000/api/get-latest-health');
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        const allData = await response.json();
+
+        // 2. 在地端資料中篩選：序號符合、日期符合
+        const dayData = allData.find(item => 
+            item.serial_number === currentSerial && 
+            item.record_date === d
+        );
+
+        if (dayData) {
+            // 3. 呼叫原本的卡片生成函式
+            appendBalanceCard(dayData);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(getRandomEndQuestion());
+        } else {
+            await appendAiMessage(`這天（${d}）沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️`);
+        }
+    } catch (err) {
+        console.error("讀取失敗:", err);
+        await appendAiMessage("哎呀，連不到你電腦的 Python 伺服器，記得要把 CMD 開著喔！ 🔌");
+    }
+}
+
     
 
 // 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
@@ -1618,7 +1723,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemma', {
+        const res = await fetch('/api/gemini02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
