@@ -721,7 +721,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
 let targetData, prevData;
 
 try {
-    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com');
+    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com/api/get-latest-health');
     if (!response.ok) throw new Error("地端連線失敗");
     
     const allData = await response.json();
@@ -815,7 +815,7 @@ async function fetchSummaryData(targetDate) {
 let healths = []; // 預設為空陣列，對齊原本 Supabase data 的結構
 
 try {
-    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com');
+    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com/api/get-latest-health');
     
     if (!response.ok) throw new Error("地端連線失敗");
     
@@ -853,7 +853,7 @@ try {
 let allUsersData = [];
 
 try {
-    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com');
+    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com/api/get-latest-health');
     if (!response.ok) throw new Error("地端連線失敗");
     
     const allData = await response.json();
@@ -997,7 +997,7 @@ async function updateTrend(cardId, type, days) {
 let healthData = [];
 try {
     // 呼叫地端 Python 伺服器 (假設你的 Python 跑在 5000 port)
-    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com');
+    const response = await fetch('https://dana-sig-individually-after.trycloudflare.com/api/get-latest-health');
     
     if (!response.ok) throw new Error("地端連線失敗");
     
@@ -1358,7 +1358,7 @@ async function processBalanceSearch(d) {
 
     try {
         // 1. 改向地端 Python 伺服器要資料
-        const response = await fetch('https://dana-sig-individually-after.trycloudflare.com');
+        const response = await fetch('https://dana-sig-individually-after.trycloudflare.com/api/get-latest-health');
         if (!response.ok) throw new Error("地端連線失敗");
         
         const allData = await response.json();
