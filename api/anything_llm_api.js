@@ -18,17 +18,15 @@ export default async function handler(req, res) {
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
 
-// === 【1. 日期與區間偵測】 ===
+    // === 【1. 日期與區間偵測】 ===
     const todayStr = local_date || new Date().toISOString().split('T')[0];
     const todayObj = new Date(todayStr);
     
-    // 偵測日期 (支援多個日期偵測)
     const dateRegex = /(\d{4}[\/\-\.])?(\d{1,2})[\/\-\.月](\d{1,2})[日]?/g;
     const matches = [...prompt.matchAll(dateRegex)];
     let dateFilters = [];
     let targetDateStr = null;
 
-    // 如果提問中有日期，優先處理第一個偵測到的作為 targetDateStr (為了相容你原本的邏輯)
     if (matches.length > 0) {
       const firstMatch = matches[0];
       const year = firstMatch[1] ? firstMatch[1].replace(/[\/\-\.]/g, '') : todayObj.getFullYear();
@@ -36,7 +34,6 @@ export default async function handler(req, res) {
       const day = firstMatch[3].padStart(2, '0');
       targetDateStr = `${year}-${month}-${day}`;
       
-      // 為每個偵測到的日期抓取「當天+前7天」
       matches.forEach(m => {
         const y = m[1] ? m[1].replace(/[\/\-\.]/g, '') : todayObj.getFullYear();
         const mon = m[2].padStart(2, '0');
@@ -49,7 +46,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // 處理關鍵字範圍 (去年、上個月)
     if (prompt.includes("去年")) {
       const lastYear = todayObj.getFullYear() - 1;
       dateFilters.push(`and(record_date.gte.${lastYear}-01-01,record_date.lte.${lastYear}-12-31)`);
@@ -60,7 +56,6 @@ export default async function handler(req, res) {
       dateFilters.push(`and(record_date.gte.${firstDay},record_date.lte.${lastDay})`);
     }
 
-    // 如果什麼都沒偵測到，或是問「最近」，預設抓最近 30 天
     if (dateFilters.length === 0 || prompt.includes("最近") || prompt.includes("本月")) {
       const thirtyDaysAgo = new Date(new Date(todayObj).setDate(todayObj.getDate() - 30)).toISOString().split('T')[0];
       dateFilters.push(`and(record_date.gte.${thirtyDaysAgo},record_date.lte.${todayStr})`);
@@ -68,7 +63,8 @@ export default async function handler(req, res) {
 
     // --- 2. 執行 Supabase OR 查詢 ---
     const filterQuery = `or(${dateFilters.join(',')})`;
-    const queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&record_date=${filterQuery}&order=record_date.desc`;
+    // 加入 encodeURIComponent 確保特殊符號在網址中安全傳遞
+    const queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&record_date=${encodeURIComponent(filterQuery)}&order=record_date.desc`;
 
     const sbRes = await fetch(queryUrl, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
@@ -77,22 +73,20 @@ export default async function handler(req, res) {
 
     // --- 3. 數據校對與狀態 ---
     const hasTargetData = targetDateStr ? dataList.some(item => item.record_date === targetDateStr) : true;
-    const latestDateInDb = dataList.length > 0 ? dataList[0].record_date : "無數據";
+    const latestDateInDb = (dataList && dataList.length > 0) ? dataList[0].record_date : "無數據";
     
     let dataStatusNotice = "";
     if (targetDateStr && !hasTargetData) {
       dataStatusNotice = `⚠️【數據警報】：你正在詢問 ${targetDateStr}，但資料庫中沒有這天的紀錄。請老實告知，並提到目前最新數據日期為 ${latestDateInDb}。`;
     }    
 
-
     // --- 4. 格式化 Context ---
     let healthContext = "找不到相關健康數據。";
     if (dataList && dataList.length > 0) {
       healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
-        const tst = raw.TST_min || 0;
+        const tst = Number(raw.TST_min) || 0; // 確保是數字
         
-        // 建議將每個日期的數據包裝得更嚴密
         return `
 [數據日期: ${item.record_date}]
 - 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
@@ -122,7 +116,7 @@ export default async function handler(req, res) {
 - 今天日期：${todayStr}
 - 詢問目標日期：${targetDateStr || todayStr}
 
-# 資料庫真實數據（已包含目標日與前 7 天數據，或特定跨時段數據）
+# 資料庫真實數據
 ${healthContext}
 
 # 對話歷史
@@ -142,20 +136,24 @@ ${prompt}
     const data = await response.json();
     const resultText = data.textResponse || "AI 沒有回覆內容。";
 
-    // --- 8. 存檔 ---
-    fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
-      method: 'POST',
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        serial_number, user_query: prompt, ai_response: resultText,
-        record_date: local_date, record_time: local_time, ai_model: 'AnythingLLM-Qwen-2.5'
-      })
-    }).catch(e => console.error(e));
+    // --- 8. 存檔 (加上 await 確保存檔完成) ---
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serial_number, user_query: prompt, ai_response: resultText,
+          record_date: local_date, record_time: local_time, ai_model: 'AnythingLLM-Qwen-2.5'
+        })
+      });
+    } catch (logError) {
+      console.error("Log 存檔失敗:", logError);
+    }
 
     res.status(200).json({ text: resultText });
 
   } catch (error) {
-    console.error(error);
+    console.error("主要錯誤:", error);
     res.status(500).json({ text: "我的大腦接線生好像休假了，再試一次？ 😅" });
   }
 }
