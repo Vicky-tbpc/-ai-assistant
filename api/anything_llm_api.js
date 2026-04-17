@@ -13,31 +13,48 @@ export default async function handler(req, res) {
      // === 【設定區】 ===
     const anythingLlmUrl = process.env.ANYTHING_LLM_URL;
     const apiKey = process.env.ANYTHING_LLM_KEY;
-    
-    const modelName = process.env.ANYTHING_LLM_MODEL;
-    
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
 
-// === 【重點修改 1：精準計算使用者裝置的今天與昨天】 ===
-    // 優先使用前端傳過來的裝置日期，避免伺服器時區誤差
+// === 【核心修改 1：日期偵測與標準化】 ===
+    // 1. 偵測特定日期 (2026/4/7, 4/7, 4月7日)
+    const dateRegex = /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})|(\d{1,2}[\/\-]\d{1,2})|(\d{1,2}月\d{1,2}日)/;
+    const matchedDate = prompt.match(dateRegex);
+    let targetDate = null;
+
+    if (matchedDate) {
+      let rawDate = matchedDate[0].replace(/月/g, '/').replace(/日/g, '');
+      const dateObj = new Date(rawDate);
+      const year = isNaN(dateObj.getFullYear()) || dateObj.getFullYear() < 2000 
+                   ? new Date(local_date).getFullYear() 
+                   : dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      targetDate = `${year}-${month}-${day}`;
+    }
+
+    // 2. 基準日期與昨天計算 (統一標準化)
     const todayStr = local_date || new Date().toISOString().split('T')[0];
-    
-    // 計算昨天
     const todayObj = new Date(todayStr);
     const yesterdayObj = new Date(todayObj);
     yesterdayObj.setDate(yesterdayObj.getDate() - 1);
     const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
 
-    // --- 1. 判斷查詢範圍並構建 Supabase URL ---
+   // --- 1. 判斷查詢範圍並構建 Supabase URL ---
     let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
 
-    // 基準日期也使用 todayStr
-    const baseDate = record_date ? new Date(record_date) : new Date(todayStr);
+    // 優先權：目標日期 > record_date > 裝置今天
+    const baseDateStr = targetDate || record_date || todayStr;
+    const baseDate = new Date(baseDateStr);
 
-    if (prompt.includes("去年")) {
+    if (targetDate) {
+      const startDate = new Date(baseDate);
+      startDate.setDate(startDate.getDate() - 7);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${targetDate}`;
+    } else if (prompt.includes("去年")) {
       const lastYear = baseDate.getFullYear() - 1;
       queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
     } else if (prompt.includes("上個月")) {
@@ -48,10 +65,10 @@ export default async function handler(req, res) {
       const thirtyDaysAgo = new Date(new Date(baseDate).setDate(baseDate.getDate() - 30)).toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
     } else {
-      const sevenDaysAgo = new Date(baseDate);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
-      const endDateStr = baseDate.toISOString().split('T')[0];
+      const startDate = new Date(baseDate);
+      startDate.setDate(startDate.getDate() - 7);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = baseDate.toISOString().split('T')[0]; // 強制標準化
       queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
     }
 
@@ -61,19 +78,16 @@ export default async function handler(req, res) {
     });
     const dataList = await sbRes.json();
 
-     // === 【新增：JS 端日期與數據狀態檢查】 ===
     const latestRecordDate = dataList.length > 0 ? dataList[0].record_date : null;
     const hasYesterdayData = dataList.some(item => item.record_date === yesterdayStr);
-    // 判斷使用者是否在問昨天或最新資料
     const isAskingForYesterday = prompt.includes("昨天") || prompt.includes("昨晚") || prompt.includes("最新");
 
     let dataStatusNotice = "";
     if (isAskingForYesterday && !hasYesterdayData) {
-        // 如果問昨天但沒資料，準備一段文字「警告」AI
-        dataStatusNotice = `【系統通知】：使用者正在詢問昨天 (${yesterdayStr}) 的紀錄，但資料庫中「沒有」這一天的數據。目前最新的一份數據日期是 ${latestRecordDate || '未知'}。請務必誠實告知使用者，不要套用範例或其他日期的數值。`;
+        dataStatusNotice = `【系統通知】：使用者正在詢問昨天 (${yesterdayStr}) 的紀錄，但資料庫中無此數據。目前最新數據日期是 ${latestRecordDate || '未知'}。請老實告知。`;
     }
 
-     // --- 3. 格式化數據 Context ---
+    // --- 3. 格式化數據 Context ---
     let healthContext = "找不到相關數據。";
     let avgContext = ""; // 用來存放計算好的平均值區塊
     let avgs = {};
@@ -181,7 +195,7 @@ if (count >= 7) {
 
   // 5. 組合 avgContext 餵給 AI
   avgContext = `
-### 【個人平均值】
+### 【個人生理基線說明】
 ${baselineDescription}
 - 🌿 rMSSD (放鬆恢復) 基線：平均為 ${rmssdAvg} ms。
   (你的專屬波動範圍是基線的正負 10%，即 ${rmssdLower} ~ ${rmssdUpper} ms)
@@ -278,15 +292,10 @@ ${baselineDescription}
     }));
 
     // --- 3.5 意圖預判 (JS 端過濾器) ---
-const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋") || /^[a-zA-Z0-9? ]+$/.test(prompt)) && !prompt.includes("我");
+const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋")) && !prompt.includes("我") && !matchedDate;
 
-const safeAvgContext = isPathA 
-  ? "【系統提醒：使用者目前僅在詢問名詞定義，請專注於醫學知識科普，嚴禁提及任何個人數據、平均值或波動範圍。】" 
-  : avgContext;
-
-const safeHealthContext = isPathA 
-  ? "【系統提醒：數據已屏蔽。請勿在回覆中帶入任何具體數值，結尾請引導使用者詢問具體數據。】" 
-  : healthContext;
+    const safeAvgContext = isPathA ? "【系統提醒：名詞解釋路徑，屏蔽數據】" : avgContext;
+    const safeHealthContext = isPathA ? "【數據已隱藏】" : healthContext;
 
 // --- 3.6 語系硬核偵測 (針對日文/英文) ---
 // 偵測日文：檢查是否包含平假名 (\u3040-\u309F) 或片假名 (\u30A0-\u30FF)
@@ -337,25 +346,19 @@ const healthStandards = `
 const finalCombinedMessage = `
 ${systemInstruction}
 
-[系統指令]：
-${systemInstruction}
-
-[日期參考]：
-今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+[日期參考]
+今天是 ${todayStr}，昨天是 ${yesterdayStr}
+目標日期：${targetDate || '最新資料'}
+${dataStatusNotice}
 
 [資料庫真實數據內容]
+${safeAvgContext}
 ${safeHealthContext}
 
-[個人平均值]
-${safeAvgContext}
-
-[診斷參考依據]
-${healthStandards}  <-- 放在這裡，讓 AI 剛看完數據馬上對照標準
-
 [對話紀錄]
-${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n') : "無"}
+${history.map(h => `${h.role === "model" ? "assistant" : "user"}: ${h.parts[0].text}`).slice(-4).join('\n')}
 
-[使用者當前問題]
+[使用者問題]
 "${prompt}"
 
 ---
