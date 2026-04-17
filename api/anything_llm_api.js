@@ -81,20 +81,12 @@ export default async function handler(req, res) {
         const tst = raw.TST_min || 0;
         const hrMean = Math.round(raw.HR_mean || 0);
         const hrMin = Math.round(raw.HR_min || 0);
-        const hrMax = Math.round(raw.HR_max || 0);
         const rMssd = Math.round(raw.rMSSD || 0);
         const hbi = Math.round(raw.HBI || 0);
         const spo2 = Math.round(raw.SpO2_mean || 0);
-        const spo2Max = Math.round(raw.SpO2_max || 0);
-        const spo2Min = Math.round(raw.SpO2_min || 0);
         const rr = Math.round(raw.RR_mean || 0);
-        const rrMax = Math.round(raw.RR_max || 0);
-        const rrMin = Math.round(raw.RR_min || 0);
         const odi3 = Math.round(raw.ODI3_total || 0);
         const odi4 = Math.round(raw.ODI4_total || 0);
-        const t90 = Math.round(raw.T90_pct || 0);
-        const t89 = Math.round(raw.T89_pct || 0);
-        const t88 = Math.round(raw.T88_pct || 0);
 
         return `📌【日期：${item.record_date}】 
                 睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分
@@ -106,13 +98,8 @@ export default async function handler(req, res) {
                 HBI缺氧負荷:${hbi}%min/h
                 睡眠平均脈搏:${hrMean}bpm
                 睡眠最低脈搏:${hrMin}bpm
-                睡眠最高脈搏:${hrMax}bpm
                 睡眠平均血氧飽和度:${spo2}%
-                睡眠最高血氧飽和度:${spo2Max}%
-                睡眠最低血氧飽和度:${spo2Min}%
                 睡眠平均呼吸頻率:${rr}rpm
-                睡眠最高呼吸頻率:${rrMax}rpm
-                睡眠最低呼吸頻率:${rrMin}rpm
                 ODI 3%:${odi3}次/小時
                 ODI 4%:${odi4}次/小時
                 T90:${raw.T90_pct || 0}%
@@ -269,7 +256,7 @@ ${prompt}
           ai_response: resultText,
           record_date: local_date,
           record_time: local_time,
-          ai_model: 'AnythingLLM-Qwen-2.5-02' // <--- 新增這一行，也可以寫 'Qwen-2.5-14b' 方便區分模型
+          ai_model: 'AnythingLLM-Qwen-2.5' // <--- 新增這一行，也可以寫 'Qwen-2.5-14b' 方便區分模型
         })
       });
     } catch (logError) {
