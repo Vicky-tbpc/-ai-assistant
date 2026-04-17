@@ -89,7 +89,21 @@ export default async function handler(req, res) {
       healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
-        return `[日期:${item.record_date}] 睡眠:${Math.floor(tst / 60)}時${tst % 60}分, 深睡:${raw.N3_pct || 0}%, 效率:${raw.sleep_efficiency_pct || 0}%, rMSSD:${Math.round(raw.rMSSD || 0)}ms, HBI:${Math.round(raw.HBI || 0)}%min/h, 平均脈搏:${Math.round(raw.HR_mean || 0)}bpm, 血氧:${Math.round(raw.SpO2_mean || 0)}%, ODI3:${Math.round(raw.ODI3_total || 0)}次/h`;
+        
+        // 建議將每個日期的數據包裝得更嚴密
+        return `
+[數據日期: ${item.record_date}]
+- 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
+- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM ${raw.REM_pct || 0}%
+- 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
+- 自律神經: rMSSD放鬆恢復 ${Math.round(raw.rMSSD || 0)}ms
+- 呼吸負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
+- 脈搏數據: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
+- 血氧數據: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
+- 呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
+- 血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
+- 低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%
+-----------------------`;
       }).join('\n');
     }
 
