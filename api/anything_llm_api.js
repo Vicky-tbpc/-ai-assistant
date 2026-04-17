@@ -1,4 +1,4 @@
-// anything_llm_api_02
+// anything_llm_api_01
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const { prompt, serial_number, record_date, history = [], local_date, local_time } = req.body;
 
-     // === 【設定區】 ===
+    // === 【設定區】 ===
     const anythingLlmUrl = process.env.ANYTHING_LLM_URL;
     const apiKey = process.env.ANYTHING_LLM_KEY;
     const workspaceSlug = process.env.ANYTHING_LLM_WORKSPACE || "tbpc_medical_ref_database";
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
         dataStatusNotice = `⚠️【重要提醒】：使用者正在詢問昨天 (${yesterdayStr}) 的紀錄，但資料庫中找不到該日數據。目前最新的紀錄日期是 ${latestRecordDate || '未知'}。請務必誠實告知，不要編造數據。`;
     }
 
-    // --- 3. 格式化數據 Context ---
+    // --- 3. 格式化數據 Context ---
     let healthContext = "目前資料庫中找不到你的相關健康數據。";
     if (dataList && dataList.length > 0) {
       healthContext = dataList.map(item => {
@@ -71,8 +71,7 @@ export default async function handler(req, res) {
         const tst = raw.TST_min || 0;
         return `[日期:${item.record_date}] 睡眠:${Math.floor(tst / 60)}時${tst % 60}分, 深睡:${raw.N3_pct || 0}%, 效率:${raw.sleep_efficiency_pct || 0}%, rMSSD:${Math.round(raw.rMSSD || 0)}ms, HBI:${Math.round(raw.HBI || 0)}%min/h, 平均脈搏:${Math.round(raw.HR_mean || 0)}bpm, 血氧:${Math.round(raw.SpO2_mean || 0)}%, ODI3:${Math.round(raw.ODI3_total || 0)}次/h`;
       }).join('\n');
-    }}).join('\n');
-    }
+    }
 
     // --- 4. 準備對話歷史 ---
     const formattedHistory = history.map(h => `${h.role === "model" ? "助手" : "使用者"}: ${h.parts[0].text}`).join('\n');
