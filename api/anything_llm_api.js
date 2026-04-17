@@ -1,4 +1,4 @@
-// anything_llm_api_03
+// anything_llm_api_02
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -75,133 +75,76 @@ export default async function handler(req, res) {
 
      // --- 3. 格式化數據 Context ---
     let healthContext = "找不到相關數據。";
-    let avgContext = ""; // 用來存放計算好的平均值區塊
-    let avgs = {};
+    if (dataList && dataList.length > 0) {
+      healthContext = dataList.map(item => {
+        const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0;
+        const hrMean = Math.round(raw.HR_mean || 0);
+        const hrMin = Math.round(raw.HR_min || 0);
+        const rMssd = Math.round(raw.rMSSD || 0);
+        const hbi = Math.round(raw.HBI || 0);
+        const spo2 = Math.round(raw.SpO2_mean || 0);
+        const rr = Math.round(raw.RR_mean || 0);
+        const odi3 = Math.round(raw.ODI3_total || 0);
+        const odi4 = Math.round(raw.ODI4_total || 0);
 
-if (dataList && dataList.length > 0) {
-  const count = dataList.length; // 實際的天數
+        return `📌【日期：${item.record_date}】 
+                睡眠時長:${Math.floor(tst / 60)}時${tst % 60}分
+                N3深睡:${raw.N3_pct || 0}%
+                效率:${raw.sleep_efficiency_pct || 0}%
+                淺睡:${raw.N1N2_pct || 0}%
+                REM:${raw.REM_pct || 0}%
+                rMSSD放鬆恢復:${rMssd}ms
+                HBI缺氧負荷:${hbi}%min/h
+                睡眠平均脈搏:${hrMean}bpm
+                睡眠最低脈搏:${hrMin}bpm
+                睡眠平均血氧飽和度:${spo2}%
+                睡眠平均呼吸頻率:${rr}rpm
+                ODI 3%:${odi3}次/小時
+                ODI 4%:${odi4}次/小時
+                T90:${raw.T90_pct || 0}%
+                T89:${raw.T89_pct || 0}%
+                T88:${raw.T88_pct || 0}%
+                -------------------`;
+                       }).join('\n');
+                      }
 
-  // 1. 初始化累加器物件 (將所有指標預設為 0)
-  let sums = {
-    tst: 0, n3: 0, eff: 0, light: 0, rem: 0,
-    rMssd: 0, hbi: 0, hrMean: 0, hrMin: 0,
-    spo2: 0, rr: 0, odi3: 0, odi4: 0,
-    t90: 0, t89: 0, t88: 0
-  };
-
-  // 2. 格式化每日數據，同時累加數值
-  healthContext = dataList.map(item => {
-    const raw = item.raw_json || {};
-    
-    // 取得當日數值並確保是數字型態 (parseFloat)
-    const d = {
-      tst: parseFloat(raw.TST_min) || 0,
-      n3: parseFloat(raw.N3_pct) || 0,
-      eff: parseFloat(raw.sleep_efficiency_pct) || 0,
-      light: parseFloat(raw.N1N2_pct) || 0,
-      rem: parseFloat(raw.REM_pct) || 0,
-      rMssd: parseFloat(raw.rMSSD) || 0,
-      hbi: parseFloat(raw.HBI) || 0,
-      hrMean: parseFloat(raw.HR_mean) || 0,
-      hrMin: parseFloat(raw.HR_min) || 0,
-      spo2: parseFloat(raw.SpO2_mean) || 0,
-      rr: parseFloat(raw.RR_mean) || 0,
-      odi3: parseFloat(raw.ODI3_total) || 0,
-      odi4: parseFloat(raw.ODI4_total) || 0,
-      t90: parseFloat(raw.T90_pct) || 0,
-      t89: parseFloat(raw.T89_pct) || 0,
-      t88: parseFloat(raw.T88_pct) || 0
-    };
-
-    // 執行加總
-    Object.keys(sums).forEach(key => sums[key] += d[key]);
-
-        // 回傳原本要求的每日格式字串
-    return `📌【日期：${item.record_date}】 
-            睡眠時長:${Math.floor(d.tst / 60)}時${Math.round(d.tst % 60)}分
-            N3深睡:${d.n3}%
-            效率:${d.eff}%
-            淺睡:${d.light}%
-            REM:${d.rem}%
-            rMSSD放鬆恢復:${Math.round(d.rMssd)}ms
-            HBI缺氧負荷:${Math.round(d.hbi)}%min/h
-            睡眠平均脈搏:${Math.round(d.hrMean)}bpm
-            睡眠最低脈搏:${Math.round(d.hrMin)}bpm
-            睡眠平均血氧飽和度:${Math.round(d.spo2)}%
-            睡眠平均呼吸頻率:${Math.round(d.rr)}rpm
-            ODI 3%:${Math.round(d.odi3)}次/小時
-            ODI 4%:${Math.round(d.odi4)}次/小時
-            T90:${d.t90}%
-            T89:${d.t89}%
-            T88:${d.t88}%
-            -------------------`;
-  }).join('\n');
-
-        
-    // 3. 計算平均值 (保留一位小數)
-  Object.keys(sums).forEach(key => {
-        avgs[key] = (sums[key] / count).toFixed(1);
-      });
-
-  // 4. 生成平均值 Context (給 AI 參考)
-  avgContext = `
-### 【數據基準計算 - 過去 ${count} 日平均值】
-- 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分
-- 💤 N3深睡比例平均：${avgs.n3}%
-- 📈 睡眠效率平均：${avgs.eff}%
-- ☁️ 淺睡比例平均：${avgs.light}%
-- 🎭 REM快速動眼期平均：${avgs.rem}%
-- 🌿 rMSSD放鬆恢復平均：${avgs.rMssd}ms
-- ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h
-- ❤️ 脈搏平均：${avgs.hrMean}bpm / 最低平均：${avgs.hrMin}bpm
-- 🩸 睡眠平均血氧：${avgs.spo2}%
-- 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm
-- 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}
-- 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%
-(⚠️ AI 指導：分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。)
---------------------------------------------------`;
-    }
-                      
     // --- 4. 準備 Ollama 的訊息格式 ---
     // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
-    const systemInstruction = `
-
-           ### 角色設定
+    const systemInstruction = `### 角色設定
            你是一位溫暖、專業且具備敏銳洞察力的睡眠健康夥伴。你不是冷冰冰的數據產生器，而是一個會為使用者的睡眠狀況感到開心或擔憂的好友。
-
-           ### 【絕對指令：語系對齊與規範】
-           1. **100% 語言同步**：你必須精準偵測使用者問題的語系（繁中、簡中、日文、英文）。
-              - 若使用者用英文提問，你「必須」全程以英文回覆。
-              - 若僅輸入術語（如：HBI?），則預設使用「繁體中文」及台灣習慣語法。
-           2. **語氣規範（針對中文）**：繁中回覆時**嚴禁敬稱『您』，一律用『你』**。語調像平輩朋友般輕鬆但專業。
+           請用『繁體中文』回答，嚴禁使用敬稱『您』，一律用『你』。
 
            ### 溝通風格規範
-           1. **拒絕報表感**：禁止連續使用「你的 [指標] 是 [數值]」，請將數據融入自然對話。
-           2. **情緒化開場**：根據數據給予反饋。睡得好給予鼓勵 ✨；睡不好給予安慰 🌿。
-           3. **口語化銜接**：多用「其實」、「值得注意的是」、「看得出來」等轉折詞。
-           4. **Emoji 豐富化**：每則回覆必須包含 3-5 個 Emoji（如：😴, 💪, ✨, 📈, ⚠️）。
-           5. **直接輸出答案**：禁止輸出「思考過程」、「判斷路徑」或「標題」。
-           6. **保持精簡**：字數控制在 150-250 字以內，直擊重點。
+           1. **拒絕報表感**：禁止連續使用「你的 [指標] 是 [數值]」這種句式。請將數據融入自然對話中。
+           2. **情緒化開場**：根據數據好壞給予情緒反饋。
+              - 睡得好：表現驚嘆、鼓勵（如：太棒了！、這份數據很亮眼喔）。
+              - 睡不好：給予安慰、提醒（如：辛苦了、看來昨晚有些挑戰呢）。
+           3. **口語化銜接**：多使用「不過」、「其實」、「值得注意的是」、「看得出來」等轉折詞。
+           4. **Emoji 豐富化：為了增加親切感，每則回覆「必須」包含至少 3-5 個 Emoji。請在句首、關鍵數值或語氣轉折處加入 (例如：😴, 💪, ✨, 📈, ⚠️, 🌿, 👋, 👀, 🌱)。絕對不要只傳冷冰冰的文字。
+           5. **嚴禁敬稱**：一律使用「你」，維持平輩朋友的語氣。
+           6. **【極重要】嚴格核對日期**：當使用者問「昨天」或提及特定日期時，你必須精準核對資料庫內容中的 \`日期\`。如果資料庫中沒有使用者詢問的那一天（例如使用者問昨天 03/29，但資料庫最新只有 03/26），你必須老實告訴使用者「我這邊沒有你 03/29 的睡眠紀錄喔」，並主動告知「目前最新的一份紀錄是 03/26 的」。絕對不能指鹿為馬，把最新的資料直接當作昨天或指定日期的資料來回答！
+           7. **【極重要】直接輸出答案**：禁止輸出任何關於「思考過程」、「判斷路徑」、「系統資訊」或「標題」。
+           8. **保持精簡**：回答內容需直擊重點，字數控制在 150-200 字以內。
            
-           ### 【核心指令：三路徑意圖過濾】
-           **請嚴格根據 [使用者當前問題] 判斷路徑，這決定了你是否能存取下方數據數據區塊：**
+           【核心指令：三路徑意圖過濾】
+           請根據 [使用者當前問題] 與 [對話歷史紀錄 (History)] 判斷路徑：
 
-           #### 🛑 路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、rMSSD是什麼？)
-           - **核心目的**：僅提供醫學/健康知識科普，引發使用者興趣。
-           - **❌ 絕對禁令**：**嚴禁提及任何數值（包含平均值、日期、最新值）**。即使你能在下方的數據區塊看到資料，也請當作沒看到。
-           - **回覆結構**：
-             1. 溫暖地解釋該指標的定義與對健康的意義。
-             2. **結尾必須僅使用以下詢問句**：「想看更多具體數據嗎？或者你還有其他指標想知道的？😉」
-           - **違規處罰**：若在此路徑提到任何 %、ms、bpm 等具體個人數據，將視為系統嚴重錯誤。
+           路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、怎麼睡更好？)
+           - **禁止行為**：絕對禁止提及具體數值或日期。
+           - **結尾要求**：解釋完知識後，親切詢問，例如：『要看看最近這方面的數據嗎？』。
 
-           #### 📊 路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
-           - **核心要求**：精準核對日期。若無當日紀錄須老實告知，並告知最新紀錄日期。
-           - **數據使用**：必須優先採用系統算好的「平均值」，禁止自行運算。
-           - **內容**：對比「個人7日移動平均（不含當日）」，將數據轉化為「身體的悄悄話」。
+           路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
+           - **內容要求**：依照【數據參考標準】分析數據。
+           - **語氣要求**：將數據分析轉化為「身體的悄悄話」。例如：rMSSD 高不是說數值高，而是說「身體有在努力修復」。
+           - **動態基準**：必須對比「個人7日移動平均（不含當日）」。若數值異常，請主動指出這可能代表的意義。
+           - **字數控制**：200-250 字，確保內容充實但不囉唆。
 
-           #### 🎯 路徑 C：特定指標追蹤 (例如：當使用者回答「好啊」、「想看」)
-           - **觸發條件**：當 History 顯示上一則是在解釋指標（路徑 A），且使用者現在給予肯定回覆時。
-           - **絕對限制**：**「嚴禁」提及任何與該指標無關的數據**。只分析該指標的最新值、平均值與趨勢。
+           路徑 C：特定指標追蹤 (例如：使用者回答「好啊」、「想看」、「好喔」)
+           - **觸發條件**：當使用者回覆肯定詞，且 History 顯示你上一則訊息是在解釋某個特定指標（如：HBI、rMSSD）時。
+           - **內容要求 (絕對限制)**：**「嚴禁」提及任何與該指標無關的數據**。例如上一則在講 HBI，這則就只能講 HBI 的最新值、平均值與趨勢。
+           - **違規處罰**：如果在此路徑下提到了其他無關指標（如：睡眠時長、N3 等），將視為格式錯誤。請保持專注，只當該指標的專家。
+           - **分析內容**：列出該指標的最新數值、與個人7日移動平均（不含當日）的對比，以及該指標在過去一週的趨勢變化。
                    
            【數據參考標準】：
            - 睡眠時長：目標 7 小時。
@@ -210,13 +153,13 @@ if (dataList && dataList.length > 0) {
            - 恢復指標：rMSSD (基準值 = 7日動態平均±10%)、最低脈搏 (基準值 = 7日動態平均±5bpm)。
            - 呼吸風險：若 HBI 超過平均，或 ODI/T90 異常（如 T90>5%、T89>4%、T88>3%、ODI>5次），呼吸頻率不在標準範圍 12-25rpm 之間。
            
-           【平均值使用規範】
+           【平均值計算強制規則】（極重要）：
 
-           1. 數據來源：請優先採用 [系統預先計算] 區塊提供的平均值。
-           2. 禁止計算：嚴禁自行將數據清單中的 HBI、ODI 等數值進行加減乘除。如果發現系統提供的平均值與你看到的數值有出入，請以系統提供的平均值為準。
-           3. 僅在 Path B 或 Path C 時使用。
-           4. **Path A 嚴禁引用。**
-           
+           1. 自動降級處理：若資料庫中的紀錄不滿 7 筆（例如只有 4 筆），請直接以這 4 筆數據的總和除以 4 作為「基準值」。
+           2. 禁止拒絕回答：絕對禁止回覆「因為數據不足 7 日無法計算」或「數據太少無法分析」。
+           3. 禁止虛構：嚴禁假設缺失日期的數值為 0 或接近平均值。
+           4. 主動告知：若數據不足 7 日，請在分析中順口提到「根據你最近 X 天的平均狀況...」，讓使用者知道這是基於有限數據的分析。
+       
            ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
           使用者問：「分析我最新一天的睡眠？」
           你回：
@@ -228,13 +171,27 @@ if (dataList && dataList.length > 0) {
            1. **嚴格日期核對**：在回答前，請先在 [資料庫真實數據] 區塊中尋找與使用者問題「完全匹配」的日期紀錄。
            2. **禁止指鹿為馬**：嚴禁將相鄰日期（如 03/31）的數值用於回答另一個日期（如 04/01）的問題。
            3. **無資料即告知**：如果指定的日期在數據中只有 03/31 而沒有 04/01，請誠實回覆「目前還沒有 04/01 的資料」，絕對不能用前一天的數據來遞補！
-           `.trim();
+           `;
 
     // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
     const formattedHistory = history.map(h => ({
       role: h.role === "model" ? "assistant" : "user",
       content: h.parts[0].text
     }));
+
+    // === 【重點修改 3：在 User 訊息中提供清晰的今天與昨天日期對照】 ===
+    const messages = [
+      { role: "system", content: systemInstruction },
+      ...formattedHistory,
+      { 
+        role: "user", 
+        content: `[系統時間通知]：今天是 ${todayStr}，昨天是 ${yesterdayStr}。
+[資料庫撈取到的數據內容]：
+${healthContext}
+
+[使用者當前問題]：${prompt}` 
+      }
+    ];
 
     // --- 5. 呼叫 AnythingLLM 原生 API ---
     const workspaceSlug = "tbpc_medical_ref_database"; 
@@ -247,10 +204,6 @@ ${systemInstruction}
 [日期參考]：
 今天是 ${todayStr}，昨天是 ${yesterdayStr}。
 
-${dataStatusNotice}
-
-${avgContext}  <-- 這裡把算好的平均值直接餵給 AI
-
 [資料庫真實數據內容]：
 ${healthContext}
 
@@ -259,16 +212,11 @@ ${formattedHistory.length > 0
   ? formattedHistory.map(h => `${h.role === 'assistant' ? 'AI' : 'User'}: ${h.content}`).join('\n') 
   : "（目前無歷史對話內容）"}
 
-[偵測指令]：請以使用者輸入的語言進行回覆。
-
-[使用者當前問題]：${prompt}
+[使用者當前問題]：
+${prompt}
 
 (請嚴格核對日期，若數據中無使用者詢問的日期紀錄，請告知無資料，禁止引用歷史紀錄或其他日期的數值。)
-
-⚠️【重要提醒】：
-1. 分析時請直接引用上方「數據基準計算」區塊提供的平均值。
-2. 若無指定日期數據，請老實告知使用者。
-`.trim();
+    `.trim();
 
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
@@ -308,7 +256,7 @@ ${formattedHistory.length > 0
           ai_response: resultText,
           record_date: local_date,
           record_time: local_time,
-          ai_model: 'AnythingLLM-Qwen-2.5-03' // <--- 新增這一行，也可以寫 'Qwen-2.5-14b' 方便區分模型
+          ai_model: 'AnythingLLM-Qwen-2.5-02' // <--- 新增這一行，也可以寫 'Qwen-2.5-14b' 方便區分模型
         })
       });
     } catch (logError) {
