@@ -1,4 +1,4 @@
-// anything_llm_api_08
+// anything_llm_api_09
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -21,23 +21,45 @@ export default async function handler(req, res) {
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
 
-    // === 【重點修改 1：精準計算使用者裝置的今天與昨天】 ===
-    // 優先使用前端傳過來的裝置日期，避免伺服器時區誤差
+// === 【重點修改 1：日期偵測與 local_date 基準化】 ===
+    // 1. 偵測使用者提問中是否有特定日期 (支援 2026/4/7, 4/7, 4月7日)
+    const dateRegex = /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})|(\d{1,2}[\/\-]\d{1,2})|(\d{1,2}月\d{1,2}日)/;
+    const matchedDate = prompt.match(dateRegex);
+    let targetDate = null;
+
+    if (matchedDate) {
+      let rawDate = matchedDate[0].replace(/月/g, '/').replace(/日/g, '');
+      const dateObj = new Date(rawDate);
+      // 自動補齊年份 (若沒寫年份則抓 local_date 的年份)
+      const year = isNaN(dateObj.getFullYear()) || dateObj.getFullYear() < 2000 
+                   ? new Date(local_date).getFullYear() 
+                   : dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      targetDate = `${year}-${month}-${day}`;
+    }
+
+    // 2. 統一使用 local_date 作為今天，徹底避免伺服器 ISO 時區誤差
     const todayStr = local_date || new Date().toISOString().split('T')[0];
-    
-    // 計算昨天
     const todayObj = new Date(todayStr);
     const yesterdayObj = new Date(todayObj);
     yesterdayObj.setDate(yesterdayObj.getDate() - 1);
     const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
 
-    // --- 1. 判斷查詢範圍並構建 Supabase URL ---
+   // --- 1. 判斷查詢範圍並構建 Supabase URL ---
     let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
 
-    // 基準日期也使用 todayStr
-    const baseDate = record_date ? new Date(record_date) : new Date(todayStr);
+    // 基準日期優先權：目標日期 > record_date > 裝置今天
+    const baseDateStr = targetDate || record_date || todayStr;
+    const baseDate = new Date(baseDateStr);
 
-    if (prompt.includes("去年")) {
+    if (targetDate) {
+      // 若問特定日期：抓當日 + 往前推 7 天 (供基線計算)
+      const startDate = new Date(baseDate);
+      startDate.setDate(startDate.getDate() - 7);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${targetDate}`;
+    } else if (prompt.includes("去年")) {
       const lastYear = baseDate.getFullYear() - 1;
       queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
     } else if (prompt.includes("上個月")) {
@@ -48,10 +70,11 @@ export default async function handler(req, res) {
       const thirtyDaysAgo = new Date(new Date(baseDate).setDate(baseDate.getDate() - 30)).toISOString().split('T')[0];
       queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
     } else {
-      const sevenDaysAgo = new Date(baseDate);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const startDateStr = sevenDaysAgo.toISOString().split('T')[0];
-      const endDateStr = baseDate.toISOString().split('T')[0];
+      // 預設抓 7 天
+      const startDate = new Date(baseDate);
+      startDate.setDate(startDate.getDate() - 7);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = baseDateStr;
       queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
     }
 
@@ -339,6 +362,7 @@ ${systemInstruction}
 
 [目前的環境資訊]
 - 使用者所在地日期: ${todayStr} (昨天是 ${yesterdayStr})
+- 使用者詢問的目標日期: ${targetDate || '最新資料'} 
 - 數據狀態: ${dataStatusNotice}
 
 [數據區塊]
