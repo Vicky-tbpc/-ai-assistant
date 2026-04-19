@@ -1,4 +1,4 @@
-// anything_llm_api_02
+// anything_llm_api_03
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -27,17 +27,51 @@ export default async function handler(req, res) {
       return `${y}-${m}-${d}`;
     };
 
+     // --- 【新增】精準解析「週幾」函數 ---
+    const getSpecificDate = (p, baseDate) => {
+      const weekMap = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0 };
+      const match = p.match(/(這|上)(週|星期|禮拜)([一二三四五六日天])/);
+      if (match) {
+        const relative = match[1]; // "這" 或 "上"
+        const targetDay = weekMap[match[3]];
+        const currentDay = baseDate.getDay() === 0 ? 7 : baseDate.getDay(); // Mon=1...Sun=7
+        
+        // 先回推到「本週一」
+        const thisMonday = new Date(baseDate);
+        thisMonday.setDate(baseDate.getDate() - (currentDay - 1));
+
+        const resultDate = new Date(thisMonday);
+        if (relative === "上") {
+          // 上週：先減 7 天，再加上目標星期的偏移量
+          resultDate.setDate(thisMonday.getDate() - 7 + (targetDay === 0 ? 6 : targetDay - 1));
+        } else {
+          // 這週：直接加目標星期的偏移量
+          resultDate.setDate(thisMonday.getDate() + (targetDay === 0 ? 6 : targetDay - 1));
+        }
+        return fmt(resultDate);
+      }
+      return null;
+    };
+
     // --- 1. 日期解析與標準化 (Rule 1 & 4) ---
-    const today = new Date(local_date); // 使用使用者傳來的 local_date
+    const today = new Date(local_date);
     let targetDate = null;
     let queryStartDate = "";
     let queryEndDate = fmt(today);
-    let analysisMode = "range"; // single (單日) or range (區間) or compare (比較)
+    let analysisMode = "range";
 
-    // 絕對日期匹配 (例如 2026/02/20 或 2026-02-20)
-    const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+    // A. 優先檢查是否為「上週三/這週日」這種格式
+    const weekdayDate = getSpecificDate(prompt, today);
     
-    if (absMatch) {
+    // B. 絕對日期匹配 (例如 2026/02/20)
+    const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+
+    if (weekdayDate) {
+      targetDate = weekdayDate;
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    } else if (absMatch) {
       targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
       queryStartDate = targetDate;
       queryEndDate = targetDate;
@@ -55,24 +89,18 @@ export default async function handler(req, res) {
       queryEndDate = targetDate;
       analysisMode = "single";
     } else if (prompt.includes("本週") || prompt.includes("上週")) {
-      // Rule 3: 週一至週日
       analysisMode = "compare";
-      const currentDay = today.getDay() === 0 ? 7 : today.getDay(); // 轉換為 Mon=1, Sun=7
+      const currentDay = today.getDay() === 0 ? 7 : today.getDay();
       const thisMon = new Date(today);
       thisMon.setDate(today.getDate() - (currentDay - 1));
-      
       const lastMon = new Date(thisMon);
       lastMon.setDate(lastMon.getDate() - 7);
-      const lastSun = new Date(thisMon);
-      lastSun.setDate(lastSun.getDate() - 1);
-
-      queryStartDate = fmt(lastMon); // 從上週一開始抓到今天
+      queryStartDate = fmt(lastMon); 
     } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
       analysisMode = "compare";
       const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       queryStartDate = fmt(firstDayLastMonth);
     } else {
-      // 預設抓取 14 天 (擴大區間以利解析)
       const defaultStart = new Date(today);
       defaultStart.setDate(today.getDate() - 14);
       queryStartDate = fmt(defaultStart);
@@ -133,6 +161,15 @@ export default async function handler(req, res) {
       }).join('\n');
     }
 
+    // --- 【新增】建立日期參考表，防止 AI 算錯星期 ---
+    const weekDaysInfo = [];
+    const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+    for (let i = 0; i < 10; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
+    }
+      
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 # 核心規範
@@ -142,10 +179,12 @@ export default async function handler(req, res) {
 4. 比較原則：若是跨區間比較，請計算平均值。
 5. 字數：150-250 字。
 
-# 時間與數據
-- 今天：${fmt(today)}
+# 精準日期參考 (以這些對照為準)
+- 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
 - 查詢範圍：${queryStartDate} 至 ${queryEndDate}
-- 真實數據內容：
+- 最近日期對照表：${weekDaysInfo.join('\n')}
+
+# 資料庫真實數據
 ${healthContext}
 
 # 對話紀錄
