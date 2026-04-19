@@ -1,4 +1,4 @@
-// anything_llm_api_05
+// anything_llm_api_06
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -66,6 +66,9 @@ export default async function handler(req, res) {
     // B. 絕對日期匹配 (例如 2026/02/20)
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
 
+    // C. 新增：月份匹配 (例如 2026年2月 或 2月)
+    const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
+
     if (weekdayDate) {
       targetDate = weekdayDate;
       queryStartDate = targetDate;
@@ -76,6 +79,16 @@ export default async function handler(req, res) {
       queryStartDate = targetDate;
       queryEndDate = targetDate;
       analysisMode = "single";
+    } else if (monthMatch) {
+      analysisMode = "compare"; // 月份分析建議使用 compare 模式
+      const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
+      const month = parseInt(monthMatch[2]);
+      // 設定該月的第一天
+      const firstDay = new Date(year, month - 1, 1);
+      // 設定該月的最後一天 (下個月的第 0 天就是這個月最後一天)
+      const lastDay = new Date(year, month, 0);      
+      queryStartDate = fmt(firstDay);
+      queryEndDate = fmt(lastDay);
     } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -88,21 +101,38 @@ export default async function handler(req, res) {
       queryStartDate = targetDate;
       queryEndDate = targetDate;
       analysisMode = "single";
+    
     } else if (prompt.includes("本週") || prompt.includes("上週")) {
       analysisMode = "compare";
       const currentDay = today.getDay() === 0 ? 7 : today.getDay();
       const thisMon = new Date(today);
       thisMon.setDate(today.getDate() - (currentDay - 1));
-      const lastMon = new Date(thisMon);
-      lastMon.setDate(lastMon.getDate() - 7);
-      queryStartDate = fmt(lastMon); 
+      
+      if (prompt.includes("上週")) {
+        const lastMon = new Date(thisMon);
+        lastMon.setDate(lastMon.getDate() - 7);
+        const lastSun = new Date(thisMon);
+        lastSun.setDate(thisMon.getDate() - 1);
+        
+        queryStartDate = fmt(lastMon);
+        queryEndDate = fmt(lastSun); // 修正：結束日期設為上週日
+      } else {
+        queryStartDate = fmt(thisMon);
+        // 這週的結束日期維持 today 是正確的
+      }
     } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
       analysisMode = "compare";
-      const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      queryStartDate = fmt(firstDayLastMonth);
+      if (prompt.includes("上個月")) {
+        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        queryStartDate = fmt(firstDayLastMonth);
+        queryEndDate = fmt(lastDayLastMonth); // 修正：結束日期設為上個月最後一天
+      } else {
+        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        queryStartDate = fmt(firstDayThisMonth);
     } else {
       const defaultStart = new Date(today);
-      defaultStart.setDate(today.getDate() - 30);
+      defaultStart.setDate(today.getDate() - 14);
       queryStartDate = fmt(defaultStart);
     }
 
