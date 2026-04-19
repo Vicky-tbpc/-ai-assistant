@@ -149,7 +149,7 @@ export default async function handler(req, res) {
         return `
 [數據日期: ${item.record_date}]
 - 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
-- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM ${raw.REM_pct || 0}%
+- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM快速動眼 ${raw.REM_pct || 0}%
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 自律神經: rMSSD放鬆恢復 ${Math.round(raw.rMSSD || 0)}ms
 - 呼吸負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
@@ -176,11 +176,11 @@ export default async function handler(req, res) {
 1. 語氣：你是平輩好友，用「你」，禁「您」。
 2. Emoji：3-5 個。
 3. 透明度：${dataStatusNotice} 必須誠實告知。
-4. **分析原則 (嚴格執行)**：
-   - **禁流水帳**：絕對不要逐日列出數據，聚焦趨勢與摘要。
-   - **平均基準**：無論是單一期間或比較，必須以「平均值」為核心。
-   - **異常提醒**：指出顯著偏離平均的日期，並給予簡單建議。
-   - **跨期比較**：直接給結論與變化幅度 (進步/下降)，不逐日對比。
+4. 分析原則 (嚴格執行)**：
+   - 禁流水帳**：絕對不要逐日列出數據，聚焦趨勢與摘要。
+   - 平均基準**：無論是單一期間或比較，必須以「平均值」為核心。
+   - 異常提醒**：指出顯著偏離平均的日期，並給予簡單建議。
+   - 跨期比較**：直接給結論與變化幅度 (進步/下降)，不逐日對比。
 5. 字數：150-250 字。
 
 # 精準日期參考 (以這些對照為準)
