@@ -1,4 +1,4 @@
-// anything_llm_api_03
+// anything_llm_api_04
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -176,7 +176,11 @@ export default async function handler(req, res) {
 1. 語氣：你是平輩好友，用「你」，禁「您」。
 2. Emoji：3-5 個。
 3. 透明度：${dataStatusNotice} 必須誠實告知。
-4. 比較原則：若是跨區間比較，請計算平均值。
+4. **分析原則 (嚴格執行)**：
+   - **禁流水帳**：絕對不要逐日列出數據，聚焦趨勢與摘要。
+   - **平均基準**：無論是單一期間或比較，必須以「平均值」為核心。
+   - **異常提醒**：指出顯著偏離平均的日期，並給予簡單建議。
+   - **跨期比較**：直接給結論與變化幅度 (進步/下降)，不逐日對比。
 5. 字數：150-250 字。
 
 # 精準日期參考 (以這些對照為準)
