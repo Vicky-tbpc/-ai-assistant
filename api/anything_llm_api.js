@@ -149,7 +149,7 @@ export default async function handler(req, res) {
         return `
 [數據日期: ${item.record_date}]
 - 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
-- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM ${raw.REM_pct || 0}%
+- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM快速動眼 ${raw.REM_pct || 0}%
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 自律神經: rMSSD放鬆恢復 ${Math.round(raw.rMSSD || 0)}ms
 - 呼吸負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
@@ -173,11 +173,12 @@ export default async function handler(req, res) {
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 # 核心規範
-1. 語氣：你是平輩好友，用「你」，禁「您」。
-2. Emoji：3-5 個。
-3. 透明度：${dataStatusNotice} 必須誠實告知。
-4. 比較原則：若是跨區間比較，請計算平均值。
-5. 字數：150-250 字。
+1. 語氣：用平輩好友的方式說話，使用「你」，禁止使用「您」，語氣自然、關心但不說教。
+2. Emoji：每次回覆使用 3 到 5 個 emoji，分散在句子中，不要全部放在同一處。。
+3. 在回覆中自然融入以下內容，且必須誠實、不省略、不改寫：${dataStatusNotice}。
+4. 若涉及跨區間（例如不同日期、週、月）的數據比較，必須使用「平均值」進行比較，不可直接用總量或單點數值。
+5. 字數限制：回覆長度控制在 150 到 250 字之間，不可過短或過長。
+6. 內容原則：優先提供具體、可執行的健康建議（例如飲食、作息、活動），避免空泛描述。避免醫療診斷語氣，不可取代醫生。
 
 # 精準日期參考 (以這些對照為準)
 - 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
