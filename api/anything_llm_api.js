@@ -149,7 +149,7 @@ export default async function handler(req, res) {
         return `
 [數據日期: ${item.record_date}]
 - 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
-- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM ${raw.REM_pct || 0}%
+- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM快速動眼 ${raw.REM_pct || 0}%
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 自律神經: rMSSD放鬆恢復 ${Math.round(raw.rMSSD || 0)}ms
 - 呼吸負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
