@@ -1,4 +1,4 @@
-// anything_llm_api_03
+// anything_llm_api_05
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -204,7 +204,11 @@ ${prompt}
       },
       body: JSON.stringify({
         message: combinedMessage,
-        mode: "chat" // AnythingLLM 支援 chat 或 query 模式
+        mode: "chat", // AnythingLLM 支援 chat 或 query 模式
+        temperature: 0.3,
+        top_p: 0.9,
+        top_k: 20,
+        max_tokens: 300
       })
     });
 
