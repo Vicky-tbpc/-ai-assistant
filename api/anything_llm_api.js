@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       queryStartDate = fmt(firstDayLastMonth);
     } else {
       const defaultStart = new Date(today);
-      defaultStart.setDate(today.getDate() - 14);
+      defaultStart.setDate(today.getDate() - 30);
       queryStartDate = fmt(defaultStart);
     }
 
