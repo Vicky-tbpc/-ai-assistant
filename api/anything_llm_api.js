@@ -224,6 +224,13 @@ export default async function handler(req, res) {
 - 查詢範圍：${queryStartDate} 至 ${queryEndDate}
 - 最近日期對照表：${weekDaysInfo.join('\n')}
 
+# 資料判斷規則（非常重要）
+1. 僅可依據「資料庫真實數據（healthContext）」進行分析。
+2. 若 healthContext 為空、無相關數據、或無法支持問題內容，
+   必須明確回覆「目前沒有資料」或「無法判斷」。
+3. 禁止推測、補齊、假設或生成任何不存在的數據。
+4. 若資料不足，優先說明限制，再提供一般性健康建議。
+
 # 資料庫真實數據
 ${healthContext}
 
