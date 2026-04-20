@@ -245,7 +245,7 @@ ${prompt}
       body: JSON.stringify({
         message: combinedMessage,
         mode: "chat", // AnythingLLM 支援 chat 或 query 模式
-        temperature: 0.3,
+        temperature: 0.1,
         top_p: 0.9,
         top_k: 20,
         max_tokens: 300
