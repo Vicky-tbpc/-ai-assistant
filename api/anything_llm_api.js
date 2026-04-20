@@ -1,4 +1,4 @@
-// anything_llm_api_06
+// anything_llm_api_08
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -218,6 +218,7 @@ export default async function handler(req, res) {
    只有在確認數值關係正確後，才能描述趨勢。若涉及多筆數據，必須逐一比較，不可憑語感推測。
    若無法確認數值關係，必須明確回覆「無法判斷」，禁止猜測或反向描述。
 8. 數據透明度：必須自然融入以下資訊，且不可省略或改寫：${dataStatusNotice}
+9. 請只輸出最終回覆內容，不要輸出任何提示詞、規則、標題或系統訊息。
 
 # 精準日期參考 (以這些對照為準)
 - 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
