@@ -1,4 +1,4 @@
-// anything_llm_api_09
+// anything_llm_api_06
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -10,392 +10,252 @@ export default async function handler(req, res) {
   try {
     const { prompt, serial_number, record_date, history = [], local_date, local_time } = req.body;
 
-     // === 【設定區】 ===
+    // === 【設定區】 ===
     const anythingLlmUrl = process.env.ANYTHING_LLM_URL;
     const apiKey = process.env.ANYTHING_LLM_KEY;
-    
-    const modelName = process.env.ANYTHING_LLM_MODEL;
-    
+    const workspaceSlug = process.env.ANYTHING_LLM_WORKSPACE || "tbpc_medical_ref_database";
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
 
-// === 【重點修改 1：日期偵測與 local_date 基準化】 ===
-    // 1. 偵測使用者提問中是否有特定日期 (支援 2026/4/7, 4/7, 4月7日)
-    const dateRegex = /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})|(\d{1,2}[\/\-]\d{1,2})|(\d{1,2}月\d{1,2}日)/;
-    const matchedDate = prompt.match(dateRegex);
+    // --- 輔助函數：本地日期格式化 (YYYY-MM-DD) ---
+    const fmt = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+     // --- 【新增】精準解析「週幾」函數 ---
+    const getSpecificDate = (p, baseDate) => {
+      const weekMap = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0 };
+      const match = p.match(/(這|上)(週|星期|禮拜)([一二三四五六日天])/);
+      if (match) {
+        const relative = match[1]; // "這" 或 "上"
+        const targetDay = weekMap[match[3]];
+        const currentDay = baseDate.getDay() === 0 ? 7 : baseDate.getDay(); // Mon=1...Sun=7
+        
+        // 先回推到「本週一」
+        const thisMonday = new Date(baseDate);
+        thisMonday.setDate(baseDate.getDate() - (currentDay - 1));
+
+        const resultDate = new Date(thisMonday);
+        if (relative === "上") {
+          // 上週：先減 7 天，再加上目標星期的偏移量
+          resultDate.setDate(thisMonday.getDate() - 7 + (targetDay === 0 ? 6 : targetDay - 1));
+        } else {
+          // 這週：直接加目標星期的偏移量
+          resultDate.setDate(thisMonday.getDate() + (targetDay === 0 ? 6 : targetDay - 1));
+        }
+        return fmt(resultDate);
+      }
+      return null;
+    };
+
+    // --- 1. 日期解析與標準化 (Rule 1 & 4) ---
+    const today = new Date(local_date);
     let targetDate = null;
+    let queryStartDate = "";
+    let queryEndDate = fmt(today);
+    let analysisMode = "range";
 
-    if (matchedDate) {
-      let rawDate = matchedDate[0].replace(/月/g, '/').replace(/日/g, '');
-      const dateObj = new Date(rawDate);
-      // 自動補齊年份 (若沒寫年份則抓 local_date 的年份)
-      const year = isNaN(dateObj.getFullYear()) || dateObj.getFullYear() < 2000 
-                   ? new Date(local_date).getFullYear() 
-                   : dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      targetDate = `${year}-${month}-${day}`;
-    }
+    // A. 優先檢查是否為「上週三/這週日」這種格式
+    const weekdayDate = getSpecificDate(prompt, today);
+    
+    // B. 絕對日期匹配 (例如 2026/02/20)
+    const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
 
-    // 2. 統一使用 local_date 作為今天，徹底避免伺服器 ISO 時區誤差
-    const todayStr = local_date || new Date().toISOString().split('T')[0];
-    const todayObj = new Date(todayStr);
-    const yesterdayObj = new Date(todayObj);
-    yesterdayObj.setDate(yesterdayObj.getDate() - 1);
-    const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
+    // C. 新增：月份匹配 (例如 2026年2月 或 2月)
+    const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
-   // --- 1. 判斷查詢範圍並構建 Supabase URL ---
-    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&select=record_date,raw_json&order=record_date.desc`;
-
-    // 基準日期優先權：目標日期 > record_date > 裝置今天
-    const baseDateStr = targetDate || record_date || todayStr;
-    const baseDate = new Date(baseDateStr);
-
-    if (targetDate) {
-      // 若問特定日期：抓當日 + 往前推 7 天 (供基線計算)
-      const startDate = new Date(baseDate);
-      startDate.setDate(startDate.getDate() - 7);
-      const startDateStr = startDate.toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${targetDate}`;
-    } else if (prompt.includes("去年")) {
-      const lastYear = baseDate.getFullYear() - 1;
-      queryUrl += `&record_date=gte.${lastYear}-01-01&record_date=lte.${lastYear}-12-31`;
-    } else if (prompt.includes("上個月")) {
-      const firstDayLastMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1).toISOString().split('T')[0];
-      const lastDayLastMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 0).toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${firstDayLastMonth}&record_date=lte.${lastDayLastMonth}`;
-    } else if (prompt.includes("月")) {
-      const thirtyDaysAgo = new Date(new Date(baseDate).setDate(baseDate.getDate() - 30)).toISOString().split('T')[0];
-      queryUrl += `&record_date=gte.${thirtyDaysAgo}`;
+    if (weekdayDate) {
+      targetDate = weekdayDate;
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    } else if (absMatch) {
+      targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    } else if (monthMatch) {
+      analysisMode = "compare"; // 月份分析建議使用 compare 模式
+      const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
+      const month = parseInt(monthMatch[2]);
+      // 設定該月的第一天
+      const firstDay = new Date(year, month - 1, 1);
+      // 設定該月的最後一天 (下個月的第 0 天就是這個月最後一天)
+      const lastDay = new Date(year, month, 0);      
+      queryStartDate = fmt(firstDay);
+      queryEndDate = fmt(lastDay);
+    } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      targetDate = fmt(yesterday);
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    } else if (prompt.includes("今天") || prompt.includes("最新")) {
+      targetDate = fmt(today);
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    
+    } else if (prompt.includes("本週") || prompt.includes("上週")) {
+      analysisMode = "compare";
+      const currentDay = today.getDay() === 0 ? 7 : today.getDay();
+      const thisMon = new Date(today);
+      thisMon.setDate(today.getDate() - (currentDay - 1));
+      
+      if (prompt.includes("上週")) {
+        const lastMon = new Date(thisMon);
+        lastMon.setDate(lastMon.getDate() - 7);
+        const lastSun = new Date(thisMon);
+        lastSun.setDate(thisMon.getDate() - 1);
+        
+        queryStartDate = fmt(lastMon);
+        queryEndDate = fmt(lastSun); // 修正：結束日期設為上週日
+      } else {
+        queryStartDate = fmt(thisMon);
+        // 這週的結束日期維持 today 是正確的
+      }
+    } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
+      analysisMode = "compare";
+      if (prompt.includes("上個月")) {
+        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        queryStartDate = fmt(firstDayLastMonth);
+        queryEndDate = fmt(lastDayLastMonth); // 修正：結束日期設為上個月最後一天
+      } else {
+        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        queryStartDate = fmt(firstDayThisMonth);
+      }
     } else {
-      // 預設抓 7 天
-      const startDate = new Date(baseDate);
-      startDate.setDate(startDate.getDate() - 7);
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = baseDateStr;
-      queryUrl += `&record_date=gte.${startDateStr}&record_date=lte.${endDateStr}`;
+      const defaultStart = new Date(today);
+      defaultStart.setDate(today.getDate() - 14);
+      queryStartDate = fmt(defaultStart);
     }
 
     // --- 2. 執行資料庫讀取 ---
+    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&record_date=gte.${queryStartDate}&record_date=lte.${queryEndDate}&select=record_date,raw_json&order=record_date.desc`;
     const sbRes = await fetch(queryUrl, {
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
     });
     const dataList = await sbRes.json();
 
-     // === 【新增：JS 端日期與數據狀態檢查】 ===
-    const latestRecordDate = dataList.length > 0 ? dataList[0].record_date : null;
-    const hasYesterdayData = dataList.some(item => item.record_date === yesterdayStr);
-    // 判斷使用者是否在問昨天或最新資料
-    const isAskingForYesterday = prompt.includes("昨天") || prompt.includes("昨晚") || prompt.includes("最新");
-
+    // --- 3. 單日查詢補償邏輯 (Rule 2) ---
+    let finalContextData = dataList;
     let dataStatusNotice = "";
-    if (isAskingForYesterday && !hasYesterdayData) {
-        // 如果問昨天但沒資料，準備一段文字「警告」AI
-        dataStatusNotice = `【系統通知】：使用者正在詢問昨天 (${yesterdayStr}) 的紀錄，但資料庫中「沒有」這一天的數據。目前最新的一份數據日期是 ${latestRecordDate || '未知'}。請務必誠實告知使用者，不要套用範例或其他日期的數值。`;
+
+    if (analysisMode === "single" && targetDate) {
+      const exactMatch = dataList.find(d => d.record_date === targetDate);
+      if (!exactMatch && dataList.length > 0) {
+        // 尋找時間差最小的日期
+        const sortedByDist = [...dataList].sort((a, b) => {
+          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
+          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
+          if (distA === distB) return new Date(b.record_date) - new Date(a.record_date); // 優先選較新的
+          return distA - distB;
+        });
+        const nearest = sortedByDist[0];
+        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
+        finalContextData = [nearest];
+      } else if (!exactMatch && dataList.length === 0) {
+        dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
+        finalContextData = [];
+      } else {
+        finalContextData = [exactMatch];
+      }
     }
 
-     // --- 3. 格式化數據 Context ---
-    let healthContext = "找不到相關數據。";
-    let avgContext = ""; // 用來存放計算好的平均值區塊
-    let avgs = {};
-    let count = 0; // <<--- 在這裡先宣告，預設為 0
-
-if (dataList && dataList.length > 0) {
-   count = dataList.length; // 實際的天數
-  
-  // 1. 初始化累加器物件 (將所有指標預設為 0)
-  let sums = {
-    tst: 0, n3: 0, eff: 0, light: 0, rem: 0,
-    rMssd: 0, hbi: 0, hrMean: 0, hrMin: 0,
-    spo2: 0, rr: 0, odi3: 0, odi4: 0,
-    t90: 0, t89: 0, t88: 0, hrMax: 0, rrMax: 0, 
-    rrMin: 0, spo2Max: 0, spo2Min: 0
-  };
-
-  // 2. 格式化每日數據，並累加總和 (這是為了得到 sums)
-  healthContext = dataList.map(item => {
-    const raw = item.raw_json || {};
-    
-    // 取得當日數值並確保是數字型態 (parseFloat)
-    const d = {
-      tst: parseFloat(raw.TST_min) || 0,
-      n3: parseFloat(raw.N3_pct) || 0,
-      eff: parseFloat(raw.sleep_efficiency_pct) || 0,
-      light: parseFloat(raw.N1N2_pct) || 0,
-      rem: parseFloat(raw.REM_pct) || 0,
-      rMssd: parseFloat(raw.rMSSD) || 0,
-      hbi: parseFloat(raw.HBI) || 0,
-      hrMean: parseFloat(raw.HR_mean) || 0,
-      hrMin: parseFloat(raw.HR_min) || 0,
-      hrMax: parseFloat(raw.HR_max) || 0,
-      spo2: parseFloat(raw.SpO2_mean) || 0,
-      spo2Max: parseFloat(raw.SpO2_max) || 0,
-      spo2Min: parseFloat(raw.SpO2_min) || 0,
-      rr: parseFloat(raw.RR_mean) || 0,
-      rrMax: parseFloat(raw.RR_max) || 0,
-      rrMin: parseFloat(raw.RR_min) || 0,
-      odi3: parseFloat(raw.ODI3_total) || 0,
-      odi4: parseFloat(raw.ODI4_total) || 0,
-      t90: parseFloat(raw.T90_pct) || 0,
-      t89: parseFloat(raw.T89_pct) || 0,
-      t88: parseFloat(raw.T88_pct) || 0
-    };
-
-    // 執行加總
-    Object.keys(sums).forEach(key => sums[key] += d[key]);
-
-        // 回傳原本要求的每日格式字串
-    return `📌【日期：${item.record_date}】 
-            睡眠時長:${Math.floor(d.tst / 60)}時${Math.round(d.tst % 60)}分
-            N3深睡:${d.n3}%
-            效率:${d.eff}%
-            淺睡:${d.light}%
-            REM:${d.rem}%
-            rMSSD放鬆恢復:${Math.round(d.rMssd)}ms
-            HBI缺氧負荷:${Math.round(d.hbi)}%min/h
-            睡眠平均脈搏:${Math.round(d.hrMean)}bpm
-            睡眠最低脈搏:${Math.round(d.hrMin)}bpm
-            睡眠最高脈搏:${Math.round(d.hrMax)}bpm
-            睡眠平均血氧飽和度:${Math.round(d.spo2)}%
-            睡眠最高血氧飽和度:${Math.round(d.spo2Max)}%
-            睡眠最低血氧飽和度:${Math.round(d.spo2Min)}%
-            睡眠平均呼吸頻率:${Math.round(d.rr)}rpm
-            睡眠最高呼吸頻率:${Math.round(d.rrMax)}rpm
-            睡眠最低呼吸頻率:${Math.round(d.rrMin)}rpm
-            ODI 3%:${Math.round(d.odi3)}次/小時
-            ODI 4%:${Math.round(d.odi4)}次/小時
-            T90:${d.t90}%
-            T89:${d.t89}%
-            T88:${d.t88}%
-            -------------------`;
-  }).join('\n');
-
+    // --- 4. 格式化數據 Context ---
+    let healthContext = "找不到相關健康數據。";
+    if (dataList && dataList.length > 0) {
+      healthContext = dataList.map(item => {
+        const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0;
         
-    // 3. 計算平均值 (Avgs) - 這一步完成後才會有 avgs 物件
-  Object.keys(sums).forEach(key => {
-  const rawAvg = sums[key] / count;
-  // 脈搏相關取整數，其餘保留一位小數
-  if (key.includes('hr') || key === 'rMssd' || key.includes('odi')) {
-    avgs[key] = Math.round(rawAvg);
-  } else {
-    avgs[key] = rawAvg.toFixed(1);
-  }
-});
-
-    // 4. 【重點：有了平均值後，再計算波動範圍門檻】
-  const rmssdAvg = parseFloat(avgs.rMssd);
-  const rmssdUpper = (rmssdAvg * 1.1).toFixed(1);
-  const rmssdLower = (rmssdAvg * 0.9).toFixed(1);
-
-  const hrMinAvg = parseInt(avgs.hrMin); // 改用整數
-  const hrMinUpper = (hrMinAvg + 5).toFixed(1);
-  const hrMinLower = (hrMinAvg - 5).toFixed(1);
-
-let baselineDescription = "";
-if (count >= 7) {
-  baselineDescription = `根據你過去 ${count} 天非常穩定的生理規律，我為你整理出了這份「專屬生理基線」：`;
-} else if (count >= 3) {
-  baselineDescription = `這是我根據你這 ${count} 天的數據初步建立的「生理基線」，這不是網路上的通用標準，而是真正認識你身體的數字：`;
-} else {
-  baselineDescription = `雖然目前數據還在累積階段（僅 ${count} 天），但我先幫你抓出了初步的生理參考點：`;
-}
-
-  // 5. 組合 avgContext 餵給 AI
-  avgContext = `
-### 【個人生理基線說明】
-${baselineDescription}
-- 🌿 rMSSD (放鬆恢復) 基線：平均為 ${rmssdAvg} ms。
-  (你的專屬波動範圍是基線的正負 10%，即 ${rmssdLower} ~ ${rmssdUpper} ms)
-- ❤️ 睡眠最低脈搏基線：平均為 ${hrMinAvg} bpm。
-  (你的專屬波動範圍是基線的正負 5 bpm，即 ${hrMinLower} ~ ${hrMinUpper} bpm)
-
-- 其他指標平均：
-- 😴 睡眠時長平均：${Math.floor(avgs.tst / 60)}時${Math.round(avgs.tst % 60)}分、
-- 💤 N3深睡比例平均：${avgs.n3}%、
-- 📈 睡眠效率平均：${avgs.eff}%、
-- ☁️ 淺睡比例平均：${avgs.light}%、
-- 🎭 REM快速動眼期平均：${avgs.rem}%、
-- ⚠️ HBI缺氧負荷平均：${avgs.hbi}%min/h、
-- 🩸 睡眠平均血氧：${avgs.spo2}%、
-- 🌬️ 睡眠平均呼吸頻率：${avgs.rr}rpm、
-- 📊 呼吸事件平均：ODI 3%: ${avgs.odi3}, ODI 4%: ${avgs.odi4}、
-- 📉 缺氧時間佔比平均：T90: ${avgs.t90}%, T89: ${avgs.t89}%, T88: ${avgs.t88}%。
-(⚠️ AI 指導：
- 1. 分析時請直接引用以上平均值，嚴禁自行計算，以免出錯。
- 2. 回覆時請將上述「正負值邏輯」自然地告訴使用者，增加專業感與信任度。
- 3. 特別提醒：rMSSD 高於範圍通常代表恢復力極佳 ✨，請給予鼓勵；低於範圍才需要提醒注意壓力或疲勞。)
---------------------------------------------------`;
+        // 建議將每個日期的數據包裝得更嚴密
+        return `
+[數據日期: ${item.record_date}]
+- 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
+- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM快速動眼 ${raw.REM_pct || 0}%
+- 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
+- 自律神經: rMSSD放鬆恢復 ${Math.round(raw.rMSSD || 0)}ms
+- 呼吸負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
+- 脈搏數據: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
+- 血氧數據: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
+- 呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
+- 血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
+- 低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%`;
+      }).join('\n');
     }
-                      
-    // --- 4. 準備 Ollama 的訊息格式 ---
-    // === 【重點修改 2：在 System Instruction 加入「日期核對」規範】 ===
-    const systemInstruction = `
 
-           ### 角色設定
-           你是一位溫暖、專業且具備敏銳洞察力的睡眠健康夥伴。你不是冷冰冰的數據產生器，而是一個會為使用者的睡眠狀況感到開心或擔憂的好友。
+    // --- 【新增】建立日期參考表，防止 AI 算錯星期 ---
+    const weekDaysInfo = [];
+    const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+    for (let i = 0; i < 10; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
+    }
+      
+    // --- 5. 組合最終 Prompt ---
+    const combinedMessage = `
+# 核心規範
 
-           ### 【絕對指令：語系對齊與規範】
-           1. **100% 語言同步**：你必須精準偵測使用者問題的語系（繁中、簡中、日文、英文）。
-              - 若使用者用英文提問，你「必須」全程以英文回覆。
-              - 若僅輸入術語（如：HBI?），則預設使用「繁體中文」及台灣習慣語法。
-           2. **語氣規範（針對中文）**：繁中回覆時**嚴禁敬稱『您』，一律用『你』**。語調像平輩朋友般輕鬆但專業。
+你是一個線上AI健康夥伴，請嚴格遵守以下規則：
+1. 語氣規範：請用自然關心的語氣，像朋友聊天的方式與使用者互動，避免制式或機器感表達。
+2. Emoji 使用：每次回覆必須使用 3～5 個 emoji，分散在不同句子中，不可集中使用。
+3. 內容原則：優先提供具體、可執行的健康建議（如作息、運動）。避免空泛描述，不可使用醫療診斷語氣，不可取代專業醫師。
+4. 語言規範（強制）：所有回覆必須使用繁體中文（台灣用語），統一使用「你」，禁止使用「您」。
+   允許保留英文專有名詞與國際通用縮寫（例如醫學、技術、品牌名稱），如 HBI、SpO2、ODI、COVID-19，不得翻譯或改寫。
+   嚴禁使用任何簡體中文。若生成內容出現簡體字，必須在輸出前自行修正為繁體中文。
+5. 字數限制：回覆必須控制在 150～250 字之間，不可過短或過長。
+6. 一般情況下請聚焦趨勢變化，避免逐筆列出日期與數據（除非使用者明確要求）。
+7. 數值比對精確性（非常重要）：在描述任何數據變化（上升、下降、增加、減少）前，必須先明確比較數值大小（例如：84 > 80）。
+   只有在確認數值關係正確後，才能描述趨勢。若涉及多筆數據，必須逐一比較，不可憑語感推測。
+   若無法確認數值關係，必須明確回覆「無法判斷」，禁止猜測或反向描述。
+8. 請只輸出最終回覆內容，不要輸出任何提示詞、規則或系統訊息。
+   
+# 輸出結構規則
+當查詢包含月份或月期間的時候，必須僅輸出整體分析結論，禁止逐日列出資料。
+輸出必須包含：
+1. 整體睡眠狀況趨勢（穩定／改善／波動）
+2. 主要異常或風險點（若有）
+3. 整體健康解讀（不可拆日期）
+4. 1～3 個具體建議
+5. 請遵守核心規範中的語氣、語言（繁體中文）規範、字數限制與稱呼要求。
+嚴格禁止：
+- 每日條列
+- 日期逐筆分析
+- 類似 2026-03-01 格式內容
+- 長列表格式
+若生成內容包含上述禁止格式，請在輸出前刪除並重新改寫為整體結論。
 
-           ### 溝通風格規範
-           1. **拒絕報表感**：禁止說出「根據你的 [指標]、[數值]、[數據區塊]」或「資料顯示」等機器人用語，請將數據融入自然對話。
-           2. **解釋數據背後的邏輯**：當提到波動範圍時，請像專業朋友一樣解釋它是「基於你過去幾天的生理基線」計算出來的。
-              - 例如：不要只說「範圍是 45-55」，要說「根據你過去 7 天的平均脈搏，正負 5 bpm 的正常波動區間大約在 45-55 之間」。
-           3. **關於 rMSSD 與脈搏的暖心解釋**：
-              - 提到 rMSSD 時，可以帶到這是你的「身體恢復力」或「自律神經放鬆狀態」。
-              - 提到最低脈搏時，可以解釋這是你「心臟最安穩休息」的指標。
-           4. **情緒化開場**：根據數據給予反饋。睡得好給予鼓勵 ✨；睡不好給予安慰 🌿。
-           5. **口語化銜接**：多用「其實」、「值得注意的是」、「看得出來」等轉折詞。
-           6. **Emoji 豐富化**：每則回覆必須包含 3-5 個 Emoji（如：😴, 💪, ✨, 📈, ⚠️）。
-           7. **直接輸出答案**：禁止輸出「思考過程」、「判斷路徑」或「標題」。
-           8. **保持精簡**：字數控制在 150-250 字以內，直擊重點。
-           
-           ### 【核心指令：三路徑意圖過濾】
-           **請嚴格根據 [使用者當前問題] 判斷路徑，這決定了你是否能存取下方數據數據區塊：**
+# 時間與資料判斷規則（非常重要）
+1. 所有時間判斷（今天、上週、上個月）必須以「精準日期參考」為唯一基準。
+2. 若 healthContext 中的資料年份或區間與查詢時間不一致，必須回覆「目前沒有資料」或「無法判斷」，禁止錯誤對應或使用舊資料推測。
+3. 不得自行用歷史資料填補當前查詢時間區間。不得使用外部知識補充不存在的數據。
+4. 數據透明度：必須自然融入以下資訊，且不可省略或改寫：${dataStatusNotice}
 
-           #### 🛑 路徑 A：名詞解釋或一般建議 (例如：什麼是HBI？、rMSSD是什麼？)
-           - **核心目的**：僅提供醫學/健康知識科普，引發使用者興趣。
-           - **❌ 絕對禁令**：**嚴禁提及任何數值（包含平均值、日期、最新值）**。即使你能在下方的數據區塊看到資料，也請當作沒看到。
-           - **回覆結構**：
-             1. 溫暖地解釋該指標的定義與對健康的意義。
-             2. **結尾必須僅使用以下詢問句**：「想看更多具體數據嗎？或者你還有其他指標想知道的？😉」
-           - **違規處罰**：若在此路徑提到任何 %、ms、bpm 等具體個人數據，將視為系統嚴重錯誤。
+# 精準日期參考 (以這些對照為準)
+- 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
+- 查詢範圍：${queryStartDate} 至 ${queryEndDate}
+- 最近日期對照表：${weekDaysInfo.join('\n')}
 
-           #### 📊 路徑 B：要求分析個人數據 (例如：分析昨晚、最近睡得好嗎？)
-           - **核心要求**：精準核對日期。若無當日紀錄須老實告知，並告知最新紀錄日期。
-           - **數據使用**：必須優先採用系統算好的「平均值」，禁止自行運算。
-           - **內容**：對比「個人7日移動平均（不含當日）」，將數據轉化為「身體的悄悄話」。
+# 資料庫真實數據
+${healthContext}
 
-           #### 🎯 路徑 C：特定指標追蹤 (例如：當使用者回答「好啊」、「想看」)
-           - **觸發條件**：當 History 顯示上一則是在解釋指標（路徑 A），且使用者現在給予肯定回覆時。
-           - **絕對限制**：**「嚴禁」提及任何與該指標無關的數據**。只分析該指標的最新值、平均值與趨勢。
-                    
-           【數據分析與平均值規範】
-            1. **數據標準**：請以隨後提供的 **[診斷參考依據]** 區塊為唯一判斷準則。
-            2. **平均值來源**：請優先採用 [系統預先計算] 區塊提供的平均值。
-            3. **禁止計算**：嚴禁自行對數據進行加減乘除，以系統提供的平均值為準。
-            4. **Path A 嚴禁引用數據。**
-           
-           ### 【格式參考範例】（僅供回覆語氣與格式參考，嚴禁引用此處之 03/26 日期與數值）
-          使用者問：「分析我最新一天的睡眠？」
-          你回：
-          「你好！看來你 03/26 的睡眠有些挑戰呢。😴 總時長僅 5 小時 1 分，遠低於 7 小時目標與過去一週平均的 6.3 小時。深睡 N3 僅 8%，淺睡達 71% 偏高，睡眠結構需要優化喔。
-           此外，你的 HBI 缺氧負荷 6%min/h，且 ODI 3% 達 6 次/小時，這已超過建議標準（ODI > 5 次），並略高於平均，建議你多留意呼吸狀況。⚠️
-           不過，rMSSD 放鬆恢復高達 80ms，顯著優於平均值，表示你的身體在有限睡眠時間裡，仍盡力修復！💪
+# 對話紀錄
+${history.map(h => `${h.role === "model" ? "助手" : "我"}: ${h.parts[0].text}`).slice(-3).join('\n')}
 
-           ### 數據精準度嚴格規範（新增）：
-           1. **嚴格日期核對**：在回答前，請先在 [資料庫真實數據] 區塊中尋找與使用者問題「完全匹配」的日期紀錄。
-           2. **禁止指鹿為馬**：嚴禁將相鄰日期（如 03/31）的數值用於回答另一個日期（如 04/01）的問題。
-           3. **無資料即告知**：如果指定的日期在數據中只有 03/31 而沒有 04/01，請誠實回覆「目前還沒有 04/01 的資料」，絕對不能用前一天的數據來遞補！
-           `.trim();
-
-    // 轉換歷史紀錄格式 (Gemini parts -> Ollama content)
-    const formattedHistory = history.map(h => ({
-      role: h.role === "model" ? "assistant" : "user",
-      content: h.parts[0].text
-    }));
-
-    // --- 3.5 意圖預判 (JS 端過濾器) ---
-const isPathA = (prompt.includes("是什麼") || prompt.includes("解釋") || /^[a-zA-Z0-9? ]+$/.test(prompt)) && !prompt.includes("我");
-
-const safeAvgContext = isPathA 
-  ? "【系統提醒：使用者目前僅在詢問名詞定義，請專注於醫學知識科普，嚴禁提及任何個人數據、平均值或波動範圍。】" 
-  : avgContext;
-
-const safeHealthContext = isPathA 
-  ? "【系統提醒：數據已屏蔽。請勿在回覆中帶入任何具體數值，結尾請引導使用者詢問具體數據。】" 
-  : healthContext;
-
-// --- 3.6 語系硬核偵測 (針對日文/英文) ---
-// 偵測日文：檢查是否包含平假名 (\u3040-\u309F) 或片假名 (\u30A0-\u30FF)
-const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF]/.test(prompt);
-// 偵測英文：檢查是否整句幾乎由英文字母與標點組成
-const isEnglish = /^[a-zA-Z0-9?\s.,!'"-]+$/.test(prompt);
-
-let forcedLanguageInstruction = "";
-if (hasJapanese) {
-    forcedLanguageInstruction = "⚠️ [CRITICAL] Detected Japanese. You MUST respond in Japanese (日本語).";
-} else if (isEnglish) {
-    forcedLanguageInstruction = "⚠️ [CRITICAL] Detected English. You MUST respond in English.";
-} else {
-    // 預設為繁體中文，並再次強調不使用「您」
-    forcedLanguageInstruction = "請使用繁體中文回覆，嚴禁敬稱「您」，一律用「你」。回覆時請務必對照 [診斷參考依據] 的數值門檻。";
-}
-
-// --- 3.7 定義硬性診斷標準 ---
-const healthStandards = `
-### 📊 睡眠診斷標準 (分析時必須以此為準)
-1. **睡眠時長**：目標 7 小時。
-2. **睡眠效率**：≥ 85% 良好；≤ 75% 不佳。
-3. **睡眠結構**：N3(10-20%)、REM(10-25%)、淺睡(50-65%)。
-4. **恢復指標 (重要)**：
-   - **rMSSD**：請直接對照上方 [數據基準計算] 提供的「正常範圍」。若當日數值不在該區間內，即判定為恢復異常。
-   - **最低脈搏**：請直接對照上方 [數據基準計算] 提供的「正常範圍」。若當日數值不在該區間內，即判定為異常。
-5. **呼吸風險 (異常判定)**：
-   - HBI：對比下方 7 日平均值，超過平均值視為異常。
-   - T90 > 5% 或 T89 > 4% 或 T88 > 3% 視為嚴重缺氧。
-   - ODI3 ≥ 5 次/小時 或 ODI4 ≥ 5 次/小時 視為呼吸事件頻繁。
-   - 呼吸頻率：不在 12-25 rpm 之間視為異常。
-
-### 🚨 異常處置分級指南 (請根據趨勢給予對應建議)
-- **🟢 輕微 (單日異常)**：
-  - 判定：僅當天數據不佳。
-  - 回饋：給予「觀察」建議，語氣應溫暖提醒，例如：「今晚早點休息，再觀察看看」。
-- **🟡 中等 (連續 3-5 天異常)**：
-  - 判定：指標連續 3 到 5 天未達標。
-  - 回饋：給予「提醒調整」建議，例如：「已經連續幾天恢復不理想了，建議調整一下作息或環境喔」。
-- **🔴 高風險 (≥6 天連續異常 或 出現單次極端值)**：
-  - 判定：連續 6 天以上異常，或出現 T90 異常、ODI 極高等「單次極端值」。
-  - 回饋：給予「建議就醫」建議，語氣應嚴肅關懷，例如：「這種情況已經持續一段時間（或數值非常顯著），為了安全起見，建議諮詢專業醫生了解原因」。
-`;
-
-// --- 5. 呼叫 AnythingLLM 原生 API ---
-    const workspaceSlug = "tbpc_medical_ref_database"; 
-
-const finalCombinedMessage = `
-${systemInstruction}
-
-[目前的環境資訊]
-- 使用者所在地日期: ${todayStr} (昨天是 ${yesterdayStr})
-- 使用者詢問的目標日期: ${targetDate || '最新資料'} 
-- 數據狀態: ${dataStatusNotice}
-
-[數據區塊]
-${safeAvgContext} 
-${safeHealthContext}
-
-[診斷參考依據]
-${healthStandards}  <-- 放在這裡，讓 AI 剛看完數據馬上對照標準
-
-[對話紀錄]
-${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.content}`).join('\n') : "無"}
-
-[使用者當前問題]
-"${prompt}"
-
----
-### ⚠️ 最終回覆強制指令：
-1. ${forcedLanguageInstruction}
-2. **禁止引用區塊標題**：嚴禁在回覆中出現「[數據區塊]」、「[診斷參考依據]」或「[數據基準計算]」等字眼。
-3. **溫暖地解釋邏輯**：
-   - 提到最低脈搏範圍時，必須提到：「這是以你過去 ${count > 0 ? count : '幾'} 天的平均值為準，允許正負 5 bpm 的正常波動」。
-   - 提到 rMSSD 範圍時，必須提到：「這是根據你個人基線的正負 10% 來計算的，代表你自律神經的穩定區間」。
-4. **數據比對要求**：分析時請「嚴格」將 [數據區塊] 的數值與 [診斷參考依據] 進行比對。
-5. **rMSSD 特別提醒**：
-   - 如果使用者的當日 rMSSD 高於正常範圍，請用開心的語氣恭喜他，這代表「身體恢復力極佳、自律神經非常放鬆」✨。
-   - 只有低於範圍時，才需要提醒注意壓力。
-6. 若上述 [數據區塊] 顯示「已屏蔽」，嚴禁提及任何數值。
-7. 保持平輩朋友語氣，並包含 3-5 個 Emoji。
-8. **趨勢分析要求**：請檢查 [資料庫真實數據] 中的日期紀錄，判斷異常是「單日」還是「連續多日」，並根據 [異常處置分級指南] 給予對應的行動建議。
-⚠️【針對恢復指標的特別指令】：
-關於 rMSSD 與 最低脈搏，我已經幫你算好「正常範圍」了。請你「禁止自行計算百分比」，直接拿當日數據跟範圍比對即可。
+# 我的問題
+${prompt}
 `.trim();
 
+    // --- 6. 呼叫 AnythingLLM API ---
     const response = await fetch(`${anythingLlmUrl}/api/v1/workspace/${workspaceSlug}/chat`, {
       method: "POST",
       headers: { 
@@ -403,48 +263,46 @@ ${formattedHistory.length > 0 ? formattedHistory.map(h => `${h.role}: ${h.conten
         "Authorization": `Bearer ${apiKey}` 
       },
       body: JSON.stringify({
-        // 關鍵：這裡必須傳送組合後的訊息內容，AI 才能進行路徑判斷
-        message: finalCombinedMessage,
-        mode: "chat"
+        message: combinedMessage,
+        mode: "chat", // AnythingLLM 支援 chat 或 query 模式
+        temperature: 0.1,
+        top_p: 0.9,
+        top_k: 20,
+        max_tokens: 300
       })
     });
 
     if (!response.ok) {
       const errorDetail = await response.text();
-      throw new Error(`AnythingLLM 原生連線失敗: ${response.status} - ${errorDetail}`);
+      throw new Error(`AnythingLLM 連線失敗: ${response.status} - ${errorDetail}`);
     }
 
     const data = await response.json();
-    // 原生 API 的回傳欄位名稱是 textResponse
     const resultText = data.textResponse || "AI 目前沒有回傳內容。";
 
-    // --- 6. 同步對話記錄至 Supabase ---
-    try {
-      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          serial_number: serial_number,
-          user_query: prompt,
-          ai_response: resultText,
-          record_date: local_date,
-          record_time: local_time,
-          ai_model: 'AnythingLLM-Qwen-2.5' // <--- 新增這一行，也可以寫 'Qwen-2.5-14b' 方便區分模型
-        })
-      });
-    } catch (logError) {
-      console.error("對話紀錄存檔失敗:", logError);
-    }
+    // --- 6. 同步對話記錄至 Supabase (異步執行) ---
+    fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        serial_number: serial_number,
+        user_query: prompt,
+        ai_response: resultText,
+        record_date: local_date,
+        record_time: local_time,
+        ai_model: 'AnythingLLM-Qwen-2.5'
+      })
+    }).catch(e => console.error("Log 存檔失敗", e));
 
     res.status(200).json({ text: resultText });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ text: "我的大腦（地端 AI）反應有點慢，或是穿透工具斷線了，再試一次看看？ 😅" });
+    res.status(500).json({ text: "我的地端大腦（Qwen）稍微斷線了，再試一次看看？ 😅" });
   }
 }
