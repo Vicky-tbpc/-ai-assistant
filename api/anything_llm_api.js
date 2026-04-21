@@ -1,4 +1,4 @@
-// anything_llm_api_06
+// anything_llm_api_07
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,6 +18,19 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
+
+    // --- 【新增】 檢查日期模糊性邏輯 ---
+    // 檢查是否包含「月」或「斜線日期」，但卻沒有 4 位數年份
+    const hasYear = /\d{4}/.test(prompt); 
+    const hasMonthOnly = /(?<!\d{4}[年\/-])\b\d{1,2}月/.test(prompt); // 匹配「3月」但排除「2026年3月」
+    const hasShortDate = /(?<!\d{4}[/-])\b\d{1,2}[\/-]\d{1,2}\b/.test(prompt); // 匹配「4/6」但排除「2026/4/6」
+    const hasRelativeMonth = prompt.includes("上個月") && !hasYear;
+
+    if (!hasYear && (hasMonthOnly || hasShortDate || hasRelativeMonth)) {
+      return res.status(200).json({ 
+        text: `嘿！可以告訴我完整日期嗎？ 📅 比如「2026年3月」或「2026/4/6」，我才能準確幫你分析，不會拿錯資料喔～📊✨` 
+      });
+    }
 
     // --- 輔助函數：本地日期格式化 (YYYY-MM-DD) ---
     const fmt = (date) => {
@@ -62,10 +75,8 @@ export default async function handler(req, res) {
 
     // A. 優先檢查是否為「上週三/這週日」這種格式
     const weekdayDate = getSpecificDate(prompt, today);
-    
     // B. 絕對日期匹配 (例如 2026/02/20)
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-
     // C. 新增：月份匹配 (例如 2026年2月 或 2月)
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
