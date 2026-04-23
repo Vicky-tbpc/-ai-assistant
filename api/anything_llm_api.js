@@ -300,7 +300,8 @@ ${prompt}
     const resultText = data.textResponse || "AI 目前沒有回傳內容。";
 
     // --- 6. 同步對話記錄至 Supabase (異步執行) ---
-    fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: {
         'apikey': supabaseKey,
@@ -316,7 +317,10 @@ ${prompt}
         record_time: local_time,
         ai_model: 'AnythingLLM-Qwen-2.5'
       })
-    }).catch(e => console.error("Log 存檔失敗", e));
+      });
+    } catch (logError) {
+      console.error("對話紀錄存檔失敗:", logError);
+    }
 
     res.status(200).json({ text: resultText });
 
