@@ -1,4 +1,4 @@
-// anything_llm_api_08
+// anything_llm_api_07
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
-
+    
     // --- 【新增】 檢查日期模糊性邏輯 ---
     // 1. 檢查是否有 4 位數年份 (如 2025, 2026)
     const hasYear = /\d{4}/.test(prompt); 
@@ -186,29 +186,12 @@ export default async function handler(req, res) {
       }
     }
 
-        // --- 4. 格式化數據 Context (核心修改區) ---
+    // --- 4. 格式化數據 Context ---
     let healthContext = "找不到相關健康數據。";
     if (dataList && dataList.length > 0) {
-      // 過濾掉單純用來提供恢復指數的「明天」資料列，我們只需要顯示使用者請求的日期範圍
-      const displayList = dataList.filter(d => {
-          if (analysisMode === "single") return d.record_date === targetDate;
-          // 範圍查詢則排除掉最後一天（因為那是為了最後一筆數據準備的「隔天」）
-          return d.record_date <= (weekdayDate || absMatch ? targetDate : fmt(today));
-      });
-
-      healthContext = displayList.map(item => {
+      healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
-        
-        // --- 【關鍵修改】：尋找隔天的資料來取得恢復指數 ---
-        const nextDayDate = new Date(item.record_date);
-        nextDayDate.setDate(nextDayDate.getDate() + 1);
-        const nextDayStr = fmt(nextDayDate);
-        
-        const nextDayData = dataList.find(d => d.record_date === nextDayStr);
-        const recoveryIndex = nextDayData 
-          ? `${nextDayData.raw_json?.Personal_Battery_weighted_round || 0}%`
-          : "無(需待隔日資料更新)";
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
@@ -222,8 +205,7 @@ export default async function handler(req, res) {
 - 睡眠血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
 - 睡眠呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
 - 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
-- 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms
-- 恢復指數 (醒來後測得): ${recoveryIndex}`;
+- 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms`;
       }).join('\n');
     }
 
@@ -254,7 +236,6 @@ export default async function handler(req, res) {
 - 聚焦整體趨勢，不逐日列資料
 - 描述變化前必須先比較數值（例如 84 > 80）
 - 無法判斷時必須明確說「無法判斷」
-- 恢復指數是指當晚睡眠後，隔天早上醒來計算得到的數值，代表該晚睡眠的恢復效果。
   
 【月份分析規則】
 當查詢包含月份或月期間的時候，必須僅輸出整體分析結論，禁止逐日列出資料。
