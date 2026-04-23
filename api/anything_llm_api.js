@@ -1,4 +1,6 @@
-// anything_llm_api_08
+// anything_llm_api_09
+import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -295,17 +297,16 @@ ${prompt}
       })
     });
 
-    if (!response.ok) {
-      const errorDetail = await response.text();
-      throw new Error(`AnythingLLM 連線失敗: ${response.status} - ${errorDetail}`);
-    }
-
+    if (!response.ok) throw new Error(`AnythingLLM 連線失敗`);
     const data = await response.json();
     const resultText = data.textResponse || "AI 目前沒有回傳內容。";
 
-    // --- 6. 同步對話記錄至 Supabase (異步執行) ---
-    try {
-      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+    // ==========================================
+    // 【重點修改區】：背景執行存檔 (方案一)
+    // ==========================================
+    
+    // 1. 定義存檔的 Promise，但不使用 await
+    const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: {
         'apikey': supabaseKey,
@@ -321,12 +322,13 @@ ${prompt}
         record_time: local_time,
         ai_model: 'AnythingLLM-Qwen-2.5'
       })
-      });
-    } catch (logError) {
-      console.error("對話紀錄存檔失敗:", logError);
-    }
+    }).catch(e => console.error("背景存檔錯誤:", e));
 
-    res.status(200).json({ text: resultText });
+    // 2. 關鍵：告訴 Vercel 必須等這個任務跑完才能關掉伺服器環境
+    waitUntil(logTask);
+
+    // 3. 立即回傳結果給使用者，這時候 logTask 還在背景跑，使用者不需要等它
+    return res.status(200).json({ text: resultText });
 
   } catch (error) {
     console.error(error);
