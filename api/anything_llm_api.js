@@ -1,4 +1,4 @@
-// anything_llm_api_07
+// anything_llm_api_08
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
-    
+
     // --- 【新增】 檢查日期模糊性邏輯 ---
     // 1. 檢查是否有 4 位數年份 (如 2025, 2026)
     const hasYear = /\d{4}/.test(prompt); 
@@ -196,16 +196,17 @@ export default async function handler(req, res) {
         // 建議將每個日期的數據包裝得更嚴密
         return `
 [數據日期: ${item.record_date}]
-- 睡眠時長: ${Math.floor(tst / 60)}時${tst % 60}分
-- 睡眠階段: N3深睡 ${raw.N3_pct || 0}%, 淺睡 ${raw.N1N2_pct || 0}%, REM快速動眼 ${raw.REM_pct || 0}%
+- 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
-- 自律神經: rMSSD放鬆恢復 ${Math.round(raw.rMSSD || 0)}ms
-- 呼吸負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
-- 脈搏數據: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
-- 血氧數據: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
-- 呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
-- 血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
-- 低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%`;
+- 睡眠結構: 深睡期 ${raw.N3_pct || 0}%, 淺睡期 ${raw.N1N2_pct || 0}%, 快速動眼期 ${raw.REM_pct || 0}%
+- 睡眠血氧飽和度: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
+- 睡眠低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%
+- 缺氧負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
+- 睡眠血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
+- 睡眠呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
+- 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
+- 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms
+- 恢復指數: ${raw.Personal_Battery_weighted_round || 0}%`;
       }).join('\n');
     }
 
