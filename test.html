@@ -519,13 +519,6 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
-const healthConfigs = [
-    // 原有指標
-   
-
-    // 新增指標
-    { regex: /恢復指數/, displayField: 'Personal_Battery_weighted_round', prefix: '恢復指數', fallbackTitle: '恢復指數', displayLabel: '恢復指數', unit: '' }
-];
 
     // 日期偵測
     const absDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
