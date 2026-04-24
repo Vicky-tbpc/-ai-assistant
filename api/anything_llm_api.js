@@ -1,4 +1,4 @@
-// anything_llm_api_11
+// anything_llm_api_12
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -242,10 +242,23 @@ export default async function handler(req, res) {
         d.setDate(today.getDate() - i);
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
+
+    // --- 4.5 異常偵測 (新增) ---
+    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
+    const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
+    
+    // 如果數據異常，就塞一段悄悄話給 AI
+    const sensoryTask = isStressed ? `
+【生理自覺任務】
+目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
+『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
+記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
+
+${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
 
 【健康數據分析指南（內部對照）】
 
