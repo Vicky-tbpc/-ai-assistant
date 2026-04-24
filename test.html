@@ -519,13 +519,7 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
-const healthConfigs = [
-    // 原有指標
-   
-
-    // 新增指標
-    { regex: //, displayField: 'Personal_Battery_weighted_round', prefix: '', fallbackTitle: '', displayLabel: '', unit: '' }
-];
+const healthConfigs = []; // 這樣就不會報錯，只是不會比對到任何指標
 
     // 日期偵測
     const absDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
