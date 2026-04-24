@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n57</title>
+    <title>Soosyn 健康夥伴 n61</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -693,7 +693,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             return;
         }
 
-           // --- 準備資料抓取 ---
+              // --- 準備資料抓取 ---
         
         // 1. 先備份使用者原本輸入的日期 (顯示標題用)
         const displayDateStr = targetDateStr; 
@@ -717,14 +717,27 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
 
-        const { data: records, error } = await _supabase.from('health_data')
-            .select('record_date, raw_json')
-            .eq('serial_number', currentSerial)
-            .in('record_date', [targetDateStr, prevDateStr]);
+        // --- 【關鍵修改部分：改向地端要資料】 ---
+let targetData, prevData;
 
-        if (error) throw error;
-        const targetData = records?.find(r => r.record_date === targetDateStr);
-        const prevData = records?.find(r => r.record_date === prevDateStr);
+try {
+    const response = await fetch('/api/health');
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allData = await response.json();
+
+    // 模擬 Supabase 的 .eq('serial_number', currentSerial) 與 .in('record_date', [...])
+    const userRecords = allData.filter(r => r.serial_number === currentSerial);
+    
+    targetData = userRecords.find(r => r.record_date === targetDateStr);
+    prevData = userRecords.find(r => r.record_date === prevDateStr);
+
+} catch (err) {
+    console.error("讀取失敗:", err);
+    await appendAiMessage("連不到地端 Python 伺服器，請確認 CMD 視窗有沒有開喔！ 🔌");
+    return;
+}
+
 
         // --- 無資料處理 ---
         if (!targetData) {
@@ -738,6 +751,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         const prevRaw = prevData?.raw_json;
         let displayValStr = "";
         let logicStatus = ""; // 用於決定抓取哪種建議 (佳/差/平...)
+
         let rangeHint = "";   // 範圍提示文字
 
         // --- 根據不同指標執行特定判斷邏輯 ---
@@ -791,17 +805,41 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
     }
 }
 
-    // --- 核心邏輯：摘要比較與建議 (修正版) ---
+   // --- 核心邏輯：摘要比較與建議 (修正版) ---
 
+// --- 核心邏輯：摘要比較與建議 (修正版) ---
 
 async function fetchSummaryData(targetDate) {
-    // 1. 獲取個人當前與前兩筆數據（包含目標日期與前一筆）
-    const { data: healths } = await _supabase.from('health_data')
-        .select('record_date, raw_json')
-        .eq('serial_number', currentSerial)
-        .lte('record_date', targetDate) // 依然維持 lte，因為需要抓取「前一天」來做增減比較
-        .order('record_date', { ascending: false })
-        .limit(2);
+    
+// --- 1. 改向地端 Python 伺服器獲取整份資料 ---
+let healths = []; // 預設為空陣列，對齊原本 Supabase data 的結構
+
+try {
+    const response = await fetch('/api/health');
+    
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allData = await response.json();
+
+    // --- 2. 模擬 Supabase 的過濾與排序邏輯 ---
+    healths = allData
+        // .eq('serial_number', currentSerial) -> 篩選序號
+        // .lte('record_date', targetDate) -> 篩選日期小於等於目標日
+        .filter(item => 
+            item.serial_number === currentSerial && 
+            item.record_date <= targetDate
+        )
+        // .order('record_date', { ascending: false }) -> 日期降冪排序
+        .sort((a, b) => b.record_date.localeCompare(a.record_date))
+        // .limit(2) -> 只取前兩筆 (今天與前一筆)
+        .slice(0, 2);
+
+} catch (err) {
+    console.error("讀取地端資料發生錯誤:", err);
+    // 這裡可以根據需求決定要不要提示使用者 CMD 沒開
+}
+
+// 接下來你原本後續使用 healths 的邏輯（例如 if (!healths?.length) ...）完全不用改
 
     if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
     // 這代表「目標日期當天」沒有數據，直接回傳 null
@@ -811,10 +849,25 @@ async function fetchSummaryData(targetDate) {
     const raw = current.raw_json;
     const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-    // --- 2. 新增：計算百分比排名邏輯 (整合自 n12) ---
-    const { data: allUsersData } = await _supabase.from('health_data')
-        .select('raw_json')
-        .eq('record_date', current.record_date);
+    // --- 改向地端 Python 伺服器獲取整份資料 ---
+let allUsersData = [];
+
+try {
+    const response = await fetch('/api/health');
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allData = await response.json();
+
+    // --- 模擬 Supabase 的 .eq('record_date', current.record_date) ---
+    // 找出所有與 current.record_date 相同的紀錄 (不分序號)
+    if (Array.isArray(allData)) {
+        allUsersData = allData.filter(item => item.record_date === current.record_date);
+    }
+
+} catch (err) {
+    console.error("計算排名時讀取地端資料失敗:", err);
+    // 如果讀取失敗，allUsersData 會是空陣列，後續排名邏輯會自動處理（通常顯示為 0%）
+}
 
     let percentage = 0;
     if (allUsersData && allUsersData.length > 0) {
@@ -825,6 +878,7 @@ async function fetchSummaryData(targetDate) {
         ).length;
         percentage = Math.round((lowerUsers / totalUsers) * 100);
     }
+
     // --------------------------------------------
 
     // 3. 指標增減比較邏輯
@@ -939,17 +993,39 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 抓取生理數據 (保持資料庫原始日期)
-    const { data: healthData, error } = await _supabase.from('health_data')
-        .select('record_date, raw_json') 
-        .eq('serial_number', currentSerial)
-        .order('record_date', { ascending: false })
-        .limit(days);
+    // 1. 將原本的 Supabase 呼叫註解掉或替換掉
+let healthData = [];
+try {
+    // 呼叫地端 Python 伺服器 (假設你的 Python 跑在 5000 port)
+    const response = await fetch('/api/health');
+    
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    const allJsonData = await response.json();
 
-    if (error || !healthData || healthData.length === 0) {
-        card.querySelector('.trend-content').innerHTML = error ? "讀取失敗" : "暫無數據 😅";
-        return;
-    }
+    // 2. 篩選與排序邏輯 (這部分原本是在 Supabase 伺服器端做，現在改到前端做)
+    healthData = allJsonData
+        .filter(item => item.serial_number === currentSerial) // 篩選序號
+        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
+        .slice(0, days) // 取得最近的幾天
+        .map(item => ({
+            record_date: item.record_date,
+            raw_json: item.raw_json
+        }));
+
+} catch (err) {
+    console.error("讀取地端資料錯誤:", err);
+    card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
+    return;
+}
+
+// 3. 檢查是否有資料 (保留你原本的判斷邏輯)
+if (healthData.length === 0) {
+    card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+    return;
+}
+
+// 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
 
     const sortedData = [...healthData].reverse();
     
@@ -1276,8 +1352,37 @@ function renderLegend(type, abnormalLabel) {
 
 
     // 其他輔助函數
-    async function processBalanceSearch(d) { document.querySelector('.date-actions')?.remove(); await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`); const { data } = await _supabase.from('health_data').select('record_date, raw_json').eq('serial_number', currentSerial).eq('record_date', d).single(); if (data) { appendBalanceCard(data); await new Promise(r => setTimeout(r, 600)); await appendAiMessage(getRandomEndQuestion());
-} else await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️"); }
+async function processBalanceSearch(d) {
+    document.querySelector('.date-actions')?.remove();
+    await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`);
+
+    try {
+        // 1. 改向地端 Python 伺服器要資料
+        const response = await fetch('/api/health');
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        const allData = await response.json();
+
+        // 2. 在地端資料中篩選：序號符合、日期符合
+        const dayData = allData.find(item => 
+            item.serial_number === currentSerial && 
+            item.record_date === d
+        );
+
+        if (dayData) {
+            // 3. 呼叫原本的卡片生成函式
+            appendBalanceCard(dayData);
+            await new Promise(r => setTimeout(r, 600));
+            await appendAiMessage(getRandomEndQuestion());
+        } else {
+            await appendAiMessage(`這天（${d}）沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️`);
+        }
+    } catch (err) {
+        console.error("讀取失敗:", err);
+        await appendAiMessage("哎呀，連不到你電腦的 Python 伺服器，記得要把 CMD 開著喔！ 🔌");
+    }
+}
+
     
 
 // 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
