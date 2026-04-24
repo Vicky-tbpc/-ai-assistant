@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n61</title>
+    <title>Soosyn 健康夥伴 n62</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -93,8 +93,6 @@
 }
 
 
-
-
 /* 趨勢圖整體容器優化 */
 .trend-card { 
     background: #fff; border-radius: 12px; 
@@ -167,12 +165,11 @@
     border-radius: 20px;
     font-size: 15px; /* 稍微放大字體 */
     font-weight: bold;
-    display: inline-block;
-   
+    display: inline-block;  
 }
 
 
-/* 新增：生理狀態燈號圓點樣式 */
+/* 新增：發炎風險燈號圓點樣式 */
 .status-dot {
     display: inline-block;
     width: 14px;           /* 圓點寬度 */
@@ -188,7 +185,6 @@
     display: flex;
     align-items: center;
 }
-
 
 
 </style>
@@ -220,7 +216,6 @@
         <button class="secondary-btn" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; background: white; color: #888; cursor: pointer; font-weight: bold; margin-top: 10px;" onclick="closeBindingModal()">以後再說</button>
     </div>
 </div>
-
 
 
     <div id="nickname-overlay" class="modal-overlay hidden">
@@ -281,10 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-
-
-
-
 // 初始化 LIFF
 async function initLIFF() {
     try {
@@ -295,8 +286,6 @@ async function initLIFF() {
     }
 }
 initLIFF(); // 頁面載入時執行
-
-
 
 
 // 獲取使用者裝置的本地日期字串 (YYYY-MM-DD)
@@ -342,13 +331,13 @@ function getRandomEndQuestion() {
     return END_QUESTIONS[Math.floor(Math.random() * END_QUESTIONS.length)];
 }
     const CTA_PHRASES = [
-        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、生理電量、rMSSD放鬆恢復，還是睡眠最低脈搏？",
+        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、恢復指數、rMSSD放鬆恢復，還是睡眠最低脈搏？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
         "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是睡眠平衡度呢？",
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是睡眠平衡度？",
-        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、🔋 生理電量？"
+        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、📈 恢復指數？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["生理狀態", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "綠燈", "紅燈", "黃燈", "黃紅燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "生理電量"];
+    const ENCYCLOPEDIA_KEYWORDS = ["發炎風險", "黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "綠燈", "紅燈", "黃燈", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性", "恢復指數"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -519,9 +508,6 @@ return getLocalDateString(); // <-- 修改這裡，不要用 ISOString
     return `${y}-${m}-${d}`;
 }
 
-
-
-
 // 3. 修改 sendMessage 內的設定
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
@@ -538,7 +524,7 @@ const healthConfigs = [
    
 
     // 新增指標
-    { regex: /電量/, displayField: 'Personal_Battery_weighted_round', prefix: '生理電量', fallbackTitle: '生理電量', displayLabel: '生理電量', unit: '' }
+    { regex: /恢復指數/, displayField: 'Personal_Battery_weighted_round', prefix: '恢復指數', fallbackTitle: '恢復指數', displayLabel: '恢復指數', unit: '' }
 ];
 
     // 日期偵測
@@ -568,7 +554,6 @@ const healthConfigs = [
         }
         return;
     }
-
 
 // --- 需求：健康摘要邏輯修改 (修正版) ---
 if (msg.includes("健康摘要")) {
@@ -604,7 +589,6 @@ if (msg.includes("健康摘要")) {
 }
 
 
-
     if (msg.includes("趨勢圖")) {
         await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
         appendTrendOptions();
@@ -629,7 +613,6 @@ if (isWaitingForAbnormality) {
         await handleAbnormalityInput(msg); 
         return; 
     }
-
 
 
 // 在處理任何新訊息邏輯前，先移除畫面上可能殘留的日期按鈕
@@ -665,10 +648,6 @@ if (isWaitingForAbnormality) {
         return; // 直接結束，不往下跑 Gemini
     }
 
-
-
-
-
     
 // 這裡原本是處理單獨日期或顯示「收到！正在學習...」的地方
     if (typeof formattedDate !== 'undefined' && formattedDate) {
@@ -698,8 +677,8 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         // 1. 先備份使用者原本輸入的日期 (顯示標題用)
         const displayDateStr = targetDateStr; 
 
-        // 2. 邏輯偏移：僅針對「生理電量」
-        if (config.prefix === '生理電量') {
+        // 2. 邏輯偏移：僅針對「恢復指數」
+        if (config.prefix === '恢復指數') {
             const tempDate = new Date(targetDateStr.replace(/-/g, '/'));
             tempDate.setDate(tempDate.getDate() - 1); // 減去一天
             
@@ -710,7 +689,7 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             targetDateStr = `${y}-${m}-${d}`; 
         }
 
-        // 3. 計算用於比較的「前一日」 (在生理電量情況下，這會變成「前兩天」)
+        // 3. 計算用於比較的「前一日」 (在恢復指數情況下，這會變成「前兩天」)
         const targetDate = new Date(targetDateStr.replace(/-/g, '/'));
         const prevDate = new Date(targetDate);
         prevDate.setDate(prevDate.getDate() - 1);
@@ -758,7 +737,7 @@ try {
         const val = raw[config.displayField];
 
         switch(config.prefix) {
-            case '生理電量':
+            case '恢復指數':
                 displayValStr = `**${val}**`;
                 if (prevRaw && prevRaw.Personal_Battery_weighted_round !== undefined) {
                     logicStatus = (val > prevRaw.Personal_Battery_weighted_round) ? "佳" : "差";
@@ -804,8 +783,6 @@ try {
         await appendAiMessage("查詢時發生一點小狀況，請稍後再試。");
     }
 }
-
-   // --- 核心邏輯：摘要比較與建議 (修正版) ---
 
 // --- 核心邏輯：摘要比較與建議 (修正版) ---
 
@@ -872,7 +849,7 @@ try {
     let percentage = 0;
     if (allUsersData && allUsersData.length > 0) {
         const totalUsers = allUsersData.length;
-        // 計算有多少人的生理電量低於目前使用者
+        // 計算有多少人的恢復指數低於目前使用者
         const lowerUsers = allUsersData.filter(d => 
             (d.raw_json.Personal_Battery_weighted_round || 0) < currentBattery
         ).length;
@@ -899,19 +876,14 @@ try {
     const { data: phrases } = await _supabase.from('phrase_library')
         .select('logic_key, detailed_content')
         .in('logic_key', logicKeys);
-        
-    const { data: feedback } = await _supabase.from('daily_feedback')
-        .select('status_light')
-        .eq('serial_number', currentSerial)
-        .eq('record_date', current.record_date)
-        .single();
+    const statusLight = current.raw_json?.light_status || '--';
 
     // 5. 回傳整合後的物件
 return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
         percentage: percentage, // 傳回計算出的百分比
-        light: feedback?.status_light || '--', 
+        light: statusLight, // <--- 這裡改用剛剛抓到的 statusLight 
         bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
         worstText: phrases?.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
         raw_json: raw, // <--- 修正：這裡一定要補上逗點
@@ -945,7 +917,7 @@ async function showSummaryFlow(isFirstTime = false) {
 function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
-        { name: "🔋 生理電量", type: "battery" },
+        { name: "📈 恢復指數", type: "battery" },
         { name: "😴 N3 深睡比例", type: "n3" },
         { name: "🧘 rMSSD 放鬆恢復", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
@@ -1076,7 +1048,7 @@ if (healthData.length === 0) {
 
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
-        battery: { title: "生理電量", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
+        battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
      
         n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
@@ -1099,7 +1071,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     // 準備體感數據：battery 對齊隔天，其餘對齊當天
     const subjectiveValues = rawData.map(d => {
         if (type === 'battery') {
-            // 生理電量要對齊「隔天」的體感
+            // 恢復指數要對齊「隔天」的體感
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             const nextDayStr = dateObj.toLocaleDateString('en-CA');
@@ -1190,7 +1162,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
     ];
 
 
-// 如果是生理電量，新增一條「個人感受」曲線
+// 如果是恢復指數，新增一條「個人感受」曲線
     if (type === 'battery') {
         datasets.push({
             label: '體感數值',
@@ -1257,7 +1229,7 @@ function renderLegend(type, abnormalLabel) {
     `;
 
 
-// 生理電量特有圖例
+// 恢復指數特有圖例
     if (type === 'battery') {
         html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
@@ -1490,7 +1462,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                     ` : ''}
                     
                     <div class="battery-meta">
-                        <span>生理電量</span>
+                        <span>恢復指數</span>
                         <div style="text-align: right;">
                             <span class="battery-val" style="color:${colors}">${data.battery}</span><br>
                             <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
