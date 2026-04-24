@@ -1,4 +1,4 @@
-// anything_llm_api_09
+// anything_llm_api_10
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -156,12 +156,34 @@ export default async function handler(req, res) {
       queryStartDate = fmt(defaultStart);
     }
 
-    // --- 2. 執行資料庫讀取 ---
-    let queryUrl = `${supabaseUrl}/rest/v1/health_data?serial_number=eq.${serial_number}&record_date=gte.${queryStartDate}&record_date=lte.${queryEndDate}&select=record_date,raw_json&order=record_date.desc`;
-    const sbRes = await fetch(queryUrl, {
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
-    });
-    const dataList = await sbRes.json();
+    // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['host'];
+    const healthApiUrl = `${protocol}://${host}/api/health`;
+
+    let dataList = [];
+    try {
+        const response = await fetch(healthApiUrl);
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        const allData = await response.json();
+
+        // 模擬原本 Supabase 的過濾邏輯：
+        // 1. 先篩選出對應的序號 (currentSerial)
+        const userRecords = allData.filter(r => r.serial_number === serial_number);
+        
+        // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
+        dataList = userRecords.filter(r => 
+            r.record_date >= queryStartDate && r.record_date <= queryEndDate
+        );
+
+        // 3. 排序：按日期降序排列
+        dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+
+    } catch (err) {
+        console.error("讀取失敗:", err);
+        // 如果讀取失敗，dataList 會維持空陣列，後面的邏輯會處理「找不到數據」的情況
+    }
 
     // --- 3. 單日查詢補償邏輯 (Rule 2) ---
     let finalContextData = dataList;
