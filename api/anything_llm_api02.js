@@ -1,4 +1,4 @@
-// anything_llm_api_12
+// anything_llm_api_13
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -47,6 +47,13 @@ export default async function handler(req, res) {
       const d = String(date.getDate()).padStart(2, '0');
       return `${y}-${m}-${d}`;
     };
+
+// --- 輔助函數：取得前一天日期 (YYYY-MM-DD) ---
+const getPrevDay = (dateStr) => {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() - 1);
+  return fmt(d);
+};
 
      // --- 【新增】精準解析「週幾」函數 ---
     const getSpecificDate = (p, baseDate) => {
@@ -185,27 +192,35 @@ export default async function handler(req, res) {
         // 如果讀取失敗，dataList 會維持空陣列，後面的邏輯會處理「找不到數據」的情況
     }
 
-    // --- 3. 單日查詢補償邏輯 (Rule 2) ---
+// --- 3. 單日查詢補償邏輯 (Rule 2) ---
     let finalContextData = dataList;
     let dataStatusNotice = "";
 
     if (analysisMode === "single" && targetDate) {
-      const exactMatch = dataList.find(d => d.record_date === targetDate);
+      // 重點：恢復指數與發炎風險是參考「前一晚」的睡眠，所以設定搜尋目標為 targetDate 減 1 天
+      const effectiveRecordDate = getPrevDay(targetDate);
+
+      // 優先尋找剛好是「前一晚」的紀錄
+      const exactMatch = dataList.find(d => d.record_date === effectiveRecordDate);
+
       if (!exactMatch && dataList.length > 0) {
-        // 尋找時間差最小的日期
+        // 補償機制：若沒有剛好前一晚的，尋找與「前一晚」時間差最小的日期
         const sortedByDist = [...dataList].sort((a, b) => {
-          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
-          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
+          const distA = Math.abs(new Date(a.record_date) - new Date(effectiveRecordDate));
+          const distB = Math.abs(new Date(b.record_date) - new Date(effectiveRecordDate));
           if (distA === distB) return new Date(b.record_date) - new Date(a.record_date); // 優先選較新的
           return distA - distB;
         });
         const nearest = sortedByDist[0];
-        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
+        
+        // 修正提示語：告知使用者查詢日期與實際讀取日期的關聯
+        dataStatusNotice = `⚠️ 你查詢 ${targetDate} 的狀態（需參考 ${effectiveRecordDate} 的睡眠），但我為你找到最接近的數據日期是 ${nearest.record_date}。`;
         finalContextData = [nearest];
       } else if (!exactMatch && dataList.length === 0) {
-        dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
+        dataStatusNotice = `⚠️ 資料庫中找不到 ${effectiveRecordDate} 附近的數據來分析 ${targetDate} 的恢復狀態。`;
         finalContextData = [];
       } else {
+        // 找到了剛好前一晚的紀錄
         finalContextData = [exactMatch];
       }
     }
@@ -216,6 +231,11 @@ export default async function handler(req, res) {
       healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
+
+// 計算這筆睡眠數據對應的「恢復日」
+        const d = new Date(item.record_date);
+        d.setDate(d.getDate() + 1);
+        const statusDate = fmt(d);
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
@@ -251,8 +271,8 @@ export default async function handler(req, res) {
     const sensoryTask = isStressed ? `
 【生理自覺任務】
 目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
-『你現在會覺得頭痛、特別累，或是感覺心跳很快嗎？』
-強調這些自覺感受對優化他的健康模型很重要喔！ 🌟` : "";
+『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
+記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
