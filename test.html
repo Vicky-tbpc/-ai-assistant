@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n62</title>
+    <title>Soosyn 健康夥伴 n63</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -331,10 +331,10 @@ function getRandomEndQuestion() {
     return END_QUESTIONS[Math.floor(Math.random() * END_QUESTIONS.length)];
 }
     const CTA_PHRASES = [
-        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、恢復指數、rMSSD放鬆恢復，還是睡眠最低脈搏？",
-        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、N3深睡比例或HBI缺氧負荷呢？",
-        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是睡眠平衡度呢？",
-        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、趨勢圖，還是睡眠平衡度？",
+        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、恢復指數、rMSSD放鬆恢復，還是發炎風險？",
+        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、恢復指數或發炎風險呢？",
+        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是發炎風險呢？",
+        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、恢復指數，還是睡眠平衡度？",
         "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、📈 恢復指數？"
     ];
     const ENCYCLOPEDIA_KEYWORDS = ["黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性"];
@@ -519,6 +519,13 @@ async function sendMessage() {
     document.querySelector('.date-actions')?.remove();
 
     // 指標配置與 regex (包含您要求的所有關鍵字)
+const healthConfigs = [
+    // 原有指標
+   
+
+    // 新增指標
+    { regex: //, displayField: 'Personal_Battery_weighted_round', prefix: '', fallbackTitle: '', displayLabel: '', unit: '' }
+];
 
     // 日期偵測
     const absDateMatch = msg.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/) || msg.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
