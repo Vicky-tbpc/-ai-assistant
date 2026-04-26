@@ -222,7 +222,7 @@ export default async function handler(req, res) {
         // 【新增邏輯】抓取「核心狀態」所需的前一天數據
         const currentDate = new Date(item.record_date);
         const prevDate = new Date(currentDate);
-        prevDate.setDate(currentDate.getDate() - 1);
+        prevDate.setDate(currentDate.getDate() + 1);
         const prevDateStr = fmt(prevDate);        
 
         // 從 userRecords (該用戶所有資料) 中找出前一天的紀錄
