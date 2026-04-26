@@ -303,7 +303,7 @@ if (analysisMode === "single") {
     } else if (isStatusQuery) {
         // 情況 B：問狀態/恢復 (不論有沒有問睡眠，只要有問狀態就要解釋)
         if (userAskedDate !== targetDate) {
-            shiftExplanation = `\n⚠️ 指令：使用者詢問的是 ${userAskedDate} 的「狀態/恢復」。請明確告知這些指數是根據個人睡眠期間生理數據的基線計算而成的，並以此進行分析。`;
+            shiftExplanation = `\n⚠️ 指令：使用者詢問的是 ${userAskedDate} 的「狀態/恢復」。請回答你 ${userAskedDate} 的「狀態/恢復」是依據個人生理基線計算而成。`;
         } else {
             shiftExplanation = `\n⚠️ 指令：請分析 ${targetDate} 當天的核心狀態。`;
         }
