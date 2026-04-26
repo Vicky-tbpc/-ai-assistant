@@ -40,6 +40,20 @@ export default async function handler(req, res) {
       });
     }
 
+    // --- 【新增】判斷查詢類型 ---
+    const isStatusQuery = /狀態|恢復|發炎|指數/.test(prompt);
+    const isSleepQuery = /睡眠|睡得/.test(prompt);
+
+    // --- 輔助函數：日期位移 (傳入 YYYY-MM-DD, 回傳減一天後的 YYYY-MM-DD) ---
+    const shiftDate = (dateStr, days) => {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     // --- 輔助函數：本地日期格式化 (YYYY-MM-DD) ---
     const fmt = (date) => {
       const y = date.getFullYear();
@@ -74,53 +88,58 @@ export default async function handler(req, res) {
       return null;
     };
 
-    // --- 1. 日期解析與標準化 (Rule 1 & 4) ---
+// --- 1. 日期解析與標準化 (整合優化版) ---
     const today = new Date(local_date);
-    let targetDate = null;
+    let targetDate = null;      // 最終去資料庫抓資料的日期
+    let userAskedDate = null;   // 使用者原始想詢問的日期
     let queryStartDate = "";
     let queryEndDate = fmt(today);
     let analysisMode = "range";
 
-    // A. 優先檢查是否為「上週三/這週日」這種格式
+    // 取得基礎解析格式
     const weekdayDate = getSpecificDate(prompt, today);
-    // B. 絕對日期匹配 (例如 2026/02/20)
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-    // C. 新增：月份匹配 (例如 2026年2月 或 2月)
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
-    if (weekdayDate) {
-      targetDate = weekdayDate;
+    // --- A. 判斷是否為單日查詢 (包含：週幾、絕對日期、昨天/今天) ---
+    if (weekdayDate || absMatch || prompt.includes("昨天") || prompt.includes("昨晚") || prompt.includes("今天") || prompt.includes("最新")) {
+      analysisMode = "single";
+      
+      // 1. 先決定使用者口中的日期 (userAskedDate)
+      if (weekdayDate) {
+        userAskedDate = weekdayDate;
+      } else if (absMatch) {
+        userAskedDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
+      } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        userAskedDate = fmt(yesterday);
+      } else {
+        userAskedDate = fmt(today);
+      }
+
+      // 2. 【核心位移邏輯】：決定最終要抓取的資料日期 (targetDate)
+      // 若問狀態/恢復且沒問睡眠，資料日期 = 詢問日期 - 1
+      if (isStatusQuery && !isSleepQuery) {
+        targetDate = shiftDate(userAskedDate, -1);
+      } else {
+        targetDate = userAskedDate;
+      }
+      
       queryStartDate = targetDate;
       queryEndDate = targetDate;
-      analysisMode = "single";
-    } else if (absMatch) {
-      targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
+
+    // --- B. 月份查詢邏輯 ---
     } else if (monthMatch) {
-      analysisMode = "compare"; // 月份分析建議使用 compare 模式
+      analysisMode = "compare"; 
       const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
       const month = parseInt(monthMatch[2]);
-      // 設定該月的第一天
       const firstDay = new Date(year, month - 1, 1);
-      // 設定該月的最後一天 (下個月的第 0 天就是這個月最後一天)
       const lastDay = new Date(year, month, 0);      
       queryStartDate = fmt(firstDay);
       queryEndDate = fmt(lastDay);
-    } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      targetDate = fmt(yesterday);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
-    } else if (prompt.includes("今天") || prompt.includes("最新")) {
-      targetDate = fmt(today);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
-    
+
+    // --- C. 本週/上週區間邏輯 ---
     } else if (prompt.includes("本週") || prompt.includes("上週")) {
       analysisMode = "compare";
       const currentDay = today.getDay() === 0 ? 7 : today.getDay();
@@ -132,28 +151,33 @@ export default async function handler(req, res) {
         lastMon.setDate(lastMon.getDate() - 7);
         const lastSun = new Date(thisMon);
         lastSun.setDate(thisMon.getDate() - 1);
-        
         queryStartDate = fmt(lastMon);
-        queryEndDate = fmt(lastSun); // 修正：結束日期設為上週日
+        queryEndDate = fmt(lastSun);
       } else {
         queryStartDate = fmt(thisMon);
-        // 這週的結束日期維持 today 是正確的
+        queryEndDate = fmt(today);
       }
+
+    // --- D. 上個月/這個月區間邏輯 ---
     } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
       analysisMode = "compare";
       if (prompt.includes("上個月")) {
         const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
         queryStartDate = fmt(firstDayLastMonth);
-        queryEndDate = fmt(lastDayLastMonth); // 修正：結束日期設為上個月最後一天
+        queryEndDate = fmt(lastDayLastMonth);
       } else {
         const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         queryStartDate = fmt(firstDayThisMonth);
+        queryEndDate = fmt(today);
       }
+
+    // --- E. 預設情況 (過去14天) ---
     } else {
       const defaultStart = new Date(today);
       defaultStart.setDate(today.getDate() - 14);
       queryStartDate = fmt(defaultStart);
+      queryEndDate = fmt(today);
     }
 
     // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
@@ -162,8 +186,6 @@ export default async function handler(req, res) {
     const healthApiUrl = `${protocol}://${host}/api/health`;
 
     let dataList = [];
-    let userRecords = [];
-
     try {
         const response = await fetch(healthApiUrl);
         if (!response.ok) throw new Error("地端連線失敗");
@@ -172,7 +194,7 @@ export default async function handler(req, res) {
 
         // 模擬原本 Supabase 的過濾邏輯：
         // 1. 先篩選出對應的序號 (currentSerial)
-        userRecords = allData.filter(r => r.serial_number === serial_number);
+        const userRecords = allData.filter(r => r.serial_number === serial_number);
         
         // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
         dataList = userRecords.filter(r => 
@@ -218,26 +240,11 @@ export default async function handler(req, res) {
       healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
-
-        // 【新增邏輯】抓取「核心狀態」所需的前一天數據
-        const currentDate = new Date(item.record_date);
-        const prevDate = new Date(currentDate);
-        prevDate.setDate(currentDate.getDate() + 1);
-        const prevDateStr = fmt(prevDate);        
-
-        // 從 userRecords (該用戶所有資料) 中找出前一天的紀錄
-        const prevDayRecord = userRecords.find(r => r.record_date === prevDateStr);
-        const prevDayRaw = prevDayRecord ? (prevDayRecord.raw_json || {}) : null;
-
-        // 核心狀態字串處理 (若找不到前一天資料則顯示無資料)
-        const coreStatusDisplay = prevDayRaw 
-          ? `恢復指數 ${prevDayRaw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${prevDayRaw.light_status || "無資料"}`
-          : `核心狀態: (查無前日 ${prevDateStr} 數據)`;
-
+        
         // 建議將每個日期的數據包裝得更嚴密
         return `
 [數據日期: ${item.record_date}]
-- 核心狀態 (讀取前日 ${prevDateStr})：${coreStatusDisplay}
+- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 睡眠結構: 深睡期 ${raw.N3_pct || 0}%, 淺睡期 ${raw.N1N2_pct || 0}%, 快速動眼期 ${raw.REM_pct || 0}%
@@ -276,6 +283,7 @@ export default async function handler(req, res) {
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
+${shiftExplanation} // <--- 加入這裡，讓 AI 知道日期位移的狀況
 
 【健康數據分析指南（內部對照）】
 
@@ -331,9 +339,11 @@ ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
 2. 數據透明度：必須自然融入以下資訊：${dataStatusNotice}
+3. 數據來源說明：${analysisMode === "single" ? `詢問日期為 ${userAskedDate}，實際數據日期為 ${targetDate}` : "區間趨勢分析"}
 
 【精準日期參考（禁止輸出）】
 - 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
+-  詢問日期：${userAskedDate || "未指定"}
 - 查詢範圍：${queryStartDate} 至 ${queryEndDate}
 - 最近日期對照表：${weekDaysInfo.join('\n')}
 
