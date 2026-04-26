@@ -277,6 +277,12 @@ export default async function handler(req, res) {
 目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
 『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
 記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
+
+// 💡 【新增：修復錯誤的關鍵】定義日期位移說明文字
+    let shiftExplanation = "";
+    if (analysisMode === "single" && userAskedDate && targetDate && userAskedDate !== targetDate) {
+      shiftExplanation = `\n⚠️ 注意：使用者詢問的是 ${userAskedDate} 的狀態，你目前讀取的是前一晚（${targetDate}）的睡眠數據來推算「恢復指數」與「發炎風險」。請在回覆中自然地提到：『你 ${userAskedDate} 的核心狀態是根據前一晚（${targetDate}）的睡眠品質計算出來的喔！』`;
+    }
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
