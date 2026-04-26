@@ -1,4 +1,4 @@
-// anything_llm_api_13
+// anything_llm_api_12
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -40,20 +40,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- 【新增】判斷查詢類型 ---
-    const isStatusQuery = /狀態|恢復|發炎|指數/.test(prompt);
-    const isSleepQuery = /睡眠|睡得/.test(prompt);
-
-    // --- 輔助函數：日期位移 (傳入 YYYY-MM-DD, 回傳減一天後的 YYYY-MM-DD) ---
-    const shiftDate = (dateStr, days) => {
-      const d = new Date(dateStr);
-      d.setDate(d.getDate() + days);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-
     // --- 輔助函數：本地日期格式化 (YYYY-MM-DD) ---
     const fmt = (date) => {
       const y = date.getFullYear();
@@ -88,58 +74,53 @@ export default async function handler(req, res) {
       return null;
     };
 
-// --- 1. 日期解析與標準化 (整合優化版) ---
+    // --- 1. 日期解析與標準化 (Rule 1 & 4) ---
     const today = new Date(local_date);
-    let targetDate = null;      // 最終去資料庫抓資料的日期
-    let userAskedDate = null;   // 使用者原始想詢問的日期
+    let targetDate = null;
     let queryStartDate = "";
     let queryEndDate = fmt(today);
     let analysisMode = "range";
 
-    // 取得基礎解析格式
+    // A. 優先檢查是否為「上週三/這週日」這種格式
     const weekdayDate = getSpecificDate(prompt, today);
+    // B. 絕對日期匹配 (例如 2026/02/20)
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+    // C. 新增：月份匹配 (例如 2026年2月 或 2月)
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
-    // --- A. 判斷是否為單日查詢 (包含：週幾、絕對日期、昨天/今天) ---
-    if (weekdayDate || absMatch || prompt.includes("昨天") || prompt.includes("昨晚") || prompt.includes("今天") || prompt.includes("最新")) {
-      analysisMode = "single";
-      
-      // 1. 先決定使用者口中的日期 (userAskedDate)
-      if (weekdayDate) {
-        userAskedDate = weekdayDate;
-      } else if (absMatch) {
-        userAskedDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
-      } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        userAskedDate = fmt(yesterday);
-      } else {
-        userAskedDate = fmt(today);
-      }
-
-      // 2. 【核心位移邏輯】：決定最終要抓取的資料日期 (targetDate)
-      // 若問狀態/恢復且沒問睡眠，資料日期 = 詢問日期 - 1
-      if (isStatusQuery && !isSleepQuery) {
-        targetDate = shiftDate(userAskedDate, -1);
-      } else {
-        targetDate = userAskedDate;
-      }
-      
+    if (weekdayDate) {
+      targetDate = weekdayDate;
       queryStartDate = targetDate;
       queryEndDate = targetDate;
-
-    // --- B. 月份查詢邏輯 ---
+      analysisMode = "single";
+    } else if (absMatch) {
+      targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
     } else if (monthMatch) {
-      analysisMode = "compare"; 
+      analysisMode = "compare"; // 月份分析建議使用 compare 模式
       const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
       const month = parseInt(monthMatch[2]);
+      // 設定該月的第一天
       const firstDay = new Date(year, month - 1, 1);
+      // 設定該月的最後一天 (下個月的第 0 天就是這個月最後一天)
       const lastDay = new Date(year, month, 0);      
       queryStartDate = fmt(firstDay);
       queryEndDate = fmt(lastDay);
-
-    // --- C. 本週/上週區間邏輯 ---
+    } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      targetDate = fmt(yesterday);
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    } else if (prompt.includes("今天") || prompt.includes("最新")) {
+      targetDate = fmt(today);
+      queryStartDate = targetDate;
+      queryEndDate = targetDate;
+      analysisMode = "single";
+    
     } else if (prompt.includes("本週") || prompt.includes("上週")) {
       analysisMode = "compare";
       const currentDay = today.getDay() === 0 ? 7 : today.getDay();
@@ -151,33 +132,28 @@ export default async function handler(req, res) {
         lastMon.setDate(lastMon.getDate() - 7);
         const lastSun = new Date(thisMon);
         lastSun.setDate(thisMon.getDate() - 1);
+        
         queryStartDate = fmt(lastMon);
-        queryEndDate = fmt(lastSun);
+        queryEndDate = fmt(lastSun); // 修正：結束日期設為上週日
       } else {
         queryStartDate = fmt(thisMon);
-        queryEndDate = fmt(today);
+        // 這週的結束日期維持 today 是正確的
       }
-
-    // --- D. 上個月/這個月區間邏輯 ---
     } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
       analysisMode = "compare";
       if (prompt.includes("上個月")) {
         const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
         queryStartDate = fmt(firstDayLastMonth);
-        queryEndDate = fmt(lastDayLastMonth);
+        queryEndDate = fmt(lastDayLastMonth); // 修正：結束日期設為上個月最後一天
       } else {
         const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         queryStartDate = fmt(firstDayThisMonth);
-        queryEndDate = fmt(today);
       }
-
-    // --- E. 預設情況 (過去14天) ---
     } else {
       const defaultStart = new Date(today);
       defaultStart.setDate(today.getDate() - 14);
       queryStartDate = fmt(defaultStart);
-      queryEndDate = fmt(today);
     }
 
     // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
@@ -267,55 +243,22 @@ export default async function handler(req, res) {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-// --- 4.5 異常偵測 (優化版) ---
-
-// A. 找出目前顯示的資料
-const currentDisplayData = (finalContextData && finalContextData.length > 0) ? (finalContextData[0].raw_json || {}) : {};
-const currentDisplayDate = (finalContextData && finalContextData.length > 0) ? finalContextData[0].record_date : "";
-
-// B. 判斷異常
-const isDataStressed = (currentDisplayData.light_status === "紅燈" || 
-                        currentDisplayData.light_status === "黃燈" || 
-                        (currentDisplayData.Personal_Battery_weighted_round < 60));
-
-// C. 判斷是否為「最新/今天」的即時關懷 (以資料日期為準)
-const isLatestData = (currentDisplayDate === fmt(today));
-
-// D. 任務分配
-const sensoryTask = (isDataStressed && isLatestData) ? `
+    // --- 4.5 異常偵測 (新增) ---
+    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
+    const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
+    
+    // 如果數據異常，就塞一段悄悄話給 AI
+    const sensoryTask = isStressed ? `
 【生理自覺任務】
-目前數據顯示他「現在」的壓力較大或恢復不足。請在對話最後自然地問他：
+目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
 『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
 記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
-
-const historyTask = (isDataStressed && !isLatestData && analysisMode === "single") ? `
-【歷史回溯提醒】
-使用者正在詢問過去（${currentDisplayDate}）的異常數據。
-請在回覆中順口問一句：『那天（${currentDisplayDate}）你是不是比較累，或是有發生什麼特別的事嗎？』
-這樣可以幫助他回顧當時的生活壓力。` : "";
-
-// --- 5. 邏輯重整：決定 AI 的回覆重點與位移解釋 ---
-let shiftExplanation = "";
-if (analysisMode === "single") {
-    if (isSleepQuery && !isStatusQuery) {
-        // 情況 A：純問睡眠
-        shiftExplanation = `\n⚠️ 指令：使用者目前只想了解「睡眠品質」。請專注分析睡眠數據（時數、效率、結構、血氧等），「不要」主動提到恢復指數或發炎風險。`;
-    } else if (isStatusQuery) {
-        // 情況 B：問狀態/恢復 (不論有沒有問睡眠，只要有問狀態就要解釋)
-        if (userAskedDate !== targetDate) {
-            shiftExplanation = `\n⚠️ 指令：使用者詢問的是 ${userAskedDate} 的「狀態/恢復」。請回答你 ${userAskedDate} 的「狀態/恢復」是依據個人生理基線計算而成。`;
-        } else {
-            shiftExplanation = `\n⚠️ 指令：請分析 ${targetDate} 當天的核心狀態。`;
-        }
-    }
-}
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
-${shiftExplanation} // <--- 加入這裡，讓 AI 知道日期位移的狀況
 
 【健康數據分析指南（內部對照）】
 
@@ -345,8 +288,6 @@ ${shiftExplanation} // <--- 加入這裡，讓 AI 知道日期位移的狀況
 
 【分析原則（動態回覆邏輯）】
 1. **模式切換**：
-     - **純睡眠查詢**：若指令註明為純睡眠查詢，請忽略恢復指數與發炎風險，僅針對睡眠數值（如 TST, 效率, SpO2）進行分析。
-     - **狀態/恢復查詢**：請務必說明數據來源日期（前一晚睡眠），並以恢復指數與發炎風險為分析核心。
    - **特定提問**：若問題針對特定指標（如：血氧、HBI），直接以自然對話回覆，禁止使用固定標題或報告範本。
    - **區間查詢**：若提問包含月份、上週或長區間，則自動啟用【月份分析規則】。
 2. **標準對照**：所有數據描述必須對照【健康數據分析指南】，給予具體評價（如：良好、輕度異常）與 1～2 個對應建議。
@@ -373,11 +314,9 @@ ${shiftExplanation} // <--- 加入這裡，讓 AI 知道日期位移的狀況
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
 2. 數據透明度：必須自然融入以下資訊：${dataStatusNotice}
-3.  查詢屬性：${isSleepQuery ? "包含睡眠分析" : ""} ${isStatusQuery ? "包含狀態分析" : ""}
 
 【精準日期參考（禁止輸出）】
 - 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
--  詢問日期：${userAskedDate || "未指定"}
 - 查詢範圍：${queryStartDate} 至 ${queryEndDate}
 - 最近日期對照表：${weekDaysInfo.join('\n')}
 
