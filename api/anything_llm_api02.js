@@ -268,44 +268,47 @@ export default async function handler(req, res) {
     }
 
 // --- 4.5 異常偵測 (優化版) ---
-    
-    // A. 找出目前「顯示給使用者看」的那筆資料 (如果是單日查詢，就是 finalContextData[0])
-    const currentDisplayData = (finalContextData && finalContextData.length > 0) ? (finalContextData[0].raw_json || {}) : {};
-    const currentDisplayDate = (finalContextData && finalContextData.length > 0) ? finalContextData[0].record_date : "";
 
-    // B. 判斷這筆資料是否異常
-    const isDataStressed = (currentDisplayData.light_status === "紅燈" || 
-                            currentDisplayData.light_status === "黃燈" || 
-                            (currentDisplayData.Personal_Battery_weighted_round < 60));
+// A. 找出目前顯示的資料
+const currentDisplayData = (finalContextData && finalContextData.length > 0) ? (finalContextData[0].raw_json || {}) : {};
+const currentDisplayDate = (finalContextData && finalContextData.length > 0) ? finalContextData[0].record_date : "";
 
-    // C. 判斷使用者是否在問「今天」或「最新」的資料
-    // 只有當查詢日期等於 fmt(today) 或是 userAskedDate 是今天時才觸發
-    const isAskingCurrent = (userAskedDate === fmt(today) || prompt.includes("今天") || prompt.includes("最新"));
+// B. 判斷異常
+const isDataStressed = (currentDisplayData.light_status === "紅燈" || 
+                        currentDisplayData.light_status === "黃燈" || 
+                        (currentDisplayData.Personal_Battery_weighted_round < 60));
 
-    // D. 只有同時滿足「異常」且「在問現在」，才執行自覺任務
-    const sensoryTask = (isDataStressed && isAskingCurrent) ? `
+// C. 判斷是否為「最新/今天」的即時關懷 (以資料日期為準)
+const isLatestData = (currentDisplayDate === fmt(today));
+
+// D. 任務分配
+const sensoryTask = (isDataStressed && isLatestData) ? `
 【生理自覺任務】
 目前數據顯示他「現在」的壓力較大或恢復不足。請在對話最後自然地問他：
 『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
 記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
 
-const historyTask = (isDataStressed && !isAskingCurrent && analysisMode === "single") ? `
+const historyTask = (isDataStressed && !isLatestData && analysisMode === "single") ? `
 【歷史回溯提醒】
 使用者正在詢問過去（${currentDisplayDate}）的異常數據。
-請在回覆中順口問一句：『那天你是不是比較累，或是有發生什麼特別的事嗎？』
-這樣可以幫助他回想當時的狀況。` : "";
+請在回覆中順口問一句：『那天（${currentDisplayDate}）你是不是比較累，或是有發生什麼特別的事嗎？』
+這樣可以幫助他回顧當時的生活壓力。` : "";
 
-// 💡 邏輯重整：根據查詢類型決定 AI 的回覆重點
-    let shiftExplanation = "";
-    if (analysisMode === "single") {
-        if (isSleepQuery && !isStatusQuery) {
-            // 情況 A：純問睡眠 -> 叫 AI 專注睡眠，不要提恢復指數
-            shiftExplanation = `\n⚠️ 指令：使用者目前只想了解「睡眠品質」。請專注分析睡眠數據（時數、效率、結構、血氧等），「不要」主動提到恢復指數或發炎風險。`;
-        } else if (isStatusQuery && userAskedDate !== targetDate) {
-            // 情況 B：問狀態或恢復 -> 提到位移邏輯
-            shiftExplanation = `\n⚠️ 指令：使用者詢問的是 ${userAskedDate} 的「狀態/恢復/發炎」。請告知他這些指數是根據前一晚（${targetDate}）的睡眠品質計算而成的，並以此進行分析。`;
+// --- 5. 邏輯重整：決定 AI 的回覆重點與位移解釋 ---
+let shiftExplanation = "";
+if (analysisMode === "single") {
+    if (isSleepQuery && !isStatusQuery) {
+        // 情況 A：純問睡眠
+        shiftExplanation = `\n⚠️ 指令：使用者目前只想了解「睡眠品質」。請專注分析睡眠數據（時數、效率、結構、血氧等），「不要」主動提到恢復指數或發炎風險。`;
+    } else if (isStatusQuery) {
+        // 情況 B：問狀態/恢復 (不論有沒有問睡眠，只要有問狀態就要解釋)
+        if (userAskedDate !== targetDate) {
+            shiftExplanation = `\n⚠️ 指令：使用者詢問的是 ${userAskedDate} 的「狀態/恢復」。請明確告知這些指數是根據「前一晚和個人睡眠期間生理數據的基線計算而成的，並以此進行分析。`;
+        } else {
+            shiftExplanation = `\n⚠️ 指令：請分析 ${targetDate} 當天的核心狀態。`;
         }
     }
+}
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
