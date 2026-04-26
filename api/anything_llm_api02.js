@@ -278,10 +278,16 @@ export default async function handler(req, res) {
 『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
 記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
 
-// 💡 【新增：修復錯誤的關鍵】定義日期位移說明文字
+// 💡 邏輯重整：根據查詢類型決定 AI 的回覆重點
     let shiftExplanation = "";
-    if (analysisMode === "single" && userAskedDate && targetDate && userAskedDate !== targetDate) {
-      shiftExplanation = `\n⚠️ 注意：使用者詢問的是 ${userAskedDate} 的狀態，你目前讀取的是前一晚（${targetDate}）的睡眠數據來推算「恢復指數」與「發炎風險」。請在回覆中自然地提到：『你 ${userAskedDate} 的核心狀態是根據前一晚（${targetDate}）的睡眠品質計算出來的喔！』`;
+    if (analysisMode === "single") {
+        if (isSleepQuery && !isStatusQuery) {
+            // 情況 A：純問睡眠 -> 叫 AI 專注睡眠，不要提恢復指數
+            shiftExplanation = `\n⚠️ 指令：使用者目前只想了解「睡眠品質」。請專注分析睡眠數據（時數、效率、結構、血氧等），「不要」主動提到恢復指數或發炎風險。`;
+        } else if (isStatusQuery && userAskedDate !== targetDate) {
+            // 情況 B：問狀態或恢復 -> 提到位移邏輯
+            shiftExplanation = `\n⚠️ 指令：使用者詢問的是 ${userAskedDate} 的「狀態/恢復/發炎」。請告知他這些指數是根據前一晚（${targetDate}）的睡眠品質計算而成的，並以此進行分析。`;
+        }
     }
       
     // --- 5. 組合最終 Prompt ---
@@ -319,6 +325,8 @@ ${shiftExplanation} // <--- 加入這裡，讓 AI 知道日期位移的狀況
 
 【分析原則（動態回覆邏輯）】
 1. **模式切換**：
+     - **純睡眠查詢**：若指令註明為純睡眠查詢，請忽略恢復指數與發炎風險，僅針對睡眠數值（如 TST, 效率, SpO2）進行分析。
+     - **狀態/恢復查詢**：請務必說明數據來源日期（前一晚睡眠），並以恢復指數與發炎風險為分析核心。
    - **特定提問**：若問題針對特定指標（如：血氧、HBI），直接以自然對話回覆，禁止使用固定標題或報告範本。
    - **區間查詢**：若提問包含月份、上週或長區間，則自動啟用【月份分析規則】。
 2. **標準對照**：所有數據描述必須對照【健康數據分析指南】，給予具體評價（如：良好、輕度異常）與 1～2 個對應建議。
@@ -345,7 +353,7 @@ ${shiftExplanation} // <--- 加入這裡，讓 AI 知道日期位移的狀況
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
 2. 數據透明度：必須自然融入以下資訊：${dataStatusNotice}
-3. 數據來源說明：${analysisMode === "single" ? `詢問日期為 ${userAskedDate}，實際數據日期為 ${targetDate}` : "區間趨勢分析"}
+3.  查詢屬性：${isSleepQuery ? "包含睡眠分析" : ""} ${isStatusQuery ? "包含狀態分析" : ""}
 
 【精準日期參考（禁止輸出）】
 - 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
