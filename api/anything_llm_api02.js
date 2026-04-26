@@ -162,6 +162,8 @@ export default async function handler(req, res) {
     const healthApiUrl = `${protocol}://${host}/api/health`;
 
     let dataList = [];
+    let userRecords = [];
+
     try {
         const response = await fetch(healthApiUrl);
         if (!response.ok) throw new Error("地端連線失敗");
@@ -170,7 +172,7 @@ export default async function handler(req, res) {
 
         // 模擬原本 Supabase 的過濾邏輯：
         // 1. 先篩選出對應的序號 (currentSerial)
-        const userRecords = allData.filter(r => r.serial_number === serial_number);
+        userRecords = allData.filter(r => r.serial_number === serial_number);
         
         // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
         dataList = userRecords.filter(r => 
