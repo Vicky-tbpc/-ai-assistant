@@ -267,16 +267,33 @@ export default async function handler(req, res) {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-    // --- 4.5 異常偵測 (新增) ---
-    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
-    const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
+// --- 4.5 異常偵測 (優化版) ---
     
-    // 如果數據異常，就塞一段悄悄話給 AI
-    const sensoryTask = isStressed ? `
+    // A. 找出目前「顯示給使用者看」的那筆資料 (如果是單日查詢，就是 finalContextData[0])
+    const currentDisplayData = (finalContextData && finalContextData.length > 0) ? (finalContextData[0].raw_json || {}) : {};
+    const currentDisplayDate = (finalContextData && finalContextData.length > 0) ? finalContextData[0].record_date : "";
+
+    // B. 判斷這筆資料是否異常
+    const isDataStressed = (currentDisplayData.light_status === "紅燈" || 
+                            currentDisplayData.light_status === "黃燈" || 
+                            (currentDisplayData.Personal_Battery_weighted_round < 60));
+
+    // C. 判斷使用者是否在問「今天」或「最新」的資料
+    // 只有當查詢日期等於 fmt(today) 或是 userAskedDate 是今天時才觸發
+    const isAskingCurrent = (userAskedDate === fmt(today) || prompt.includes("今天") || prompt.includes("最新"));
+
+    // D. 只有同時滿足「異常」且「在問現在」，才執行自覺任務
+    const sensoryTask = (isDataStressed && isAskingCurrent) ? `
 【生理自覺任務】
-目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
+目前數據顯示他「現在」的壓力較大或恢復不足。請在對話最後自然地問他：
 『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
 記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
+
+const historyTask = (isDataStressed && !isAskingCurrent && analysisMode === "single") ? `
+【歷史回溯提醒】
+使用者正在詢問過去（${currentDisplayDate}）的異常數據。
+請在回覆中順口問一句：『那天你是不是比較累，或是有發生什麼特別的事嗎？』
+這樣可以幫助他回想當時的狀況。` : "";
 
 // 💡 邏輯重整：根據查詢類型決定 AI 的回覆重點
     let shiftExplanation = "";
