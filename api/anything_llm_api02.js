@@ -1,4 +1,4 @@
-// anything_llm_api_12
+// anything_llm_api_13
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -76,9 +76,9 @@ export default async function handler(req, res) {
 
     // --- 1. 日期解析與標準化 (Rule 1 & 4) ---
     const today = new Date(local_date);
-    let targetDate = null;
+    let requestedDate = fmt(today); // 使用者主觀詢問的日期
     let queryStartDate = "";
-    let queryEndDate = fmt(today);
+    let queryEndDate = "";
     let analysisMode = "range";
 
     // A. 優先檢查是否為「上週三/這週日」這種格式
@@ -89,38 +89,35 @@ export default async function handler(req, res) {
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
     if (weekdayDate) {
-      targetDate = weekdayDate;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
+      requestedDate = weekdayDate;
       analysisMode = "single";
     } else if (absMatch) {
-      targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
+      requestedDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
       analysisMode = "single";
-    } else if (monthMatch) {
-      analysisMode = "compare"; // 月份分析建議使用 compare 模式
-      const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
-      const month = parseInt(monthMatch[2]);
-      // 設定該月的第一天
-      const firstDay = new Date(year, month - 1, 1);
-      // 設定該月的最後一天 (下個月的第 0 天就是這個月最後一天)
-      const lastDay = new Date(year, month, 0);      
-      queryStartDate = fmt(firstDay);
-      queryEndDate = fmt(lastDay);
     } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      targetDate = fmt(yesterday);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
+      requestedDate = fmt(yesterday);
       analysisMode = "single";
     } else if (prompt.includes("今天") || prompt.includes("最新")) {
-      targetDate = fmt(today);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
+      requestedDate = fmt(today);
       analysisMode = "single";
-    
+    }
+
+    // 根據模式設定抓取範圍 (為了對齊 N-1，我們統一多往前抓一天)
+    if (analysisMode === "single") {
+      const prevDate = new Date(requestedDate);
+      prevDate.setDate(prevDate.getDate() - 1);
+      queryStartDate = fmt(prevDate); // 抓取 N-1
+      queryEndDate = requestedDate;   // 抓取 N
+    } else if (monthMatch) {
+      analysisMode = "compare";
+      const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
+      const month = parseInt(monthMatch[2]);
+      const firstDay = new Date(year, month - 1, 0); // 這裡改為 0 會抓到上個月最後一天，達成 N-1
+      const lastDay = new Date(year, month, 0);
+      queryStartDate = fmt(firstDay);
+      queryEndDate = fmt(lastDay);
     } else if (prompt.includes("本週") || prompt.includes("上週")) {
       analysisMode = "compare";
       const currentDay = today.getDay() === 0 ? 7 : today.getDay();
@@ -128,61 +125,40 @@ export default async function handler(req, res) {
       thisMon.setDate(today.getDate() - (currentDay - 1));
       
       if (prompt.includes("上週")) {
-        const lastMon = new Date(thisMon);
-        lastMon.setDate(lastMon.getDate() - 7);
+        const lastSunRecord = new Date(thisMon);
+        lastSunRecord.setDate(thisMon.getDate() - 8); // 往前推到上上週日 (為了上週一的 N-1)
+        const lastSunActual = new Date(thisMon);
+        lastSunActual.setDate(thisMon.getDate() - 1);
+        queryStartDate = fmt(lastSunRecord);
+        queryEndDate = fmt(lastSunActual);
+      } else {
         const lastSun = new Date(thisMon);
         lastSun.setDate(thisMon.getDate() - 1);
-        
-        queryStartDate = fmt(lastMon);
-        queryEndDate = fmt(lastSun); // 修正：結束日期設為上週日
-      } else {
-        queryStartDate = fmt(thisMon);
-        // 這週的結束日期維持 today 是正確的
-      }
-    } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
-      analysisMode = "compare";
-      if (prompt.includes("上個月")) {
-        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-        queryStartDate = fmt(firstDayLastMonth);
-        queryEndDate = fmt(lastDayLastMonth); // 修正：結束日期設為上個月最後一天
-      } else {
-        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        queryStartDate = fmt(firstDayThisMonth);
+        queryStartDate = fmt(lastSun);
+        queryEndDate = fmt(today);
       }
     } else {
-      const defaultStart = new Date(today);
-      defaultStart.setDate(today.getDate() - 14);
-      queryStartDate = fmt(defaultStart);
+      // 預設 14 天
+      const d = new Date(today);
+      d.setDate(today.getDate() - 15);
+      queryStartDate = fmt(d);
+      queryEndDate = fmt(today);
     }
 
-    // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
+    // --- 2. 執行資料讀取 ---
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers['host'];
     const healthApiUrl = `${protocol}://${host}/api/health`;
 
     let dataList = [];
     try {
-        const response = await fetch(healthApiUrl);
-        if (!response.ok) throw new Error("地端連線失敗");
-        
-        const allData = await response.json();
-
-        // 模擬原本 Supabase 的過濾邏輯：
-        // 1. 先篩選出對應的序號 (currentSerial)
-        const userRecords = allData.filter(r => r.serial_number === serial_number);
-        
-        // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
-        dataList = userRecords.filter(r => 
-            r.record_date >= queryStartDate && r.record_date <= queryEndDate
-        );
-
-        // 3. 排序：按日期降序排列
-        dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
-
+      const response = await fetch(healthApiUrl);
+      const allData = await response.json();
+      dataList = allData
+        .filter(r => r.serial_number === serial_number && r.record_date >= queryStartDate && r.record_date <= queryEndDate)
+        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
     } catch (err) {
-        console.error("讀取失敗:", err);
-        // 如果讀取失敗，dataList 會維持空陣列，後面的邏輯會處理「找不到數據」的情況
+      console.error("讀取失敗:", err);
     }
 
     // --- 3. 單日查詢補償邏輯 (Rule 2) ---
@@ -211,11 +187,10 @@ export default async function handler(req, res) {
     }
 
     // --- 4. 格式化數據 Context ---
-    let healthContext = "找不到相關健康數據。";
-    if (dataList && dataList.length > 0) {
+    let healthContext = "目前找不到相關健康數據。";
+    if (dataList.length > 0) {
       healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
-        const tst = raw.TST_min || 0;
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
@@ -259,6 +234,20 @@ export default async function handler(req, res) {
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
+
+【日期對齊嚴格規則】
+1. **整體健康評估 / 恢復指數 / 發炎風險**：
+   - 使用者詢問日期為 N 時，你必須讀取 [記錄日期: N-1] 的數據進行分析。
+   - 回覆時請說：「這是你 ${requestedDate} 的整體健康狀況評估」。
+   - 請說明：「核心狀態是經由前一晚（${queryStartDate}）的睡眠生理數值計算而成」。
+
+2. **純睡眠分析（如：我昨晚睡得好嗎？）**：
+   - 使用者詢問日期為 N 時，請直接讀取 [記錄日期: N] 的數據。
+   - 回覆時請說：「這是你 ${requestedDate} 的睡眠分析報告」。
+
+3. **區間查詢（週/月）**：
+   - 統一將數據日期往前推移一天（N-1）作為核心狀態基準，但回覆時使用使用者要求的區間名稱。
+   - 必須輸出整體趨勢，禁止條列日期。
 
 【健康數據分析指南（內部對照）】
 
