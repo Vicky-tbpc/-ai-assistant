@@ -22,18 +22,12 @@ export default async function handler(req, res) {
     if (!anythingLlmUrl) return res.status(500).json({ text: "伺服器錯誤：找不到 AnythingLLM 網址" });
     
     // --- 【新增】 檢查日期模糊性邏輯 ---
-    // 1. 檢查是否有 4 位數年份 (如 2025, 2026)
     const hasYear = /\d{4}/.test(prompt); 
-    // 2. 檢查是否有月份 (如 3月, 12月)
     const hasMonth = /\d{1,2}月/.test(prompt);
-    // 3. 檢查是否有短日期格式 (如 4/6, 04-06)
     const hasShortDate = /\b\d{1,2}[\/-]\d{1,2}\b/.test(prompt);
-    // 4. 判斷是否為「只有年份」或「去年」
     const isYearOnly = (hasYear && !hasMonth && !hasShortDate) || prompt.includes("去年");
-    // 5. 判斷是否為「只有月份/日期但沒年份」
     const isMissingYear = !hasYear && (hasMonth || hasShortDate || prompt.includes("上個月"));
 
-    // 如果符合以上模糊條件，則觸發反問機制
     if (isYearOnly || isMissingYear) {
       return res.status(200).json({ 
         text: `嘿！可以告訴我完整日期嗎？ 📅 比如「2026年3月」或「2026/4/6」，我才能準確幫你分析，不會拿錯資料喔～📊✨` 
@@ -48,25 +42,19 @@ export default async function handler(req, res) {
       return `${y}-${m}-${d}`;
     };
 
-     // --- 【新增】精準解析「週幾」函數 ---
     const getSpecificDate = (p, baseDate) => {
       const weekMap = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0 };
       const match = p.match(/(這|上)(週|星期|禮拜)([一二三四五六日天])/);
       if (match) {
-        const relative = match[1]; // "這" 或 "上"
+        const relative = match[1];
         const targetDay = weekMap[match[3]];
-        const currentDay = baseDate.getDay() === 0 ? 7 : baseDate.getDay(); // Mon=1...Sun=7
-        
-        // 先回推到「本週一」
+        const currentDay = baseDate.getDay() === 0 ? 7 : baseDate.getDay();
         const thisMonday = new Date(baseDate);
         thisMonday.setDate(baseDate.getDate() - (currentDay - 1));
-
         const resultDate = new Date(thisMonday);
         if (relative === "上") {
-          // 上週：先減 7 天，再加上目標星期的偏移量
           resultDate.setDate(thisMonday.getDate() - 7 + (targetDay === 0 ? 6 : targetDay - 1));
         } else {
-          // 這週：直接加目標星期的偏移量
           resultDate.setDate(thisMonday.getDate() + (targetDay === 0 ? 6 : targetDay - 1));
         }
         return fmt(resultDate);
@@ -74,18 +62,21 @@ export default async function handler(req, res) {
       return null;
     };
 
-        // --- 1. 意圖偵測 (Intent Detection) ---
-    // 判斷使用者是否只問睡眠 (Sleep Only)
-    const sleepKeywords = ["睡眠", "睡得", "深睡", "淺睡", "REM", "血氧", "呼吸", "脈搏", "心率變異", "SDNN", "rMSSD", "效率", "昨晚"];
-    const isSleepOnly = sleepKeywords.some(k => prompt.includes(k)) && 
-                        !["發炎", "恢復", "狀態", "電池", "指數", "健康評估"].some(k => prompt.includes(k));
+    // --- 1. 意圖識別 (Intent Detection) ---
+    const sleepKeywords = ["睡眠", "睡得", "深睡", "淺睡", "REM", "效率", "昨晚"];
+    const coreKeywords = ["發炎", "恢復", "狀態", "電池", "指數", "健康評估"];
+    
+    // 判斷是否為「純睡眠」：包含睡眠關鍵字 且 不包含核心指標關鍵字
+    const isSleepOnly = sleepKeywords.some(k => prompt.includes(k)) && !coreKeywords.some(k => prompt.includes(k));
+    // 判斷是否為「核心狀態」或「整體評估」：包含核心關鍵字，或兩者都沒提（預設為整體）
+    const isCoreOrOverall = coreKeywords.some(k => prompt.includes(k)) || (!sleepKeywords.some(k => prompt.includes(k)) && !coreKeywords.some(k => prompt.includes(k)));
 
-    // --- 2. 日期解析與偏移邏輯 ---
+    // --- 2. 日期解析與動態偏移 (Dynamic Date Offset) ---
     const today = new Date(local_date);
-    let userRequestedDateStr = fmt(today); // 使用者指出的「名義日期」
+    let userRequestedDateStr = fmt(today); // 使用者心目中的目標日期
     let analysisMode = "range";
 
-    // 解析使用者提到的日期
+    // 解析日期關鍵字
     const weekdayDate = getSpecificDate(prompt, today);
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
@@ -106,27 +97,25 @@ export default async function handler(req, res) {
       analysisMode = "single";
     }
 
-    // --- 重要：實施 D-1 偏移邏輯 ---
+    // --- 實施動態日期偏移 (D-1 Logic) ---
     let fetchStartDate, fetchEndDate;
 
     if (analysisMode === "single") {
       const targetDateObj = new Date(userRequestedDateStr);
       if (isSleepOnly) {
-        // 睡眠分析：直接讀取 D 日
-        fetchStartDate = fmt(targetDateObj);
-        fetchEndDate = fmt(targetDateObj);
+        // 如果只問睡眠，直接找當天的數據 (D)
+        fetchStartDate = userRequestedDateStr;
+        fetchEndDate = userRequestedDateStr;
       } else {
-        // 核心狀態或整體評估：讀取 D-1 日
+        // 如果涉及恢復/發炎/整體，則找前一天的數據 (D-1)
         const prevDay = new Date(targetDateObj);
         prevDay.setDate(targetDateObj.getDate() - 1);
         fetchStartDate = fmt(prevDay);
         fetchEndDate = fmt(prevDay);
       }
-    } else if (monthMatch || prompt.includes("週") || prompt.includes("月")) {
-      // 區間查詢邏輯
+    } else {
+      // 區間模式 (月份、週等)
       analysisMode = "compare";
-      // ... (此處保留原本的區間計算，但在最後 fetch 時將整體 range 往前推一天)
-      // 簡化起見，此處展示如何處理 range 偏移：
       let tempStart, tempEnd;
       if (monthMatch) {
           const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
@@ -140,16 +129,15 @@ export default async function handler(req, res) {
           tempEnd = new Date(today);
           tempEnd.setDate(today.getDate() - currentDay);
       } else {
-          // 預設 14 天
           tempStart = new Date(today);
           tempStart.setDate(today.getDate() - 14);
           tempEnd = new Date(today);
       }
-      
-      // 如果包含核心狀態，整個區間往前推一天
+
+      // 如果非純睡眠，區間整體往前推一天以獲取對應的恢復指數
       if (!isSleepOnly) {
-          tempStart.setDate(tempStart.setDate() - 1);
-          tempEnd.setDate(tempEnd.setDate() - 1);
+        tempStart.setDate(tempStart.getDate() - 1);
+        tempEnd.setDate(tempEnd.setDate() - 1);
       }
       fetchStartDate = fmt(tempStart);
       fetchEndDate = fmt(tempEnd);
@@ -163,6 +151,7 @@ export default async function handler(req, res) {
     let dataList = [];
     try {
         const response = await fetch(healthApiUrl);
+        if (!response.ok) throw new Error("地端連線失敗");
         const allData = await response.json();
         const userRecords = allData.filter(r => r.serial_number === serial_number);
         dataList = userRecords.filter(r => r.record_date >= fetchStartDate && r.record_date <= fetchEndDate);
@@ -171,15 +160,15 @@ export default async function handler(req, res) {
         console.error("讀取失敗:", err);
     }
 
-    // --- 4. 格式化 Context (修復重複宣告與中斷代碼) ---
-    let dataStatusNotice = ""; // 只宣告一次
+    // --- 4. 格式化 Context 並建立日期透明度通知 ---
+    let dataStatusNotice = ""; 
     if (analysisMode === "single" && dataList.length > 0) {
-        const actualDate = dataList[0].record_date;
-        if (actualDate !== userRequestedDateStr) {
-            dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDate}，這反映的是使用者 ${userRequestedDateStr} 的核心健康狀態。】`;
+        const actualDataDate = dataList[0].record_date;
+        if (actualDataDate !== userRequestedDateStr) {
+            dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDataDate}，這用來反映使用者在 ${userRequestedDateStr} 的核心健康狀態。】`;
         }
     } else if (analysisMode === "single" && dataList.length === 0) {
-        dataStatusNotice = `⚠️ 找不到資料庫中 ${fetchStartDate} 的相關數據。`;
+        dataStatusNotice = `⚠️ 找不到 ${fetchStartDate} 的相關數據。`;
     }
 
     let healthContext = dataList.length > 0 ? dataList.map(item => {
@@ -198,40 +187,36 @@ export default async function handler(req, res) {
 - 睡眠呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
 - 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
 - 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms`;
-      }).join('\n');
-    }
+      }).join('\n') : "找不到相關健康數據。";
 
-    // --- 【新增】建立日期參考表，防止 AI 算錯星期 ---
+    // 建立日期參考表
     const weekDaysInfo = [];
     const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 7; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-    // --- 4.5 異常偵測 (新增) ---
+    // 異常偵測悄悄話
     const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
     const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
-    
-    // 如果數據異常，就塞一段悄悄話給 AI
     const sensoryTask = isStressed ? `
 【生理自覺任務】
-目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
-『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
-記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
+目前數據顯示壓力較大或恢復不足。請在對話最後自然問他：『你現在會覺得頭痛、心跳很快，或有其他不舒服嗎？』並強調這對調整模型很重要。` : "";
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
-你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
+你是一個線上AI健康夥伴。請只輸出回覆內容，不要輸出報告格式。
 
-${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
+${sensoryTask}
 
 【日期邏輯指引】
-1. 使用者詢問的目標日期是：${userRequestedDateStr}。
-2. 我提供給你的數據日期是：${queryStartDate} 到 ${queryEndDate}。
-3. 若數據日期比詢問日期早一天，那是因為「核心狀態（恢復/發炎）」是基於前一晚睡眠計算的，請直接回答：「這是你 ${userRequestedDateStr} 的狀態」。
-4. 在整體評估時，請說明：『根據你前一晚（${queryStartDate}）的睡眠數據，你今天的恢復指數為...』。
+1. 使用者提問的目標日期是：${userRequestedDateStr}。
+2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
+3. 重要：若數據日期比詢問日期早一天（D-1），那是因為「核心狀態」是基於前一晚睡眠計算的。
+   請在回覆中自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你今天的恢復狀態...」或直接說「這是你 ${userRequestedDateStr} 的評估結果」。
+
 
 【健康數據分析指南（內部對照）】
 
