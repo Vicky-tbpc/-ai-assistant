@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     };
 
     // --- 1. 意圖識別：僅保留核心指標識別 ---
-    const coreKeywords = ["發炎", "恢復", "狀態", "健康評估", "指數", "電池"];
+    const coreKeywords = ["發炎", "恢復", "狀態", "健康評估"];
     const isCoreQuery = coreKeywords.some(k => prompt.includes(k));
 
     // --- 2. 日期解析 ---
@@ -152,12 +152,11 @@ export default async function handler(req, res) {
         console.error("讀取失敗:", err);
     }
 
-
     // --- 4. 格式化 Context ---
     let dataStatusNotice = ""; 
     if (analysisMode === "single" && dataList.length > 0) {
         const actualDataDate = dataList[0].record_date;
-        if (actualDataDate !== userRequestedDateStr && !isSleepOnly) {
+        if (isCoreQuery && actualDataDate !== userRequestedDateStr) {
             dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDataDate}，這用來反映使用者在 ${userRequestedDateStr} 的核心健康狀態。】`;
         }
     } else if (analysisMode === "single" && dataList.length === 0) {
