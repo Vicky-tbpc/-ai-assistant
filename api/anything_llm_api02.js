@@ -62,12 +62,9 @@ export default async function handler(req, res) {
       return null;
     };
 
-    // --- 1. 意圖識別 ---
-    const sleepKeywords = ["睡眠", "睡得", "深睡", "淺睡", "REM", "效率", "昨晚"];
-    const coreKeywords = ["發炎", "恢復", "狀態", "電池", "指數", "健康評估"];
-    
-    // 【修改】更嚴格的純睡眠判斷：包含睡眠詞且絕對不包含核心詞
-    const isSleepOnly = sleepKeywords.some(k => prompt.includes(k)) && !coreKeywords.some(k => prompt.includes(k));
+    // --- 1. 意圖識別：僅保留核心指標識別 ---
+    const coreKeywords = ["發炎", "恢復", "狀態", "健康評估", "指數", "電池"];
+    const isCoreQuery = coreKeywords.some(k => prompt.includes(k));
 
     // --- 2. 日期解析 ---
     const today = new Date(local_date);
@@ -94,47 +91,48 @@ export default async function handler(req, res) {
       analysisMode = "single";
     }
 
-    // --- 實施動態日期偏移 (D-1 Logic) ---
+    // --- 實施日期偏移邏輯 (僅核心查詢 D-1) ---
     let fetchStartDate, fetchEndDate;
 
     if (analysisMode === "single") {
-      if (isSleepOnly) {
-        // 【需求2】純睡眠分析直接讀取當天 (D)，不減一天
-        fetchStartDate = userRequestedDateStr;
-        fetchEndDate = userRequestedDateStr;
-      } else {
         const targetDateObj = new Date(userRequestedDateStr);
-        const prevDay = new Date(targetDateObj);
-        prevDay.setDate(targetDateObj.getDate() - 1);
-        fetchStartDate = fmt(prevDay);
-        fetchEndDate = fmt(prevDay);
-      }
+        if (isCoreQuery) {
+            // 核心查詢讀取前一天 (D-1)
+            const prevDay = new Date(targetDateObj);
+            prevDay.setDate(targetDateObj.getDate() - 1);
+            fetchStartDate = fmt(prevDay);
+            fetchEndDate = fmt(prevDay);
+        } else {
+            // 數據分析 (HBI, T88, ODI, rMSSD 等) 直接讀取輸入日期 (D)
+            fetchStartDate = userRequestedDateStr;
+            fetchEndDate = userRequestedDateStr;
+        }
     } else {
-      analysisMode = "compare";
-      let tempStart, tempEnd;
-      if (monthMatch) {
-          const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
-          const month = parseInt(monthMatch[2]);
-          tempStart = new Date(year, month - 1, 1);
-          tempEnd = new Date(year, month, 0);
-      } else if (prompt.includes("上週")) {
-          const currentDay = today.getDay() === 0 ? 7 : today.getDay();
-          tempStart = new Date(today);
-          tempStart.setDate(today.getDate() - currentDay - 6);
-          tempEnd = new Date(today);
-          tempEnd.setDate(today.getDate() - currentDay);
-      } else {
-          tempStart = new Date(today);
-          tempStart.setDate(today.getDate() - 14);
-          tempEnd = new Date(today);
-      }
+        analysisMode = "compare";
+        let tempStart, tempEnd;
+        if (monthMatch) {
+            const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
+            const month = parseInt(monthMatch[2]);
+            tempStart = new Date(year, month - 1, 1);
+            tempEnd = new Date(year, month, 0);
+        } else if (prompt.includes("上週")) {
+            const currentDay = today.getDay() === 0 ? 7 : today.getDay();
+            tempStart = new Date(today);
+            tempStart.setDate(today.getDate() - currentDay - 6);
+            tempEnd = new Date(today);
+            tempEnd.setDate(today.getDate() - currentDay);
+        } else {
+            tempStart = new Date(today);
+            tempStart.setDate(today.getDate() - 14);
+            tempEnd = new Date(today);
+        }
 
-      if (!isSleepOnly) {
-        tempStart.setDate(tempStart.getDate() - 1);
-        tempEnd.setDate(tempEnd.setDate() - 1);
-      }
-      fetchStartDate = fmt(tempStart);
-      fetchEndDate = fmt(tempEnd);
+        if (isCoreQuery) {
+            tempStart.setDate(tempStart.getDate() - 1);
+            tempEnd.setDate(tempEnd.getDate() - 1);
+        }
+        fetchStartDate = fmt(tempStart);
+        fetchEndDate = fmt(tempEnd);
     }
 
     // --- 3. 執行地端資料讀取 ---
@@ -166,12 +164,14 @@ export default async function handler(req, res) {
         dataStatusNotice = `⚠️ 找不到 ${fetchStartDate} 的相關數據。`;
     }
 
-    let healthContext = dataList.length > 0 ? dataList.map(item => {
-        const raw = item.raw_json || {};
-        const tst = raw.TST_min || 0;
-        
-        // 【需求1】如果是純睡眠分析，排除核心狀態指標
-        const coreMetrics = isSleepOnly ? "" : `- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}`;
+let healthContext = dataList.length > 0 ? dataList.map(item => {
+    const raw = item.raw_json || {};
+    const tst = raw.TST_min || 0;
+    
+        // 僅在核心查詢時將恢復指數與發炎風險塞入 Context
+        const coreMetricsLine = isCoreQuery 
+            ? `- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}`
+            : "";
         
         return `
 [數據日期: ${item.record_date}]
@@ -201,7 +201,7 @@ export default async function handler(req, res) {
     const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
     const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
     // 如果是純睡眠模式，就不觸發生理自覺任務（因為那個任務是針對恢復不足）
-    const sensoryTask = (isStressed && !isSleepOnly) ? `
+    const sensoryTask = (isStressed && isCoreQuery) ? `
 【生理自覺任務】
 目前數據顯示壓力較大或恢復不足。請在對話最後自然問他：『你現在會覺得頭痛、心跳很快，或有其他不舒服嗎？』並強調這對調整模型很重要。` : "";
       
@@ -214,7 +214,7 @@ ${sensoryTask}
 【日期邏輯指引】
 1. 使用者提問的目標日期是：${userRequestedDateStr}。
 2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
-${isSleepOnly ? `3. 當前模式：單純睡眠分析。請直接針對提供的睡眠數據進行解讀，不需要提到「恢復指數」或「發炎風險」。` : `3. 重要：若數據日期比詢問日期早一天（D-1），那是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你今天的恢復狀態...」`}
+${isCoreQuery ? `3. 重要：數據日期為 D-1，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你今天的恢復狀態...」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據，禁止主動提到「恢復指數」或「發炎風險」。`}
 
 
 【健康數據分析指南（內部對照）】
@@ -245,8 +245,8 @@ ${isSleepOnly ? `3. 當前模式：單純睡眠分析。請直接針對提供的
 
 【分析原則（動態回覆邏輯）】
 1. **模式切換**：
-   - **純睡眠提問**：若使用者只問睡眠狀況，請專注於睡眠時間、效率、血氧及呼吸指標，**禁止提到恢復指數或發炎風險**。
-   - **核心/整體提問**：則需綜合解讀恢復指數與發炎狀況。
+        -    如果使用者詢問特定指標（如 HBI、ODI、rMSSD 等），請針對該數值解讀，不要提到恢復指數或發炎風險。
+        -    如果涉及核心關鍵字（恢復、發炎、狀態），則進行綜合健康評估。
    - **特定提問**：若問題針對特定指標（如：血氧、HBI），直接以自然對話回覆，禁止使用固定標題或報告範本。
    - **區間查詢**：若提問包含月份、上週或長區間，則自動啟用【月份分析規則】。
 2. **標準對照**：所有數據描述必須對照【健康數據分析指南】，給予具體評價（如：良好、輕度異常）與 1～2 個對應建議。
