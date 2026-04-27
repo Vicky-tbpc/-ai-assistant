@@ -1,4 +1,4 @@
-// anything_llm_api_14
+// anything_llm_api_13
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -211,9 +211,10 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
 ${sensoryTask}
 
 【日期邏輯指引】
+【日期邏輯指引】
 1. 使用者提問的目標日期是：${userRequestedDateStr}。
 2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
-${isCoreQuery ? `3. 重要：數據日期為 D-1，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你今天的恢復狀態...」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據，禁止主動提到「恢復指數」或「發炎風險」。`}
+${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日期 (${userRequestedDateStr}) 的前一天，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你 ${userRequestedDateStr} 的恢復狀態如下：」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據。`}
 
 
 【健康數據分析指南（內部對照）】
