@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     };
 
     // --- 1. 意圖識別：僅保留核心指標識別 ---
-    const coreKeywords = ["發炎", "恢復", "狀態", "健康評估"];
+    const coreKeywords = ["發炎", "恢復", "狀態", "健康"];
     const isCoreQuery = coreKeywords.some(k => prompt.includes(k));
 
     // --- 2. 日期解析 ---
