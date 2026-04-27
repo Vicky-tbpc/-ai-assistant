@@ -161,36 +161,34 @@ export default async function handler(req, res) {
       console.error("讀取失敗:", err);
     }
 
-    // --- 3. 單日查詢補償邏輯 (Rule 2) ---
-    let finalContextData = dataList;
-    let dataStatusNotice = "";
+// --- 3. 單日查詢補償邏輯 (Rule 2 優化版) ---
+let dataStatusNotice = "";
 
-    if (analysisMode === "single" && targetDate) {
-      const exactMatch = dataList.find(d => d.record_date === targetDate);
-      if (!exactMatch && dataList.length > 0) {
-        // 尋找時間差最小的日期
-        const sortedByDist = [...dataList].sort((a, b) => {
-          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
-          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
-          if (distA === distB) return new Date(b.record_date) - new Date(a.record_date); // 優先選較新的
-          return distA - distB;
-        });
-        const nearest = sortedByDist[0];
-        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
-        finalContextData = [nearest];
-      } else if (!exactMatch && dataList.length === 0) {
-        dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
-        finalContextData = [];
-      } else {
-        finalContextData = [exactMatch];
-      }
-    }
+if (analysisMode === "single" && requestedDate) {
+  const prevDate = queryStartDate; // 這是前面算好的 N-1
+  
+  const hasToday = dataList.some(d => d.record_date === requestedDate);
+  const hasYesterday = dataList.some(d => d.record_date === prevDate);
+
+  if (!hasToday && !hasYesterday && dataList.length > 0) {
+    // 兩天都沒有，找最近的一天
+    const nearest = dataList[0]; // 因為前面已經 sort 過日期了
+    dataStatusNotice = `⚠️ 找不到 ${requestedDate} 及其前一晚的數據，我參考了最接近的 ${nearest.record_date} 紀錄。`;
+  } else if (!hasToday && hasYesterday) {
+    dataStatusNotice = `⚠️ 缺少 ${requestedDate} 當天的睡眠紀錄，將以 ${prevDate} 的恢復狀態為主。`;
+  } else if (hasToday && !hasYesterday) {
+    dataStatusNotice = `⚠️ 缺少 ${prevDate} 的核心狀態數據，將直接分析你的睡眠品質。`;
+  } else if (dataList.length === 0) {
+    dataStatusNotice = `⚠️ 資料庫中完全找不到 ${requestedDate} 附近的數據。`;
+  }
+}
 
     // --- 4. 格式化數據 Context ---
     let healthContext = "目前找不到相關健康數據。";
     if (dataList.length > 0) {
       healthContext = dataList.map(item => {
         const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0; // 補上 tst 定義
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
