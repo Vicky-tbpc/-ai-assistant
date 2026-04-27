@@ -183,12 +183,10 @@ if (analysisMode === "single" && requestedDate) {
   }
 }
 
-    // --- 4. 格式化數據 Context ---
-    let healthContext = "目前找不到相關健康數據。";
-    if (dataList.length > 0) {
-      healthContext = dataList.map(item => {
-        const raw = item.raw_json || {};
-        const tst = raw.TST_min || 0; // 補上 tst 定義
+// --- 4. 格式化數據 Context (精準標記 N 與 N-1) ---
+    const formatItem = (item) => {
+      const raw = item.raw_json || {};
+      const tst = raw.TST_min || 0;
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
@@ -205,6 +203,23 @@ if (analysisMode === "single" && requestedDate) {
 - 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
 - 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms`;
       }).join('\n');
+    }
+
+    let healthContext = "";
+    if (analysisMode === "single") {
+      const dataN = dataList.find(d => d.record_date === requestedDate);
+      const dataNMinus1 = dataList.find(d => d.record_date === queryStartDate);
+
+      healthContext = `
+【重要：當前查詢日期為 ${requestedDate}】
+1. 分析「恢復指數 / 發炎風險」專用數據 (來自前一晚 ${queryStartDate})：
+${dataNMinus1 ? formatItem(dataNMinus1) : "⚠️ 找不到前一晚數據，請改參考最近紀錄。"}
+
+2. 分析「睡眠品質 / 呼吸血氧」專用數據 (來自當天 ${requestedDate})：
+${dataN ? formatItem(dataN) : "⚠️ 找不到當天睡眠數據。"}
+      `;
+    } else {
+      healthContext = dataList.map(item => formatItem(item)).join('\n---\n');
     }
 
     // --- 【新增】建立日期參考表，防止 AI 算錯星期 ---
@@ -233,24 +248,14 @@ if (analysisMode === "single" && requestedDate) {
 
 ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
 
-【日期對齊嚴格規則】
-1. **整體健康評估 / 恢復指數 / 發炎風險**：
-   - 使用者詢問日期為 N 時，你必須讀取 [數據日期: N-1] 的數據進行分析。
-   - 回覆時請自然融入，例如：「這是你 ${requestedDate} 的整體健康狀況評估」...」或「關於 ${requestedDate} 的恢復指數 / 發炎風險...」。
-
-2. **純睡眠分析（如：我昨晚睡得好嗎？）**：
-   - 使用者詢問日期為 N 時，請直接讀取 [數據日期: N] 的數據。
-   - 回覆時請自然融入，例如：「這是你 ${requestedDate} 的睡眠分析」或「關於 ${requestedDate} 的睡眠分析...」。
-
-「這是你 ${requestedDate} 的睡眠分析報告」。
-
-3. **區間查詢（週/月）**：
-   - 統一將數據日期往前推移一天（N-1）作為核心狀態基準，但回覆時使用使用者要求的區間名稱。
-   - 必須輸出整體趨勢，禁止條列日期。
-
-4. **精準建議邏輯**：
-   - 你必須對照【健康數據分析指南】，找出 1～2 個表現最差或最優的指標。
-   - 根據該指標給出「具體、生活化」的建議（例如：HBI 高就建議側睡；恢復指數低就建議晚上別排高強度運動）。
+【數據分析邏輯】
+1. **精準對齊**：
+   - 使用者詢問「${requestedDate}」的整體健康/恢復時，**你必須使用我提供的『恢復專用數據 (N-1)』**。
+   - 詢問睡眠狀況時，使用『睡眠專用數據 (N)』。
+2. **具體建議**：
+   - 請對照【健康數據分析指南】，挑選 1～2 個表現最差的指標，給出「生活化」的建議（如：側睡、早點休息、減少咖啡因等）。
+3. **活潑對話**：
+   - 拋棄「這是你的...評估」這種開場。改用「嘿！我幫你看了一下...」或「你的數據顯示...」。
 
 【健康數據分析指南（內部對照）】
 
