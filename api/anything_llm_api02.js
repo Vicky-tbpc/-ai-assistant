@@ -74,119 +74,163 @@ export default async function handler(req, res) {
       return null;
     };
 
-    // --- 1. 日期解析與標準化 (Rule 1 & 4) ---
+        // --- 1. 意圖偵測 (Intent Detection) ---
+    // 判斷使用者是否只問睡眠 (Sleep Only)
+    const sleepKeywords = ["睡眠", "睡得", "深睡", "淺睡", "REM", "血氧", "呼吸", "脈搏", "心率變異", "SDNN", "rMSSD", "效率", "昨晚"];
+    const isSleepOnly = sleepKeywords.some(k => prompt.includes(k)) && 
+                        !["發炎", "恢復", "狀態", "電池", "指數", "健康評估"].some(k => prompt.includes(k));
+
+    // --- 2. 日期解析與偏移邏輯 ---
     const today = new Date(local_date);
-    let requestedDate = fmt(today); // 使用者主觀詢問的日期
+    let userRequestedDateStr = fmt(today); // 使用者心目中的目標日期
     let queryStartDate = "";
     let queryEndDate = "";
     let analysisMode = "range";
 
-    // A. 優先檢查是否為「上週三/這週日」這種格式
+    // 解析使用者提到的日期
     const weekdayDate = getSpecificDate(prompt, today);
-    // B. 絕對日期匹配 (例如 2026/02/20)
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-    // C. 新增：月份匹配 (例如 2026年2月 或 2月)
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
     if (weekdayDate) {
-      requestedDate = weekdayDate;
+      userRequestedDateStr = weekdayDate;
       analysisMode = "single";
     } else if (absMatch) {
-      requestedDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
+      userRequestedDateStr = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
       analysisMode = "single";
     } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      requestedDate = fmt(yesterday);
+      userRequestedDateStr = fmt(yesterday);
       analysisMode = "single";
     } else if (prompt.includes("今天") || prompt.includes("最新")) {
-      requestedDate = fmt(today);
+      userRequestedDateStr = fmt(today);
       analysisMode = "single";
     }
 
-    // 根據模式設定抓取範圍 (為了對齊 N-1，我們統一多往前抓一天)
+    // --- 重要：實施 D-1 偏移邏輯 ---
+    let fetchStartDate, fetchEndDate;
+
     if (analysisMode === "single") {
-      const prevDate = new Date(requestedDate);
-      prevDate.setDate(prevDate.getDate() - 1);
-      queryStartDate = fmt(prevDate); // 抓取 N-1
-      queryEndDate = requestedDate;   // 抓取 N
-    } else if (monthMatch) {
-      analysisMode = "compare";
-      const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
-      const month = parseInt(monthMatch[2]);
-      const firstDay = new Date(year, month - 1, 0); // 這裡改為 0 會抓到上個月最後一天，達成 N-1
-      const lastDay = new Date(year, month, 0);
-      queryStartDate = fmt(firstDay);
-      queryEndDate = fmt(lastDay);
-    } else if (prompt.includes("本週") || prompt.includes("上週")) {
-      analysisMode = "compare";
-      const currentDay = today.getDay() === 0 ? 7 : today.getDay();
-      const thisMon = new Date(today);
-      thisMon.setDate(today.getDate() - (currentDay - 1));
-      
-      if (prompt.includes("上週")) {
-        const lastSunRecord = new Date(thisMon);
-        lastSunRecord.setDate(thisMon.getDate() - 8); // 往前推到上上週日 (為了上週一的 N-1)
-        const lastSunActual = new Date(thisMon);
-        lastSunActual.setDate(thisMon.getDate() - 1);
-        queryStartDate = fmt(lastSunRecord);
-        queryEndDate = fmt(lastSunActual);
+      const targetDateObj = new Date(userRequestedDateStr);
+      if (isSleepOnly) {
+        // 睡眠分析：直接讀取 D 日
+        fetchStartDate = fmt(targetDateObj);
+        fetchEndDate = fmt(targetDateObj);
       } else {
-        const lastSun = new Date(thisMon);
-        lastSun.setDate(thisMon.getDate() - 1);
-        queryStartDate = fmt(lastSun);
-        queryEndDate = fmt(today);
+        // 核心狀態或整體評估：讀取 D-1 日
+        const prevDay = new Date(targetDateObj);
+        prevDay.setDate(targetDateObj.getDate() - 1);
+        fetchStartDate = fmt(prevDay);
+        fetchEndDate = fmt(prevDay);
       }
+    } else if (monthMatch || prompt.includes("週") || prompt.includes("月")) {
+      // 區間查詢邏輯
+      analysisMode = "compare";
+      // ... (此處保留原本的區間計算，但在最後 fetch 時將整體 range 往前推一天)
+      // 簡化起見，此處展示如何處理 range 偏移：
+      let tempStart, tempEnd;
+      if (monthMatch) {
+          const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
+          const month = parseInt(monthMatch[2]);
+          tempStart = new Date(year, month - 1, 1);
+          tempEnd = new Date(year, month, 0);
+      } else if (prompt.includes("上週")) {
+          const currentDay = today.getDay() === 0 ? 7 : today.getDay();
+          tempStart = new Date(today);
+          tempStart.setDate(today.getDate() - currentDay - 6);
+          tempEnd = new Date(today);
+          tempEnd.setDate(today.getDate() - currentDay);
+      } else {
+          // 預設 14 天
+          tempStart = new Date(today);
+          tempStart.setDate(today.getDate() - 14);
+          tempEnd = new Date(today);
+      }
+      
+      if (!isSleepOnly) {
+          tempStart.setDate(tempStart.getDate() - 1);
+          tempEnd.setDate(tempEnd.getDate() - 1);
+      }
+      fetchStartDate = fmt(tempStart);
+      fetchEndDate = fmt(tempEnd);
     } else {
-      // 預設 14 天
+      // 預設抓取
       const d = new Date(today);
-      d.setDate(today.getDate() - 15);
-      queryStartDate = fmt(d);
-      queryEndDate = fmt(today);
+      d.setDate(today.getDate() - 14);
+      fetchStartDate = fmt(d);
+      fetchEndDate = fmt(today);
     }
 
-    // --- 2. 執行資料讀取 ---
+    queryStartDate = fetchStartDate;
+    queryEndDate = fetchEndDate;
+
+    // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers['host'];
     const healthApiUrl = `${protocol}://${host}/api/health`;
 
     let dataList = [];
     try {
-      const response = await fetch(healthApiUrl);
-      const allData = await response.json();
-      dataList = allData
-        .filter(r => r.serial_number === serial_number && r.record_date >= queryStartDate && r.record_date <= queryEndDate)
-        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+        const response = await fetch(healthApiUrl);
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        const allData = await response.json();
+
+        // 模擬原本 Supabase 的過濾邏輯：
+        // 1. 先篩選出對應的序號 (currentSerial)
+        const userRecords = allData.filter(r => r.serial_number === serial_number);
+        
+        // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
+        dataList = userRecords.filter(r => 
+            r.record_date >= queryStartDate && r.record_date <= queryEndDate
+        );
+
+        // 3. 排序：按日期降序排列
+        dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+
     } catch (err) {
-      console.error("讀取失敗:", err);
+        console.error("讀取失敗:", err);
+        // 如果讀取失敗，dataList 會維持空陣列，後面的邏輯會處理「找不到數據」的情況
     }
 
-// --- 3. 單日查詢補償邏輯 (Rule 2 優化版) ---
-let dataStatusNotice = "";
+    // --- 3. 單日查詢補償邏輯 (Rule 2) ---
+    let finalContextData = dataList;
+    let dataStatusNotice = "";
 
-if (analysisMode === "single" && requestedDate) {
-  const prevDate = queryStartDate; // 這是前面算好的 N-1
-  
-  const hasToday = dataList.some(d => d.record_date === requestedDate);
-  const hasYesterday = dataList.some(d => d.record_date === prevDate);
+    if (analysisMode === "single" && targetDate) {
+      const exactMatch = dataList.find(d => d.record_date === targetDate);
+      if (!exactMatch && dataList.length > 0) {
+        // 尋找時間差最小的日期
+        const sortedByDist = [...dataList].sort((a, b) => {
+          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
+          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
+          if (distA === distB) return new Date(b.record_date) - new Date(a.record_date); // 優先選較新的
+          return distA - distB;
+        });
+        const nearest = sortedByDist[0];
+        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
+        finalContextData = [nearest];
+      } else if (!exactMatch && dataList.length === 0) {
+        dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
+        finalContextData = [];
+      } else {
+        finalContextData = [exactMatch];
+      }
+    }
 
-  if (!hasToday && !hasYesterday && dataList.length > 0) {
-    // 兩天都沒有，找最近的一天
-    const nearest = dataList[0]; // 因為前面已經 sort 過日期了
-    dataStatusNotice = `⚠️ 找不到 ${requestedDate} 及其前一晚的數據，我參考了最接近的 ${nearest.record_date} 紀錄。`;
-  } else if (!hasToday && hasYesterday) {
-    dataStatusNotice = `⚠️ 缺少 ${requestedDate} 當天的睡眠紀錄，將以 ${prevDate} 的恢復狀態為主。`;
-  } else if (hasToday && !hasYesterday) {
-    dataStatusNotice = `⚠️ 缺少 ${prevDate} 的核心狀態數據，將直接分析你的睡眠品質。`;
-  } else if (dataList.length === 0) {
-    dataStatusNotice = `⚠️ 資料庫中完全找不到 ${requestedDate} 附近的數據。`;
-  }
-}
+// --- 4. 格式化 Context 並加入「日期對照說明」 ---
+    let dataStatusNotice = "";
+    if (analysisMode === "single" && dataList.length > 0) {
+        const actualDataDate = dataList[0].record_date;
+        if (actualDataDate !== userRequestedDateStr) {
+            dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDataDate}，這用來反映使用者在 ${userRequestedDateStr} 的核心狀態。】`;
+        }
+    }
 
-// --- 4. 格式化數據 Context (精準標記 N 與 N-1) ---
-    const formatItem = (item) => {
-      const raw = item.raw_json || {};
-      const tst = raw.TST_min || 0;
+    let healthContext = dataList.length > 0 ? dataList.map(item => {
+        const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0;
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
@@ -203,23 +247,6 @@ if (analysisMode === "single" && requestedDate) {
 - 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
 - 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms`;
       }).join('\n');
-    }
-
-    let healthContext = "";
-    if (analysisMode === "single") {
-      const dataN = dataList.find(d => d.record_date === requestedDate);
-      const dataNMinus1 = dataList.find(d => d.record_date === queryStartDate);
-
-      healthContext = `
-【重要：當前查詢日期為 ${requestedDate}】
-1. 分析「恢復指數 / 發炎風險」專用數據 (來自前一晚 ${queryStartDate})：
-${dataNMinus1 ? formatItem(dataNMinus1) : "⚠️ 找不到前一晚數據，請改參考最近紀錄。"}
-
-2. 分析「睡眠品質 / 呼吸血氧」專用數據 (來自當天 ${requestedDate})：
-${dataN ? formatItem(dataN) : "⚠️ 找不到當天睡眠數據。"}
-      `;
-    } else {
-      healthContext = dataList.map(item => formatItem(item)).join('\n---\n');
     }
 
     // --- 【新增】建立日期參考表，防止 AI 算錯星期 ---
@@ -248,14 +275,11 @@ ${dataN ? formatItem(dataN) : "⚠️ 找不到當天睡眠數據。"}
 
 ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
 
-【數據分析邏輯】
-1. **精準對齊**：
-   - 使用者詢問「${requestedDate}」的整體健康/恢復時，**你必須使用我提供的『恢復專用數據 (N-1)』**。
-   - 詢問睡眠狀況時，使用『睡眠專用數據 (N)』。
-2. **具體建議**：
-   - 請對照【健康數據分析指南】，挑選 1～2 個表現最差的指標，給出「生活化」的建議（如：側睡、早點休息、減少咖啡因等）。
-3. **活潑對話**：
-   - 拋棄「這是你的...評估」這種開場。改用「嘿！我幫你看了一下...」或「你的數據顯示...」。
+【日期邏輯指引】
+1. 使用者詢問的目標日期是：${userRequestedDateStr}。
+2. 我提供給你的數據日期是：${queryStartDate} 到 ${queryEndDate}。
+3. 若數據日期比詢問日期早一天，那是因為「核心狀態（恢復/發炎）」是基於前一晚睡眠計算的，請直接回答：「這是你 ${userRequestedDateStr} 的狀態」。
+4. 在整體評估時，請說明：『根據你前一晚（${queryStartDate}）的睡眠數據，你今天的恢復指數為...』。
 
 【健康數據分析指南（內部對照）】
 
