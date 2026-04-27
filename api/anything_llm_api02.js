@@ -82,9 +82,7 @@ export default async function handler(req, res) {
 
     // --- 2. 日期解析與偏移邏輯 ---
     const today = new Date(local_date);
-    let userRequestedDateStr = fmt(today); // 使用者心目中的目標日期
-    let queryStartDate = "";
-    let queryEndDate = "";
+    let userRequestedDateStr = fmt(today); // 使用者指出的「名義日期」
     let analysisMode = "range";
 
     // 解析使用者提到的日期
@@ -148,24 +146,16 @@ export default async function handler(req, res) {
           tempEnd = new Date(today);
       }
       
+      // 如果包含核心狀態，整個區間往前推一天
       if (!isSleepOnly) {
-          tempStart.setDate(tempStart.getDate() - 1);
-          tempEnd.setDate(tempEnd.getDate() - 1);
+          tempStart.setDate(tempStart.setDate() - 1);
+          tempEnd.setDate(tempEnd.setDate() - 1);
       }
       fetchStartDate = fmt(tempStart);
       fetchEndDate = fmt(tempEnd);
-    } else {
-      // 預設抓取
-      const d = new Date(today);
-      d.setDate(today.getDate() - 14);
-      fetchStartDate = fmt(d);
-      fetchEndDate = fmt(today);
     }
 
-    queryStartDate = fetchStartDate;
-    queryEndDate = fetchEndDate;
-
-    // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
+    // --- 3. 執行地端資料讀取 ---
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers['host'];
     const healthApiUrl = `${protocol}://${host}/api/health`;
@@ -173,66 +163,28 @@ export default async function handler(req, res) {
     let dataList = [];
     try {
         const response = await fetch(healthApiUrl);
-        if (!response.ok) throw new Error("地端連線失敗");
-        
         const allData = await response.json();
-
-        // 模擬原本 Supabase 的過濾邏輯：
-        // 1. 先篩選出對應的序號 (currentSerial)
         const userRecords = allData.filter(r => r.serial_number === serial_number);
-        
-        // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
-        dataList = userRecords.filter(r => 
-            r.record_date >= queryStartDate && r.record_date <= queryEndDate
-        );
-
-        // 3. 排序：按日期降序排列
+        dataList = userRecords.filter(r => r.record_date >= fetchStartDate && r.record_date <= fetchEndDate);
         dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
-
     } catch (err) {
         console.error("讀取失敗:", err);
-        // 如果讀取失敗，dataList 會維持空陣列，後面的邏輯會處理「找不到數據」的情況
     }
 
-    // --- 3. 單日查詢補償邏輯 (Rule 2) ---
-    let finalContextData = dataList;
-    let dataStatusNotice = "";
-
-    if (analysisMode === "single" && targetDate) {
-      const exactMatch = dataList.find(d => d.record_date === targetDate);
-      if (!exactMatch && dataList.length > 0) {
-        // 尋找時間差最小的日期
-        const sortedByDist = [...dataList].sort((a, b) => {
-          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
-          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
-          if (distA === distB) return new Date(b.record_date) - new Date(a.record_date); // 優先選較新的
-          return distA - distB;
-        });
-        const nearest = sortedByDist[0];
-        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
-        finalContextData = [nearest];
-      } else if (!exactMatch && dataList.length === 0) {
-        dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
-        finalContextData = [];
-      } else {
-        finalContextData = [exactMatch];
-      }
-    }
-
-// --- 4. 格式化 Context 並加入「日期對照說明」 ---
-    let dataStatusNotice = "";
+    // --- 4. 格式化 Context (修復重複宣告與中斷代碼) ---
+    let dataStatusNotice = ""; // 只宣告一次
     if (analysisMode === "single" && dataList.length > 0) {
-        const actualDataDate = dataList[0].record_date;
-        if (actualDataDate !== userRequestedDateStr) {
-            dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDataDate}，這用來反映使用者在 ${userRequestedDateStr} 的核心狀態。】`;
+        const actualDate = dataList[0].record_date;
+        if (actualDate !== userRequestedDateStr) {
+            dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDate}，這反映的是使用者 ${userRequestedDateStr} 的核心健康狀態。】`;
         }
+    } else if (analysisMode === "single" && dataList.length === 0) {
+        dataStatusNotice = `⚠️ 找不到資料庫中 ${fetchStartDate} 的相關數據。`;
     }
 
     let healthContext = dataList.length > 0 ? dataList.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
-        
-        // 建議將每個日期的數據包裝得更嚴密
         return `
 [數據日期: ${item.record_date}]
 - 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}
