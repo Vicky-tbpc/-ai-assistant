@@ -275,7 +275,7 @@ ${sensoryTask}
 
 【精準日期參考（禁止輸出）】
 - 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
-- 查詢範圍：${queryStartDate} 至 ${queryEndDate}
+- 查詢範圍：${fetchStartDate} 至 ${fetchEndDate}
 - 最近日期對照表：${weekDaysInfo.join('\n')}
 
 【資料庫真實數據】
