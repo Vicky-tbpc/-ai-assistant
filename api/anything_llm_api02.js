@@ -1,4 +1,4 @@
-// anything_llm_api_13
+// anything_llm_api_14
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -62,21 +62,18 @@ export default async function handler(req, res) {
       return null;
     };
 
-    // --- 1. 意圖識別 (Intent Detection) ---
+    // --- 1. 意圖識別 ---
     const sleepKeywords = ["睡眠", "睡得", "深睡", "淺睡", "REM", "效率", "昨晚"];
     const coreKeywords = ["發炎", "恢復", "狀態", "電池", "指數", "健康評估"];
     
-    // 判斷是否為「純睡眠」：包含睡眠關鍵字 且 不包含核心指標關鍵字
+    // 【修改】更嚴格的純睡眠判斷：包含睡眠詞且絕對不包含核心詞
     const isSleepOnly = sleepKeywords.some(k => prompt.includes(k)) && !coreKeywords.some(k => prompt.includes(k));
-    // 判斷是否為「核心狀態」或「整體評估」：包含核心關鍵字，或兩者都沒提（預設為整體）
-    const isCoreOrOverall = coreKeywords.some(k => prompt.includes(k)) || (!sleepKeywords.some(k => prompt.includes(k)) && !coreKeywords.some(k => prompt.includes(k)));
 
-    // --- 2. 日期解析與動態偏移 (Dynamic Date Offset) ---
+    // --- 2. 日期解析 ---
     const today = new Date(local_date);
-    let userRequestedDateStr = fmt(today); // 使用者心目中的目標日期
+    let userRequestedDateStr = fmt(today); 
     let analysisMode = "range";
 
-    // 解析日期關鍵字
     const weekdayDate = getSpecificDate(prompt, today);
     const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
     const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
@@ -101,20 +98,18 @@ export default async function handler(req, res) {
     let fetchStartDate, fetchEndDate;
 
     if (analysisMode === "single") {
-      const targetDateObj = new Date(userRequestedDateStr);
       if (isSleepOnly) {
-        // 如果只問睡眠，直接找當天的數據 (D)
+        // 【需求2】純睡眠分析直接讀取當天 (D)，不減一天
         fetchStartDate = userRequestedDateStr;
         fetchEndDate = userRequestedDateStr;
       } else {
-        // 如果涉及恢復/發炎/整體，則找前一天的數據 (D-1)
+        const targetDateObj = new Date(userRequestedDateStr);
         const prevDay = new Date(targetDateObj);
         prevDay.setDate(targetDateObj.getDate() - 1);
         fetchStartDate = fmt(prevDay);
         fetchEndDate = fmt(prevDay);
       }
     } else {
-      // 區間模式 (月份、週等)
       analysisMode = "compare";
       let tempStart, tempEnd;
       if (monthMatch) {
@@ -134,7 +129,6 @@ export default async function handler(req, res) {
           tempEnd = new Date(today);
       }
 
-      // 如果非純睡眠，區間整體往前推一天以獲取對應的恢復指數
       if (!isSleepOnly) {
         tempStart.setDate(tempStart.getDate() - 1);
         tempEnd.setDate(tempEnd.setDate() - 1);
@@ -160,11 +154,12 @@ export default async function handler(req, res) {
         console.error("讀取失敗:", err);
     }
 
-    // --- 4. 格式化 Context 並建立日期透明度通知 ---
+
+    // --- 4. 格式化 Context ---
     let dataStatusNotice = ""; 
     if (analysisMode === "single" && dataList.length > 0) {
         const actualDataDate = dataList[0].record_date;
-        if (actualDataDate !== userRequestedDateStr) {
+        if (actualDataDate !== userRequestedDateStr && !isSleepOnly) {
             dataStatusNotice = `【系統通知：你現在看到的數據來自 ${actualDataDate}，這用來反映使用者在 ${userRequestedDateStr} 的核心健康狀態。】`;
         }
     } else if (analysisMode === "single" && dataList.length === 0) {
@@ -174,6 +169,10 @@ export default async function handler(req, res) {
     let healthContext = dataList.length > 0 ? dataList.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
+        
+        // 【需求1】如果是純睡眠分析，排除核心狀態指標
+        const coreMetrics = isSleepOnly ? "" : `- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}`;
+        
         return `
 [數據日期: ${item.record_date}]
 - 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}
@@ -201,7 +200,8 @@ export default async function handler(req, res) {
     // 異常偵測悄悄話
     const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
     const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
-    const sensoryTask = isStressed ? `
+    // 如果是純睡眠模式，就不觸發生理自覺任務（因為那個任務是針對恢復不足）
+    const sensoryTask = (isStressed && !isSleepOnly) ? `
 【生理自覺任務】
 目前數據顯示壓力較大或恢復不足。請在對話最後自然問他：『你現在會覺得頭痛、心跳很快，或有其他不舒服嗎？』並強調這對調整模型很重要。` : "";
       
@@ -214,8 +214,7 @@ ${sensoryTask}
 【日期邏輯指引】
 1. 使用者提問的目標日期是：${userRequestedDateStr}。
 2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
-3. 重要：若數據日期比詢問日期早一天（D-1），那是因為「核心狀態」是基於前一晚睡眠計算的。
-   請在回覆中自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你今天的恢復狀態...」或直接說「這是你 ${userRequestedDateStr} 的評估結果」。
+${isSleepOnly ? `3. 當前模式：單純睡眠分析。請直接針對提供的睡眠數據進行解讀，不需要提到「恢復指數」或「發炎風險」。` : `3. 重要：若數據日期比詢問日期早一天（D-1），那是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你今天的恢復狀態...」`}
 
 
 【健康數據分析指南（內部對照）】
@@ -246,6 +245,8 @@ ${sensoryTask}
 
 【分析原則（動態回覆邏輯）】
 1. **模式切換**：
+   - **純睡眠提問**：若使用者只問睡眠狀況，請專注於睡眠時間、效率、血氧及呼吸指標，**禁止提到恢復指數或發炎風險**。
+   - **核心/整體提問**：則需綜合解讀恢復指數與發炎狀況。
    - **特定提問**：若問題針對特定指標（如：血氧、HBI），直接以自然對話回覆，禁止使用固定標題或報告範本。
    - **區間查詢**：若提問包含月份、上週或長區間，則自動啟用【月份分析規則】。
 2. **標準對照**：所有數據描述必須對照【健康數據分析指南】，給予具體評價（如：良好、輕度異常）與 1～2 個對應建議。
