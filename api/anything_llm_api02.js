@@ -222,11 +222,11 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
         // 3. 組合指令 (完全依照你要求的語句格式)
         sensoryTask = `
 【生理自覺任務】
-目前數據顯示 ${displayDate} 的狀態不佳。
+目前數據顯示 ${displayDate} 的狀態不佳（恢復指數：${batteryVal}，狀態：${lightStatus}）。
 請務必在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
 並強調：『因為你的體感回饋能幫我校正你的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
     }
-      
+
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 你是一個線上AI健康夥伴。請只輸出回覆內容，不要輸出報告格式。
@@ -236,7 +236,7 @@ ${sensoryTask}
 【日期邏輯指引】
 1. 使用者提問的目標日期是：${userRequestedDateStr}。
 2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
-${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日期 (${userRequestedDateStr}) 的前一天，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你 ${userRequestedDateStr} 的恢復狀態如下：」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據。`}
+${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日期 (${userRequestedDateStr}) 的前一天，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據分析，你 ${userRequestedDateStr} 的恢復狀態如下：」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據。`}
 
 【健康數據分析指南（內部對照）】
 
