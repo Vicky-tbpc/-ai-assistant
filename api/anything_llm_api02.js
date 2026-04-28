@@ -196,12 +196,12 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-// --- 4.5 異常偵測與動態時態調整 (結合 D-1 邏輯) ---
+// --- 4.5 異常偵測與時態統一口徑 (修正版) ---
     const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
     const batteryVal = latestData.Personal_Battery_weighted_round;
     const lightStatus = latestData.light_status;
 
-    // 1. 觸發條件：必須是「核心查詢」且「數據異常」
+    // 1. 觸發條件：核心查詢 (發炎/恢復) 且 數據異常
     const isStressed = isCoreQuery && (
         lightStatus === "紅燈" || 
         lightStatus === "黃燈" || 
@@ -210,24 +210,21 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
 
     let sensoryTask = "";
 
-    if (isStressed && dataList.length > 0) {
-        // 2. 判斷使用者「認知上」的日期
-        // userRequestedDateStr 是使用者問的日期 (例如：今天)
-        // fetchStartDate 是我們實際抓的 D-1 數據日期
+    if (isStressed) {
+        // 2. 判斷日期顯示方式
         const isToday = (userRequestedDateStr === fmt(today));
-
-        // 3. 動態決定語氣與詞彙
-        // 如果問的是「今天」，語境是「現在」
-        // 如果問的是「特定日期」，語境是「那天」
-        const timeWord = isToday ? "現在" : `在 ${userRequestedDateStr} 那天`;
+        
+        // 統一使用使用者詢問的日期 (例如 2026-04-23)，即便數據是抓前一晚的
+        const displayDate = userRequestedDateStr; 
+        const timeWord = isToday ? "現在" : `在 ${displayDate} 那天`;
         const verbWord = isToday ? "會覺得" : "有沒有覺得";
-        const targetDateLabel = userRequestedDateStr; // 使用者認知的日期標籤
 
+        // 3. 組合指令 (完全依照你要求的語句格式)
         sensoryTask = `
 【生理自覺任務】
-偵測到使用者詢問的 ${targetDateLabel} 數據（反映前晚睡眠品質）顯示壓力較大或恢復不足。
-請在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
-並說明：『因為你的體感回饋能幫我精準校正 ${targetDateLabel} 的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
+目前數據顯示 ${displayDate} 的狀態不佳。
+請務必在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
+並強調：『因為你的體感回饋能幫我校正你的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
     }
       
     // --- 5. 組合最終 Prompt ---
@@ -287,6 +284,7 @@ ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日
 
 【核心規範】
 - 用自然關心的語氣，像平輩朋友聊天 🖐️
+- 若有【生理自覺任務】，請將其自然融入結尾。
 - 除非上方出現【生理自覺任務】明確指令，否則禁止主動詢問使用者是否有頭痛、心跳快、提不起勁等生理症狀。 // <--- 加入這行約束
 - 每次回覆需包含 3～5 個 emoji，分散在句子中。
 - 提供 1～2 個與問題直接相關的具體建議。
