@@ -216,7 +216,6 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
 
     if (isStressed) {
         // 2. 判斷日期顯示方式
-    if (isStressed) {
         const isToday = (userRequestedDateStr === fmt(today));
         const displayDate = userRequestedDateStr; 
         const timeWord = isToday ? "現在" : `在 ${displayDate} 那天`;
