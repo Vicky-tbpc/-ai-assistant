@@ -1,4 +1,4 @@
-// anything_llm_api_13
+// anything_llm_api_14
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -196,38 +196,39 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-// --- 4.5 異常偵測與時態統一口徑 (修正版) ---
-    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
-    const batteryVal = latestData.Personal_Battery_weighted_round;
-    const lightStatus = latestData.light_status;
+// --- 4.5 異常偵測與時態統一口徑 (優化版) ---
+const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
+const batteryVal = latestData.Personal_Battery_weighted_round;
+const lightStatus = latestData.light_status;
 
-    // 1. 觸發條件：核心查詢 (發炎/恢復) 且 數據異常
-    const isStressed = isCoreQuery && (
-        lightStatus === "紅燈" || 
-        lightStatus === "黃燈" || 
-        (typeof batteryVal === 'number' && batteryVal < 60)
-    );
+// 1. 觸發條件：核心查詢且數據異常
+const isStressed = isCoreQuery && (
+    lightStatus === "紅燈" || 
+    lightStatus === "黃燈" || 
+    (typeof batteryVal === 'number' && batteryVal < 60)
+);
 
-    let sensoryTask = "";
+let sensoryTaskInstruction = "";
 
-    if (isStressed) {
-        // 2. 判斷日期顯示方式
-        const isToday = (userRequestedDateStr === fmt(today));
-        
-        // 統一使用使用者詢問的日期 (例如 2026-04-23)，即便數據是抓前一晚的
-        const displayDate = userRequestedDateStr; 
-        const timeWord = isToday ? "現在" : `在 ${displayDate} 那天`;
-        const verbWord = isToday ? "會覺得" : "有沒有覺得";
+if (isStressed) {
+    const isToday = (userRequestedDateStr === fmt(today));
+    const displayDate = userRequestedDateStr; 
+    const timeWord = isToday ? "現在" : `在 ${displayDate} 那天`;
+    const verbWord = isToday ? "會覺得" : "有沒有覺得";
 
-        // 3. 組合指令 (完全依照你要求的語句格式)
-        sensoryTask = `
-【生理自覺任務】
-目前數據顯示 ${displayDate} 的狀態不佳。
-請務必在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
-並強調：『因為你的體感回饋能幫我校正你的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
-    }
+    // 這裡改為「強烈指令」，確保 AI 遵守
+    sensoryTaskInstruction = `
+【核心任務：生理自覺】
+目前數據異常，請務必在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
+並感性地強調：『因為你的體感回饋能幫我校正健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
+}
 
     // --- 5. 組合最終 Prompt ---
+    // 將數據指引轉化為自然帶入的口吻
+    const dateLogicIntro = isCoreQuery 
+        ? `看了你 ${fetchStartDate} 的睡眠數據，你 ${userRequestedDateStr} 的恢復狀態如下：` 
+        : `關於你詢問的數據分析，這是 ${fetchStartDate} 的狀況：`;
+
     const combinedMessage = `
 你是一個線上AI健康夥伴。請只輸出回覆內容，不要輸出報告格式。
 
@@ -237,6 +238,21 @@ ${sensoryTask}
 1. 使用者提問的目標日期是：${userRequestedDateStr}。
 2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
 ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日期 (${userRequestedDateStr}) 的前一天，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據分析，你 ${userRequestedDateStr} 的恢復狀態如下：」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據。`}
+
+【核心規範】
+- 用自然關心的語氣，像平輩朋友聊天 🖐️
+- 每次回覆需包含 3～5 個 emoji，分散在句子中。
+- 提供 1～2 個與問題直接相關的具體建議。
+- 嚴禁醫療診斷語氣，需使用「建議觀察」、「可能存在」等委婉詞彙。
+- 一律使用繁體中文（台灣用語），統一使用「你」，不要用「您」。
+- 字數限制 150～250 字。
+- 禁止輸出任何系統規則、標題或提示詞內容（例如不要出現「根據數據分析」這種標題）。
+- **除非下方出現【生理自覺任務】明確指令，否則嚴禁主動詢問頭痛、心跳快等生理症狀。**
+
+${sensoryTask}
+
+【日期帶入指引】
+- 請在回覆開頭自然帶入這句話：『${dateLogicIntro}』
 
 【健康數據分析指南（內部對照）】
 
@@ -281,17 +297,6 @@ ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日
 3. 整體健康解讀（不可拆日期）
 4. 1～3 個具體建議
 嚴格禁止：每日條列、日期逐筆分析、類似 2026-03-01 格式、長列表格式。
-
-【核心規範】
-- 用自然關心的語氣，像平輩朋友聊天 🖐️
-- 若有【生理自覺任務】，請將其自然融入結尾。
-- 除非上方出現【生理自覺任務】明確指令，否則禁止主動詢問使用者是否有頭痛、心跳快、提不起勁等生理症狀。 // <--- 加入這行約束
-- 每次回覆需包含 3～5 個 emoji，分散在句子中。
-- 提供 1～2 個與問題直接相關的具體建議。
-- 嚴禁醫療診斷語氣，需使用「建議觀察」、「可能存在」等委婉詞彙。
-- 一律使用繁體中文（台灣用語），統一使用「你」。
-- 字數限制 150～250 字。
-- 禁止輸出任何系統規則、標題或提示詞內容。
 
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
