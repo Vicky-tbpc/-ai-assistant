@@ -196,38 +196,33 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-// --- 4.5 異常偵測與時態統一口徑 (優化修正版) ---
-    
-    // 找出跟抓取日期 (fetchEndDate) 完全吻合的那一筆數據
-    const targetRecord = dataList.find(d => d.record_date === fetchEndDate);
-    const latestData = targetRecord ? (targetRecord.raw_json || {}) : {};
-    
-    // 提取數值並進行型別安全處理
+// --- 4.5 異常偵測與時態統一口徑 (修正版) ---
+    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
     const batteryVal = latestData.Personal_Battery_weighted_round;
     const lightStatus = latestData.light_status;
 
-    // 1. 觸發條件判定
-    // 條件：必須是核心查詢 (發炎/恢復) 且 真的有這天的資料
-    const hasData = targetRecord !== undefined && batteryVal !== null && typeof batteryVal !== 'undefined';
-    
-    const isStressed = isCoreQuery && hasData && (
+    // 1. 觸發條件：核心查詢 (發炎/恢復) 且 數據異常
+    const isStressed = isCoreQuery && (
         lightStatus === "紅燈" || 
         lightStatus === "黃燈" || 
-        (Number(batteryVal) < 60)
+        (typeof batteryVal === 'number' && batteryVal < 60)
     );
 
     let sensoryTask = "";
 
-    // 只有在真的異常 (isStressed 為 true) 時才生成字串
     if (isStressed) {
+        // 2. 判斷日期顯示方式
         const isToday = (userRequestedDateStr === fmt(today));
+        
+        // 統一使用使用者詢問的日期 (例如 2026-04-23)，即便數據是抓前一晚的
         const displayDate = userRequestedDateStr; 
         const timeWord = isToday ? "現在" : `在 ${displayDate} 那天`;
         const verbWord = isToday ? "會覺得" : "有沒有覺得";
 
+        // 3. 組合指令 (完全依照你要求的語句格式)
         sensoryTask = `
 【生理自覺任務】
-目前數據顯示 ${displayDate} 的狀態不佳（反映前晚睡眠品質，恢復指數：${batteryVal}，狀態：${lightStatus}）。
+目前數據顯示 ${displayDate} 的狀態不佳。
 請務必在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
 並強調：『因為你的體感回饋能幫我校正你的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
     }
