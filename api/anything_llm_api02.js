@@ -197,24 +197,27 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
     }
 
 // --- 4.5 異常偵測與時態統一口徑 (修正版) ---
-    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
+    // 【修改】不要直接拿 dataList[0]，改用 find 找出跟抓取日期 (fetchEndDate) 完全吻合的那一筆
+    const targetRecord = dataList.find(d => d.record_date === fetchEndDate);
+    const latestData = targetRecord ? (targetRecord.raw_json || {}) : {};
+    
+    // 確保數值型態正確
     const batteryVal = latestData.Personal_Battery_weighted_round;
     const lightStatus = latestData.light_status;
 
-    // 1. 觸發條件：核心查詢 (發炎/恢復) 且 數據異常
-    const isStressed = isCoreQuery && (
+    // 【關鍵修改】1. 觸發條件：核心查詢 且 確定有抓到資料 且 真的符合異常標準
+    const isStressed = isCoreQuery && targetRecord && (
         lightStatus === "紅燈" || 
         lightStatus === "黃燈" || 
-        (typeof batteryVal === 'number' && batteryVal < 60)
+        (batteryVal !== null && typeof batteryVal !== 'undefined' && Number(batteryVal) < 60)
     );
 
     let sensoryTask = "";
 
     if (isStressed) {
         // 2. 判斷日期顯示方式
+    if (isStressed) {
         const isToday = (userRequestedDateStr === fmt(today));
-        
-        // 統一使用使用者詢問的日期 (例如 2026-04-23)，即便數據是抓前一晚的
         const displayDate = userRequestedDateStr; 
         const timeWord = isToday ? "現在" : `在 ${displayDate} 那天`;
         const verbWord = isToday ? "會覺得" : "有沒有覺得";
