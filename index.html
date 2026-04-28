@@ -331,11 +331,11 @@ function getRandomEndQuestion() {
     return END_QUESTIONS[Math.floor(Math.random() * END_QUESTIONS.length)];
 }
     const CTA_PHRASES = [
-        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、恢復指數、rMSSD放鬆恢復，還是發炎風險？",
+        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、恢復指數、rMSSD，還是發炎風險？",
         "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、恢復指數或發炎風險呢？",
         "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是發炎風險呢？",
         "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、恢復指數，還是睡眠平衡度？",
-        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD放鬆恢復、📈 恢復指數？"
+        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD、📈 恢復指數？"
     ];
     const ENCYCLOPEDIA_KEYWORDS = ["黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性"];
 
@@ -912,10 +912,10 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
-        { name: "😴 N3 深睡比例", type: "n3" },
-        { name: "🧘 rMSSD 放鬆恢復", type: "rmssd" },
+        { name: "😴 深睡期 (N3)", type: "n3" },
+        { name: "🧘 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
-        { name: "☁️ HBI 缺氧負荷", type: "hbi" }
+        { name: "☁️ HBI 低氧負擔指數", type: "hbi" }
     ];
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
     options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
@@ -1044,10 +1044,10 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
      
-        n3: { title: "N3 深睡比例", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
-        rmssd: { title: "rMSSD 放鬆恢復", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
+        n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
-        hbi: { title: "HBI 缺氧負荷", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
+        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
     
