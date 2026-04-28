@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     };
 
     // --- 1. 意圖識別：僅保留核心指標識別 ---
-    const coreKeywords = ["發炎", "恢復", "狀態", "健康"];
+    const coreKeywords = ["發炎", "恢復"];
     const isCoreQuery = coreKeywords.some(k => prompt.includes(k));
 
     // --- 2. 日期解析 ---
@@ -180,7 +180,7 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
 - 睡眠結構: 深睡期 ${raw.N3_pct || 0}%, 淺睡期 ${raw.N1N2_pct || 0}%, 快速動眼期 ${raw.REM_pct || 0}%
 - 睡眠血氧飽和度: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
 - 睡眠低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%
-- 缺氧負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
+- 低氧負擔指數: HBI低氧負擔指數 ${Math.round(raw.HBI || 0)}%min/h
 - 睡眠血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
 - 睡眠呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
 - 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
@@ -196,13 +196,39 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-    // 異常偵測悄悄話
+// --- 4.5 異常偵測與動態時態調整 (結合 D-1 邏輯) ---
     const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
-    const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
-    // 如果是純睡眠模式，就不觸發生理自覺任務（因為那個任務是針對恢復不足）
-    const sensoryTask = (isStressed && isCoreQuery) ? `
+    const batteryVal = latestData.Personal_Battery_weighted_round;
+    const lightStatus = latestData.light_status;
+
+    // 1. 觸發條件：必須是「核心查詢」且「數據異常」
+    const isStressed = isCoreQuery && (
+        lightStatus === "紅燈" || 
+        lightStatus === "黃燈" || 
+        (typeof batteryVal === 'number' && batteryVal < 60)
+    );
+
+    let sensoryTask = "";
+
+    if (isStressed && dataList.length > 0) {
+        // 2. 判斷使用者「認知上」的日期
+        // userRequestedDateStr 是使用者問的日期 (例如：今天)
+        // fetchStartDate 是我們實際抓的 D-1 數據日期
+        const isToday = (userRequestedDateStr === fmt(today));
+
+        // 3. 動態決定語氣與詞彙
+        // 如果問的是「今天」，語境是「現在」
+        // 如果問的是「特定日期」，語境是「那天」
+        const timeWord = isToday ? "現在" : `在 ${userRequestedDateStr} 那天`;
+        const verbWord = isToday ? "會覺得" : "有沒有覺得";
+        const targetDateLabel = userRequestedDateStr; // 使用者認知的日期標籤
+
+        sensoryTask = `
 【生理自覺任務】
-目前數據顯示壓力較大或恢復不足。請在對話最後自然問他：『你現在會覺得頭痛、心跳很快，或有其他不舒服嗎？』並強調這對調整模型很重要。` : "";
+偵測到使用者詢問的 ${targetDateLabel} 數據（反映前晚睡眠品質）顯示壓力較大或恢復不足。
+請在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
+並說明：『因為你的體感回饋能幫我精準校正 ${targetDateLabel} 的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
+    }
       
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
@@ -214,7 +240,6 @@ ${sensoryTask}
 1. 使用者提問的目標日期是：${userRequestedDateStr}。
 2. 我提供的數據日期為：${fetchStartDate} 到 ${fetchEndDate}。
 ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日期 (${userRequestedDateStr}) 的前一天，是因為「核心狀態」是基於前一晚睡眠計算的。請自然提到：「根據你 ${fetchStartDate} 的睡眠數據，你 ${userRequestedDateStr} 的恢復狀態如下：」` : `3. 目前模式：數據分析。請直接解讀 ${fetchStartDate} 的數據。`}
-
 
 【健康數據分析指南（內部對照）】
 
@@ -236,7 +261,7 @@ ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日
    - 睡眠結構：深睡 (N3) 10-20%, 淺睡 50-65%, 快速動眼 (REM) 10-25%。
    - 睡眠血氧 (SpO2)：正常應 > 95%。
    - 低血氧比例：T90 ≤ 5%, T89 ≤ 4%, T88 ≤ 3%。
-   - 缺氧負荷 (HBI)：>10 輕度, >30 中度（建議側睡）, >60 重度（建議就醫檢測）。
+   - 低氧負擔指數 (HBI)：>10 輕度, >30 中度（建議側睡）, >60 重度（建議就醫檢測）。
    - 血氧下降指數 (ODI 3%/4%)：每小時應 < 5 次。
    - 睡眠呼吸頻率：12-25 rpm 為正常範圍。
    - 睡眠脈搏：60-100 bpm 為正常範圍。
@@ -244,8 +269,8 @@ ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日
 
 【分析原則（動態回覆邏輯）】
 1. **模式切換**：
-        -    如果使用者詢問特定指標（如 HBI、ODI、rMSSD 等），請針對該數值解讀，不要提到恢復指數或發炎風險。
-        -    如果涉及核心關鍵字（恢復、發炎、狀態），則進行綜合健康評估。
+   - **如果使用者詢問特定指標（如 HBI、ODI、rMSSD 等），請針對該數值解讀，不要提到恢復指數或發炎風險。
+   - **如果涉及核心關鍵字（恢復、發炎），則進行綜合健康評估。
    - **特定提問**：若問題針對特定指標（如：血氧、HBI），直接以自然對話回覆，禁止使用固定標題或報告範本。
    - **區間查詢**：若提問包含月份、上週或長區間，則自動啟用【月份分析規則】。
 2. **標準對照**：所有數據描述必須對照【健康數據分析指南】，給予具體評價（如：良好、輕度異常）與 1～2 個對應建議。
@@ -262,6 +287,7 @@ ${isCoreQuery ? `3. 重要提示：數據日期 (${fetchStartDate}) 為提問日
 
 【核心規範】
 - 用自然關心的語氣，像平輩朋友聊天 🖐️
+- 除非上方出現【生理自覺任務】明確指令，否則禁止主動詢問使用者是否有頭痛、心跳快、提不起勁等生理症狀。 // <--- 加入這行約束
 - 每次回覆需包含 3～5 個 emoji，分散在句子中。
 - 提供 1～2 個與問題直接相關的具體建議。
 - 嚴禁醫療診斷語氣，需使用「建議觀察」、「可能存在」等委婉詞彙。
