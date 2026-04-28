@@ -167,15 +167,15 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
     const raw = item.raw_json || {};
     const tst = raw.TST_min || 0;
     
-        // 僅在核心查詢時將恢復指數與發炎風險塞入 Context
-        const coreMetricsLine = isCoreQuery 
-            ? `- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}`
-            : "";
-        
-        return `
+    // 1. 決定是否要加入核心指標內容，如果不加入就回傳空字串
+    const coreMetricsLine = isCoreQuery 
+        ? `- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}\n` 
+        : "";
+    
+    // 2. 將 coreMetricsLine 放入回傳內容中
+    return 
 [數據日期: ${item.record_date}]
-- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}
-- 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
+${coreMetricsLine}- 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 睡眠結構: 深睡期 ${raw.N3_pct || 0}%, 淺睡期 ${raw.N1N2_pct || 0}%, 快速動眼期 ${raw.REM_pct || 0}%
 - 睡眠血氧飽和度: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
@@ -218,7 +218,7 @@ let healthContext = dataList.length > 0 ? dataList.map(item => {
 【生理自覺任務】
 目前數據顯示 ${displayDate} 的狀態不佳。
 請務必在回覆最後自然地詢問：『${timeWord}${verbWord}頭痛、心跳很快，或有特別疲倦嗎？』
-並感性地強調：『因為你的體感回饋能幫我校正你的健康模型，讓分析更貼近你的實際狀況喔！🌟』`;
+並感性地強調：『因為你的體感回饋能幫我校正你的健康模型，讓分析更貼近你的實際狀況喔！✨』`;
     }
 
     // --- 5. 組合最終 Prompt ---
