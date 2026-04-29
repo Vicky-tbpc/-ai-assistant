@@ -1,13 +1,16 @@
-// api/health.js 修正版
+// api/health.js 分筆資料
 export default async function handler(req, res) {
+  const { start, end, serial } = req.query; // 接收來自 anything_llm_api 的參數
   const API_KEY = process.env.LOCAL_API_KEY;
   const TUNNEL_URL = process.env.LOCAL_TUNNEL_URL;
 
   try {
-    const response = await fetch(`${TUNNEL_URL}/api/get-latest-health`, {
+    // 將參數串接到 ngrok 網址後方
+    const url = `${TUNNEL_URL}/api/get-latest-health?start=${start || ''}&end=${end || ''}&serial=${serial || ''}`;
+    
+    const response = await fetch(url, {
       headers: { 
         'X-API-KEY': API_KEY,
-        // --- 下面這一行一定要加，專門給 ngrok 用的 ---
         'ngrok-skip-browser-warning': 'true' 
       }
     });
