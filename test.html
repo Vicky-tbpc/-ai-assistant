@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n65</title>
+    <title>Soosyn 健康夥伴 n67</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -824,39 +824,45 @@ async function fetchSummaryData(targetDate) {
     // 這代表「目標日期當天」沒有數據，直接回傳 null
     if (!healths?.length || healths[0].record_date !== targetDate) return null;
 
-   const current = healths[0];
-    const raw = current.raw_json;
-    const currentBattery = raw.Personal_Battery_weighted_round || 0;
+const current = healths[0];
+const raw = current.raw_json;
+const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-    // --- 改向地端 Python 伺服器獲取整份資料 ---
+// --- 調整為精準獲取當日全體數據的減少流量法 ---
 let allUsersData = [];
 
 try {
-    const response = await fetch('/api/health');
+    // 1. 只請求「目標日期」這一天的數據，不需要抓取全部歷史紀錄
+    const params = new URLSearchParams({
+        start: current.record_date,
+        end: current.record_date
+        // 注意：這裡不帶 serial，因為我們要計算的是「全體排名」
+    }).toString();
+
+    const response = await fetch(`/api/health?${params}`);
     if (!response.ok) throw new Error("地端連線失敗");
     
-    const allData = await response.json();
+    // 現在拿到的資料只包含該日期的所有紀錄，體積縮小非常多
+    const dailyData = await response.json();
 
-    // --- 模擬 Supabase 的 .eq('record_date', current.record_date) ---
-    // 找出所有與 current.record_date 相同的紀錄 (不分序號)
-    if (Array.isArray(allData)) {
-        allUsersData = allData.filter(item => item.record_date === current.record_date);
+    if (Array.isArray(dailyData)) {
+        allUsersData = dailyData;
     }
 
 } catch (err) {
     console.error("計算排名時讀取地端資料失敗:", err);
-    // 如果讀取失敗，allUsersData 會是空陣列，後續排名邏輯會自動處理（通常顯示為 0%）
 }
 
-    let percentage = 0;
-    if (allUsersData && allUsersData.length > 0) {
-        const totalUsers = allUsersData.length;
-        // 計算有多少人的恢復指數低於目前使用者
-        const lowerUsers = allUsersData.filter(d => 
-            (d.raw_json.Personal_Battery_weighted_round || 0) < currentBattery
-        ).length;
-        percentage = Math.round((lowerUsers / totalUsers) * 100);
-    }
+// 2. 排名計算邏輯保持不變
+let percentage = 0;
+if (allUsersData && allUsersData.length > 0) {
+    const totalUsers = allUsersData.length;
+    // 計算有多少人的恢復指數低於目前使用者
+    const lowerUsers = allUsersData.filter(d => 
+        (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
+    ).length;
+    percentage = Math.round((lowerUsers / totalUsers) * 100);
+}
 
     // --------------------------------------------
 
