@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n63</title>
+    <title>Soosyn 健康夥伴 n65</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -689,21 +689,29 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
         prevDate.setDate(prevDate.getDate() - 1);
         const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`;
 
-
         // --- 【關鍵修改部分：改向地端要資料】 ---
 let targetData, prevData;
 
 try {
-    const response = await fetch('/api/health');
+    // 1. 準備查詢參數：只抓取特定序號的資料
+    // 建議同時帶上日期範圍 (start/end)，進一步壓縮流量
+    const params = new URLSearchParams({
+        serial: currentSerial,
+        start: prevDateStr, // 最小日期
+        end: targetDateStr  // 最大日期
+    }).toString();
+
+    // 2. 呼叫 API 並帶入參數
+    const response = await fetch(`/api/health?${params}`);
+    
     if (!response.ok) throw new Error("地端連線失敗");
     
-    const allData = await response.json();
+    // 現在拿到的 jsonData 已經是經過後端初步篩選的結果
+    const filteredData = await response.json();
 
-    // 模擬 Supabase 的 .eq('serial_number', currentSerial) 與 .in('record_date', [...])
-    const userRecords = allData.filter(r => r.serial_number === currentSerial);
-    
-    targetData = userRecords.find(r => r.record_date === targetDateStr);
-    prevData = userRecords.find(r => r.record_date === prevDateStr);
+    // 3. 在精簡後的資料中找出對應日期[cite: 11]
+    targetData = filteredData.find(r => r.record_date === targetDateStr);
+    prevData = filteredData.find(r => r.record_date === prevDateStr);
 
 } catch (err) {
     console.error("讀取失敗:", err);
@@ -711,14 +719,13 @@ try {
     return;
 }
 
-
-        // --- 無資料處理 ---
-        if (!targetData) {
-            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
-            await new Promise(r => setTimeout(r, 800));
-            await appendAiMessage(getRandomEndQuestion());
-            return;
-        }
+// --- 無資料處理 ---
+if (!targetData) {
+    await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+    await new Promise(r => setTimeout(r, 800));
+    await appendAiMessage(getRandomEndQuestion());
+    return;
+}
 
         const raw = targetData.raw_json;
         const prevRaw = prevData?.raw_json;
@@ -782,73 +789,80 @@ try {
 
 async function fetchSummaryData(targetDate) {
     
-// --- 1. 改向地端 Python 伺服器獲取整份資料 ---
-let healths = []; // 預設為空陣列，對齊原本 Supabase data 的結構
+    // --- 1. 準備減少流量的查詢參數 ---
+    let healths = []; 
 
-try {
-    const response = await fetch('/api/health');
-    
-    if (!response.ok) throw new Error("地端連線失敗");
-    
-    const allData = await response.json();
+    try {
+        // 使用 URLSearchParams 構建參數，讓地端只回傳這個序號且日期 <= targetDate 的資料
+        const params = new URLSearchParams({
+            serial: currentSerial,
+            end: targetDate, // 限制日期上限，減少不必要的未來資料傳輸
+            limit: 10        // 雖然只要 2 筆，但多拿幾筆當緩衝比較保險
+        }).toString();
 
-    // --- 2. 模擬 Supabase 的過濾與排序邏輯 ---
-    healths = allData
-        // .eq('serial_number', currentSerial) -> 篩選序號
-        // .lte('record_date', targetDate) -> 篩選日期小於等於目標日
-        .filter(item => 
-            item.serial_number === currentSerial && 
-            item.record_date <= targetDate
-        )
-        // .order('record_date', { ascending: false }) -> 日期降冪排序
-        .sort((a, b) => b.record_date.localeCompare(a.record_date))
-        // .limit(2) -> 只取前兩筆 (今天與前一筆)
-        .slice(0, 2);
+        const response = await fetch(`/api/health?${params}`);
+        
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        // 此時 allData 已經是被地端初步過濾過的精簡資料
+        const allData = await response.json();
 
-} catch (err) {
-    console.error("讀取地端資料發生錯誤:", err);
-    // 這裡可以根據需求決定要不要提示使用者 CMD 沒開
-}
+        // --- 2. 前端只需做最後的精確排序與切片 ---
+        healths = allData
+            // 雖然地端過濾過，但前端再次確保排序正確與只取 2 筆 (今日與前一筆)
+            .sort((a, b) => b.record_date.localeCompare(a.record_date))
+            .slice(0, 2);
+
+    } catch (err) {
+        console.error("讀取地端資料發生錯誤:", err);
+        // 建議這裡可以加一個靜默失敗或小提醒
+    }
 
 // 接下來你原本後續使用 healths 的邏輯（例如 if (!healths?.length) ...）完全不用改
 
     if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
     // 這代表「目標日期當天」沒有數據，直接回傳 null
-    if (!healths?.length || healths[0].record_date !== targetDate) return null;
+    if (!healths?.length) return null;
 
-   const current = healths[0];
-    const raw = current.raw_json;
-    const currentBattery = raw.Personal_Battery_weighted_round || 0;
+const current = healths[0];
+const raw = current.raw_json;
+const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-    // --- 改向地端 Python 伺服器獲取整份資料 ---
+// --- 調整為精準獲取當日全體數據的減少流量法 ---
 let allUsersData = [];
 
 try {
-    const response = await fetch('/api/health');
+    // 1. 只請求「目標日期」這一天的數據，不需要抓取全部歷史紀錄
+    const params = new URLSearchParams({
+        start: current.record_date,
+        end: current.record_date
+        // 注意：這裡不帶 serial，因為我們要計算的是「全體排名」
+    }).toString();
+
+    const response = await fetch(`/api/health?${params}`);
     if (!response.ok) throw new Error("地端連線失敗");
     
-    const allData = await response.json();
+    // 現在拿到的資料只包含該日期的所有紀錄，體積縮小非常多
+    const dailyData = await response.json();
 
-    // --- 模擬 Supabase 的 .eq('record_date', current.record_date) ---
-    // 找出所有與 current.record_date 相同的紀錄 (不分序號)
-    if (Array.isArray(allData)) {
-        allUsersData = allData.filter(item => item.record_date === current.record_date);
+    if (Array.isArray(dailyData)) {
+        allUsersData = dailyData;
     }
 
 } catch (err) {
     console.error("計算排名時讀取地端資料失敗:", err);
-    // 如果讀取失敗，allUsersData 會是空陣列，後續排名邏輯會自動處理（通常顯示為 0%）
 }
 
-    let percentage = 0;
-    if (allUsersData && allUsersData.length > 0) {
-        const totalUsers = allUsersData.length;
-        // 計算有多少人的恢復指數低於目前使用者
-        const lowerUsers = allUsersData.filter(d => 
-            (d.raw_json.Personal_Battery_weighted_round || 0) < currentBattery
-        ).length;
-        percentage = Math.round((lowerUsers / totalUsers) * 100);
-    }
+// 2. 排名計算邏輯保持不變
+let percentage = 0;
+if (allUsersData && allUsersData.length > 0) {
+    const totalUsers = allUsersData.length;
+    // 計算有多少人的恢復指數低於目前使用者
+    const lowerUsers = allUsersData.filter(d => 
+        (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
+    ).length;
+    percentage = Math.round((lowerUsers / totalUsers) * 100);
+}
 
     // --------------------------------------------
 
@@ -1325,29 +1339,31 @@ function renderLegend(type, abnormalLabel) {
         document.getElementById('chat-history').innerHTML += cardHtml; 
         scrollToBottom();
     }
-
-
-
-    // 其他輔助函數
+// 其他輔助函數
 async function processBalanceSearch(d) {
     document.querySelector('.date-actions')?.remove();
     await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`);
 
     try {
-        // 1. 改向地端 Python 伺服器要資料
-        const response = await fetch('/api/health');
+        // 1. 準備精準查詢參數：鎖定序號與單一日期 (start 與 end 設為同一天)
+        const params = new URLSearchParams({
+            serial: currentSerial,
+            start: d,
+            end: d
+        }).toString();
+
+        // 2. 向地端要求精簡後的資料
+        const response = await fetch(`/api/health?${params}`);
         if (!response.ok) throw new Error("地端連線失敗");
         
-        const allData = await response.json();
+        // 此時回傳的 data 應該只會包含該使用者在那一天的紀錄 (或是空陣列)
+        const filteredData = await response.json();
 
-        // 2. 在地端資料中篩選：序號符合、日期符合
-        const dayData = allData.find(item => 
-            item.serial_number === currentSerial && 
-            item.record_date === d
-        );
+        // 3. 取得資料 (因為已經過濾過，直接拿第一筆即可)
+        const dayData = Array.isArray(filteredData) ? filteredData[0] : null;
 
         if (dayData) {
-            // 3. 呼叫原本的卡片生成函式
+            // 4. 呼叫原本的卡片生成函式
             appendBalanceCard(dayData);
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
@@ -1359,9 +1375,7 @@ async function processBalanceSearch(d) {
         await appendAiMessage("哎呀，連不到你電腦的 Python 伺服器，記得要把 CMD 開著喔！ 🔌");
     }
 }
-
     
-
 // 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
 async function processSummarySearch(d, displayDate) {
     // 如果呼叫時沒傳 displayDate，就預設跟 d 一樣（確保相容性）
