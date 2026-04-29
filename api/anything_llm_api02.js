@@ -147,29 +147,32 @@ export default async function handler(req, res) {
       queryStartDate = fmt(defaultStart);
     }
 
-    // --- 2. 執行地端資料讀取 【修改：支援雙日期篩選】 ---
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers['host'];
-    const healthApiUrl = `${protocol}://${host}/api/health`;
+// --- 2. 執行地端資料讀取 【修改：帶入參數以節省 ngrok 流量】 ---
+const protocol = req.headers['x-forwarded-proto'] || 'http';
+const host = req.headers['host'];
 
-    let dataList = [];
-    try {
-        const response = await fetch(healthApiUrl);
-        if (!response.ok) throw new Error("地端連線失敗");
-        const allData = await response.json();
-        const userRecords = allData.filter(r => r.serial_number === serial_number);
+// 將篩選條件串接在 URL 後面
+const queryParams = new URLSearchParams({
+    serial: serial_number,
+    start: queryStartDate,
+    end: queryEndDate
+}).toString();
 
-        // 改良篩選：只要「入睡日」或「起床日」在範圍內都抓出來
-        dataList = userRecords.filter(r => {
-            const endDate = r.raw_json?.record_end ? r.raw_json.record_end.split(' ')[0] : r.record_date;
-            return (r.record_date >= queryStartDate && r.record_date <= queryEndDate) ||
-                   (endDate >= queryStartDate && endDate <= queryEndDate);
-        });
+const healthApiUrl = `${protocol}://${host}/api/health?${queryParams}`;
 
-        dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
-    } catch (err) {
-        console.error("讀取失敗:", err);
-    }
+let dataList = [];
+try {
+    const response = await fetch(healthApiUrl);
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    // 現在拿到的直接就是該使用者、該區間的資料了，不需要再 filter 一次
+    dataList = await response.json();
+
+    // 雖然地端可能排過序，但為了保險，雲端這邊可以再排一次
+    dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+} catch (err) {
+    console.error("讀取失敗:", err);
+}
 
     // --- 3. 單日查詢補償邏輯 【修改：支援 record_end 匹配】 ---
     let finalContextData = dataList;
