@@ -1,5 +1,4 @@
-
-// anything_llm_api_12
+// anything_llm_api_15
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -91,73 +90,62 @@ export default async function handler(req, res) {
 
     if (weekdayDate) {
       targetDate = weekdayDate;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
       analysisMode = "single";
     } else if (absMatch) {
       targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
       analysisMode = "single";
     } else if (monthMatch) {
-      analysisMode = "compare"; // 月份分析建議使用 compare 模式
+      analysisMode = "compare";
       const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
       const month = parseInt(monthMatch[2]);
-      // 設定該月的第一天
-      const firstDay = new Date(year, month - 1, 1);
-      // 設定該月的最後一天 (下個月的第 0 天就是這個月最後一天)
-      const lastDay = new Date(year, month, 0);      
-      queryStartDate = fmt(firstDay);
-      queryEndDate = fmt(lastDay);
+      queryStartDate = fmt(new Date(year, month - 1, 1));
+      queryEndDate = fmt(new Date(year, month, 0));
     } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
       targetDate = fmt(yesterday);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
       analysisMode = "single";
     } else if (prompt.includes("今天") || prompt.includes("最新")) {
       targetDate = fmt(today);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
       analysisMode = "single";
-    
     } else if (prompt.includes("本週") || prompt.includes("上週")) {
       analysisMode = "compare";
       const currentDay = today.getDay() === 0 ? 7 : today.getDay();
       const thisMon = new Date(today);
       thisMon.setDate(today.getDate() - (currentDay - 1));
-      
       if (prompt.includes("上週")) {
         const lastMon = new Date(thisMon);
         lastMon.setDate(lastMon.getDate() - 7);
         const lastSun = new Date(thisMon);
         lastSun.setDate(thisMon.getDate() - 1);
-        
         queryStartDate = fmt(lastMon);
-        queryEndDate = fmt(lastSun); // 修正：結束日期設為上週日
+        queryEndDate = fmt(lastSun);
       } else {
         queryStartDate = fmt(thisMon);
-        // 這週的結束日期維持 today 是正確的
       }
     } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
       analysisMode = "compare";
       if (prompt.includes("上個月")) {
-        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-        queryStartDate = fmt(firstDayLastMonth);
-        queryEndDate = fmt(lastDayLastMonth); // 修正：結束日期設為上個月最後一天
+        queryStartDate = fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+        queryEndDate = fmt(new Date(today.getFullYear(), today.getMonth(), 0));
       } else {
-        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        queryStartDate = fmt(firstDayThisMonth);
+        queryStartDate = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
       }
-    } else {
-      const defaultStart = new Date(today);
-      defaultStart.setDate(today.getDate() - 14);
-      queryStartDate = fmt(defaultStart);
     }
 
-    // --- 2. 執行地端資料讀取 (採用你指定的 n61 邏輯語法) ---
+    if (analysisMode === "single" && targetDate) {
+        // 為了確保能抓到跨日資料，單日查詢時擴大範圍：往前推一天
+        const searchStart = new Date(targetDate);
+        searchStart.setDate(searchStart.getDate() - 1);
+        queryStartDate = fmt(searchStart);
+        queryEndDate = targetDate;
+    } else if (!queryStartDate) {
+        const defaultStart = new Date(today);
+        defaultStart.setDate(today.getDate() - 14);
+        queryStartDate = fmt(defaultStart);
+    }
+
+    // --- 2. 執行地端資料讀取 ---
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers['host'];
     const healthApiUrl = `${protocol}://${host}/api/health`;
@@ -165,43 +153,33 @@ export default async function handler(req, res) {
     let dataList = [];
     try {
         const response = await fetch(healthApiUrl);
-        if (!response.ok) throw new Error("地端連線失敗");
-        
         const allData = await response.json();
-
-        // 模擬原本 Supabase 的過濾邏輯：
-        // 1. 先篩選出對應的序號 (currentSerial)
         const userRecords = allData.filter(r => r.serial_number === serial_number);
         
-        // 2. 再篩選出符合查詢日期範圍的資料 (queryStartDate ~ queryEndDate)
+        // 篩選範圍
         dataList = userRecords.filter(r => 
             r.record_date >= queryStartDate && r.record_date <= queryEndDate
         );
-
-        // 3. 排序：按日期降序排列
         dataList.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
-
     } catch (err) {
         console.error("讀取失敗:", err);
-        // 如果讀取失敗，dataList 會維持空陣列，後面的邏輯會處理「找不到數據」的情況
     }
 
-    // --- 3. 單日查詢補償邏輯 (Rule 2) ---
+    // --- 3. 單日查詢補償邏輯 (針對 record_end 優化) ---
     let finalContextData = dataList;
     let dataStatusNotice = "";
 
     if (analysisMode === "single" && targetDate) {
-      const exactMatch = dataList.find(d => d.record_date === targetDate);
+      // 優先尋找醒來日期 (record_end) 符合 targetDate 的資料
+      const exactMatch = dataList.find(d => {
+          const endDate = d.raw_json?.record_end ? d.raw_json.record_end.split(' ')[0] : d.record_date;
+          return endDate === targetDate;
+      });
+
       if (!exactMatch && dataList.length > 0) {
-        // 尋找時間差最小的日期
-        const sortedByDist = [...dataList].sort((a, b) => {
-          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
-          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
-          if (distA === distB) return new Date(b.record_date) - new Date(a.record_date); // 優先選較新的
-          return distA - distB;
-        });
-        const nearest = sortedByDist[0];
-        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
+        const nearest = dataList[0];
+        const displayDate = nearest.raw_json?.record_end ? nearest.raw_json.record_end.split(' ')[0] : nearest.record_date;
+        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${displayDate}。`;
         finalContextData = [nearest];
       } else if (!exactMatch && dataList.length === 0) {
         dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
@@ -211,16 +189,18 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 4. 格式化數據 Context ---
+    // --- 4. 格式化數據 Context (核心修改區) ---
     let healthContext = "找不到相關健康數據。";
-    if (dataList && dataList.length > 0) {
-      healthContext = dataList.map(item => {
+    if (finalContextData && finalContextData.length > 0) {
+      healthContext = finalContextData.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
+        // 提取 record_end 的日期部分 (YYYY-MM-DD)
+        const endDate = raw.record_end ? raw.record_end.split(' ')[0] : item.record_date;
         
         // 建議將每個日期的數據包裝得更嚴密
         return `
-[數據日期: ${item.record_date}]
+[數據基準日期 (睡眠當晚): ${item.record_date}]
 - 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
@@ -244,20 +224,14 @@ export default async function handler(req, res) {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-    // --- 4.5 異常偵測 (新增) ---
-    const latestData = dataList.length > 0 ? (dataList[0].raw_json || {}) : {};
+    // --- 4.5 異常偵測 ---
+    const latestData = finalContextData.length > 0 ? (finalContextData[0].raw_json || {}) : {};
     const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
+    const sensoryTask = isStressed ? `\n【生理自覺任務】\n目前數據顯示壓力較大。請詢問對方是否有不適感。` : ""
     
-    // 如果數據異常，就塞一段悄悄話給 AI
-    const sensoryTask = isStressed ? `
-【生理自覺任務】
-目前他的數據顯示壓力較大或恢復不足。請在對話最後自然地問他：
-『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』
-記得強調：『這對我調整你的健康模型很重要喔！🌟』` : "";
-      
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
-你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
+你是一個線上AI健康夥伴，請根據提供的數據進行分析。只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
 
