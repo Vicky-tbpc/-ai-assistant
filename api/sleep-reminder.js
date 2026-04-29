@@ -1,4 +1,4 @@
-// sleep-reminder_04 讀地端
+// sleep-reminder_05 單筆資料
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -27,26 +27,30 @@ export default async function handler(req, res) {
 
     if (userError) throw userError;
 
-    // --- STEP 2: 改向地端 Python 伺服器獲取整份資料 (取代原有的 supabase.from('health_data')) ---
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers['host'];
-    const healthApiUrl = `${protocol}://${host}/api/health`;
+// --- STEP 2: 改向地端 Python 伺服器獲獲取「特定日期」資料 ---
+const protocol = req.headers['x-forwarded-proto'] || 'http';
+const host = req.headers['host'];
 
-    let healthData = [];
-    try {
-        const response = await fetch(healthApiUrl);
-        if (!response.ok) throw new Error("地端連線失敗");
-        
-        const allData = await response.json();
+// 這裡我們直接指定要抓取的日期區間：從「前天」到「昨天」
+const queryParams = new URLSearchParams({
+    start: dayBeforeYesterday,
+    end: yesterday
+}).toString();
 
-        // 模擬原本 Supabase 的 .in('record_date', [yesterday, dayBeforeYesterday])
-        healthData = allData.filter(r => 
-            r.record_date === yesterday || r.record_date === dayBeforeYesterday
-        );
-    } catch (err) {
-        console.error("讀取地端資料失敗:", err);
-        return res.status(500).json({ error: "無法從地端 JSON 獲取健康數據" });
-    }
+const healthApiUrl = `${protocol}://${host}/api/health?${queryParams}`;
+
+let healthData = [];
+try {
+    const response = await fetch(healthApiUrl);
+    if (!response.ok) throw new Error("地端連線失敗");
+    
+    // 現在拿到的直接就是這兩天的過濾後數據，不需再 filter 
+    healthData = await response.json();
+    
+} catch (err) {
+    console.error("讀取地端資料失敗:", err);
+    return res.status(500).json({ error: "無法從地端 JSON 獲取健康數據" });
+}
 
     const metrics = ['Battery_TST_min_A', 'Battery_N3_pct_A', 'Battery_rMSSD_A', 'Battery_HBI_A', 'Battery_HR_min_A'];
 
