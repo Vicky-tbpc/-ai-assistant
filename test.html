@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n68</title>
+    <title>Soosyn 健康夥伴 n65</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -822,7 +822,7 @@ async function fetchSummaryData(targetDate) {
 
     if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
     // 這代表「目標日期當天」沒有數據，直接回傳 null
-    if (!healths?.length || healths[0].record_date !== targetDate) return null;
+    if (!healths?.length) return null;
 
 const current = healths[0];
 const raw = current.raw_json;
