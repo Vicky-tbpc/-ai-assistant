@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n67</title>
+    <title>Soosyn 健康夥伴 n68</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1339,29 +1339,31 @@ function renderLegend(type, abnormalLabel) {
         document.getElementById('chat-history').innerHTML += cardHtml; 
         scrollToBottom();
     }
-
-
-
-    // 其他輔助函數
+// 其他輔助函數
 async function processBalanceSearch(d) {
     document.querySelector('.date-actions')?.remove();
     await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`);
 
     try {
-        // 1. 改向地端 Python 伺服器要資料
-        const response = await fetch('/api/health');
+        // 1. 準備精準查詢參數：鎖定序號與單一日期 (start 與 end 設為同一天)
+        const params = new URLSearchParams({
+            serial: currentSerial,
+            start: d,
+            end: d
+        }).toString();
+
+        // 2. 向地端要求精簡後的資料
+        const response = await fetch(`/api/health?${params}`);
         if (!response.ok) throw new Error("地端連線失敗");
         
-        const allData = await response.json();
+        // 此時回傳的 data 應該只會包含該使用者在那一天的紀錄 (或是空陣列)
+        const filteredData = await response.json();
 
-        // 2. 在地端資料中篩選：序號符合、日期符合
-        const dayData = allData.find(item => 
-            item.serial_number === currentSerial && 
-            item.record_date === d
-        );
+        // 3. 取得資料 (因為已經過濾過，直接拿第一筆即可)
+        const dayData = Array.isArray(filteredData) ? filteredData[0] : null;
 
         if (dayData) {
-            // 3. 呼叫原本的卡片生成函式
+            // 4. 呼叫原本的卡片生成函式
             appendBalanceCard(dayData);
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
@@ -1373,9 +1375,7 @@ async function processBalanceSearch(d) {
         await appendAiMessage("哎呀，連不到你電腦的 Python 伺服器，記得要把 CMD 開著喔！ 🔌");
     }
 }
-
     
-
 // 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
 async function processSummarySearch(d, displayDate) {
     // 如果呼叫時沒傳 displayDate，就預設跟 d 一樣（確保相容性）
