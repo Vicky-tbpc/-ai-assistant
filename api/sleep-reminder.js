@@ -1,4 +1,4 @@
-// sleep-reminder_03
+// sleep-reminder_04 讀地端
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -27,13 +27,26 @@ export default async function handler(req, res) {
 
     if (userError) throw userError;
 
-    // 2. 取得「昨天」與「前天」的健康數據 (因為昨天的資料才是最新的睡眠結果)
-    const { data: healthData, error: healthError } = await supabase
-      .from('health_data')
-      .select('serial_number, record_date, raw_json')
-      .in('record_date', [yesterday, dayBeforeYesterday]);
+    // --- STEP 2: 改向地端 Python 伺服器獲取整份資料 (取代原有的 supabase.from('health_data')) ---
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['host'];
+    const healthApiUrl = `${protocol}://${host}/api/health`;
 
-    if (healthError) throw healthError;
+    let healthData = [];
+    try {
+        const response = await fetch(healthApiUrl);
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        const allData = await response.json();
+
+        // 模擬原本 Supabase 的 .in('record_date', [yesterday, dayBeforeYesterday])
+        healthData = allData.filter(r => 
+            r.record_date === yesterday || r.record_date === dayBeforeYesterday
+        );
+    } catch (err) {
+        console.error("讀取地端資料失敗:", err);
+        return res.status(500).json({ error: "無法從地端 JSON 獲取健康數據" });
+    }
 
     const metrics = ['Battery_TST_min_A', 'Battery_N3_pct_A', 'Battery_rMSSD_A', 'Battery_HBI_A', 'Battery_HR_min_A'];
 
@@ -90,10 +103,10 @@ export default async function handler(req, res) {
         const sendStatus = await sendLineMessage(user.line_user_id, message);
         
         return {
-          serial: user.serial_number,
-          target_date: yesterday,
-          metric: targetMetric,
-          status: sendStatus
+          serial: user.serial_number, 
+          status: sendStatus === 'success' ? "Success" : "Failed", // 轉成你想要的 Success 字樣
+          targetMetric: targetMetric,
+          target_date: yesterday
         };
 
         // --- 計算邏輯結束 ---
