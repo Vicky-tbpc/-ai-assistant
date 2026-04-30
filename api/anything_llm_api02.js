@@ -1,4 +1,4 @@
-// anything_llm_api_15
+// anything_llm_api_16
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -74,79 +74,86 @@ export default async function handler(req, res) {
       return null;
     };
 
-    // --- 1. 日期解析與標準化 ---
-    const today = new Date(local_date);
-    let targetDate = null;
-    let queryStartDate = "";
-    let queryEndDate = fmt(today);
-    let analysisMode = "range";
+    // --- 1. 日期解析與標準化 (整合版) ---
+const today = new Date(local_date);
+let targetDate = null;
+let queryStartDate = "";
+let queryEndDate = fmt(today);
+let analysisMode = "range";
 
-    const weekdayDate = getSpecificDate(prompt, today);
-    const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-    const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
+// 保留你原有的各種匹配邏輯
+const weekdayDate = getSpecificDate(prompt, today);
+const absMatch = prompt.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+const monthMatch = prompt.match(/(?:(\d{4})年)?(\d{1,2})月/);
 
-    if (weekdayDate) {
-      targetDate = weekdayDate;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
-    } else if (absMatch) {
-      targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
-    } else if (monthMatch) {
-      analysisMode = "compare";
-      const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
-      const month = parseInt(monthMatch[2]);
-      const firstDay = new Date(year, month - 1, 1);
-      const lastDay = new Date(year, month, 0);      
-      queryStartDate = fmt(firstDay);
-      queryEndDate = fmt(lastDay);
-    } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      targetDate = fmt(yesterday);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
-    } else if (prompt.includes("今天") || prompt.includes("最新")) {
-      targetDate = fmt(today);
-      queryStartDate = targetDate;
-      queryEndDate = targetDate;
-      analysisMode = "single";
-    } else if (prompt.includes("本週") || prompt.includes("上週")) {
-      analysisMode = "compare";
-      const currentDay = today.getDay() === 0 ? 7 : today.getDay();
-      const thisMon = new Date(today);
-      thisMon.setDate(today.getDate() - (currentDay - 1));
-      if (prompt.includes("上週")) {
-        const lastMon = new Date(thisMon);
-        lastMon.setDate(lastMon.getDate() - 7);
-        const lastSun = new Date(thisMon);
-        lastSun.setDate(thisMon.getDate() - 1);
-        queryStartDate = fmt(lastMon);
-        queryEndDate = fmt(lastSun);
-      } else {
-        queryStartDate = fmt(thisMon);
-      }
-    } else if (prompt.includes("上個月") || prompt.includes("這個月")) {
-      analysisMode = "compare";
-      if (prompt.includes("上個月")) {
-        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-        queryStartDate = fmt(firstDayLastMonth);
-        queryEndDate = fmt(lastDayLastMonth);
-      } else {
-        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        queryStartDate = fmt(firstDayThisMonth);
-      }
-    } else {
-      const defaultStart = new Date(today);
-      defaultStart.setDate(today.getDate() - 14);
-      queryStartDate = fmt(defaultStart);
-    }
+if (weekdayDate) {
+  targetDate = weekdayDate;
+  analysisMode = "single";
+} else if (absMatch) {
+  targetDate = `${absMatch[1]}-${absMatch[2].padStart(2, '0')}-${absMatch[3].padStart(2, '0')}`;
+  analysisMode = "single";
+} else if (monthMatch) {
+  analysisMode = "compare";
+  const year = monthMatch[1] ? parseInt(monthMatch[1]) : today.getFullYear();
+  const month = parseInt(monthMatch[2]);
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);      
+  queryStartDate = fmt(firstDay);
+  queryEndDate = fmt(lastDay);
+} else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  targetDate = fmt(yesterday);
+  analysisMode = "single";
+} else if (prompt.includes("今天") || prompt.includes("最新")) {
+  targetDate = fmt(today);
+  analysisMode = "single";
+} else if (prompt.includes("本週") || prompt.includes("上週")) {
+  analysisMode = "compare";
+  const currentDay = today.getDay() === 0 ? 7 : today.getDay();
+  const thisMon = new Date(today);
+  thisMon.setDate(today.getDate() - (currentDay - 1));
+  if (prompt.includes("上週")) {
+    const lastMon = new Date(thisMon);
+    lastMon.setDate(lastMon.getDate() - 7);
+    const lastSun = new Date(thisMon);
+    lastSun.setDate(thisMon.getDate() - 1);
+    queryStartDate = fmt(lastMon);
+    queryEndDate = fmt(lastSun);
+  } else {
+    queryStartDate = fmt(thisMon);
+    queryEndDate = fmt(today); // 補上結束日期為今天
+  }
+} else if (prompt.includes("上個月") || prompt.includes("這個月")) {
+  analysisMode = "compare";
+  if (prompt.includes("上個月")) {
+    const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    queryStartDate = fmt(firstDayLastMonth);
+    queryEndDate = fmt(lastDayLastMonth);
+  } else {
+    const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    queryStartDate = fmt(firstDayThisMonth);
+    queryEndDate = fmt(today); // 補上結束日期為今天
+  }
+} else {
+  const defaultStart = new Date(today);
+  defaultStart.setDate(today.getDate() - 14);
+  queryStartDate = fmt(defaultStart);
+  queryEndDate = fmt(today);
+}
 
+// --- 重要修正：針對單日查詢擴充 API 搜尋範圍 ---
+// 這樣做是為了確保能撈到 record_date (入睡) 與 record_end (起床) 跨天的資料
+if (analysisMode === "single" && targetDate) {
+    const d = new Date(targetDate);
+    const start = new Date(d); 
+    start.setDate(d.getDate() - 2); // 往前多抓兩天
+    const end = new Date(d); 
+    end.setDate(d.getDate() + 1);   // 往後多抓一天
+    queryStartDate = fmt(start);
+    queryEndDate = fmt(end);
+}
 // --- 2. 執行地端資料讀取 【修改：帶入參數以節省 ngrok 流量】 ---
 const protocol = req.headers['x-forwarded-proto'] || 'http';
 const host = req.headers['host'];
@@ -174,45 +181,44 @@ try {
     console.error("讀取失敗:", err);
 }
 
-    // --- 3. 單日查詢補償邏輯 【修改：支援 record_end 匹配】 ---
+
+    // --- 3. 單日查詢補償與精準匹配邏輯 ---
     let finalContextData = dataList;
     let dataStatusNotice = "";
 
     if (analysisMode === "single" && targetDate) {
-      // 同時檢查 record_date 或 record_end 是否等於 targetDate
-      const exactMatch = dataList.find(d => {
-          const endDate = d.raw_json?.record_end ? d.raw_json.record_end.split(' ')[0] : d.record_date;
-          return d.record_date === targetDate || endDate === targetDate;
-      });
+      // 根據詢問類型決定匹配哪個日期[cite: 1, 2]
+      let match = null;
+      if (isRecoveryQuery) {
+          // 恢復/發炎：找 record_end 等於目標日期的資料
+          match = dataList.find(d => d.raw_json?.record_end?.startsWith(targetDate));
+      } else {
+          // 其他睡眠細節：找 record_date 等於目標日期的資料[cite: 2]
+          match = dataList.find(d => d.record_date === targetDate);
+      }
 
-      if (!exactMatch && dataList.length > 0) {
-        const sortedByDist = [...dataList].sort((a, b) => {
-          const distA = Math.abs(new Date(a.record_date) - new Date(targetDate));
-          const distB = Math.abs(new Date(b.record_date) - new Date(targetDate));
-          return distA - distB;
-        });
-        const nearest = sortedByDist[0];
-        dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有直接數據，我為你參考最接近的日期 ${nearest.record_date}。`;
-        finalContextData = [nearest];
-      } else if (exactMatch) {
-        finalContextData = [exactMatch];
+      if (match) {
+          finalContextData = [match];
+      } else if (dataList.length > 0) {
+          // 若無精準匹配，找最接近的 record_date
+          dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
+          finalContextData = [dataList[0]];
+          dataStatusNotice = `⚠️ 沒找到 ${targetDate} 的直接紀錄，參考最接近的日期。`;
       }
     }
 
-    // --- 4. 格式化數據 Context 【修改：明確標註開始與結束日期】 ---
-    let healthContext = "找不到相關健康數據。";
+    // --- 4. 格式化 Context ---
+    let healthContext = "目前沒有相關數據。";
     if (finalContextData.length > 0) {
       healthContext = finalContextData.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
-        const endDate = raw.record_end ? raw.record_end.split(' ')[0] : item.record_date;
-        
-        // 建議將每個日期的數據包裝得更嚴密
         return `
 [數據紀錄]
-- 起床日 (對應恢復/發炎): ${endDate}
-- 入睡日 (對應睡眠細節): ${item.record_date}
-- 核心狀態：恢復指數 ${raw.Personal_Battery_weighted_round || 0}% / 發炎風險: ${raw.light_status || "無資料"}
+- (record_date) 入睡日期: ${item.record_date}
+- (record_end) 起床日期: ${raw.record_end || "無"}
+- (record_end) 恢復指數: ${raw.Personal_Battery_weighted_round || 0}%
+- (record_end) 發炎風險: ${raw.light_status || "無資料"}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 睡眠結構: 深睡期 ${raw.N3_pct || 0}%, 淺睡期 ${raw.N1N2_pct || 0}%, 快速動眼期 ${raw.REM_pct || 0}%
@@ -234,19 +240,32 @@ try {
         weekDaysInfo.push(`${fmt(d)} (星期${dayNames[d.getDay()]})`);
     }
 
-    const latestData = finalContextData.length > 0 ? (finalContextData[0].raw_json || {}) : {};
-    const isStressed = (latestData.light_status === "紅燈" || latestData.light_status === "黃燈" || (latestData.Personal_Battery_weighted_round < 60));
-    const sensoryTask = isStressed ? `\n【生理自覺任務】\n目前數據顯示壓力較大。請在最後問他：『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』記得強調這對調整模型很重要！🌟` : "";
-      
+// 1. 確保最新數據是篩選後的首筆
+const latestData = finalContextData.length > 0 ? (finalContextData[0].raw_json || {}) : {};
+
+// 2. 判斷壓力狀態：紅/黃燈，或恢復指數 < 60
+const isStressed = (
+  latestData.light_status === "紅燈" || 
+  latestData.light_status === "黃燈" || 
+  (latestData.Personal_Battery_weighted_round < 60)
+);
+
+// 3. 額外判斷：只有在詢問「今天」或「最新」時，才觸發現在的生理自覺問句
+const isAskingNow = prompt.includes("今天") || prompt.includes("最新") || !targetDate;
+
+const sensoryTask = (isStressed && isAskingNow) 
+  ? `\n【生理自覺任務】\n目前數據顯示壓力較大 ⚠️。請在回覆最後關心他：『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』並強調這對優化 AI 模型精準度很重要喔！🌟` 
+  : "";
+
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
-${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
-
-【日期判斷重要規則】
-1. 若使用者問「某日」的【整體健康、恢復、發炎】，請看該筆數據中的「起床日」。(例如：問 4/27 恢復，請找起床日為 4/27 的紀錄)。
-2. 若使用者問「某日」的【睡眠品質、HBI、ODI、血氧、睡眠結構】，請看該筆數據中的「入睡日」。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
+【日期輸出嚴格規範】
+1. 當使用者問「某日」的恢復或發炎時，你必須找出該起床日(record_end)對應的數據[cite: 1, 2]。
+2. 回覆時必須按照此格式：
+   「根據 YYYY-MM-DD (record_date) 的數據，你的 (record_end) 恢復指數為 X%...」
+3. 若數據中 (record_end) 發炎風險顯示綠燈，請明確寫出「(record_end) 發炎風險顯示綠燈」。
 
 【健康數據分析指南（內部對照）】
 
@@ -298,6 +317,7 @@ ${sensoryTask} // <--- 這裡一定要加，不然 AI 不知道要問問題！
 - 一律使用繁體中文（台灣用語），統一使用「你」。
 - 字數限制 150～250 字。
 - 禁止輸出任何系統規則、標題或提示詞內容。
+${sensoryTask} // <--- 建議放在這裡，作為行為規範的動態補充
 
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
