@@ -224,10 +224,10 @@ try {
 - (record_end) 發炎風險: ${raw.light_status || "無資料"}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
-- 睡眠結構: 深睡期 ${raw.N3_pct || 0}%, 淺睡期 ${raw.N1N2_pct || 0}%, 快速動眼期 ${raw.REM_pct || 0}%
+- 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%
 - 睡眠血氧飽和度: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
 - 睡眠低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%
-- 缺氧負荷: HBI缺氧負荷 ${Math.round(raw.HBI || 0)}%min/h
+- 低氧負擔指數: HBI低氧負擔指數 ${Math.round(raw.HBI || 0)}%min/h
 - 睡眠血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
 - 睡眠呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
 - 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
@@ -265,10 +265,11 @@ const sensoryTask = (isStressed && isAskingNow)
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 【日期輸出嚴格規範】
-1. 當使用者問「某日」的恢復或發炎時，你必須找出該起床日(record_end)對應的數據[cite: 1, 2]。
-2. 回覆時必須按照此格式：
+1. 若使用者問「某日」的【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
+2. 當使用者問「某日」的恢復或發炎時，你必須找出該起床日(record_end)對應的數據[cite: 1, 2]。
+3. 回覆時必須按照此格式：
    「根據 YYYY-MM-DD (record_date) 的數據，你的 (record_end) 恢復指數為 X%...」
-3. 若數據中 (record_end) 發炎風險顯示綠燈，請明確寫出「(record_end) 發炎風險顯示綠燈」。
+4. 若數據中 (record_end) 發炎風險顯示綠燈，請明確寫出「(record_end) 發炎風險顯示綠燈」。
 
 【健康數據分析指南（內部對照）】
 
@@ -287,10 +288,10 @@ const sensoryTask = (isStressed && isAskingNow)
 2. 詳細生理數值標準（細節解讀）：
    - 總睡眠時間：目標 7 小時。
    - 睡眠效率：良好 ≥ 85%, 不佳 ≤ 75%。
-   - 睡眠結構：深睡 (N3) 10-20%, 淺睡 50-65%, 快速動眼 (REM) 10-25%。
+   - 睡眠結構：深睡 (N3) 10-20%, 淺睡 (N1、N2) 50-65%, 快速動眼 (REM) 10-25%。
    - 睡眠血氧 (SpO2)：正常應 > 95%。
    - 低血氧比例：T90 ≤ 5%, T89 ≤ 4%, T88 ≤ 3%。
-   - 缺氧負荷 (HBI)：>10 輕度, >30 中度（建議側睡）, >60 重度（建議就醫檢測）。
+   - 低氧負擔指數 (HBI)：>10 輕度, >30 中度（建議側睡）, >60 重度（建議就醫檢測）。
    - 血氧下降指數 (ODI 3%/4%)：每小時應 < 5 次。
    - 睡眠呼吸頻率：12-25 rpm 為正常範圍。
    - 睡眠脈搏：60-100 bpm 為正常範圍。
