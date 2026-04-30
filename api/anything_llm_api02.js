@@ -181,6 +181,9 @@ try {
     console.error("讀取失敗:", err);
 }
 
+// --- 2.5 判斷查詢類型 (補上這一段) ---
+    // 檢查使用者是否在問關於恢復、發炎、分數或燈號的問題
+    const isRecoveryQuery = prompt.includes("恢復") || prompt.includes("發炎") || prompt.includes("指數") || prompt.includes("燈");
 
     // --- 3. 單日查詢補償與精準匹配邏輯 ---
     let finalContextData = dataList;
