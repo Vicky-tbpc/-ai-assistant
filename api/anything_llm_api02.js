@@ -1,4 +1,4 @@
-// anything_llm_api_15
+// anything_llm_api_16
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -185,63 +185,39 @@ try {
     // 檢查使用者是否在問關於恢復、發炎、分數或燈號的問題
     const isRecoveryQuery = prompt.includes("恢復") || prompt.includes("發炎") || prompt.includes("指數") || prompt.includes("燈");
 
-// --- 3. 單日查詢補償與精準匹配邏輯 (優化版) ---
-let finalContextData = dataList;
-let dataStatusNotice = "";
+    // --- 3. 單日查詢補償與精準匹配邏輯 ---
+    let finalContextData = dataList;
+    let dataStatusNotice = "";
 
-if (analysisMode === "single" && targetDate) {
-    // 統一格式化目標日期以便比對 (把 - 換成 / 或統一格式)
-    const normalizedTarget = targetDate.replace(/\//g, '-'); 
-    
-    let match = null;
-    if (isRecoveryQuery) {
-        // 恢復/發炎：找 record_end 符合目標日期的資料
-        // 使用更強大的比對，先轉成 Date 物件確保萬無一失
-        match = dataList.find(d => {
-            if (!d.raw_json?.record_end) return false;
-            return d.raw_json.record_end.includes(normalizedTarget) || 
-                   d.raw_json.record_end.replace(/\//g, '-').startsWith(normalizedTarget);
-        });
-    } else {
-        // 其他睡眠細節：找 record_date
-        match = dataList.find(d => d.record_date.replace(/\//g, '-') === normalizedTarget);
+    if (analysisMode === "single" && targetDate) {
+      // 根據詢問類型決定匹配哪個日期[cite: 1, 2]
+      let match = null;
+      if (isRecoveryQuery) {
+          // 恢復/發炎：找 record_end 等於目標日期的資料
+          match = dataList.find(d => d.raw_json?.record_end?.startsWith(targetDate));
+      } else {
+          // 其他睡眠細節：找 record_date 等於目標日期的資料[cite: 2]
+          match = dataList.find(d => d.record_date === targetDate);
+      }
+
+      if (match) {
+          finalContextData = [match];
+      } else if (dataList.length > 0) {
+          // 若無精準匹配，找最接近的 record_date
+          dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
+          finalContextData = [dataList[0]];
+          dataStatusNotice = `⚠️ 沒找到 ${targetDate} 的直接紀錄，參考最接近的日期。`;
+      }
     }
 
-    if (match) {
-        finalContextData = [match];
-        dataStatusNotice = `✅ 已精準尋獲 ${targetDate} 的數據。`;
-    } else if (dataList.length > 0) {
-        // 修復排序 Bug：找出跟 targetDate 最接近的 record_date
-        const targetTS = new Date(targetDate).getTime();
-        dataList.sort((a, b) => {
-            const diffA = Math.abs(new Date(a.record_date).getTime() - targetTS);
-            const diffB = Math.abs(new Date(b.record_date).getTime() - targetTS);
-            return diffA - diffB;
-        });
-
-        finalContextData = [dataList[0]];
-        const actualDate = dataList[0].record_date;
-        const actualEnd = dataList[0].raw_json?.record_end || "未知";
-        
-        // 這邊是預防 AI 亂講話的關鍵！
-        dataStatusNotice = `⚠️ 警告：資料庫查無 ${targetDate} 的紀錄。目前提供的是最接近的資料（入睡日：${actualDate}，起床日：${actualEnd}）。請務必在回覆中告知使用者日期不符。`;
-    } else {
-        finalContextData = [];
-        dataStatusNotice = `❌ 嚴重錯誤：資料庫中完全找不到 ${targetDate} 附近的任何數據。`;
-    }
-}
-
-// --- 4. 格式化 Context (完整整合版) ---
-let healthContext = "目前沒有相關數據。";
-if (finalContextData.length > 0) {
-  healthContext = finalContextData.map(item => {
-    const raw = item.raw_json || {};
-    const tst = raw.TST_min || 0; // 計算總睡眠分鐘數
-    
-    // 這裡整合了「強效日期標籤」與你原本所有的詳細指標
-    return `
-【數據真實日期標籤：${item.record_date}】
-[數據紀錄詳細內容]
+    // --- 4. 格式化 Context ---
+    let healthContext = "目前沒有相關數據。";
+    if (finalContextData.length > 0) {
+      healthContext = finalContextData.map(item => {
+        const raw = item.raw_json || {};
+        const tst = raw.TST_min || 0;
+        return `
+[數據紀錄]
 - (record_date) 入睡日期: ${item.record_date}
 - (record_end) 起床日期: ${raw.record_end || "無"}
 - (record_end) 恢復指數: ${raw.Personal_Battery_weighted_round || 0}%
@@ -292,10 +268,10 @@ const sensoryTask = (isStressed && isAskingNow)
 【日期輸出嚴格規範】
 1. 若使用者問「某日」的【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 當使用者問「某日」的恢復或發炎時，你必須找出該起床日(record_end)對應的數據[cite: 1, 2]。
-3. 資訊融入而非模板：不要每次都以「根據...」開頭。請用自然聊天的方式，將 (record_date) 與 (record_end) 的日期順帶提到即可。例如：「你昨晚（${targetDate}）睡得不錯喔，今天起來恢復指數有 X%...」或「我看你 ${targetDate} 那天的數據...」。
+3. 資訊融入而非模板：請用自然聊天的方式，將 (record_date) 與 (record_end) 的日期順帶提到即可
+   例如：「根據 YYYY-MM-DD (record_date) 的數據，你的 (record_end) 恢復指數為 X%...」或「我看你 YYYY-MM-DD (record_date) 那天的數據...」。
+
 4. 若數據中 (record_end) 發炎風險顯示綠燈，請明確寫出「(record_end) 發炎風險顯示綠燈」。
-5. 核對義務：如果資料中的「數據真實日期標籤」與使用者詢問的日期 (${targetDate}) 不符，
-   你必須在回覆中主動說明：「抱歉，我沒找到 ${targetDate} 的數據，這是我能找到最接近的紀錄（${finalContextData[0]?.record_date}）。」
 
 【健康數據分析指南（內部對照）】
 
