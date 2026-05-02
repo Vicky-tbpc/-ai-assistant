@@ -1,4 +1,4 @@
-// anything_llm_api_15
+// anything_llm_api_16
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -207,15 +207,18 @@ try {
               dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
           }
           
-          const nearest = dataList[0];
+const nearest = dataList[0];
           finalContextData = [nearest];
           
-          // 根據查詢類型，提示正確的「最近日期」給使用者看
-          const showDate = (isRecoveryQuery || isOverallQuery) 
+          // 根據查詢類型，取得原始帶時間的日期
+          const rawShowDate = (isRecoveryQuery || isOverallQuery) 
                            ? (nearest.raw_json?.record_end || nearest.record_date) 
                            : nearest.record_date;
                            
-          dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的紀錄是 ${showDate}。`;
+          // 【整合在這裡】切除時分秒，只保留 YYYY-MM-DD
+          const cleanShowDate = rawShowDate ? rawShowDate.split(' ')[0] : "";
+                           
+          dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的紀錄是 ${cleanShowDate}。`;
       } else {
           finalContextData = [];
           dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
