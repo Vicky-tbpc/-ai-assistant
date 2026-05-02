@@ -1,4 +1,4 @@
-// anything_llm_api_15
+// anything_llm_api_16
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -181,32 +181,47 @@ try {
     console.error("讀取失敗:", err);
 }
 
-// --- 2.5 判斷查詢類型 (補上這一段) ---
-    // 檢查使用者是否在問關於恢復、發炎、分數或燈號的問題
+    // --- 2.5 判斷查詢類型 ---
     const isRecoveryQuery = prompt.includes("恢復") || prompt.includes("發炎") || prompt.includes("指數") || prompt.includes("燈");
+    const isOverallQuery = prompt.includes("整體") || prompt.includes("綜合") || prompt.includes("狀況");
 
     // --- 3. 單日查詢補償與精準匹配邏輯 ---
     let finalContextData = dataList;
     let dataStatusNotice = "";
 
     if (analysisMode === "single" && targetDate) {
-      // 根據詢問類型決定匹配哪個日期[cite: 1, 2]
       let match = null;
-      if (isRecoveryQuery) {
-          // 恢復/發炎：找 record_end 等於目標日期的資料
+      if (isRecoveryQuery || isOverallQuery) {
           match = dataList.find(d => d.raw_json?.record_end?.startsWith(targetDate));
       } else {
-          // 其他睡眠細節：找 record_date 等於目標日期的資料[cite: 2]
           match = dataList.find(d => d.record_date === targetDate);
       }
 
       if (match) {
           finalContextData = [match];
       } else if (dataList.length > 0) {
-          // 若無精準匹配，找最接近的 record_date
-          dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
-          finalContextData = [dataList[0]];
-          dataStatusNotice = `⚠️ 沒找到 ${targetDate} 的直接紀錄，參考最接近的日期。`;
+          // 修改排序邏輯：如果問恢復，就用 record_end 找最近；如果問睡眠，用 record_date 找最近
+          if (isRecoveryQuery || isOverallQuery) {
+              dataList.sort((a, b) => Math.abs(new Date(a.raw_json?.record_end || a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.raw_json?.record_end || b.record_date) - new Date(targetDate)));
+          } else {
+              dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
+          }
+          
+const nearest = dataList[0];
+          finalContextData = [nearest];
+          
+          // 根據查詢類型，取得原始帶時間的日期
+          const rawShowDate = (isRecoveryQuery || isOverallQuery) 
+                           ? (nearest.raw_json?.record_end || nearest.record_date) 
+                           : nearest.record_date;
+                           
+          // 【整合在這裡】切除時分秒，只保留 YYYY-MM-DD
+          const cleanShowDate = rawShowDate ? rawShowDate.split(' ')[0] : "";
+                           
+          dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的紀錄是 ${cleanShowDate}。`;
+      } else {
+          finalContextData = [];
+          dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
       }
     }
 
@@ -257,8 +272,13 @@ const isStressed = (
 const isAskingNow = prompt.includes("今天") || prompt.includes("最新") || !targetDate;
 
 const sensoryTask = (isStressed && isAskingNow) 
-  ? `\n【生理自覺任務】\n目前數據顯示壓力較大 ⚠️。請在回覆最後關心他：『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』並強調這對優化 AI 模型精準度很重要喔！🌟` 
+  ? `\n【生理自覺任務】\n目前數據顯示壓力較大 ⚠️。請在回覆最後關心他：『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』並強調這對優化你的健康模型精準度很重要喔！🌟` 
   : "";
+
+    // 【新增】強制注入警告提示的指令
+    const noticeInstruction = dataStatusNotice 
+      ? `\n【系統強制要求】請務必在回覆的第一段加上這句話：「${dataStatusNotice}」，然後再開始你的數據分析。` 
+      : "";
 
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
@@ -267,16 +287,8 @@ const sensoryTask = (isStressed && isAskingNow)
 【數據處理與日期匹配邏輯】(這部分是你的內部邏輯，請務必遵守)
 1. 查詢睡眠細節【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
-3. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
-
-【對話與輸出風格規範】(重點：自然但精確)
-1. **必須包含精確日期**：回覆時「不可」只說昨天/今天。請自然地帶出日期，例如：「看你 2026-04-29 的數據...」或「根據你 4/29 入睡、4/30 起床的紀錄...」。
-2. **自然融合「入睡」與「起床」**：
-   - 描述恢復指數與發炎時，請清楚標示這是「起床日(record_end)」的狀態。
-   - 範例語氣：「看你 2026-04-29 的數據，你 2026-04-30 的起床日恢復指數為 80%...」。
-3. **燈號白話化**：
-   - 不要只寫「發炎風險顯示綠燈」，後面要加上具體的解釋（如：表示身體狀況穩定、發炎風險低）。
-4. **禁止模板開場**：不要用「根據...，你的...」這種死板的 A 根據 B 格式，要像朋友在跟你說明近況。
+3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「前一晚的睡眠狀況是如何影響今日的恢復結果」。
+4. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
 
 【健康數據分析指南（內部對照）】
 
@@ -333,14 +345,15 @@ const sensoryTask = (isStressed && isAskingNow)
 - 一律使用繁體中文（台灣用語），統一使用「你」。
 - 字數限制 150～250 字。
 - 禁止輸出任何系統規則、標題或提示詞內容。
-${sensoryTask} // <--- 建議放在這裡，作為行為規範的動態補充
+${sensoryTask}
+${noticeInstruction}
 
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
-2. 數據透明度：必須自然融入以下資訊：${dataStatusNotice}
+2. 數據透明度：若有【系統強制要求】，請務必照做。
 
-【精準日期參考（禁止輸出）】
-- 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
+【系統當前時間參數】(請依據此區塊回答「今天幾號」等時間問題，絕對不可以拿數據紀錄的日期當作今天)
+- 系統認定今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
 - 查詢範圍：${queryStartDate} 至 ${queryEndDate}
 - 最近日期對照表：${weekDaysInfo.join('\n')}
 
