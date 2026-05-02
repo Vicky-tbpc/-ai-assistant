@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n65</title>
+    <title>Soosyn 健康夥伴 n66</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1348,8 +1348,8 @@ async function processBalanceSearch(d) {
         // 1. 準備精準查詢參數：鎖定序號與單一日期 (start 與 end 設為同一天)
         const params = new URLSearchParams({
             serial: currentSerial,
-            start: d,
-            end: d
+            start: d
+           
         }).toString();
 
         // 2. 向地端要求精簡後的資料
@@ -1714,7 +1714,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/anything_llm_api02', {
+        const res = await fetch('/api/anything_llm_api', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
