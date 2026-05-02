@@ -205,8 +205,13 @@ try {
       } else if (dataList.length > 0) {
           // 若無精準匹配，找最接近的 record_date
           dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
-          finalContextData = [dataList[0]];
-          dataStatusNotice = `⚠️ 沒找到 ${targetDate} 的直接紀錄，參考最接近的日期。`;
+          const nearest = dataList[0];
+          finalContextData = [nearest];
+          dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
+      } else {
+          // 若沒有精準匹配，且資料庫完全沒有任何資料
+          finalContextData = [];
+          dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
       }
     }
 
@@ -268,7 +273,6 @@ const sensoryTask = (isStressed && isAskingNow)
 1. 查詢睡眠細節【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
 3. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
-
 
 【健康數據分析指南（內部對照）】
 
