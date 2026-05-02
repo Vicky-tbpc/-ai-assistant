@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n6</title>
+    <title>Soosyn 健康夥伴 n67</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -817,6 +817,18 @@ async function fetchSummaryData(targetDate) {
         console.error("讀取地端資料發生錯誤:", err);
         // 建議這裡可以加一個靜默失敗或小提醒
     }
+
+    // 【關鍵修改】：檢查長度與日期是否相符
+    if (!healths?.length || healths[0].record_date !== targetDate) {
+        return null; 
+    }
+
+    const current = healths[0];
+    const raw = current.raw_json;
+    const currentBattery = raw.Personal_Battery_weighted_round || 0;
+
+    // ... 以下原本的計算排名與回傳邏輯維持不變 ...
+}
 
 // 接下來你原本後續使用 healths 的邏輯（例如 if (!healths?.length) ...）完全不用改
 
