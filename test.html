@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n66</title>
+    <title>Soosyn 健康夥伴 n6</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1343,36 +1343,33 @@ function renderLegend(type, abnormalLabel) {
 async function processBalanceSearch(d) {
     document.querySelector('.date-actions')?.remove();
     await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`);
-
     try {
-        // 1. 準備精準查詢參數：鎖定序號與單一日期 (start 與 end 設為同一天)
-        const params = new URLSearchParams({
-            serial: currentSerial,
-            start: d
-           
-        }).toString();
-
-        // 2. 向地端要求精簡後的資料
+        // 1. 修改參數：加上 end，將搜尋範圍鎖定在目標日期當天
+        const params = new URLSearchParams({ serial: currentSerial, start: d, end: d }).toString();
+        
+        // 2. 向地端要求資料
         const response = await fetch(`/api/health?${params}`);
         if (!response.ok) throw new Error("地端連線失敗");
         
-        // 此時回傳的 data 應該只會包含該使用者在那一天的紀錄 (或是空陣列)
         const filteredData = await response.json();
-
-        // 3. 取得資料 (因為已經過濾過，直接拿第一筆即可)
-        const dayData = Array.isArray(filteredData) ? filteredData[0] : null;
-
+        
+        // 3. 修改抓取邏輯：確保 record_date 與目標日期完全一致
+        const dayData = Array.isArray(filteredData) ? filteredData.find(r => r.record_date === d) : null;
+        
         if (dayData) {
-            // 4. 呼叫原本的卡片生成函式
+            // 4. 呼叫卡片生成函式
             appendBalanceCard(dayData);
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
         } else {
-            await appendAiMessage(`這天（${d}）沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️`);
+            // 5. 沒有資料時的處理邏輯
+            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
+            await new Promise(r => setTimeout(r, 800));
+            await appendAiMessage(getRandomEndQuestion());
         }
     } catch (err) {
         console.error("讀取失敗:", err);
-        await appendAiMessage("哎呀，連不到你電腦的 Python 伺服器，記得要把 CMD 開著喔！ 🔌");
+        await appendAiMessage("連不到地端 Python 伺服器，請確認 CMD 視窗有沒有開喔！ 🔌");
     }
 }
     
