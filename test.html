@@ -786,123 +786,111 @@ if (!targetData) {
 }
 
 // --- 核心邏輯：摘要比較與建議 (修正版) ---
-
 async function fetchSummaryData(targetDate) {
-    // --- 1. 準備減少流量的查詢參數 ---
-    let healths = []; 
+    // --- 1. 抓取個人資料：抓取目標日期與前一筆紀錄 (用於進退步比較) ---
+    let healths = [];
 
     try {
-        // 使用 URLSearchParams 構建參數，讓地端只回傳這個序號且日期 <= targetDate 的資料
         const params = new URLSearchParams({
             serial: currentSerial,
-            end: targetDate, // 限制日期上限，減少不必要的未來資料傳輸
-            limit: 10        // 雖然只要 2 筆，但多拿幾筆當緩衝比較保險
+            end: targetDate, // 限制日期上限
+            limit: 10        // 取多一點當緩衝，後續再過濾
         }).toString();
 
         const response = await fetch(`/api/health?${params}`);
         if (!response.ok) throw new Error("地端連線失敗");
         
-        // 此時 allData 已經是被地端初步過濾過的精簡資料
         const allData = await response.json();
 
-        // --- 2. 前端只需做最後的精確排序與切片 ---
+        // 確保排序正確並取出目標日與前一次紀錄
         healths = allData
-            // 雖然地端過濾過，但前端再次確保排序正確與只取 2 筆 (今日與前一筆)
             .sort((a, b) => b.record_date.localeCompare(a.record_date))
             .slice(0, 2);
 
     } catch (err) {
-        console.error("讀取地端資料發生錯誤:", err);
+        console.error("讀取個人資料發生錯誤:", err);
+        return null;
     }
 
-    // 【關鍵修改】：若完全沒資料，或最新的一筆資料日期不等於目標日期，直接回傳 null
+    // 【關鍵修改】：檢查當天是否有數據，若無則回傳 null
     if (!healths?.length || healths[0].record_date !== targetDate) {
-        return null; 
+        return null;
     }
 
     const current = healths[0];
     const raw = current.raw_json;
     const currentBattery = raw.Personal_Battery_weighted_round || 0;
 
-    // ... 以下原本的計算排名與回傳邏輯維持不變 ...
-}
+    // --- 2. 抓取全體資料 (計算排名用)：僅請求目標日期當天數據，體積最小 ---
+    let allUsersData = [];
+    try {
+        const rankParams = new URLSearchParams({
+            start: current.record_date,
+            end: current.record_date
+            // 不帶 serial，獲取該日所有人的資料
+        }).toString();
 
-// 接下來你原本後續使用 healths 的邏輯（例如 if (!healths?.length) ...）完全不用改
-
-    if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
-
-const current = healths[0];
-const raw = current.raw_json;
-const currentBattery = raw.Personal_Battery_weighted_round || 0;
-
-// --- 調整為精準獲取當日全體數據的減少流量法 ---
-let allUsersData = [];
-
-try {
-    // 1. 只請求「目標日期」這一天的數據，不需要抓取全部歷史紀錄
-    const params = new URLSearchParams({
-        start: current.record_date,
-        end: current.record_date
-        // 注意：這裡不帶 serial，因為我們要計算的是「全體排名」
-    }).toString();
-
-    const response = await fetch(`/api/health?${params}`);
-    if (!response.ok) throw new Error("地端連線失敗");
-    
-    // 現在拿到的資料只包含該日期的所有紀錄，體積縮小非常多
-    const dailyData = await response.json();
-
-    if (Array.isArray(dailyData)) {
-        allUsersData = dailyData;
+        const rankRes = await fetch(`/api/health?${rankParams}`);
+        if (rankRes.ok) {
+            allUsersData = await rankRes.json();
+        }
+    } catch (err) {
+        console.error("計算排名時讀取失敗:", err);
     }
 
-} catch (err) {
-    console.error("計算排名時讀取地端資料失敗:", err);
-}
+    // 計算排名百分比
+    let percentage = 0;
+    if (allUsersData && allUsersData.length > 0) {
+        const totalUsers = allUsersData.length;
+        const lowerUsers = allUsersData.filter(d => 
+            (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
+        ).length;
+        percentage = Math.round((lowerUsers / totalUsers) * 100);
+    }
 
-// 2. 排名計算邏輯保持不變
-let percentage = 0;
-if (allUsersData && allUsersData.length > 0) {
-    const totalUsers = allUsersData.length;
-    // 計算有多少人的恢復指數低於目前使用者
-    const lowerUsers = allUsersData.filter(d => 
-        (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
-    ).length;
-    percentage = Math.round((lowerUsers / totalUsers) * 100);
-}
-
-    // --------------------------------------------
-
-    // 3. 指標增減比較邏輯
+    // --- 3. 指標增減比較邏輯 (與前一次數據比較) ---
     let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
     if (healths[1]) {
         let maxInc = -Infinity, maxDec = Infinity;
+        const prevRaw = healths[1].raw_json;
+        
         COMPARISON_FIELDS.forEach(k => {
-            const diff = (raw[k] || 0) - (healths[1].raw_json[k] || 0);
+            const diff = (raw[k] || 0) - (prevRaw[k] || 0);
             if (diff > maxInc) { maxInc = diff; bestKey = k; }
             if (diff < maxDec) { maxDec = diff; worstKey = k; }
         });
     }
 
-    // 4. 從資料庫獲取建議文字與狀態燈號
+    // --- 4. 從資料庫獲取對應建議語 ---
     const randomIdx = Math.floor(Math.random() * 3) + 1;
-    const logicKeys = [`${FIELD_CONFIG[bestKey]}最佳`, `${FIELD_CONFIG[worstKey]}最差`, `${FIELD_CONFIG[worstKey]}最差${randomIdx}`];
+    const logicKeys = [
+        `${FIELD_CONFIG[bestKey]}最佳`, 
+        `${FIELD_CONFIG[worstKey]}最差`, 
+        `${FIELD_CONFIG[worstKey]}最差${randomIdx}`
+    ];
     
-    const { data: phrases } = await _supabase.from('phrase_library')
-        .select('logic_key, detailed_content')
-        .in('logic_key', logicKeys);
-    const statusLight = current.raw_json?.light_status || '--';
+    let phrases = [];
+    try {
+        const { data } = await _supabase.from('phrase_library')
+            .select('logic_key, detailed_content')
+            .in('logic_key', logicKeys);
+        phrases = data || [];
+    } catch (err) {
+        console.error("Supabase 讀取失敗:", err);
+    }
 
-    // 5. 回傳整合後的物件
-return { 
+    const statusLight = raw?.light_status || '--';
+
+    // --- 5. 最終回傳物件 ---
+    return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
-        percentage: percentage, // 傳回計算出的百分比
-        light: statusLight, // <--- 這裡改用剛剛抓到的 statusLight 
-        bestText: phrases?.find(p => p.logic_key.includes('最佳'))?.detailed_content || "表現不錯！",
-        worstText: phrases?.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
-        raw_json: raw, // <--- 修正：這裡一定要補上逗點
-        flowSuggestion: phrases?.find(p => p.logic_key.includes('最差') && p.logic_key.match(/\d$/))?.detailed_content 
+        percentage: percentage, 
+        light: statusLight, 
+        bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
+        worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
+        raw_json: raw, 
+        flowSuggestion: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差${randomIdx}`)?.detailed_content 
     };
 }
 
