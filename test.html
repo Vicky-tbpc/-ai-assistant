@@ -788,7 +788,6 @@ if (!targetData) {
 // --- 核心邏輯：摘要比較與建議 (修正版) ---
 
 async function fetchSummaryData(targetDate) {
-    
     // --- 1. 準備減少流量的查詢參數 ---
     let healths = []; 
 
@@ -801,7 +800,6 @@ async function fetchSummaryData(targetDate) {
         }).toString();
 
         const response = await fetch(`/api/health?${params}`);
-        
         if (!response.ok) throw new Error("地端連線失敗");
         
         // 此時 allData 已經是被地端初步過濾過的精簡資料
@@ -815,10 +813,9 @@ async function fetchSummaryData(targetDate) {
 
     } catch (err) {
         console.error("讀取地端資料發生錯誤:", err);
-        // 建議這裡可以加一個靜默失敗或小提醒
     }
 
-    // 【關鍵修改】：檢查長度與日期是否相符
+    // 【關鍵修改】：若完全沒資料，或最新的一筆資料日期不等於目標日期，直接回傳 null
     if (!healths?.length || healths[0].record_date !== targetDate) {
         return null; 
     }
