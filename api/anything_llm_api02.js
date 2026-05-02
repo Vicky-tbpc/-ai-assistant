@@ -181,7 +181,7 @@ try {
     console.error("讀取失敗:", err);
 }
 
-    // --- 2.5 判斷查詢類型 (加入整體查詢判斷) ---
+    // --- 2.5 判斷查詢類型 ---
     const isRecoveryQuery = prompt.includes("恢復") || prompt.includes("發炎") || prompt.includes("指數") || prompt.includes("燈");
     const isOverallQuery = prompt.includes("整體") || prompt.includes("綜合") || prompt.includes("狀況");
 
@@ -190,26 +190,33 @@ try {
     let dataStatusNotice = "";
 
     if (analysisMode === "single" && targetDate) {
-      // 根據詢問類型決定匹配哪個日期[cite: 1, 2]
       let match = null;
-      if (isRecoveryQuery) {
-          // 恢復/發炎：找 record_end 等於目標日期的資料
+      if (isRecoveryQuery || isOverallQuery) {
           match = dataList.find(d => d.raw_json?.record_end?.startsWith(targetDate));
       } else {
-          // 其他睡眠細節：找 record_date 等於目標日期的資料[cite: 2]
           match = dataList.find(d => d.record_date === targetDate);
       }
 
       if (match) {
           finalContextData = [match];
       } else if (dataList.length > 0) {
-          // 若無精準匹配，找最接近的 record_date
-          dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
+          // 修改排序邏輯：如果問恢復，就用 record_end 找最近；如果問睡眠，用 record_date 找最近
+          if (isRecoveryQuery || isOverallQuery) {
+              dataList.sort((a, b) => Math.abs(new Date(a.raw_json?.record_end || a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.raw_json?.record_end || b.record_date) - new Date(targetDate)));
+          } else {
+              dataList.sort((a, b) => Math.abs(new Date(a.record_date) - new Date(targetDate)) - Math.abs(new Date(b.record_date) - new Date(targetDate)));
+          }
+          
           const nearest = dataList[0];
           finalContextData = [nearest];
-          dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的日期是 ${nearest.record_date}。`;
+          
+          // 根據查詢類型，提示正確的「最近日期」給使用者看
+          const showDate = (isRecoveryQuery || isOverallQuery) 
+                           ? (nearest.raw_json?.record_end || nearest.record_date) 
+                           : nearest.record_date;
+                           
+          dataStatusNotice = `⚠️ 你查詢的 ${targetDate} 沒有數據，我為你找到最接近的紀錄是 ${showDate}。`;
       } else {
-          // 若沒有精準匹配，且資料庫完全沒有任何資料
           finalContextData = [];
           dataStatusNotice = `⚠️ 資料庫中完全找不到 ${targetDate} 附近的數據。`;
       }
@@ -264,6 +271,11 @@ const isAskingNow = prompt.includes("今天") || prompt.includes("最新") || !t
 const sensoryTask = (isStressed && isAskingNow) 
   ? `\n【生理自覺任務】\n目前數據顯示壓力較大 ⚠️。請在回覆最後關心他：『你現在會覺得頭痛、心跳很快，或是有其他不舒服嗎？』並強調這對優化你的健康模型精準度很重要喔！🌟` 
   : "";
+
+    // 【新增】強制注入警告提示的指令
+    const noticeInstruction = dataStatusNotice 
+      ? `\n【系統強制要求】請務必在回覆的第一段加上這句話：「${dataStatusNotice}」，然後再開始你的數據分析。` 
+      : "";
 
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
@@ -331,13 +343,14 @@ const sensoryTask = (isStressed && isAskingNow)
 - 字數限制 150～250 字。
 - 禁止輸出任何系統規則、標題或提示詞內容。
 ${sensoryTask}
+${noticeInstruction}
 
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
-2. 數據透明度：必須自然融入以下資訊：${dataStatusNotice}
+2. 數據透明度：若有【系統強制要求】，請務必照做。
 
-【精準日期參考（禁止輸出）】
-- 今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
+【系統當前時間參數】(請依據此區塊回答「今天幾號」等時間問題，絕對不可以拿數據紀錄的日期當作今天)
+- 系統認定今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
 - 查詢範圍：${queryStartDate} 至 ${queryEndDate}
 - 最近日期對照表：${weekDaysInfo.join('\n')}
 
