@@ -830,8 +830,6 @@ async function fetchSummaryData(targetDate) {
 // 接下來你原本後續使用 healths 的邏輯（例如 if (!healths?.length) ...）完全不用改
 
     if (!healths?.length) return null;// 【修正重點】：如果沒有數據，或是搜尋到的第一筆日期不等於使用者輸入的目標日期
-    // 這代表「目標日期當天」沒有數據，直接回傳 null
-    if (!healths?.length) return null;
 
 const current = healths[0];
 const raw = current.raw_json;
