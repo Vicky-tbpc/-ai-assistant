@@ -27,32 +27,39 @@ export default async function handler(req, res) {
 
     if (userError) throw userError;
 
-// --- STEP 2: 改向地端 Python 伺服器獲取「特定日期」資料 ---
-const protocol = req.headers['x-forwarded-proto'] || 'http';
-const host = req.headers['host'];
-
-const queryParams = new URLSearchParams({
-    start: dayBeforeYesterday,
-    end: yesterday
-}).toString();
-
-const healthApiUrl = `${protocol}://${host}/api/health?${queryParams}`;
+// --- STEP 2: 直接向地端 Python 伺服器獲取「特定日期」資料 ---
+const API_KEY = process.env.LOCAL_API_KEY;
+const TUNNEL_URL = process.env.LOCAL_TUNNEL_URL;
 
 let healthData = [];
 try {
-    const response = await fetch(healthApiUrl);
-    
-    // 【新增詳細 Log】
+    if (!TUNNEL_URL || !API_KEY) {
+        throw new Error('Vercel 環境變數缺失，請確認 LOCAL_TUNNEL_URL 與 LOCAL_API_KEY 已設定。');
+    }
+
+    // 直接建立地端的請求網址
+    const targetUrl = new URL(`${TUNNEL_URL}/api/get-latest-health`);
+    targetUrl.searchParams.append('start', dayBeforeYesterday);
+    targetUrl.searchParams.append('end', yesterday);
+
+    console.log("正在直接連線至地端 Python API:", targetUrl.toString());
+
+    const response = await fetch(targetUrl.toString(), {
+        headers: { 
+            'X-API-KEY': API_KEY,
+            'ngrok-skip-browser-warning': 'true' 
+        }
+    });
+
     if (!response.ok) {
-        const errorDetail = await response.text();
-        throw new Error(`HTTP 錯誤碼 ${response.status}: ${errorDetail}`);
+        const errorText = await response.text();
+        throw new Error(`地端 API 回傳錯誤 (${response.status}): ${errorText}`);
     }
     
     healthData = await response.json();
     
 } catch (err) {
     console.error("讀取地端資料失敗:", err);
-    // 把詳細的原因塞在 detail 裡面回傳
     return res.status(500).json({ error: "無法從地端 JSON 獲取健康數據", detail: err.message });
 }
 
