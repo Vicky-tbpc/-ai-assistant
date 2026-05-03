@@ -1,4 +1,4 @@
-// anything_llm_api_16
+// anything_llm_api_17
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -250,6 +250,16 @@ const nearest = dataList[0];
       }).join('\n');
     }
 
+    // 【優化】先取出最近 3 筆對話，再過濾歷史訊息中的警告文字
+const cleanedHistory = history.slice(-3).map(h => {
+  let text = h.parts[0] ? h.parts[0].text : "";
+  if (h.role === "model") {
+    // 移除開頭的警告語，支援 Windows/Unix 換行符號 (\r?\n)
+    text = text.replace(/^⚠️\s*你查詢的.*?。(\r?\n)?/, "");
+  }
+  return `${h.role === "model" ? "助手" : "我"}: ${text}`;
+}).join('\n');
+
     const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
     const weekDaysInfo = [];
     for (let i = 0; i < 10; i++) {
@@ -260,7 +270,6 @@ const nearest = dataList[0];
 
 // 1. 確保最新數據是篩選後的首筆
 const latestData = finalContextData.length > 0 ? (finalContextData[0].raw_json || {}) : {};
-// 【修正】：把 finalContextDate 改成 finalContextData
 const latestRecordDate = finalContextData.length > 0 ? finalContextData[0].record_date : "";
 const latestRecordEnd = (latestData.record_end || "").split(' ')[0] || "";
 
@@ -289,6 +298,11 @@ const sensoryTask = (isStressed && isAskingNow)
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
+
+【系統當前時間參數】(請依據此區塊回答「今天幾號」等時間問題，絕對不可以拿數據紀錄的日期當作今天)
+- 系統認定今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
+- 查詢範圍：${queryStartDate} 至 ${queryEndDate}
+- 最近日期對照表：${weekDaysInfo.join('\n')}
 
 【數據處理與日期匹配邏輯】(這部分是你的內部邏輯，請務必遵守)
 1. 查詢睡眠細節：【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
@@ -343,6 +357,12 @@ const sensoryTask = (isStressed && isAskingNow)
 - 禁止逐筆分析：不可針對特定單一數據點進行日期與數值的配對描述。
 - 違反後果：若輸出包含具體日期，將視為違反精準度規範，因為月分析應聚焦於「統計趨勢」而非「單日細節」。
 
+【資料庫真實數據】
+${healthContext}
+
+【對話紀錄】
+${cleanedHistory}
+
 【核心規範】
 - 用自然關心的語氣，像平輩朋友聊天 🖐️
 - 每次回覆需包含 3～5 個 emoji，分散在句子中。
@@ -358,17 +378,6 @@ ${noticeInstruction}
 【時間與資料判斷規則】
 1. 若資料年份或區間不符，回覆「目前沒有資料」，禁止胡說八道。
 2. 數據透明度：若有【系統強制要求】，請務必照做。
-
-【系統當前時間參數】(請依據此區塊回答「今天幾號」等時間問題，絕對不可以拿數據紀錄的日期當作今天)
-- 系統認定今天是：${fmt(today)} (星期${dayNames[today.getDay()]})
-- 查詢範圍：${queryStartDate} 至 ${queryEndDate}
-- 最近日期對照表：${weekDaysInfo.join('\n')}
-
-【資料庫真實數據】
-${healthContext}
-
-【對話紀錄】
-${history.map(h => `${h.role === "model" ? "助手" : "我"}: ${h.parts[0].text}`).slice(-3).join('\n')}
 
 【我的問題】
 ${prompt}
