@@ -251,7 +251,7 @@ const nearest = dataList[0];
     }
 
     // === 【強化優化】提取對話紀錄，並強力抹除舊警告字眼 ===
-    const cleanedHistory = (history || []).slice(-3).map(h => {
+    const cleanedHistory = (history || []).slice(-1).map(h => {
       let text = h.content || (h.parts?.[0]?.text) || "";
       const role = (h.role || "").toLowerCase();
       // 判斷是否為 AI 端回覆（兼顧 model、assistant、ai 等常見變數名稱）
