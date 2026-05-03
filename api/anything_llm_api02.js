@@ -1,4 +1,4 @@
-// anything_llm_api_17
+// anything_llm_api_18
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -231,6 +231,13 @@ const nearest = dataList[0];
       healthContext = finalContextData.map(item => {
         const raw = item.raw_json || {};
         const tst = raw.TST_min || 0;
+
+        // 【修改這裡】精準判斷恢復指數與發炎風險是否缺乏
+        const battery = raw.Personal_Battery_weighted_round;
+        const light = raw.light_status;
+        const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
+        const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
+
         return `
 [數據紀錄]
 - (record_date) 入睡日期: ${item.record_date}
@@ -264,10 +271,11 @@ const latestRecordDate = finalContextData.length > 0 ? finalContextData[0].recor
 const latestRecordEnd = (latestData.record_end || "").split(' ')[0] || "";
 
 // 2. 判斷壓力狀態：紅/黃燈，或恢復指數 < 60
+const batteryValue = latestData.Personal_Battery_weighted_round;
 const isStressed = (
   latestData.light_status === "紅燈" || 
   latestData.light_status === "黃燈" || 
-  (latestData.Personal_Battery_weighted_round < 60)
+  (batteryValue !== null && batteryValue !== undefined && batteryValue < 60)
 );
 
 // 3. 額外判斷：只有在詢問「今天」或「最新」時，才觸發現在的生理自覺問句
@@ -301,6 +309,7 @@ const cleanedHistory = history.map(h => {
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
 3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「入睡日(record_date) 的睡眠狀況是如何影響 起床日(record_end) 的恢復結果」，絕對不要使用「前一晚、今日」等模糊字眼。
 4. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
+5. 若數據中顯示「恢復指數」或「發炎風險」為「資料不足」，請直接告訴我：「這兩項指標需要連續 7 天的睡眠紀錄才能計算出來喔！請繼續保持佩戴～」絕對不要把它解讀為 0%、屬於注意範圍或說無資料。
 
 【健康數據分析指南（內部對照）】
 
