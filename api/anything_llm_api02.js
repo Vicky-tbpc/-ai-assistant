@@ -250,15 +250,18 @@ const nearest = dataList[0];
       }).join('\n');
     }
 
-    // 【優化】先取出最近 3 筆對話，再過濾歷史訊息中的警告文字
-const cleanedHistory = history.slice(-3).map(h => {
-  let text = h.parts[0] ? h.parts[0].text : "";
-  if (h.role === "model") {
-    // 移除開頭的警告語，支援 Windows/Unix 換行符號 (\r?\n)
-    text = text.replace(/^⚠️\s*你查詢的.*?。(\r?\n)?/, "");
-  }
-  return `${h.role === "model" ? "助手" : "我"}: ${text}`;
-}).join('\n');
+    // === 【強化優化】提取對話紀錄，並強力抹除舊警告字眼 ===
+    const cleanedHistory = (history || []).slice(-3).map(h => {
+      let text = h.content || (h.parts?.[0]?.text) || "";
+      const role = (h.role || "").toLowerCase();
+      // 判斷是否為 AI 端回覆（兼顧 model、assistant、ai 等常見變數名稱）
+      const isAssistant = role === "model" || role === "assistant" || role === "ai";
+      if (isAssistant) {
+        // 全域移除所有以 ⚠️ 你查詢的...。 開頭或包含在句子中的警告字眼
+        text = text.replace(/⚠️\s*你查詢的.*?。(\r?\n)?/g, "").trim();
+      }
+      return `${isAssistant ? "助手" : "我"}: ${text}`;
+    }).join('\n');
 
     const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
     const weekDaysInfo = [];
@@ -392,7 +395,7 @@ ${prompt}
       },
       body: JSON.stringify({
         message: combinedMessage,
-        mode: "chat", // AnythingLLM 支援 chat 或 query 模式
+        mode: "query", // AnythingLLM 支援 chat 或 query 模式
         temperature: 0.1,
         top_p: 0.9,
         top_k: 20,
