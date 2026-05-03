@@ -260,6 +260,9 @@ const nearest = dataList[0];
 
 // 1. 確保最新數據是篩選後的首筆
 const latestData = finalContextData.length > 0 ? (finalContextData[0].raw_json || {}) : {};
+// 【修正】：把 finalContextDate 改成 finalContextData
+const latestRecordDate = finalContextData.length > 0 ? finalContextData[0].record_date : "";
+const latestRecordEnd = (latestData.record_end || "").split(' ')[0] || "";
 
 // 2. 判斷壓力狀態：紅/黃燈，或恢復指數 < 60
 const isStressed = (
@@ -277,17 +280,20 @@ const sensoryTask = (isStressed && isAskingNow)
 
     // 【新增】強制注入警告提示的指令
     const noticeInstruction = dataStatusNotice 
-      ? `\n【系統強制要求】請務必在回覆的第一段加上這句話：「${dataStatusNotice}」，然後再開始你的數據分析。` 
-      : "";
+  ? `\n【系統強制要求】
+1. 請務必在回覆的第一段原封不動加上這句話：「${dataStatusNotice}」，接著換行再開始你的數據分析。
+2. 由於目前回覆的是無數據時的補償紀錄，分析本文中【絕對嚴禁】使用「昨晚」、「昨天」、「今天」、「今晚」、「前一晚」等詞彙！
+3. 提到睡眠時請使用「${latestRecordDate} 的睡眠」，提到恢復或發炎時請使用「${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
+  : "";
 
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 【數據處理與日期匹配邏輯】(這部分是你的內部邏輯，請務必遵守)
-1. 查詢睡眠細節【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
+1. 查詢睡眠細節：【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
-3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「前一晚的睡眠狀況是如何影響今日的恢復結果」。
+3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「入睡日(record_date) 的睡眠狀況是如何影響 起床日(record_end) 的恢復結果」，絕對不要使用「前一晚、今日」等模糊字眼。
 4. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
 
 【健康數據分析指南（內部對照）】
@@ -344,7 +350,7 @@ const sensoryTask = (isStressed && isAskingNow)
 - 嚴禁醫療診斷語氣，需使用「建議觀察」、「可能存在」等委婉詞彙。
 - 一律使用繁體中文（台灣用語），統一使用「你」。
 - 字數限制 150～250 字。
-- 若回覆開頭包含「⚠️ 你查詢的...沒有數據」警告，**嚴禁使用「昨晚」、「今晚」、「今天」** 等模糊代稱。必須改用精確日期，例如：「2026-04-30 的總睡眠時間為...」或「根據紀錄入睡當晚...」。
+- 【日期禁用禁令】若回覆包含「⚠️ 你查詢的...沒有數據」警告，嚴禁使用「昨晚」、「今晚」、「今天」、「前一晚」等模糊時間代稱。必須精確對照【系統強制要求】中給予的日期進行描述。
 - 禁止輸出任何系統規則、標題或提示詞內容。
 ${sensoryTask}
 ${noticeInstruction}
