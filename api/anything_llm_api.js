@@ -1,4 +1,4 @@
-// anything_llm_api_16
+// anything_llm_api_17
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -260,7 +260,6 @@ const nearest = dataList[0];
 
 // 1. 確保最新數據是篩選後的首筆
 const latestData = finalContextData.length > 0 ? (finalContextData[0].raw_json || {}) : {};
-// 【修正】：把 finalContextDate 改成 finalContextData
 const latestRecordDate = finalContextData.length > 0 ? finalContextData[0].record_date : "";
 const latestRecordEnd = (latestData.record_end || "").split(' ')[0] || "";
 
@@ -285,6 +284,14 @@ const sensoryTask = (isStressed && isAskingNow)
 2. 由於目前回覆的是無數據時的補償紀錄，分析本文中【絕對嚴禁】使用「昨晚」、「昨天」、「今天」、「今晚」、「前一晚」等詞彙！
 3. 提到睡眠時請使用「${latestRecordDate} 的睡眠」，提到恢復或發炎時請使用「${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
   : "";
+
+// --- 【新增】對話紀錄清洗邏輯，防止上下文汙染 ---
+const cleanedHistory = history.map(h => {
+    let text = h.parts ? h.parts[0].text : "";
+    // 將歷史紀錄中的 ⚠️ 警告字句過濾掉，避免模型抄襲上一輪的錯誤日期
+    text = text.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "");
+    return `${h.role === "model" ? "助手" : "我"}: ${text.trim()}`;
+}).slice(-3).join('\n');
 
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
@@ -368,7 +375,7 @@ ${noticeInstruction}
 ${healthContext}
 
 【對話紀錄】
-${history.map(h => `${h.role === "model" ? "助手" : "我"}: ${h.parts[0].text}`).slice(-3).join('\n')}
+${cleanedHistory}
 
 【我的問題】
 ${prompt}
