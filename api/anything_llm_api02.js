@@ -278,11 +278,10 @@ const sensoryTask = (isStressed && isAskingNow)
   : "";
 
     // 【新增】強制注入警告提示的指令
-    const noticeInstruction = dataStatusNotice 
+const noticeInstruction = dataStatusNotice 
   ? `\n【系統強制要求】
-1. 請務必在回覆的第一段原封不動加上這句話：「${dataStatusNotice}」，接著換行再開始你的數據分析。
-2. 由於目前回覆的是無數據時的補償紀錄，分析本文中【絕對嚴禁】使用「昨晚」、「昨天」、「今天」、「今晚」、「前一晚」等詞彙！
-3. 提到睡眠時請使用「${latestRecordDate} 的睡眠」，提到恢復或發炎時請使用「${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
+1. 由於目前回覆的是無數據時的補償紀錄，分析本文中【絕對嚴禁】使用「昨晚」、「昨天」、「今天」、「今晚」、「前一晚」等詞彙！
+2. 提到睡眠時請使用「${latestRecordDate} 的睡眠」，提到恢復或發炎時請使用「${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
   : "";
 
 // --- 【新增】對話紀錄清洗邏輯，防止上下文汙染 ---
@@ -399,8 +398,19 @@ ${prompt}
     });
 
     if (!response.ok) throw new Error(`AnythingLLM 連線失敗`);
-    const data = await response.json();
-    const resultText = data.textResponse || "AI 目前沒有回傳內容。";
+const data = await response.json();
+let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
+
+// 步驟 A：先清除 AI 可能自己產生的警告（以防它偶爾又乖乖聽話，導致出現兩次警告）
+finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
+
+// 步驟 B：如果系統有產生警告，直接用程式碼強制加在最前面！💯
+if (dataStatusNotice) {
+    finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
+}
+
+// 備註：接下來如果你的程式碼下方有用到 resultText 的地方（例如 logTask 存檔 或 res.json），
+// 請記得把變數名稱改為 finalResultText
 
     // ==========================================
     // 【重點修改區】：背景執行存檔 (方案一)
@@ -418,7 +428,7 @@ ${prompt}
       body: JSON.stringify({
         serial_number: serial_number,
         user_query: prompt,
-        ai_response: resultText,
+        ai_response: finalResultText,
         record_date: local_date,
         record_time: local_time,
         ai_model: 'AnythingLLM-Qwen-2.5'
@@ -429,7 +439,7 @@ ${prompt}
     waitUntil(logTask);
 
     // 3. 立即回傳結果給使用者，這時候 logTask 還在背景跑，使用者不需要等它
-    return res.status(200).json({ text: resultText });
+    return res.status(200).json({ text: finalResultText });
 
   } catch (error) {
     console.error(error);
