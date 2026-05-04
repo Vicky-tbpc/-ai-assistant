@@ -1,4 +1,4 @@
-// anything_llm_api_18
+// anything_llm_api_19
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -181,9 +181,16 @@ try {
     console.error("讀取失敗:", err);
 }
 
-    // --- 2.5 判斷查詢類型 ---
-    const isRecoveryQuery = prompt.includes("恢復") || prompt.includes("發炎") || prompt.includes("指數") || prompt.includes("燈");
-    const isOverallQuery = prompt.includes("整體") || prompt.includes("綜合") || prompt.includes("狀況");
+    // --- 2.5 判斷查詢類型 (加入歷史意圖推斷) ---
+// 找出歷史紀錄中，使用者「上一輪」的問題。以防這輪的問題太短（例如「昨天呢？」）導致失去判斷依據
+const lastUserHistory = history.filter(h => h.role === "user").pop();
+const lastUserText = lastUserHistory && lastUserHistory.parts ? lastUserHistory.parts[0].text : "";
+
+// 將上一句的問題與這一句合併起來當作判斷基準
+const combinedIntentText = `${lastUserText} ${prompt}`;
+
+const isRecoveryQuery = combinedIntentText.includes("恢復") || combinedIntentText.includes("發炎") || combinedIntentText.includes("指數") || combinedIntentText.includes("燈");
+const isOverallQuery = combinedIntentText.includes("整體") || combinedIntentText.includes("綜合") || combinedIntentText.includes("狀況");
 
     // --- 3. 單日查詢補償與精準匹配邏輯 ---
     let finalContextData = dataList;
