@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     // 2. 準備 3 種版本的訊息
     const messages = [
-      "📊 今天的健康資訊已更新囉！\n\n💡 抽空看看自己的身體狀況吧👇\nhttps://ai-assistant-eight-puce.vercel.app/",
+      "📊 今天的健康資訊更新囉！\n\n💡 抽空看看自己的身體狀況吧👇\nhttps://ai-assistant-eight-puce.vercel.app/",
       "📊 嗨～你的健康分析完成囉~\n\n👀 點進來看看，關心一下自己吧\nhttps://ai-assistant-eight-puce.vercel.app/",
       "📊 今日健康分析更新囉～\n\n✨ 花一點時間了解一下今天的身體狀況👇\nhttps://ai-assistant-eight-puce.vercel.app/"
     ];
