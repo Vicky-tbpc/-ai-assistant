@@ -1,4 +1,4 @@
-// anything_llm_api_18
+// anything_llm_api_19
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -181,9 +181,42 @@ try {
     console.error("讀取失敗:", err);
 }
 
-    // --- 2.5 判斷查詢類型 ---
-    const isRecoveryQuery = prompt.includes("恢復") || prompt.includes("發炎") || prompt.includes("指數") || prompt.includes("燈");
-    const isOverallQuery = prompt.includes("整體") || prompt.includes("綜合") || prompt.includes("狀況");
+    // --- 2.5 判斷查詢類型 (加入智慧歷史意圖推斷) ---
+    // 1. 先定義各類別的專屬關鍵字
+    const recoveryKeywords = ["恢復", "發炎", "指數", "燈"];
+    const overallKeywords = ["整體", "綜合", "狀況"];
+
+// 建議將你列出的所有細節詞彙都加入
+    const sleepKeywords = [
+        "睡眠", "深睡", "N3", "淺睡", "快速動眼", "REM", 
+        "血氧", "SpO2", "T90", "T89", "T88", "低血氧",
+        "HBI", "負擔指數", "ODI", "下降指數",
+        "呼吸", "脈搏", "心率", "SDNN", "rMSSD", "變異度"
+    ];
+
+    // 2. 檢查「當前這句話 (prompt)」是否包含這些關鍵字
+    const promptHasRecovery = recoveryKeywords.some(kw => prompt.includes(kw));
+    const promptHasOverall = overallKeywords.some(kw => prompt.includes(kw));
+    const promptHasSleep = sleepKeywords.some(kw => prompt.includes(kw));
+
+    let isRecoveryQuery = false;
+    let isOverallQuery = false;
+
+    // 3. 核心判斷邏輯
+    if (promptHasRecovery || promptHasOverall || promptHasSleep) {
+        // 情境 A：當前問題有明確指定要問什麼（例如：「昨天的睡眠分析」）
+        // 那就直接以當前問題的意圖為主，完全不看歷史紀錄，避免交叉汙染！
+        isRecoveryQuery = promptHasRecovery;
+        isOverallQuery = promptHasOverall;
+    } else {
+        // 情境 B：當前問題沒有明確指標（例如：「昨天呢？」、「那5/3號的？」）
+        // 這時候才去抓歷史紀錄，繼承上一輪的查詢意圖
+        const lastUserHistory = history.filter(h => h.role === "user").pop();
+        const lastUserText = lastUserHistory && lastUserHistory.parts ? lastUserHistory.parts[0].text : "";
+
+        isRecoveryQuery = recoveryKeywords.some(kw => lastUserText.includes(kw));
+        isOverallQuery = overallKeywords.some(kw => lastUserText.includes(kw));
+    }
 
     // --- 3. 單日查詢補償與精準匹配邏輯 ---
     let finalContextData = dataList;
