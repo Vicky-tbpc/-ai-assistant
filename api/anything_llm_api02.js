@@ -1,4 +1,4 @@
-// anything_llm_api_19
+// anything_llm_api_20
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -191,7 +191,7 @@ try {
         "睡眠", "深睡", "N3", "淺睡", "快速動眼", "REM", 
         "血氧", "SpO2", "T90", "T89", "T88", "低血氧",
         "HBI", "負擔指數", "ODI", "下降指數",
-        "呼吸", "脈搏", "心率", "SDNN", "rMSSD", "變異度"
+        "呼吸", "脈搏", "心率", "SDNN", "rMSSD", "LF", "HF", "pNN50", "變異度"
     ];
 
     // 2. 檢查「當前這句話 (prompt)」是否包含這些關鍵字
@@ -280,13 +280,13 @@ const nearest = dataList[0];
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%
-- 睡眠血氧飽和度: 平均 ${Math.round(raw.SpO2_mean || 0)}% / 最高 ${Math.round(raw.SpO2_max || 0)}% / 最低 ${Math.round(raw.SpO2_min || 0)}%
-- 睡眠低血氧時間比例: T90 ${Math.round(raw.T90_pct || 0)}%, T89 ${Math.round(raw.T89_pct || 0)}%, T88 ${Math.round(raw.T88_pct || 0)}%
-- 低氧負擔指數: HBI低氧負擔指數 ${Math.round(raw.HBI || 0)}%min/h
-- 睡眠血氧下降指數: ODI 3% ${Math.round(raw.ODI3_total || 0)}次/h, ODI 4% ${Math.round(raw.ODI4_total || 0)}次/h
-- 睡眠呼吸頻率: 平均 ${Math.round(raw.RR_mean || 0)} / 最高 ${Math.round(raw.RR_max || 0)} / 最低 ${Math.round(raw.RR_min || 0)} rpm
-- 睡眠脈搏: 平均 ${Math.round(raw.HR_mean || 0)} / 最高 ${Math.round(raw.HR_max || 0)} / 最低 ${Math.round(raw.HR_min || 0)} bpm
-- 心率變異度: SDNN ${Math.round(raw.SDNN || 0)}ms, rMSSD ${Math.round(raw.rMSSD || 0)}ms`;
+- 睡眠血氧飽和度: 平均 ${raw.SpO2_mean || 0}% / 最高 ${raw.SpO2_max || 0}% / 最低 ${raw.SpO2_min || 0}%
+- 睡眠低血氧時間比例: T90 ${raw.T90_pct || 0}%, T89 ${raw.T89_pct || 0}%, T88 ${raw.T88_pct || 0}%
+- 低氧負擔指數: HBI低氧負擔指數 ${raw.HBI || 0}%min/h
+- 睡眠血氧下降指數: ODI 3% ${raw.ODI3_total || 0}次/h, ODI 4% ${raw.ODI4_total || 0}次/h
+- 睡眠呼吸頻率: 平均 ${raw.RR_mean || 0} / 最高 ${raw.RR_max || 0} / 最低 ${raw.RR_min || 0} rpm
+- 睡眠脈搏: 平均 ${raw.HR_mean || 0} / 最高 ${raw.HR_max || 0} / 最低 ${raw.HR_min || 0} bpm
+- 心率變異度: SDNN ${raw.SDNN || 0}ms, rMSSD ${raw.rMSSD || 0}ms, LF ${raw.LF_ms2 || 0}ms2, HF ${raw.HF_ms2 || 0}ms2, LF/HF ${raw.LF_HF || 0}, pNN50 ${raw.pNN50_pct || 0}%`;
       }).join('\n');
     }
 
@@ -338,7 +338,7 @@ const cleanedHistory = history.map(h => {
 你是一個線上AI健康夥伴，請只輸出最終回覆內容，不要每次都輸出重複的報告格式。
 
 【數據處理與日期匹配邏輯】(這部分是你的內部邏輯，請務必遵守)
-1. 查詢睡眠細節：【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
+1. 查詢睡眠細節：【總睡眠時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD/LF/HF/pNN50)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
 3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「入睡日(record_date) 的睡眠狀況是如何影響 起床日(record_end) 的恢復結果」，絕對不要使用「前一晚、今日」等模糊字眼。
 4. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
@@ -368,7 +368,7 @@ const cleanedHistory = history.map(h => {
    - 血氧下降指數 (ODI 3%/4%)：每小時應 < 5 次。
    - 睡眠呼吸頻率：12-25 rpm 為正常範圍。
    - 睡眠脈搏：60-100 bpm 為正常範圍。
-   - 心率變異度 (HRV)：SDNN 32-93 ms, rMSSD 19-75 ms。
+   - 心率變異度 (HRV)：SDNN 32-93 ms, rMSSD 19-75 ms, LF 193-1009 ms2, HF 83-3630 ms2, LF/HF 1.1-11.6, pNN50 6-50 %。
 
 【分析原則（動態回覆邏輯）】
 1. **模式切換**：
