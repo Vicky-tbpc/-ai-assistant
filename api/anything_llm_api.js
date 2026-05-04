@@ -275,8 +275,8 @@ const nearest = dataList[0];
 [數據紀錄]
 - (record_date) 入睡日期: ${item.record_date}
 - (record_end) 起床日期: ${raw.record_end || "無"}
-- (record_end) 恢復指數: ${raw.Personal_Battery_weighted_round || 0}%
-- (record_end) 發炎風險: ${raw.light_status || "無資料"}
+- (record_end) 恢復指數: ${batteryDisplay}
+- (record_end) 發炎風險: ${lightDisplay}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%
