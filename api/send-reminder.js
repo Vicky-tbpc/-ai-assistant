@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       to: user.line_user_id,
       messages: [{
         type: 'text',
-        text: `嗨 ${user.nickname}，提醒你今晚記得佩戴手環紀錄睡眠，並於隔天上傳數據，以建立你的恢復指數與發炎風險個人基線喔！`
+        text: `嗨 ${user.nickname}，今晚記得佩戴手環記錄睡眠 💤，明天起床後再上傳數據 📊，我會幫你建立專屬的恢復指數與發炎風險基線，讓你的健康狀態更清楚掌握！`
       }]
     }));
 
