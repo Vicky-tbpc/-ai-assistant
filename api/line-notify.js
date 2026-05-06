@@ -1,4 +1,4 @@
-// api/line-notify_02.js
+// api/line-notify_03.js
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
@@ -43,9 +43,15 @@ export default async function handler(req, res) {
       ];
       let msg = baseMessages[Math.floor(Math.random() * baseMessages.length)] + "\n\n";
       
+      // 👇 新增：如果 battery 和 light 都是 null，直接回傳預設問候與連結
+      if (battery === null && light === null) {
+        msg += "💡 抽空看看自己的身體狀況吧👇\nhttps://ai-assistant-eight-puce.vercel.app/";
+        return msg;
+      }
+
       let warnings = [];
-      // 恢復指數小於 60
-      if (battery < 60) {
+      // 恢復指數小於 60 (加入 battery !== null 防呆，避免 null 被轉成 0 而誤判)
+      if (battery !== null && battery < 60) {
         warnings.push(`🤒 今天的恢復指數為 ${battery}%，屬於恢復不足，建議放慢節奏，多休息喔！`);
       }
       
