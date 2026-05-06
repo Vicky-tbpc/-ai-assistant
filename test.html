@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n67</title>
+    <title>Soosyn 健康夥伴 n68</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -331,11 +331,11 @@ function getRandomEndQuestion() {
     return END_QUESTIONS[Math.floor(Math.random() * END_QUESTIONS.length)];
 }
     const CTA_PHRASES = [
-        "🌱 保持健康是每天的小累積💪，還想了解哪個健康資訊呢？\n趨勢圖表、恢復指數、rMSSD，還是發炎風險？",
-        "健康都是一點一滴累積的🌿，還想了解哪個指標呢？\n健康摘要、趨勢圖表、恢復指數或發炎風險呢？",
-        "健康是每天最好的投資！🌿\n除了剛剛的數據，你還想了解健康摘要、趨勢圖表，或是發炎風險呢？",
-        "我會與你一起建立好習慣！✨ 現在想從哪個部分開始了解呢？\n健康摘要、恢復指數，還是睡眠平衡度？",
-        "🌟 維持健康的好習慣很重要！想查看哪個資訊呢？\n⚖️ 睡眠平衡度、📊 趨勢圖、🧘 rMSSD、📈 恢復指數？"
+        "🌱 保持健康是每天的小累積💪，讓我陪你一起關注健康狀態！想查看哪個資訊呢？",
+        "健康都是一點一滴累積的🌿，一起慢慢打造更好的自己吧！想了解哪個指標呢？",
+        "健康是每天最好的投資！🌿 持續累積就能看到改變！想查看哪個資訊呢？",
+        "我會與你一起建立好習慣！✨ 一步一步邁向更健康的生活！現在想從哪個部分開始了解呢？",
+        "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
     const ENCYCLOPEDIA_KEYWORDS = ["黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠連續性", "睡眠規律性", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎", "修復時間", "核心修復", "放鬆指數", "脈搏穩定度", "血氧穩定度", "睡眠連續性", "睡眠規律性"];
 
@@ -583,11 +583,13 @@ if (msg.includes("健康摘要")) {
 }
 
 
-    if (msg.includes("趨勢圖")) {
-        await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
-        appendTrendOptions();
-        return;
-    }
+const keywords = ["趨勢圖", "圖表"];
+
+if (keywords.some(key => msg.includes(key))) {
+    await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
+    appendTrendOptions();
+    return;
+}
 
     // 百科關鍵字
     const wikiKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
@@ -1706,7 +1708,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/anything_llm_api02', {
+        const res = await fetch('/api/anything_llm_api', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
