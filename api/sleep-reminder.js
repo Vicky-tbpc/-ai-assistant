@@ -1,4 +1,4 @@
-// sleep-reminder_06 單筆資料
+// sleep-reminder_07 null不推播
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -75,6 +75,13 @@ try {
         if (!userYesterday || !userYesterday.raw_json) {
           return { serial: user.serial_number, status: "Skipped", reason: "昨天(最新)沒資料" };
         }
+
+        // +++ 新增過濾邏輯：檢查所有 Battery 指標是否全為 null 或 undefined +++
+        const isAllNull = metrics.every(m => userYesterday.raw_json[m] == null);
+        if (isAllNull) {
+          return { serial: user.serial_number, status: "Skipped", reason: "昨天的所有 Battery 指標均為 null" };
+        }
+        // +++ 新增過濾邏輯結束 +++
 
         // --- 計算邏輯：比較「昨天」與「前天」 ---
         let targetMetric = '';
