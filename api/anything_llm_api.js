@@ -279,7 +279,7 @@ const nearest = dataList[0];
 - (record_end) 恢復指數: ${batteryDisplay}
 - (record_end) 發炎風險: ${lightDisplay}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
-- 總紀錄時間: ${Math.floor(trt / 60)}時${tst % 60}分
+- 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
 - 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%
 - 睡眠血氧飽和度: 平均 ${raw.SpO2_mean || 0}% / 最高 ${raw.SpO2_max || 0}% / 最低 ${raw.SpO2_min || 0}%
