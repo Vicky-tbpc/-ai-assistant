@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n67</title>
+    <title>Soosyn 健康夥伴 n68</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -583,11 +583,13 @@ if (msg.includes("健康摘要")) {
 }
 
 
-    if (msg.includes("趨勢圖")) {
-        await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
-        appendTrendOptions();
-        return;
-    }
+const keywords = ["趨勢圖", "圖表"];
+
+if (keywords.some(key => msg.includes(key))) {
+    await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
+    appendTrendOptions();
+    return;
+}
 
     // 百科關鍵字
     const wikiKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
