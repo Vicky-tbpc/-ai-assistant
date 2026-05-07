@@ -66,25 +66,31 @@
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
-/* 修改這段，確保垂直排列並處理手機安全區域 */
 .footer-input { 
+    /* 修改這裡：使用 flex-direction 讓輸入框跟警語垂直排列 */
     padding: 15px 20px; 
-    /* 加入下面這行，確保在 iPhone 有「橫條」的裝置上不會被遮到 */
-    padding-bottom: calc(15px + env(safe-area-inset-bottom)); 
+    /* 關鍵：針對手機底部安全區域留白，避免被黑條擋住 */
+    padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
     background: var(--bg-color); 
     display: flex; 
-    flex-direction: column; /* 強制垂直排列：輸入框在上，文字在下 */
-    align-items: center;    /* 水平置中 */
-    gap: 10px;              /* 輸入框與文字之間的間距 */
+    flex-direction: column; 
+    align-items: center;
+    gap: 8px; /* 輸入框跟警語之間的間距 */
 }
 
-/* 新增警語樣式 */
+/* 新增：警語的樣式 */
 .disclaimer {
-    font-size: 11px;        /* 手機上建議 11-12px */
-    color: #888;           /* 淺灰色 */
+    font-size: 11px; /* 字體小一點，比較不干擾 */
+    color: #888;
     text-align: center;
-    width: 100%;           /* 確保文字置中效果 */
-    line-height: 1.4;
+    width: 100%;
+}
+
+/* 額外修正：避免 100vh 在手機瀏覽器造成位移 */
+#app-container { 
+    display: flex; 
+    flex-direction: column; 
+    height: 100dvh; /* 改用 dvh，能動態適應手機瀏覽器工具列的高度 */
 }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
