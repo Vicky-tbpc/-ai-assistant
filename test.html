@@ -66,16 +66,22 @@
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
-.footer-input { 
-    /* 修改這裡：使用 flex-direction 讓輸入框跟警語垂直排列 */
-    padding: 15px 20px; 
-    /* 關鍵：針對手機底部安全區域留白，避免被黑條擋住 */
-    padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-    background: var(--bg-color); 
-    display: flex; 
-    flex-direction: column; 
+.footer-input {
+    background: var(--bg-color);
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px; /* 輸入框跟警語之間的間距 */
+    gap: 8px;
+    
+    /* 左右間距加寬，讓輸入框不要貼邊 */
+    padding: 10px 20px; 
+    
+    /* 關鍵：修正寬度計算 */
+    box-sizing: border-box; 
+    width: 100%;
+
+    /* 關鍵：處理手機底部安全區域（如 iPhone 黑條） */
+    padding-bottom: calc(15px + env(safe-area-inset-bottom));
 }
 
 /* 新增：警語的樣式 */
@@ -87,12 +93,27 @@
 }
 
 /* 額外修正：避免 100vh 在手機瀏覽器造成位移 */
-#app-container { 
-    display: flex; 
-    flex-direction: column; 
-    height: 100dvh; /* 改用 dvh，能動態適應手機瀏覽器工具列的高度 */
+#app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh; /* 關鍵：改用 dvh */
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    background-color: white;
+    position: relative;
+    overflow: hidden;
 }
-        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
+.input-box {
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 25px;
+    padding: 5px 15px;
+    width: 100%;        /* 滿寬 */
+    box-sizing: border-box; /* 確保 padding 不會撐破寬度 */
+    border: 1px solid #eee;
+}
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
