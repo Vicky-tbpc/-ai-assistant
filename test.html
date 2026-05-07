@@ -66,24 +66,28 @@
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
-        .footer-input { 
-    padding: 15px 20px 25px 20px; 
+.footer-input { 
+    padding: 15px 20px; /* 先給基本的上下間距 */
+    /* 關鍵：加入這行，會自動避開 iPhone 底部的黑條區域 */
+    padding-bottom: calc(15px + env(safe-area-inset-bottom)); 
     background: var(--bg-color); 
     display: flex; 
-    flex-direction: column; /* 改為垂直排列，警語才會在下面 */
-    align-items: center;    /* 讓內容水平置中 */
-    gap: 10px;             /* 讓輸入框和警語之間有一點間距 */
+    flex-direction: column; 
+    align-items: center;    
+    gap: 8px;             
+    flex-shrink: 0; /* 確保 footer 不會因為上方內容多而被壓縮 */
 }
 
-/* 新增這個警語專用的樣式 */
 .disclaimer-text {
-    font-size: 11px;       /* 字體小一點，才不會太搶戲 */
-    color: #999;           /* 顏色淺灰，看起來比較專業 */
+    font-size: 10px;       /* 手機版可以再小一點點，減少空間占用 */
+    color: #888;           
     text-align: center;
-    max-width: 800px;      /* 跟輸入框一樣的最大寬度 */
-    line-height: 1.4;
-    padding: 0 10px;
+    max-width: 90%;        /* 寬度不要太滿 */
+    line-height: 1.3;
+    word-break: break-all; /* 確保長句子會自動換行 */
+    opacity: 0.8;
 }
+
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
