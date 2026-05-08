@@ -281,7 +281,7 @@ const nearest = dataList[0];
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
-- 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%
+- 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%, 醒來及清醒期 (Wake) ${raw.wake_minutes || 0}分
 - 睡眠血氧飽和度: 平均 ${raw.SpO2_mean || 0}% / 最高 ${raw.SpO2_max || 0}% / 最低 ${raw.SpO2_min || 0}%
 - 睡眠低血氧時間比例: T90 ${raw.T90_pct || 0}%, T89 ${raw.T89_pct || 0}%, T88 ${raw.T88_pct || 0}%
 - 低氧負擔指數: HBI低氧負擔指數 ${raw.HBI || 0}%min/h
