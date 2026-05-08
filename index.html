@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n68</title>
+    <title>Soosyn 健康夥伴 n69</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -26,7 +26,11 @@
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
-        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        #app-container { 
+    display: flex; 
+    flex-direction: column; 
+    height: 100dvh; /* 這裡原本是 100vh，改成 100dvh 可以完美避開手機網址列縮放問題 */
+}
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
         .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; position: relative; }
@@ -66,7 +70,24 @@
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
-        .footer-input { padding: 15px 20px 30px 20px; background: var(--bg-color); display: flex; justify-content: center; }
+        /* 修改原有的 .footer-input，加入 flex-direction: column 與安全距離 */
+.footer-input { 
+    /* 底部 padding 加上系統安全距離，避免被手機底部導覽條遮住 */
+    padding: 15px 20px calc(12px + env(safe-area-inset-bottom, 0px)) 20px; 
+    background: var(--bg-color); 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+}
+
+/* 新增警語專用樣式 */
+.disclaimer-text {
+    font-size: 10px;
+    color: #999;
+    margin-top: 8px;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -256,8 +277,9 @@
                 <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
-        </div>
-    </div>
+        <!-- 這裡加上警語 -->
+    <div class="disclaimer-text">AI 回覆僅供健康參考，無法取代專業醫療。</div>
+</div>
 
 <script>
 
