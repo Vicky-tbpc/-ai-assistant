@@ -1692,7 +1692,7 @@ async function saveConsent(originalPrompt, agreed, btnId) {
             agreed_at: new Date()
         });
 
-        appendAiMessage("感謝您的同意，正在為您尋找答案...");
+        appendAiMessage("感謝您的同意，正在為您分析...");
         const response = await callGeminiAPI(originalPrompt);
         appendAiMessage(response);
     } else {
