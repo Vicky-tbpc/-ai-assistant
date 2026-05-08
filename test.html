@@ -69,7 +69,7 @@
         /* 修改原有的 .footer-input，加入 flex-direction: column 與安全距離 */
 .footer-input { 
     /* 底部 padding 加上系統安全距離，避免被手機底部導覽條遮住 */
-    padding: 15px 20px calc(25px + env(safe-area-inset-bottom, 0px)) 20px; 
+    padding: 15px 20px calc(12px + env(safe-area-inset-bottom, 0px)) 20px; 
     background: var(--bg-color); 
     display: flex; 
     flex-direction: column; 
@@ -78,7 +78,7 @@
 
 /* 新增警語專用樣式 */
 .disclaimer-text {
-    font-size: 11px;
+    font-size: 10px;
     color: #999;
     margin-top: 8px;
     text-align: center;
