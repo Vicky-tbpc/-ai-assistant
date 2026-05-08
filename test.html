@@ -66,19 +66,23 @@
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
+        /* 修改原有的 .footer-input，加入 flex-direction: column 與安全距離 */
 .footer-input { 
-    padding: 15px 20px 15px 20px; /* 稍微縮小原來的底部留白 */
+    /* 底部 padding 加上系統安全距離，避免被手機底部導覽條遮住 */
+    padding: 15px 20px calc(25px + env(safe-area-inset-bottom, 0px)) 20px; 
     background: var(--bg-color); 
     display: flex; 
-    flex-direction: column; /* 改為垂直排列 */
+    flex-direction: column; 
     align-items: center; 
 }
+
+/* 新增警語專用樣式 */
 .disclaimer-text {
-    font-size: 12px;
+    font-size: 11px;
     color: #999;
-    margin-top: 8px; /* 與上方輸入框的間距 */
+    margin-top: 8px;
     text-align: center;
-    width: 100%;
+    letter-spacing: 0.5px;
 }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
         #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
@@ -269,8 +273,9 @@
                 <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
-        <div class="disclaimer-text">AI 回覆僅供健康參考，無法取代專業醫療。</div>
-        </div>
+        <!-- 這裡加上警語 -->
+    <div class="disclaimer-text">AI 回覆僅供健康參考，無法取代專業醫療。</div>
+</div>
 
 <script>
 
