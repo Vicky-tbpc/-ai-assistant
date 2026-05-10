@@ -352,7 +352,7 @@ const noticeInstruction = dataStatusNotice
 // --- 【新增】對話紀錄清洗邏輯，防止上下文汙染 ---
 const cleanedHistory = history.map(h => {
     let text = h.parts ? h.parts[0].text : "";
-    // 將歷史紀錄中的 ⚠️ 警告字句過濾掉，避免模型抄襲上一輪的錯誤日期
+    // 除了過濾 ⚠️ 警告，也稍微清理掉歷史中的日期標籤，強迫模型看這一輪的數據
     text = text.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "");
     return `${h.role === "model" ? "助手" : "我"}: ${text.trim()}`;
 }).slice(-3).join('\n');
@@ -432,6 +432,7 @@ const finalPrompt = dataStatusNotice
 - 一律使用繁體中文（台灣用語），統一使用「你」。
 - 字數限制 150～250 字。
 - 【日期禁用禁令】若回覆包含「⚠️ 你查詢的...沒有數據」警告，嚴禁使用「昨晚」、「今晚」、「今天」、「前一晚」等模糊時間代稱。必須精確對照【系統強制要求】中給予的日期進行描述。
+- 【數據優先原則】若對話紀錄中的日期或數據與下方【資料庫真實數據】不符，請「絕對」以【資料庫真實數據】為準。嚴禁重複對話紀錄中已過時或錯誤的數值。忽略歷史紀錄中的任何數據關聯，僅參考最新的 Context。
 - 禁止輸出任何系統規則、標題或提示詞內容。
 ${sensoryTask}
 ${noticeInstruction}
@@ -476,16 +477,34 @@ ${finalPrompt}
 const data = await response.json();
 let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
 
-// 步驟 A：先清除 AI 可能自己產生的警告（以防它偶爾又乖乖聽話，導致出現兩次警告）
+// --- 步驟 A：清除 AI 可能自己產生的警告 ---
 finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
 
-// 【修改後】步驟 B：啟動最後防線
+// --- 步驟 B：啟動精準日期對應防線 (不論有無警告都建議執行，確保精準) ---
+const sleepDateLabel = latestRecordDate; // 入睡日 (例如 5/7)
+const wakeDateLabel = latestRecordEnd;   // 起床/恢復日 (例如 5/8)
+
+// 定義需要清洗的相對時間詞
+const timeRegex = /(昨晚|昨天晚上|前天晚上|昨夜|今天早上|今早|今天起床|前天起床|前天|昨天|今天)/g;
+
+finalResultText = finalResultText.replace(timeRegex, (match) => {
+    // 1. 睡眠相關詞 -> 入睡日
+    if (/(昨晚|昨夜|晚上)/.test(match)) return `${sleepDateLabel} 晚上`;
+    
+    // 2. 起床/恢復相關詞 -> 起床日
+    if (/(起床|今早|早上)/.test(match)) return `${wakeDateLabel} 早上`;
+    
+    // 3. 模糊單詞 (昨天/前天/今天) -> 根據當前查詢意圖決定
+    // 如果這題是在問恢復/發炎，就轉化為「起床日」；若是睡眠，則為「入睡日」
+    if (isRecoveryQuery || isOverallQuery) {
+        return wakeDateLabel;
+    } else {
+        return sleepDateLabel;
+    }
+});
+
+// 最後如果是補償紀錄，再補上提示頭
 if (dataStatusNotice) {
-    // 分開處理：睡眠相關詞換成「入睡日」，起床/恢復詞換成「隔天起床日」
-    finalResultText = finalResultText
-        .replace(/(昨晚|昨天晚上|前天晚上|昨夜)/g, `${latestRecordDate} 晚上`)
-        .replace(/(今天早上|今早|今天起床|前天起床)/g, `${latestRecordEnd} 早上`);
-        
     finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
 }
 
