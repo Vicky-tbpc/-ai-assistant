@@ -480,32 +480,40 @@ let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
 // --- 步驟 A：清除 AI 可能自己產生的警告 ---
 finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
 
-// --- 步驟 B：啟動精準日期對應防線 (不論有無警告都建議執行，確保精準) ---
-const sleepDateLabel = latestRecordDate; // 入睡日 (例如 5/7)
-const wakeDateLabel = latestRecordEnd;   // 起床/恢復日 (例如 5/8)
+// --- 步驟 B：啟動精準日期與冗餘消除防線 💯 ---
+if (dataStatusNotice || analysisMode === "single") {
+    const sleepDateLabel = latestRecordDate; // 入睡日 (5/7)
+    const wakeDateLabel = latestRecordEnd;   // 起床/恢復日 (5/8)
 
-// 定義需要清洗的相對時間詞
-const timeRegex = /(昨晚|昨天晚上|前天晚上|昨夜|今天早上|今早|今天起床|前天起床|前天|昨天|今天)/g;
+    // 這個正規表達式會抓取：相對時間詞 + (選用的後綴字) + (選用的括號日期)
+    // 例如：抓取 "前天" + "晚上" + "（2026-05-07）"
+    const smartTimeRegex = /(昨晚|昨天晚上|前天晚上|昨夜|今天早上|今早|今天起床|前天起床|前天|昨天|今天)(晚上|的數據|數據|的睡眠|睡眠|恢復|起床)?(\s*[\(（].*?[\)）])?/g;
 
-finalResultText = finalResultText.replace(timeRegex, (match) => {
-    // 1. 睡眠相關詞 -> 入睡日
-    if (/(昨晚|昨夜|晚上)/.test(match)) return `${sleepDateLabel} 晚上`;
-    
-    // 2. 起床/恢復相關詞 -> 起床日
-    if (/(起床|今早|早上)/.test(match)) return `${wakeDateLabel} 早上`;
-    
-    // 3. 模糊單詞 (昨天/前天/今天) -> 根據當前查詢意圖決定
-    // 如果這題是在問恢復/發炎，就轉化為「起床日」；若是睡眠，則為「入睡日」
-    if (isRecoveryQuery || isOverallQuery) {
-        return wakeDateLabel;
-    } else {
-        return sleepDateLabel;
+    finalResultText = finalResultText.replace(smartTimeRegex, (match, p1, p2, p3) => {
+        // p1: 相對詞 (如 "前天")
+        // p2: 後綴 (如 "晚上" 或 "恢復")
+        // p3: AI 吐出的括號內容 (如 "（2026-05-07）") -> 我們將其忽略(回傳空字串)來消除冗餘
+        
+        const suffix = p2 || "";
+
+        // 邏輯 A：如果是提到「晚上、睡眠、數據」，一律用【入睡日】
+        if (/(晚上|昨晚|昨夜|睡眠|數據)/.test(p1 + suffix)) {
+            return `${sleepDateLabel} ${suffix}`;
+        }
+        
+        // 邏輯 B：如果是提到「起床、恢復、今早」，一律用【起床日】
+        if (/(起床|恢復|早上|今早)/.test(p1 + suffix)) {
+            return `${wakeDateLabel} ${suffix}`;
+        }
+
+        // 邏輯 C：如果只是單純的「前天/昨天」，根據查詢意圖決定
+        return (isRecoveryQuery || isOverallQuery) ? wakeDateLabel : sleepDateLabel;
+    });
+
+    // 最後補上補償警告
+    if (dataStatusNotice) {
+        finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
     }
-});
-
-// 最後如果是補償紀錄，再補上提示頭
-if (dataStatusNotice) {
-    finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
 }
 
 // 備註：接下來如果你的程式碼下方有用到 resultText 的地方（例如 logTask 存檔 或 res.json），
