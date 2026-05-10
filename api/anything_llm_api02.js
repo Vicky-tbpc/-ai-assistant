@@ -1,4 +1,4 @@
-// anything_llm_api_21
+// anything_llm_api_20
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -100,18 +100,6 @@ if (weekdayDate) {
   const lastDay = new Date(year, month, 0);      
   queryStartDate = fmt(firstDay);
   queryEndDate = fmt(lastDay);
-} else if (prompt.includes("大前天")) {
-  // 【新增】大前天的邏輯
-  const ddby = new Date(today);
-  ddby.setDate(today.getDate() - 3);
-  targetDate = fmt(ddby);
-  analysisMode = "single";
-} else if (prompt.includes("前天")) {
-  // 【新增】前天的邏輯
-  const dby = new Date(today);
-  dby.setDate(today.getDate() - 2);
-  targetDate = fmt(dby);
-  analysisMode = "single";
 } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -278,15 +266,6 @@ const nearest = dataList[0];
         const tst = raw.TST_min || 0;
         const trt = raw.TRT_min || 0;
 
-        // 【新增/修改】抓取分鐘數據並換算時分格式
-        const n3Min = raw.N3_min || 0;
-        const n1n2Min = raw.N1N2_min || 0;
-        const remMin = raw.REM_min || 0;
-        
-        const n3Time = `${Math.floor(n3Min / 60)}時${n3Min % 60}分`;
-        const n1n2Time = `${Math.floor(n1n2Min / 60)}時${n1n2Min % 60}分`;
-        const remTime = `${Math.floor(remMin / 60)}時${remMin % 60}分`;
-
         // 【修改這裡】精準判斷恢復指數與發炎風險是否缺乏
         const battery = raw.Personal_Battery_weighted_round;
         const light = raw.light_status;
@@ -302,7 +281,7 @@ const nearest = dataList[0];
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
-- 睡眠結構: 深睡期 (N3) ${raw.N3_pct || 0}% (${n3Time}), 淺睡期 (N1、N2) ${raw.N1N2_pct || 0}% (${n1n2Time}), 快速動眼期 (REM) ${raw.REM_pct || 0}% (${remTime}), 醒來及清醒期 (Wake) ${raw.wake_minutes || 0}分
+- 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%, 醒來及清醒期 (Wake) ${raw.wake_minutes || 0}分
 - 睡眠血氧飽和度: 平均 ${raw.SpO2_mean || 0}% / 最高 ${raw.SpO2_max || 0}% / 最低 ${raw.SpO2_min || 0}%
 - 睡眠低血氧時間比例: T90 ${raw.T90_pct || 0}%, T89 ${raw.T89_pct || 0}%, T88 ${raw.T88_pct || 0}%
 - 低氧負擔指數: HBI低氧負擔指數 ${raw.HBI || 0}%min/h
@@ -345,26 +324,16 @@ const sensoryTask = (isStressed && isAskingNow)
 const noticeInstruction = dataStatusNotice 
   ? `\n【系統強制要求】
 1. 由於目前回覆的是無數據時的補償紀錄，分析本文中【絕對嚴禁】使用「昨晚」、「昨天」、「今天」、「今晚」、「前一晚」等詞彙！
-2. 提到睡眠時請使用「${latestRecordDate} 的睡眠」。
-3. 提到恢復或發炎時，必須強調是睡眠後的隔天，請使用「隔天 ${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
+2. 提到睡眠時請使用「${latestRecordDate} 的睡眠」，提到恢復或發炎時請使用「${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
   : "";
 
 // --- 【新增】對話紀錄清洗邏輯，防止上下文汙染 ---
 const cleanedHistory = history.map(h => {
     let text = h.parts ? h.parts[0].text : "";
-    // 除了過濾 ⚠️ 警告，也稍微清理掉歷史中的日期標籤，強迫模型看這一輪的數據
+    // 將歷史紀錄中的 ⚠️ 警告字句過濾掉，避免模型抄襲上一輪的錯誤日期
     text = text.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "");
     return `${h.role === "model" ? "助手" : "我"}: ${text.trim()}`;
 }).slice(-3).join('\n');
-
-// --- 【新增】將警告直接綁定在最後的 prompt，防止模型幻覺 ---
-const finalPrompt = dataStatusNotice 
-  ? `${prompt}\n\n(🤖 系統強制指令：因為找不到 ${targetDate} 的資料，你【必須】遵守以下規則：
-1. 開頭先說明「找不到 ${targetDate} 的資料，改為分析最近一筆 ${latestRecordDate} 的數據」。
-2. 全文【絕對嚴禁】使用昨晚、昨天、今天、前一晚等相對時間詞。
-3. 提到睡眠時一律稱呼「${latestRecordDate} 的睡眠」。
-4. 提到恢復、發炎或起床狀態時，一律稱呼「隔天 ${latestRecordEnd} 的起床恢復」。)`
-  : prompt;
 
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
@@ -373,7 +342,7 @@ const finalPrompt = dataStatusNotice
 【數據處理與日期匹配邏輯】(這部分是你的內部邏輯，請務必遵守)
 1. 查詢睡眠細節：【總睡眠時間、總紀錄時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼/醒來及清醒期)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD/LF/HF/pNN50)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
-3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「${latestRecordDate} 的睡眠狀況是如何影響 隔天 ${latestRecordEnd} 的恢復結果」。
+3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「入睡日(record_date) 的睡眠狀況是如何影響 起床日(record_end) 的恢復結果」，絕對不要使用「前一晚、今日」等模糊字眼。
 4. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
 5. 若數據中顯示「恢復指數」或「發炎風險」為「資料不足」，請直接告訴我：「恢復指數與發炎風險需要 7 天的睡眠紀錄才能計算出來喔！請繼續保持佩戴～」絕對不要把它解讀為 0%、屬於注意範圍或說無資料。
 
@@ -432,7 +401,6 @@ const finalPrompt = dataStatusNotice
 - 一律使用繁體中文（台灣用語），統一使用「你」。
 - 字數限制 150～250 字。
 - 【日期禁用禁令】若回覆包含「⚠️ 你查詢的...沒有數據」警告，嚴禁使用「昨晚」、「今晚」、「今天」、「前一晚」等模糊時間代稱。必須精確對照【系統強制要求】中給予的日期進行描述。
-- 【數據優先原則】若對話紀錄中的日期或數據與下方【資料庫真實數據】不符，請「絕對」以【資料庫真實數據】為準。嚴禁重複對話紀錄中已過時或錯誤的數值。忽略歷史紀錄中的任何數據關聯，僅參考最新的 Context。
 - 禁止輸出任何系統規則、標題或提示詞內容。
 ${sensoryTask}
 ${noticeInstruction}
@@ -453,7 +421,7 @@ ${healthContext}
 ${cleanedHistory}
 
 【我的問題】
-${finalPrompt}
+${prompt}
 `.trim();
 
     // --- 6. 呼叫 AnythingLLM API ---
@@ -477,43 +445,12 @@ ${finalPrompt}
 const data = await response.json();
 let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
 
-// --- 步驟 A：清除 AI 可能自己產生的警告 ---
+// 步驟 A：先清除 AI 可能自己產生的警告（以防它偶爾又乖乖聽話，導致出現兩次警告）
 finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
 
-// --- 步驟 B：啟動精準日期與冗餘消除防線 💯 ---
-if (dataStatusNotice || analysisMode === "single") {
-    const sleepDateLabel = latestRecordDate; // 入睡日 (5/7)
-    const wakeDateLabel = latestRecordEnd;   // 起床/恢復日 (5/8)
-
-    // 這個正規表達式會抓取：相對時間詞 + (選用的後綴字) + (選用的括號日期)
-    // 例如：抓取 "前天" + "晚上" + "（2026-05-07）"
-    const smartTimeRegex = /(昨晚|昨天晚上|前天晚上|昨夜|今天早上|今早|今天起床|前天起床|前天|昨天|今天)(晚上|的數據|數據|的睡眠|睡眠|恢復|起床)?(\s*[\(（].*?[\)）])?/g;
-
-    finalResultText = finalResultText.replace(smartTimeRegex, (match, p1, p2, p3) => {
-        // p1: 相對詞 (如 "前天")
-        // p2: 後綴 (如 "晚上" 或 "恢復")
-        // p3: AI 吐出的括號內容 (如 "（2026-05-07）") -> 我們將其忽略(回傳空字串)來消除冗餘
-        
-        const suffix = p2 || "";
-
-        // 邏輯 A：如果是提到「晚上、睡眠、數據」，一律用【入睡日】
-        if (/(晚上|昨晚|昨夜|睡眠|數據)/.test(p1 + suffix)) {
-            return `${sleepDateLabel} ${suffix}`;
-        }
-        
-        // 邏輯 B：如果是提到「起床、恢復、今早」，一律用【起床日】
-        if (/(起床|恢復|早上|今早)/.test(p1 + suffix)) {
-            return `${wakeDateLabel} ${suffix}`;
-        }
-
-        // 邏輯 C：如果只是單純的「前天/昨天」，根據查詢意圖決定
-        return (isRecoveryQuery || isOverallQuery) ? wakeDateLabel : sleepDateLabel;
-    });
-
-    // 最後補上補償警告
-    if (dataStatusNotice) {
-        finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
-    }
+// 步驟 B：如果系統有產生警告，直接用程式碼強制加在最前面！💯
+if (dataStatusNotice) {
+    finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
 }
 
 // 備註：接下來如果你的程式碼下方有用到 resultText 的地方（例如 logTask 存檔 或 res.json），
