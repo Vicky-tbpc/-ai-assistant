@@ -345,7 +345,8 @@ const sensoryTask = (isStressed && isAskingNow)
 const noticeInstruction = dataStatusNotice 
   ? `\n【系統強制要求】
 1. 由於目前回覆的是無數據時的補償紀錄，分析本文中【絕對嚴禁】使用「昨晚」、「昨天」、「今天」、「今晚」、「前一晚」等詞彙！
-2. 提到睡眠時請使用「${latestRecordDate} 的睡眠」，提到恢復或發炎時請使用「${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
+2. 提到睡眠時請使用「${latestRecordDate} 的睡眠」。
+3. 提到恢復或發炎時，必須強調是睡眠後的隔天，請使用「隔天 ${latestRecordEnd} 的起床恢復」，讓日期資訊完全精確。` 
   : "";
 
 // --- 【新增】對話紀錄清洗邏輯，防止上下文汙染 ---
@@ -362,7 +363,7 @@ const finalPrompt = dataStatusNotice
 1. 開頭先說明「找不到 ${targetDate} 的資料，改為分析最近一筆 ${latestRecordDate} 的數據」。
 2. 全文【絕對嚴禁】使用昨晚、昨天、今天、前一晚等相對時間詞。
 3. 提到睡眠時一律稱呼「${latestRecordDate} 的睡眠」。
-4. 提到恢復、發炎或起床狀態時，一律稱呼「${latestRecordEnd} 的起床恢復」。)`
+4. 提到恢復、發炎或起床狀態時，一律稱呼「隔天 ${latestRecordEnd} 的起床恢復」。)`
   : prompt;
 
     // --- 5. 組合最終 Prompt ---
@@ -372,7 +373,7 @@ const finalPrompt = dataStatusNotice
 【數據處理與日期匹配邏輯】(這部分是你的內部邏輯，請務必遵守)
 1. 查詢睡眠細節：【總睡眠時間、總紀錄時間、睡眠效率、睡眠結構 (深睡/淺睡/快速動眼/醒來及清醒期)、睡眠血氧飽和度 (SpO2)、睡眠低血氧時間比例 (T90/T89/T88)、低氧負擔指數 (HBI)、睡眠血氧下降指數 (ODI 3%/ODI 4%)、睡眠呼吸頻率、睡眠脈搏、以及心率變異度 (SDNN/rMSSD/LF/HF/pNN50)】，請看入睡日(record_date)對應的數據[cite: 2]。(例如：問 4/26 睡眠，請找入睡日為 4/26 的紀錄)。
 2. 查詢恢復或發炎（恢復指數、發炎風險）：起床日(record_end)對應的數據[cite: 1, 2]。
-3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「入睡日(record_date) 的睡眠狀況是如何影響 起床日(record_end) 的恢復結果」，絕對不要使用「前一晚、今日」等模糊字眼。
+3. 查詢整體健康狀況：請找起床日(record_end)對應的數據，先解讀當日的恢復與發炎狀態，再利用同一筆紀錄中的入睡日(record_date)睡眠細節，向使用者說明「${latestRecordDate} 的睡眠狀況是如何影響 隔天 ${latestRecordEnd} 的恢復結果」。
 4. 引用規範：當你引用數據時，必須在句子結尾加上對應的，但請自然地融入對話，不要條列。
 5. 若數據中顯示「恢復指數」或「發炎風險」為「資料不足」，請直接告訴我：「恢復指數與發炎風險需要 7 天的睡眠紀錄才能計算出來喔！請繼續保持佩戴～」絕對不要把它解讀為 0%、屬於注意範圍或說無資料。
 
@@ -478,14 +479,13 @@ let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
 // 步驟 A：先清除 AI 可能自己產生的警告（以防它偶爾又乖乖聽話，導致出現兩次警告）
 finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
 
-// 步驟 B：如果系統有產生警告，啟動最後防線與強制合併 💯
+// 【修改後】步驟 B：啟動最後防線
 if (dataStatusNotice) {
-    // 1. 先強制把內文中不該出現的「相對時間詞」洗掉，替換成精確日期
+    // 分開處理：睡眠相關詞換成「入睡日」，起床/恢復詞換成「隔天起床日」
     finalResultText = finalResultText
-        .replace(/昨晚|昨天|昨夜|前天|前一晚/g, `${latestRecordDate} 晚上`)
-        .replace(/今天|今早|今晚/g, `${latestRecordEnd} 早上`);
+        .replace(/(昨晚|昨天晚上|前天晚上|昨夜)/g, `${latestRecordDate} 晚上`)
+        .replace(/(今天早上|今早|今天起床|前天起床)/g, `${latestRecordEnd} 早上`);
         
-    // 2. 再把系統強制警告加在回覆的最前面
     finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
 }
 
