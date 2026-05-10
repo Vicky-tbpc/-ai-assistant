@@ -1,4 +1,4 @@
-// anything_llm_api_20
+// anything_llm_api_21
 import { waitUntil } from '@vercel/functions'; // 【新增】引入 Vercel 的背景執行工具
 
 export default async function handler(req, res) {
@@ -100,6 +100,18 @@ if (weekdayDate) {
   const lastDay = new Date(year, month, 0);      
   queryStartDate = fmt(firstDay);
   queryEndDate = fmt(lastDay);
+} else if (prompt.includes("大前天")) {
+  // 【新增】大前天的邏輯
+  const ddby = new Date(today);
+  ddby.setDate(today.getDate() - 3);
+  targetDate = fmt(ddby);
+  analysisMode = "single";
+} else if (prompt.includes("前天")) {
+  // 【新增】前天的邏輯
+  const dby = new Date(today);
+  dby.setDate(today.getDate() - 2);
+  targetDate = fmt(dby);
+  analysisMode = "single";
 } else if (prompt.includes("昨天") || prompt.includes("昨晚")) {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -266,6 +278,15 @@ const nearest = dataList[0];
         const tst = raw.TST_min || 0;
         const trt = raw.TRT_min || 0;
 
+        // 【新增/修改】抓取分鐘數據並換算時分格式
+        const n3Min = raw.N3_min || 0;
+        const n1n2Min = raw.N1N2_min || 0;
+        const remMin = raw.REM_min || 0;
+        
+        const n3Time = `${Math.floor(n3Min / 60)}時${n3Min % 60}分`;
+        const n1n2Time = `${Math.floor(n1n2Min / 60)}時${n1n2Min % 60}分`;
+        const remTime = `${Math.floor(remMin / 60)}時${remMin % 60}分`;
+
         // 【修改這裡】精準判斷恢復指數與發炎風險是否缺乏
         const battery = raw.Personal_Battery_weighted_round;
         const light = raw.light_status;
@@ -281,7 +302,7 @@ const nearest = dataList[0];
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
-- 睡眠結構: 深睡 (N3) ${raw.N3_pct || 0}%, 淺睡 (N1、N2) ${raw.N1N2_pct || 0}%, 快速動眼 (REM) ${raw.REM_pct || 0}%, 醒來及清醒期 (Wake) ${raw.wake_minutes || 0}分
+- 睡眠結構: 深睡期 (N3) ${raw.N3_pct || 0}% (${n3Time}), 淺睡期 (N1、N2) ${raw.N1N2_pct || 0}% (${n1n2Time}), 快速動眼期 (REM) ${raw.REM_pct || 0}% (${remTime}), 醒來及清醒期 (Wake) ${raw.wake_minutes || 0}分
 - 睡眠血氧飽和度: 平均 ${raw.SpO2_mean || 0}% / 最高 ${raw.SpO2_max || 0}% / 最低 ${raw.SpO2_min || 0}%
 - 睡眠低血氧時間比例: T90 ${raw.T90_pct || 0}%, T89 ${raw.T89_pct || 0}%, T88 ${raw.T88_pct || 0}%
 - 低氧負擔指數: HBI低氧負擔指數 ${raw.HBI || 0}%min/h
@@ -334,6 +355,15 @@ const cleanedHistory = history.map(h => {
     text = text.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "");
     return `${h.role === "model" ? "助手" : "我"}: ${text.trim()}`;
 }).slice(-3).join('\n');
+
+// --- 【新增】將警告直接綁定在最後的 prompt，防止模型幻覺 ---
+const finalPrompt = dataStatusNotice 
+  ? `${prompt}\n\n(🤖 系統強制指令：因為找不到 ${targetDate} 的資料，你【必須】遵守以下規則：
+1. 開頭先說明「找不到 ${targetDate} 的資料，改為分析最近一筆 ${latestRecordDate} 的數據」。
+2. 全文【絕對嚴禁】使用昨晚、昨天、今天、前一晚等相對時間詞。
+3. 提到睡眠時一律稱呼「${latestRecordDate} 的睡眠」。
+4. 提到恢復、發炎或起床狀態時，一律稱呼「${latestRecordEnd} 的起床恢復」。)`
+  : prompt;
 
     // --- 5. 組合最終 Prompt ---
     const combinedMessage = `
@@ -421,7 +451,7 @@ ${healthContext}
 ${cleanedHistory}
 
 【我的問題】
-${prompt}
+${finalPrompt}
 `.trim();
 
     // --- 6. 呼叫 AnythingLLM API ---
@@ -448,8 +478,14 @@ let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
 // 步驟 A：先清除 AI 可能自己產生的警告（以防它偶爾又乖乖聽話，導致出現兩次警告）
 finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
 
-// 步驟 B：如果系統有產生警告，直接用程式碼強制加在最前面！💯
+// 步驟 B：如果系統有產生警告，啟動最後防線與強制合併 💯
 if (dataStatusNotice) {
+    // 1. 先強制把內文中不該出現的「相對時間詞」洗掉，替換成精確日期
+    finalResultText = finalResultText
+        .replace(/昨晚|昨天|昨夜|前天|前一晚/g, `${latestRecordDate} 晚上`)
+        .replace(/今天|今早|今晚/g, `${latestRecordEnd} 早上`);
+        
+    // 2. 再把系統強制警告加在回覆的最前面
     finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
 }
 
