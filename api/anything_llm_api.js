@@ -359,11 +359,7 @@ const cleanedHistory = history.map(h => {
 
 // --- 【新增】將警告直接綁定在最後的 prompt，防止模型幻覺 ---
 const finalPrompt = dataStatusNotice 
-  ? `${prompt}\n\n(🤖 系統強制指令：因為找不到 ${targetDate} 的資料，你【必須】遵守以下規則：
-1. 開頭先說明「找不到 ${targetDate} 的資料，改為分析最近一筆 ${latestRecordDate} 的數據」。
-2. 全文【絕對嚴禁】使用昨晚、昨天、今天、前一晚等相對時間詞。
-3. 提到睡眠時一律稱呼「${latestRecordDate} 的睡眠」。
-4. 提到恢復、發炎或起床狀態時，一律稱呼「隔天 ${latestRecordEnd} 的起床恢復」。)`
+  ? `${prompt}\n\n(🤖 系統標記：資料庫中找不到 ${targetDate} 的資料，請直接分析 ${latestRecordDate} 這一筆現有數據，並在回覆中明確提到數據日期是 ${latestRecordDate} 即可。)`
   : prompt;
 
     // --- 5. 組合最終 Prompt ---
@@ -492,9 +488,9 @@ const data = await response.json();
 let finalResultText = data.textResponse || "AI 目前沒有回傳內容。";
 
 // --- 步驟 A：清除 AI 可能自己產生的警告 ---
-finalResultText = finalResultText.replace(/⚠️ 你查詢的.*?[。！]\n*/g, "").trim();
+finalResultText = finalResultText.replace(/(找不到|目前找不到).*?(的資料|數據).*?(改為分析|改為提供).*?[。！]\n*/g, "");
 
-// --- 步驟 B：啟動「生理因果」日期精準校正防線 💯 ---
+// --- 步驟 B：啟動「生理因果」日期精準校正防線 ---
 if (dataStatusNotice || analysisMode === "single") {
     const sleepDate = latestRecordDate; // 5/10 (入睡)
     const wakeDate = latestRecordEnd;   // 5/11 (起床/恢復)
@@ -525,7 +521,10 @@ if (dataStatusNotice || analysisMode === "single") {
 
     // 最後補上補償警告
     if (dataStatusNotice) {
-        finalResultText = `${dataStatusNotice}\n\n${finalResultText}`;
+        // 先檢查內容是否已經包含了警告字眼（防呆），如果沒有才加上去
+        if (!finalResultText.includes(dataStatusNotice)) {
+            finalResultText = `${dataStatusNotice}\n\n${finalResultText.trim()}`;
+        }
     }
 }
 
