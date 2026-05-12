@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     let response = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: prompt, mode: "chat", tools }) // 注意：AnythingLLM 需開啟 Tool 支援
+      body: JSON.stringify({ message: prompt, mode: "query", tools }) // 注意：AnythingLLM 需開啟 Tool 支援
     });
     
     let result = await response.json();
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
       const finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "請根據以上數據回答使用者", mode: "chat" })
+        body: JSON.stringify({ message: "請根據以上數據回答使用者", mode: "query" })
       });
       
       const finalData = await finalRes.json();
