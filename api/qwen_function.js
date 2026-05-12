@@ -49,11 +49,15 @@ export default async function handler(req, res) {
 
     // --- 第一步：詢問 AI 意圖 ---
     let response = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: prompt, mode: "query", tools }) // 注意：AnythingLLM 需開啟 Tool 支援
-    });
-    
+  method: "POST",
+  headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ 
+    message: prompt, 
+    mode: "agent", // 強制進入推理模式
+    tools 
+  })
+});
+
     let result = await response.json();
 
     // 【這裡加上第一個 Log】 看看 AI 有沒有說他要呼叫工具 (toolCalls)
@@ -80,10 +84,13 @@ export default async function handler(req, res) {
       messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(healthData) });
 
       const finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "請根據以上數據回答使用者", mode: "query" })
-      });
+  method: "POST",
+  headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ 
+    message: "請根據以上工具回傳的數據回答使用者，不要引用知識庫中的舊範例。", 
+    mode: "chat" // 回到純聊天模式解釋數據
+  })
+});
       
       const finalData = await finalRes.json();
       result.textResponse = finalData.textResponse;
