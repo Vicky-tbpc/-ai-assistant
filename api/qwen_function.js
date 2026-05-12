@@ -53,7 +53,7 @@ export default async function handler(req, res) {
   headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
   body: JSON.stringify({ 
     message: prompt, 
-    mode: "query", // 強制進入推理模式
+    mode: "agent", // 強制進入推理模式
     tools 
   })
 });
