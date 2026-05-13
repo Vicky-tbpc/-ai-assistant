@@ -11,8 +11,6 @@ export default async function handler(req, res) {
 
   try {
     const { prompt, serial_number, history = [], local_date } = req.body;
-    // 取得今天是星期幾，幫助 AI 準確計算「上週」
-    const dayOfWeek = new Date(local_date).toLocaleDateString('zh-TW', { weekday: 'long' });
 
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
@@ -60,14 +58,14 @@ export default async function handler(req, res) {
     } catch (e) { console.log("意圖解析失敗"); }
 
     // ==========================================
-    // 第二階段：抓取並「格式化」數據 - 整合你的格式化邏輯
+    // 第二階段：抓取並「格式化」數據
     // ==========================================
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
       const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
       
-     const dataRes = await fetch(healthApiUrl);
+      const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
         const finalContextData = await dataRes.json();
         
@@ -118,8 +116,7 @@ export default async function handler(req, res) {
 - 心率變異度: SDNN ${raw.SDNN || 0}ms, rMSSD ${raw.rMSSD || 0}ms, LF ${raw.LF_ms2 || 0}ms2, HF ${raw.HF_ms2 || 0}ms2, LF/HF ${raw.LF_HF || 0}, pNN50 ${raw.pNN50_pct || 0}%`;
           }).join('\n---\n');
           
-// 如果天數太多（超過 7 天），加上統計摘要避免 AI 幻覺
-if (finalContextData.length > 7) {
+          if (finalContextData.length > 7) {
   // 1. 定義你想統計的欄位名稱 (必須與 raw_json 的 key 完全一致)
   const fieldsToAvg = [
     { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%' },
@@ -145,23 +142,20 @@ if (finalContextData.length > 7) {
     { key: 'pNN50_pct', label: '平均pNN50', unit: '%' }
   ];
 
-  // 2. 用迴圈自動算出所有平均值並組成文字
-  const summaryLines = fieldsToAvg.map(field => {
-    // 這裡使用 cur.raw_json?.[field.key] 確保對應到原始數據
-    const sum = finalContextData.reduce((acc, cur) => acc + (Number(cur.raw_json?.[field.key]) || 0), 0);
-    const avg = (sum / finalContextData.length).toFixed(1);
-    return `- ${field.label}：${avg}${field.unit || ''}`;
-  });
+            const summaryLines = fieldsToAvg.map(field => {
+              const sum = finalContextData.reduce((acc, cur) => acc + (Number(cur.raw_json?.[field.key]) || 0), 0);
+              const avg = (sum / finalContextData.length).toFixed(1);
+              return `- ${field.label}：${avg}${field.unit || ''}`;
+            });
 
-  // 3. 組合進 healthContext
-  healthContext = `【多日統計摘要 (共 ${finalContextData.length} 天)】\n${summaryLines.join('\n')}\n` + healthContext;
-}
+            healthContext = `【多日統計摘要 (共 ${finalContextData.length} 天)】\n${summaryLines.join('\n')}\n` + healthContext;
+          }
         }
       }
     }
 
     // ==========================================
-    // 第三階段：最終回答 - 增加「防幻覺」解讀規則
+    // 第三階段：最終回答
     // ==========================================
     const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 【生理數據解讀規則】
@@ -171,7 +165,7 @@ if (finalContextData.length > 7) {
 3. 【星期推算】：描述趨勢時，請嚴格依照數據紀錄中標註的星期幾（如：週一、週二）來回答，絕對不可以自行瞎猜星期！
 4. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
 5. 知識庫僅用於醫學常識查詢。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者的現況。
-請用平輩口吻回答，多用 emoji 喔！`;
+請用平輩口吻回答，多用 emoji！`;
 
     const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
     const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
@@ -185,7 +179,6 @@ if (finalContextData.length > 7) {
     let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
-    // 背景存檔
     const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
@@ -196,6 +189,7 @@ if (finalContextData.length > 7) {
     return res.status(200).json({ text: aiText });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ text: "大腦卡住了，再試試？ 😅" });
   }
 }
