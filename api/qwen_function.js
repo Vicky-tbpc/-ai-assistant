@@ -15,14 +15,15 @@ export default async function handler(req, res) {
     const dayOfWeek = new Date(local_date).toLocaleDateString('zh-TW', { weekday: 'long' });
 
     // ==========================================
-    // 第一階段：極速意圖判斷 (Router) - 解決日期計算錯誤
+    // 第一階段：極速意圖判斷 (Router) 
     // ==========================================
-    // 【新增】：用 JS 精準算出今天、昨天、過去七天的日期
     const parseDate = (dateStr) => {
       const [y, m, d] = dateStr.split('-');
       return new Date(y, m - 1, d);
     };
+
     const todayObj = parseDate(local_date);
+    // 修正點 1：只在這裡宣告一次 dayOfWeek
     const dayOfWeek = todayObj.toLocaleDateString('zh-TW', { weekday: 'long' });
 
     const getOffsetDate = (offset) => {
@@ -66,31 +67,25 @@ export default async function handler(req, res) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
       const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
       
-      const dataRes = await fetch(healthApiUrl);
+     const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
         const finalContextData = await dataRes.json();
         
-        // --- 整合你提供的格式化 Context 語法 ---
         if (finalContextData.length > 0) {
           healthContext = finalContextData.map(item => {
-  const raw = item.raw_json || {};
-  
-  // 1. 計算「入睡日期」的星期
-  const itemDateObj = parseDate(item.record_date);
-  const itemWeekday = itemDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
+            const raw = item.raw_json || {}; // 修正點 2：raw 只宣告一次
+            
+            const itemDateObj = parseDate(item.record_date);
+            const itemWeekday = itemDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
 
-  // 2. 新增：計算「起床日期」的星期 (避免跨日造成的混淆)
-  let endWeekday = "";
-  if (raw.record_end && raw.record_end !== "無") {
-    // 假設 record_end 格式也是 YYYY-MM-DD
-    const endDateObj = parseDate(raw.record_end.split(' ')[0]); // 如果有時間就切掉只留日期
-    endWeekday = `(${endDateObj.toLocaleDateString('zh-TW', { weekday: 'short' })})`;
-  }
+            let endWeekday = "";
+            if (raw.record_end && raw.record_end !== "無") {
+              const endDateObj = parseDate(raw.record_end.split(' ')[0]);
+              endWeekday = `(${endDateObj.toLocaleDateString('zh-TW', { weekday: 'short' })})`;
+            }
 
-            const raw = item.raw_json || {};
             const tst = raw.TST_min || 0;
             const trt = raw.TRT_min || 0;
-
             const n3Min = raw.N3_min || 0;
             const n1n2Min = raw.N1N2_min || 0;
             const remMin = raw.REM_min || 0;
