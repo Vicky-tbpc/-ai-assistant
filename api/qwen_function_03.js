@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { prompt, serial_number, history = [], local_date } = req.body;
+    const { prompt, serial_number, history = [], local_date, local_time } = req.body;
 
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
@@ -179,22 +179,25 @@ export default async function handler(req, res) {
     let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
-            const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
+    const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
-      headers: { 
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 
-        'Content-Type': 'application/json' 
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
       },
-      body: JSON.stringify({ 
-        serial_number, 
-        user_query: prompt, 
-        ai_response: aiText, 
-        record_date: local_date, 
-        record_time: local_date, // 暫時改用 local_date，或在上面補宣告 local_time
-        ai_model: "LLM-Qwen-function" 
+      body: JSON.stringify({
+        serial_number: serial_number,
+        user_query: prompt,
+        ai_response: aiText,
+        record_date: local_date,
+        record_time: local_time,
+        ai_model: 'LLM-Qwen-function'
       })
-    });
+    }).catch(e => console.error("背景存檔錯誤:", e));
+
+    // 2. 關鍵：告訴 Vercel 必須等這個任務跑完才能關掉伺服器環境
     waitUntil(logTask);
 
     return res.status(200).json({ text: aiText });
@@ -203,4 +206,4 @@ export default async function handler(req, res) {
     console.error(error);
     res.status(500).json({ text: "大腦卡住了，再試試？ 😅" });
   }
-} // 確保這是最後一個括號，刪除它之後的所有內容
+}
