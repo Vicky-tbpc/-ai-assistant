@@ -179,7 +179,7 @@ export default async function handler(req, res) {
     let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
-        const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
+            const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: { 
         'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 
@@ -191,8 +191,8 @@ export default async function handler(req, res) {
         user_query: prompt, 
         ai_response: aiText, 
         record_date: local_date, 
-        record_time: local_time, 
-        ai_model: "LLM-Qwen-function" // 這裡要加引號！
+        record_time: local_date, // 暫時改用 local_date，或在上面補宣告 local_time
+        ai_model: "LLM-Qwen-function" 
       })
     });
     waitUntil(logTask);
@@ -203,4 +203,4 @@ export default async function handler(req, res) {
     console.error(error);
     res.status(500).json({ text: "大腦卡住了，再試試？ 😅" });
   }
-}
+} // 確保這是最後一個括號，刪除它之後的所有內容
