@@ -1,4 +1,4 @@
-// qwen_function_03.js
+// qwen_function_02.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -176,65 +176,17 @@ export default async function handler(req, res) {
       body: JSON.stringify({ message: finalChatPrompt, mode: "chat" })
     });
     
-let finalResult = await finalRes.json();
+    let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
-    // --- 新增：取得目前本地時間 (HH:mm:ss) ---
-    const now = new Date();
-    const localTimeStr = now.toLocaleTimeString('zh-TW', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
-    });
-
-// ==========================================
-    // 【重點修改區】：背景執行存檔 (修正時區與模型名稱)
-    // ==========================================
-
-    // 1. 強制取得台灣時區 (Asia/Taipei) 的日期與時間
-    const now = new Date();
-    
-    // 格式化日期：YYYY-MM-DD
-    const recordDateTW = now.toLocaleDateString('zh-TW', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).replace(/\//g, '-'); 
-
-    // 格式化時間：HH:mm:ss (24小時制)
-    const recordTimeTW = now.toLocaleTimeString('zh-TW', {
-        timeZone: 'Asia/Taipei',
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-
-    // 2. 定義存檔任務
-    const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+    const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
-      headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({
-        serial_number: serial_number,
-        user_query: prompt,
-        ai_response: finalResultText,
-        record_date: recordDateTW,       // 使用修正後的台灣日期
-        record_time: recordTimeTW,       // 使用修正後的台灣時間
-        ai_model: 'LLM-Qwen-function'    // 依照你的要求更新模型名稱
-      })
-    }).catch(e => console.error("背景存檔錯誤:", e));
-
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serial_number, user_query: prompt, ai_response: aiText, record_date: local_date })
+    });
     waitUntil(logTask);
 
-    return res.status(200).json({ text: finalResultText });
-
+    return res.status(200).json({ text: aiText });
 
   } catch (error) {
     console.error(error);
