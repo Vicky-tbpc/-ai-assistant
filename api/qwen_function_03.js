@@ -179,10 +179,21 @@ export default async function handler(req, res) {
     let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
-    const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
+        const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
-      headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serial_number, user_query: prompt, ai_response: aiText, record_date: local_date, record_time: local_time, ai_model: LLM-Qwen-function })
+      headers: { 
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ 
+        serial_number, 
+        user_query: prompt, 
+        ai_response: aiText, 
+        record_date: local_date, 
+        record_time: local_time, 
+        ai_model: "LLM-Qwen-function" // 這裡要加引號！
+      })
     });
     waitUntil(logTask);
 
