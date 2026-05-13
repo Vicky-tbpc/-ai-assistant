@@ -188,28 +188,53 @@ let finalResult = await finalRes.json();
       second: '2-digit' 
     });
 
-    // --- 修改：新增 record_time 和 ai_model 欄位 ---
-    const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
-      method: 'POST',
-      headers: { 
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 
-        'Content-Type': 'application/json' 
-      },
-      body: JSON.stringify({ 
-        serial_number, 
-        user_query: prompt, 
-        ai_response: aiText, 
-        record_date: local_date,       // 使用傳入的日期
-        record_time: localTimeStr,    // 新增：目前的本地時間
-        ai_model: "LLM-Qwen-function"  // 新增：指定模型名稱
-      })
-    });
+// ==========================================
+    // 【重點修改區】：背景執行存檔 (修正時區與模型名稱)
+    // ==========================================
+
+    // 1. 強制取得台灣時區 (Asia/Taipei) 的日期與時間
+    const now = new Date();
     
+    // 格式化日期：YYYY-MM-DD
+    const recordDateTW = now.toLocaleDateString('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).replace(/\//g, '-'); 
+
+    // 格式化時間：HH:mm:ss (24小時制)
+    const recordTimeTW = now.toLocaleTimeString('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    // 2. 定義存檔任務
+    const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        serial_number: serial_number,
+        user_query: prompt,
+        ai_response: finalResultText,
+        record_date: recordDateTW,       // 使用修正後的台灣日期
+        record_time: recordTimeTW,       // 使用修正後的台灣時間
+        ai_model: 'LLM-Qwen-function'    // 依照你的要求更新模型名稱
+      })
+    }).catch(e => console.error("背景存檔錯誤:", e));
+
     waitUntil(logTask);
 
+    return res.status(200).json({ text: finalResultText });
 
-    return res.status(200).json({ text: aiText });
 
   } catch (error) {
     console.error(error);
