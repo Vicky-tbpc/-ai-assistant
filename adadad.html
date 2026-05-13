@@ -298,19 +298,23 @@
 // 匯出對話紀錄功能
 function exportChatLogs() {
     const btn = document.getElementById('exportBtn');
-    const originalText = btn.innerText;
+    const dateInput = document.getElementById('export-date-picker');
+    const selectedDate = dateInput.value; // 取得 yyyy-mm-dd 格式
 
-    // 變更按鈕狀態，增加使用者體驗
-    btn.innerText = '⌛ 正在準備檔案...';
+    if (!selectedDate) {
+        alert("請先選擇要匯出的日期");
+        return;
+    }
+
+    const originalText = btn.innerText;
+    btn.innerText = '⌛ 正在準備 ' + selectedDate + ' 檔案...';
     btn.style.opacity = '0.7';
     btn.disabled = true;
 
     try {
-        // 直接導向 API 路徑，瀏覽器會偵測到 Content-Disposition 並自動下載
-        // 因為你的 HTML 與 API 在同一個專案（同網域），建議用相對路徑
-        window.location.href = '/api/export-logs';
+        // 將日期作為 Query String 傳給 API
+        window.location.href = `/api/export-logs?date=${selectedDate}`;
 
-        // 設定一個延遲，讓按鈕在幾秒後恢復（因為跳轉下載不會重新整理頁面）
         setTimeout(() => {
             btn.innerText = originalText;
             btn.style.opacity = '1';
@@ -324,6 +328,13 @@ function exportChatLogs() {
         btn.disabled = false;
     }
 }
+
+// 頁面載入時自動設定日期為今天 (可選)
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date().toISOString().split('T')[0];
+    const picker = document.getElementById('export-date-picker');
+    if(picker) picker.value = today;
+});
 
  </script>
 </body>
