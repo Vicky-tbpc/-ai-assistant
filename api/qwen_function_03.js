@@ -182,7 +182,7 @@ export default async function handler(req, res) {
     const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serial_number, user_query: prompt, ai_response: aiText, record_date: local_date, record_time: local_date, ai_model: LLM-Qwen-function })
+      body: JSON.stringify({ serial_number, user_query: prompt, ai_response: aiText, record_date: local_date, record_time: local_time, ai_model: LLM-Qwen-function })
     });
     waitUntil(logTask);
 
