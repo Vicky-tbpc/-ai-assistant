@@ -1,4 +1,4 @@
-// qwen_function_01.js (重構版)
+// qwen_function_02.js (修正版)
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -12,102 +12,103 @@ export default async function handler(req, res) {
   try {
     const { prompt, serial_number, history = [], local_date } = req.body;
 
-    // 1. 定義工具描述 (讓 AI 知道什麼時候該查資料)
-    const tools = [
-      {
-        type: "function",
-        function: {
-          name: "get_user_health_data",
-          description: "獲取特定日期或區間的健康數據（包含睡眠、血氧、恢復指數、發炎風險）",
-          parameters: {
-            type: "object",
-            properties: {
-              start: { type: "string", description: "開始日期 (YYYY-MM-DD)" },
-              end: { type: "string", description: "結束日期 (YYYY-MM-DD)" },
-            },
-            required: ["start", "end"]
-          }
-        }
+    // ==========================================
+    // 第一階段：極速意圖判斷 (Router)
+    // ==========================================
+    const routerPrompt = `今天是 ${local_date}。
+請判斷使用者的問題：「${prompt}」是否需要查詢個人的生理健康數據？
+如果需要，請推算需要查詢的開始與結束日期。
+請「務必只」輸出以下 JSON 格式，不要有任何其他文字：
+{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`;
+
+    let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ message: routerPrompt, mode: "chat" })
+    });
+
+    let intentData = await intentRes.json();
+    let intent = { need_data: false }; // 預設值
+
+    try {
+      // 增加防呆，確保能抓到 JSON
+      const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
+      if (jsonMatch) {
+        intent = JSON.parse(jsonMatch[0]);
       }
-    ];
-
-    // 2. 初始對話請求
-    let messages = [
-      { role: "system", 
-  content: `你是一個友好而且熱情體貼的 AI 健康夥伴。今天是 ${local_date}。
-
-    【重要規則：數據來源分工】
-  1. 查詢「使用者今日/昨日/特定日期」的生理數值時，你【必須】先執行 get_user_health_data 工具。
-  2. 嚴禁從知識庫 (Sources) 的 PDF 文件中提取任何「百分比(%)」或「數值」作為使用者的現況數據。知識庫裡的數據全是過時的範例！
-  3. 知識庫僅限用於查詢「醫學標準（例如：睡眠效率多少算及格）」或「名詞定義」。
-  
-  如果你沒執行工具就回答數值，你會犯錯。現在，請先檢查是否有需要查閱的日期。
-    回覆時像平輩朋友一樣，使用「你」，多用 emoji。` },
-      ...history,
-      { role: "user", content: prompt }
-    ];
-
-    // --- 第一步：詢問 AI 意圖 ---
-    let response = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
-  method: "POST",
-  headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-  body: JSON.stringify({ 
-    message: prompt, 
-    mode: "chat", // 強制進入推理模式
-    tools 
-  })
-});
-
-    let result = await response.json();
-
-    // 【這裡加上第一個 Log】 看看 AI 有沒有說他要呼叫工具 (toolCalls)
-    console.log("AI 請求結果:", JSON.stringify(result, null, 2));
-    
-    // --- 第二步：判斷是否需要 Function Call ---
-    // 註：不同 LLM 服務回傳 Function Call 的格式略有不同，以下為標準 OpenAI 格式範例
-    if (result.toolCalls && result.toolCalls.length > 0) {
-      const call = result.toolCalls[0];
-      const { start, end } = JSON.parse(call.function.arguments);
-
-      // 3. 呼叫你的 health.js (地端代理)
-      const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${start}&end=${end}`;
-      
-      const dataRes = await fetch(healthApiUrl);
-      const healthData = await dataRes.json();
-
-      // 【這裡加上第二個 Log】 確認地端 Python 吐出來的資料是不是正確的
-      console.log("地端回傳資料:", JSON.stringify(healthData, null, 2));
-
-      // 4. 將資料餵回給 AI 做最終解釋
-      messages.push({ role: "assistant", tool_calls: result.toolCalls });
-      messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(healthData) });
-
-      const finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
-  method: "POST",
-  headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-  body: JSON.stringify({ 
-    message: "請根據以上工具回傳的數據回答使用者，不要引用知識庫中的舊範例。", 
-    mode: "chat" // 回到純聊天模式解釋數據
-  })
-});
-      
-      const finalData = await finalRes.json();
-      result.textResponse = finalData.textResponse;
+    } catch (e) {
+      console.log("意圖解析失敗，改為普通聊天模式");
     }
 
-    // 5. 背景存檔
+    // ==========================================
+    // 第二階段：抓取數據
+    // ==========================================
+    let healthDataString = "目前沒有查詢到使用者的相關生理數據。";
+    if (intent.need_data && intent.start && intent.end) {
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
+      
+      const dataRes = await fetch(healthApiUrl);
+      if (dataRes.ok) {
+        const healthData = await dataRes.json();
+        healthDataString = JSON.stringify(healthData);
+      }
+    }
+
+    // ==========================================
+    // 第三階段：最終融合回答 (處理 History)
+    // ==========================================
+    
+    const systemPrompt = `你是一個友好而且熱情體貼的 AI 健康夥伴。今天是 ${local_date}。
+【數據使用絕對規範】
+1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
+   === 使用者數據 ===
+   ${healthDataString}
+2. 關於使用者的健康狀態，你「必須完全依賴」上方數據回答。若數據為空，請誠實告知，不要捏造。
+3. 知識庫僅用於查詢醫學標準（如：心率多少算快）。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者！
+回覆時像平輩朋友一樣，多用 emoji 喔！`;
+
+    // 處理歷史對話，確保連貫性
+    // 將 history 轉為文字格式（如果 AnythingLLM 只接受單一 message 字串）
+    const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
+    
+    // 最終組合
+    const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
+
+    let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        message: finalChatPrompt, 
+        mode: "chat" 
+      })
+    });
+    
+    let finalResult = await finalRes.json();
+    const aiText = finalResult.textResponse; // 先存起來
+
+    // 5. 背景存檔 (修正變數名稱錯誤)
     const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
-      headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serial_number, user_query: prompt, ai_response: result.textResponse, record_date: local_date })
+      headers: { 
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal' 
+      },
+      body: JSON.stringify({ 
+        serial_number, 
+        user_query: prompt, 
+        ai_response: aiText, 
+        record_date: local_date 
+      })
     });
     waitUntil(logTask);
 
-    return res.status(200).json({ text: result.textResponse });
+    return res.status(200).json({ text: aiText });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ text: "地端大腦斷線了，再試試看？ 😅" });
+    console.error("Error details:", error);
+    res.status(500).json({ text: "地端大腦稍微打結了，等我一下再試試看？ 😅" });
   }
 }
