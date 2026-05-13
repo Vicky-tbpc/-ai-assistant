@@ -1,4 +1,4 @@
-// qwen_function_02.js
+// qwen_function_03.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -176,15 +176,38 @@ export default async function handler(req, res) {
       body: JSON.stringify({ message: finalChatPrompt, mode: "chat" })
     });
     
-    let finalResult = await finalRes.json();
+let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
+    // --- 新增：取得目前本地時間 (HH:mm:ss) ---
+    const now = new Date();
+    const localTimeStr = now.toLocaleTimeString('zh-TW', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+
+    // --- 修改：新增 record_time 和 ai_model 欄位 ---
     const logTask = fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_logs`, {
       method: 'POST',
-      headers: { 'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serial_number, user_query: prompt, ai_response: aiText, record_date: local_date })
+      headers: { 
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY, 
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ 
+        serial_number, 
+        user_query: prompt, 
+        ai_response: aiText, 
+        record_date: local_date,       // 使用傳入的日期
+        record_time: localTimeStr,    // 新增：目前的本地時間
+        ai_model: "LLM-Qwen-function"  // 新增：指定模型名稱
+      })
     });
+    
     waitUntil(logTask);
+
 
     return res.status(200).json({ text: aiText });
 
