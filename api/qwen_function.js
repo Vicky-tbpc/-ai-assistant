@@ -17,12 +17,32 @@ export default async function handler(req, res) {
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) - 解決日期計算錯誤
     // ==========================================
+    // 【新增】：用 JS 精準算出今天、昨天、過去七天的日期
+    const parseDate = (dateStr) => {
+      const [y, m, d] = dateStr.split('-');
+      return new Date(y, m - 1, d);
+    };
+    const todayObj = parseDate(local_date);
+    const dayOfWeek = todayObj.toLocaleDateString('zh-TW', { weekday: 'long' });
+
+    const getOffsetDate = (offset) => {
+      const d = new Date(todayObj);
+      d.setDate(d.getDate() + offset);
+      const yy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    };
+
+    const yesterdayStr = getOffsetDate(-1);
+    const lastWeekStartStr = getOffsetDate(-7);
+
     const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請判斷使用者的問題：「${prompt}」是否需要查詢生理健康數據？
-【日期定義規範】
-1. 「上週」：指上一個完整的週一至週日。
-2. 「本週/最近一週」：指今天往前推 7 天。
-3. 「上個月」：指上一個自然月的 1 號到最後一號。
+【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
+1. 「今天」：${local_date}
+2. 「昨天」：${yesterdayStr}
+3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
 請「務必只」輸出 JSON：{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`;
 
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
@@ -53,6 +73,20 @@ export default async function handler(req, res) {
         // --- 整合你提供的格式化 Context 語法 ---
         if (finalContextData.length > 0) {
           healthContext = finalContextData.map(item => {
+  const raw = item.raw_json || {};
+  
+  // 1. 計算「入睡日期」的星期
+  const itemDateObj = parseDate(item.record_date);
+  const itemWeekday = itemDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
+
+  // 2. 新增：計算「起床日期」的星期 (避免跨日造成的混淆)
+  let endWeekday = "";
+  if (raw.record_end && raw.record_end !== "無") {
+    // 假設 record_end 格式也是 YYYY-MM-DD
+    const endDateObj = parseDate(raw.record_end.split(' ')[0]); // 如果有時間就切掉只留日期
+    endWeekday = `(${endDateObj.toLocaleDateString('zh-TW', { weekday: 'short' })})`;
+  }
+
             const raw = item.raw_json || {};
             const tst = raw.TST_min || 0;
             const trt = raw.TRT_min || 0;
@@ -72,8 +106,8 @@ export default async function handler(req, res) {
 
             return `
 [數據紀錄]
-- (record_date) 入睡日期: ${item.record_date}
-- (record_end) 起床日期: ${raw.record_end || "無"}
+- (record_date) 入睡日期: ${item.record_date} (${itemWeekday})
+- (record_end) 起床日期: ${raw.record_end || "無"} ${endWeekday}
 - (record_end) 恢復指數: ${batteryDisplay}
 - (record_end) 發炎風險: ${lightDisplay}
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
@@ -139,8 +173,9 @@ if (finalContextData.length > 7) {
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
-3. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
-4. 知識庫僅用於醫學常識查詢。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者的現況。
+3. 【星期推算】：描述趨勢時，請嚴格依照數據紀錄中標註的星期幾（如：週一、週二）來回答，絕對不可以自行瞎猜星期！
+4. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
+5. 知識庫僅用於醫學常識查詢。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者的現況。
 請用平輩口吻回答，多用 emoji 喔！`;
 
     const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
