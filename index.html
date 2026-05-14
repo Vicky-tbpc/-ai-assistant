@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n69</title>
+    <title>Soosyn 健康夥伴 n71</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -346,7 +346,7 @@ let assistantName = "";
     "😊 還有想進一步了解的健康資訊嗎？",
     "關於健康資訊，還有哪部分想了解的呢？😊",
     "✨ 還有其他想了解的指標或建議嗎？我隨時都在喔！",
-    "希望這些資訊對你有幫助！還有想查看其他的健康資訊或健康摘要嗎？🌿"
+    "希望這些資訊對你有幫助！還有想查看其他的健康資訊嗎？🌿"
 ];
 // 隨機抽選函數
 function getRandomEndQuestion() {
@@ -472,7 +472,7 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~幫助我優化你的健康模型。`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
@@ -482,9 +482,7 @@ userNickname = name;      // 存入全域變數
         }
     }
 }
-
-    
-
+ 
 // 1. 日期判斷工具
 function getTargetDate(msg) {
     const today = new Date();
@@ -647,7 +645,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~幫助我優化你的健康模型。`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
@@ -918,8 +916,6 @@ async function fetchSummaryData(targetDate) {
     };
 }
 
-
-
 // --- 確保 showSummaryFlow 也能正確運作 ---
 async function showSummaryFlow(isFirstTime = false) { 
     const todayStr = getLocalDateString();
@@ -935,9 +931,6 @@ async function showSummaryFlow(isFirstTime = false) {
         }
     }
 }
-
-
-
 
 // --- 趨勢圖專用函數庫 ---
 
@@ -1575,49 +1568,175 @@ async function handleStatusSelection(text, score) {
     appendAbnormalityOptions();
 }
     
-
 async function handleAbnormalityInput(msg) { 
-const todayStr = getLocalDateString(); 
+    const todayStr = getLocalDateString(); 
 
-// 如果是從「其他」按鈕進入的，格式化文字為 其他(XXX)
+    // 如果是從「其他」按鈕進入的，格式化文字為 其他(XXX)
     let finalAbnormalityText = msg;
     if (isOtherAbnormality) {
         finalAbnormalityText = `其他(${msg})`;
         isOtherAbnormality = false; // 儲存後重置標記
     }
 
+    await _supabase.from('user_daily_surveys').upsert({ 
+        serial_number: currentSerial, 
+        record_date: todayStr, 
+        subjective_score: tempScore, 
+        physical_abnormality: finalAbnormalityText
+    }); 
 
-await _supabase.from('user_daily_surveys').upsert({ 
-serial_number: currentSerial, 
-record_date: todayStr, 
-subjective_score: tempScore, 
-physical_abnormality: finalAbnormalityText
-}); 
+    localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
 
-localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
+    // --- 🐛 修正重點在這裡 ---
+    // 因為「昨晚」的睡眠數據，在地端 JSON 的日期其實是「昨天」
+    // 所以我們要把今天的日期往前推一天，再拿去要資料
+    const dateObj = new Date(todayStr.replace(/-/g, '/'));
+    dateObj.setDate(dateObj.getDate() - 1);
+    const preDateStr = dateObj.toLocaleDateString('en-CA'); // 變成昨天的格式
 
-// 2. 檢查當天是否有健康摘要數據
-    const data = await fetchSummaryData(todayStr);
-if (data) {
-await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
+    // 2. 用「前一天」的日期去檢查健康摘要數據
+    let allData = [];
+    try {
+        const params = new URLSearchParams({ serial: currentSerial }).toString();
+        const response = await fetch(`/api/health?${params}`);
+        if (response.ok) {
+            allData = await response.json();
+            // 確保資料以日期降冪排序 (最新日期在最前)
+            allData.sort((a, b) => b.record_date.localeCompare(a.record_date));
+        }
+    } catch(e) {
+        console.error("讀取健康資料失敗:", e);
+    }
 
-// 顯示圖卡
-        appendSummaryCard(data);
+    // 檢查昨天 (preDateStr) 的資料，以及 Battery_TST_min_A 是否有值
+    const yesterdayData = allData.find(d => d.record_date === preDateStr);
+    const hasYesterdayBatteryTST = yesterdayData?.raw_json?.Battery_TST_min_A !== undefined && yesterdayData?.raw_json?.Battery_TST_min_A !== null;
 
-// 顯示後續建議與導引
+
+    // ==========================================
+    // 情境 A：當天 -1 的 Battery_TST_min_A 有資料
+    // ==========================================
+    if (hasYesterdayBatteryTST) {
+        const data = await fetchSummaryData(preDateStr);
+        if (data) {
+        await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
+
+        // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
+        appendSummaryCard(todayStr, data);
+
+        // 顯示後續建議與導引
         if (data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
             await appendAiMessage(data.flowSuggestion);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+            }
+            return; // 結束流程
         }
+    }
+    // ==========================================
+    // 情境 B：當天 -1 的 Battery_TST_min_A 沒有資料
+    // ==========================================
+    
+    // 1. 如果資料庫完全沒資料，或是只剩 1 筆(沒有前一天的歷史可以比較)
+    if (allData.length <= 1) {
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        return;
+    }
+
+    const latestData = allData[0]; // 擷取資料庫中最新的那一筆
+    const pastData = allData.slice(1); // 剩下的歷史數據
+    const fields = ['TST_min', 'N3_pct', 'rMSSD', 'HBI', 'HR_min'];
+    let baseline = {};
+
+    // 2. 決定比較基準：有3天歷史就算平均，沒有3天就只抓前一天
+    if (pastData.length >= 3) {
+        const recent3 = pastData.slice(0, 3);
+        fields.forEach(f => {
+            let sum = 0, count = 0;
+            recent3.forEach(d => {
+                if (d.raw_json && d.raw_json[f] !== undefined) {
+                    sum += Number(d.raw_json[f]);
+                    count++;
+                }
+            });
+            // 按照實際有數據的天數來除以取得平均值
+            baseline[f] = count > 0 ? sum / count : null;
+        });
     } else {
-        // 狀況 B：沒數據 (直接顯示您指定的引導文字)
-        await appendAiMessage("收到了！😊 今天想從哪裡開始呢？趨勢圖表、還是健康摘要呢？");
+        // 沒有3天的平均值可以比較，則與前一天比較
+        const prev1 = pastData[0];
+        fields.forEach(f => {
+            baseline[f] = (prev1.raw_json && prev1.raw_json[f] !== undefined) ? Number(prev1.raw_json[f]) : null;
+        });
+    }
+
+    // 3. 找出差異(惡化)最多的指標
+    let maxDeviation = -Infinity;
+    let worstMetric = null;
+    const currentRaw = latestData.raw_json || {};
+
+    fields.forEach(f => {
+        const currentVal = currentRaw[f];
+        const baseVal = baseline[f];
+
+        if (currentVal !== undefined && baseVal !== null && baseVal !== 0) {
+            let deviation = 0;
+            // 將差異轉換為百分比幅度，以便不同單位的指標能公平比較
+            if (f === 'TST_min' || f === 'N3_pct' || f === 'rMSSD') {
+                // 越低越差：(基準值 - 當前值) / 基準值 => 正值越大代表下降越多
+                deviation = (baseVal - currentVal) / Math.abs(baseVal);
+            } else if (f === 'HBI' || f === 'HR_min') {
+                // 越高越差：(當前值 - 基準值) / 基準值 => 正值越大代表上升越多
+                deviation = (currentVal - baseVal) / Math.abs(baseVal);
+            }
+
+            if (deviation > maxDeviation) {
+                maxDeviation = deviation;
+                worstMetric = f;
+            }
+        }
+    });
+
+    // 4. 如果因為缺少數值算不出任何比較結果，直接顯示 fallback
+    if (!worstMetric) {
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        return;
+    }
+
+    // 5. 轉換為 phrase_library 對應的 logic_key 前綴
+    const metricPrefixMap = {
+        'TST_min': 'Battery 總睡眠時間',
+        'N3_pct': 'Battery N3',
+        'rMSSD': 'Battery rMSSD',
+        'HBI': 'Battery HBI',
+        'HR_min': 'Battery 最低脈搏'
+    };
+
+    const prefix = metricPrefixMap[worstMetric];
+    const randomNum = Math.floor(Math.random() * 3) + 1; // 隨機 1、2、3
+    const logicKey = `${prefix}最差${randomNum}`;
+
+    try {
+        // 從 Supabase 抓取隨機 1 句回饋
+        const { data: phraseData } = await _supabase
+            .from('phrase_library')
+            .select('detailed_content')
+            .eq('logic_key', logicKey)
+            .limit(1)
+            .maybeSingle();
+
+        if (phraseData && phraseData.detailed_content) {
+            // 擇 1 項數值結果並結合前綴輸出
+            await appendAiMessage(`收到了！😊 根據你最新的睡眠數據分析，${phraseData.detailed_content}`);
+        } else {
+            await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        }
+    } catch (e) {
+        console.error("讀取 phrase_library 失敗:", e);
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
-
-
 
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
