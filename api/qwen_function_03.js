@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
-// [3] 初始化 intent，預設帶上今天日期
+// [關鍵 1] 初始化 intent，預設帶上今天日期，但不強制開啟 need_data
 let intent = { need_data: false, start: local_date, end: local_date };
 
 // ==========================================
@@ -46,12 +46,11 @@ let intent = { need_data: false, start: local_date, end: local_date };
 const fastKeywords = ["都可以", "你好", "分析", "分析數據", "幫我分析"];
 
 if (is_push || fastKeywords.includes(prompt.trim())) {
-  // 如果是推播點入，或是語意模糊的開頭，直接強制查詢當天數據
   intent.need_data = true;
-  console.log("🚀 觸發快速通道：跳過 AI 判斷直接抓取數據");
+  console.log("🚀 觸發快速通道：強制查詢當天數據");
 } else {
-  // [4] 否則才走原本的 AI Router 判斷邏輯
-const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+  // [關鍵 2] 走 AI Router 判斷邏輯
+  const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 你的任務是判斷是否需要查詢使用者的生理健康數據。
 
 【判斷準則】
@@ -66,6 +65,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
 請「務必只」輸出 JSON：{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`;
 
+try {
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
@@ -73,17 +73,20 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     });
 
     let intentData = await intentRes.json();
-try {
-  const jsonMatch = intentData.textResponse.match(/\{[\s\S]*?\}/); // 更精準的抓取第一個 JSON 區塊
-  if (jsonMatch) {
-    const parsed = JSON.parse(jsonMatch[0]);
-    intent = { ...intent, ...parsed }; // 合併解析結果
+    
+    // [關鍵 3] 解析 AI 回傳的 JSON，並更新外層的 intent 變數
+    const jsonMatch = intentData.textResponse.match(/\{[\s\S]*?\}/); 
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      // 使用擴展運算子合併結果，確保 start/end 被 AI 解析出的日期覆蓋
+      intent = { ...intent, ...parsed }; 
+    }
+  } catch (e) { 
+    console.log("意圖解析失敗，改用預設查詢");
+    intent.need_data = true; 
   }
-} catch (e) { 
-  console.log("意圖解析失敗，改用預設查詢");
-  intent.need_data = true; // 解析失敗時，保險起見設為 true
-}
-}
+} // <--- 確保這個 else 的結束括號位置正確
+
     // ==========================================
     // 第二階段：抓取並「格式化」數據
     // ==========================================
