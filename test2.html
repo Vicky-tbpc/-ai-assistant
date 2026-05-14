@@ -477,7 +477,6 @@ userNickname = name;      // 存入全域變數
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
             await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
-            await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
@@ -928,16 +927,11 @@ async function showSummaryFlow(isFirstTime = false) {
         appendSummaryCard(data);
         // 無論是否為第一次登入，只要有當天數據就顯示隨機建議
         if (data.flowSuggestion) {
-            await new Promise(r => setTimeout(r, 1000));
-            await appendAiMessage(data.flowSuggestion);
-            await new Promise(r => setTimeout(r, 800));
+
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
 }
-
-
-
 
 // --- 趨勢圖專用函數庫 ---
 
@@ -1615,7 +1609,7 @@ async function handleAbnormalityInput(msg) {
             await new Promise(r => setTimeout(r, 1000));
             await appendAiMessage(data.flowSuggestion);
             await new Promise(r => setTimeout(r, 800));
-            
+            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     } else {
         // 狀況 B：沒數據
