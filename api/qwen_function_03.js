@@ -1,4 +1,4 @@
-// qwen_function_03.js
+// qwen_function_04.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const { prompt, serial_number, history = [], local_date, local_time } = req.body;
+   const { prompt, serial_number, history = [], local_date, local_time, is_push = false } = req.body;
 
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
@@ -37,9 +37,29 @@ export default async function handler(req, res) {
 
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
+// [3] 初始化 intent，預設帶上今天日期
+let intent = { need_data: false, start: local_date, end: local_date };
 
-    const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
-請判斷使用者的問題：「${prompt}」是否需要查詢生理健康數據？
+// ==========================================
+// 最佳化邏輯：優先判斷「快速通道」
+// ==========================================
+const fastKeywords = ["都可以", "你好", "分析", "分析數據", "幫我分析"];
+
+if (is_push || fastKeywords.includes(prompt.trim())) {
+  // 如果是推播點入，或是語意模糊的開頭，直接強制查詢當天數據
+  intent.need_data = true;
+  console.log("🚀 觸發快速通道：跳過 AI 判斷直接抓取數據");
+} else {
+  // [4] 否則才走原本的 AI Router 判斷邏輯
+const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+你的任務是判斷是否需要查詢使用者的生理健康數據。
+
+【判斷準則】
+1. 若使用者詢問具體數值（如：脈搏、睡眠、恢復指數）。
+2. 若使用者語意模糊（如：都可以、你好、今天狀況如何、分析一下）。
+3. 若使用者提到「昨天」、「前天」或「上週」。
+-> 以上情況皆請設定 "need_data": true。
+
 【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
 1. 「今天」：${local_date}
 2. 「昨天」：${yesterdayStr}
@@ -53,19 +73,29 @@ export default async function handler(req, res) {
     });
 
     let intentData = await intentRes.json();
-    let intent = { need_data: false };
-    try {
-      const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
-      if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
-    } catch (e) { console.log("意圖解析失敗"); }
+try {
+  const jsonMatch = intentData.textResponse.match(/\{[\s\S]*?\}/); // 更精準的抓取第一個 JSON 區塊
+  if (jsonMatch) {
+    const parsed = JSON.parse(jsonMatch[0]);
+    intent = { ...intent, ...parsed }; // 合併解析結果
+  }
+} catch (e) { 
+  console.log("意圖解析失敗，改用預設查詢");
+  intent.need_data = true; // 解析失敗時，保險起見設為 true
+}
 
     // ==========================================
     // 第二階段：抓取並「格式化」數據
     // ==========================================
-    let healthContext = "目前沒有相關數據。";
-    if (intent.need_data && intent.start && intent.end) {
-      const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
+   let healthContext = "目前沒有相關數據。";
+if (intent.need_data && intent.start && intent.end) {
+  const protocol = req.headers['x-forwarded-proto'] || 'http'; //
+  const host = req.headers['host']; //
+  
+  // 加上 _t 參數後的完整 URL
+  const healthApiUrl = `${protocol}://${host}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}&_t=${Date.now()}`;
+  
+  console.log("正在請求最新數據:", healthApiUrl); // 偵錯用，可以看到時間戳記
       
       const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
