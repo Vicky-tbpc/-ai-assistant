@@ -346,7 +346,7 @@ let assistantName = "";
     "😊 還有想進一步了解的健康資訊嗎？",
     "關於健康資訊，還有哪部分想了解的呢？😊",
     "✨ 還有其他想了解的指標或建議嗎？我隨時都在喔！",
-    "希望這些資訊對你有幫助！還有想查看其他的健康資訊或健康摘要嗎？🌿"
+    "希望這些資訊對你有幫助！還有想查看其他的健康資訊嗎？🌿"
 ];
 // 隨機抽選函數
 function getRandomEndQuestion() {
@@ -1595,12 +1595,33 @@ async function handleAbnormalityInput(msg) {
     const preDateStr = dateObj.toLocaleDateString('en-CA'); // 變成昨天的格式
 
     // 2. 用「前一天」的日期去檢查健康摘要數據
-    const data = await fetchSummaryData(preDateStr);
-    
-    // --- 這裡修改判斷方式：檢查 5 項 Battery 指標是否齊全 ---
-    if (isValidBatteryData(data)) {
-        // 狀況 A：5 項指標都有，顯示摘要卡片
+    let allData = [];
+    try {
+        const params = new URLSearchParams({ serial: currentSerial }).toString();
+        const response = await fetch(`/api/health?${params}`);
+        if (response.ok) {
+            allData = await response.json();
+            // 確保資料以日期降冪排序 (最新日期在最前)
+            allData.sort((a, b) => b.record_date.localeCompare(a.record_date));
+        }
+    } catch(e) {
+        console.error("讀取健康資料失敗:", e);
+    }
+
+    // 檢查昨天 (preDateStr) 的資料，以及 Battery_TST_min_A 是否有值
+    const yesterdayData = allData.find(d => d.record_date === preDateStr);
+    const hasYesterdayBatteryTST = yesterdayData?.raw_json?.Battery_TST_min_A !== undefined && yesterdayData?.raw_json?.Battery_TST_min_A !== null;
+
+
+    // ==========================================
+    // 情境 A：當天 -1 的 Battery_TST_min_A 有資料
+    // ==========================================
+    if (hasYesterdayBatteryTST) {
+        const data = await fetchSummaryData(preDateStr);
+        if (data) {
         await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
+
+        // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
         appendSummaryCard(todayStr, data);
 
         // 顯示後續建議與導引
@@ -1609,128 +1630,111 @@ async function handleAbnormalityInput(msg) {
             await appendAiMessage(data.flowSuggestion);
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+            }
+            return; // 結束流程
         }
-    } else {
-        // 狀況 B：資料不全或沒有資料，進入「一句建議」生成邏輯
-        await generateNoDataAdvice(preDateStr);
     }
-}
-/**
- * 新增：檢查物件中是否包含這 5 個必要的 Battery 指標
- */
-function isValidBatteryData(data) {
-    if (!data) return false;
+    // ==========================================
+    // 情境 B：當天 -1 的 Battery_TST_min_A 沒有資料
+    // ==========================================
     
-    const requiredKeys = [
-        'Battery_TST_min_A',
-        'Battery_N3_pct_A',
-        'Battery_rMSSD_A',
-        'Battery_HBI_A',
-        'Battery_HR_min_A'
-    ];
-
-    // 檢查每一個 Key 是否都存在且不是 null/undefined
-    return requiredKeys.every(key => data[key] !== undefined && data[key] !== null);
-}
-// === 新增：沒數據時，往前尋找歷史紀錄並比對的專屬函式 ===
-async function generateNoDataAdvice(startQueryDateStr) {
-    let historicalRecords = [];
-    let currDateObj = new Date(startQueryDateStr.replace(/-/g, '/'));
-    let attempts = 0;
-
-    // 往前撈資料，最多找 4 筆 (最新 1 筆 + 過去最多 3 筆基準)
-    // 設定最多嘗試 14 次避免無窮迴圈
-    while (historicalRecords.length < 4 && attempts < 14) {
-        const dStr = currDateObj.toLocaleDateString('en-CA');
-        const record = await fetchSummaryData(dStr); 
-        
-        if (record) {
-            historicalRecords.push(record);
-        }
-        currDateObj.setDate(currDateObj.getDate() - 1);
-        attempts++;
-    }
-
-    const fallbackMsg = "收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。 ☁️\n現在想從哪個部分開始了解呢？";
-
-    // 如果連可以比較的「前一天」資料都沒有 (總共少於 2 筆) -> 執行第5點規則
-    if (historicalRecords.length < 2) {
-        await appendAiMessage(fallbackMsg);
+    // 1. 如果資料庫完全沒資料，或是只剩 1 筆(沒有前一天的歷史可以比較)
+    if (allData.length <= 1) {
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
         return;
     }
 
-    const latestRecord = historicalRecords[0];       // 最新的那一筆
-    const baselineRecords = historicalRecords.slice(1); // 剩下的 1 到 3 筆作為比較基準
+    const latestData = allData[0]; // 擷取資料庫中最新的那一筆
+    const pastData = allData.slice(1); // 剩下的歷史數據
+    const fields = ['TST_min', 'N3_pct', 'rMSSD', 'HBI', 'HR_min'];
+    let baseline = {};
 
-    // 根據實際有的天數 (1, 2 或 3 天) 來計算平均
-    const baselineCount = baselineRecords.length;
-    let sumTST = 0, sumN3 = 0, sumRMSSD = 0, sumHBI = 0, sumHR = 0;
+    // 2. 決定比較基準：有3天歷史就算平均，沒有3天就只抓前一天
+    if (pastData.length >= 3) {
+        const recent3 = pastData.slice(0, 3);
+        fields.forEach(f => {
+            let sum = 0, count = 0;
+            recent3.forEach(d => {
+                if (d.raw_json && d.raw_json[f] !== undefined) {
+                    sum += Number(d.raw_json[f]);
+                    count++;
+                }
+            });
+            // 按照實際有數據的天數來除以取得平均值
+            baseline[f] = count > 0 ? sum / count : null;
+        });
+    } else {
+        // 沒有3天的平均值可以比較，則與前一天比較
+        const prev1 = pastData[0];
+        fields.forEach(f => {
+            baseline[f] = (prev1.raw_json && prev1.raw_json[f] !== undefined) ? Number(prev1.raw_json[f]) : null;
+        });
+    }
 
-    baselineRecords.forEach(r => {
-        sumTST += Number(r.TST_min || 0);
-        sumN3 += Number(r.N3_pct || 0);
-        sumRMSSD += Number(r.rMSSD || 0);
-        sumHBI += Number(r.HBI || 0);
-        sumHR += Number(r.HR_min || 0);
+    // 3. 找出差異(惡化)最多的指標
+    let maxDeviation = -Infinity;
+    let worstMetric = null;
+    const currentRaw = latestData.raw_json || {};
+
+    fields.forEach(f => {
+        const currentVal = currentRaw[f];
+        const baseVal = baseline[f];
+
+        if (currentVal !== undefined && baseVal !== null && baseVal !== 0) {
+            let deviation = 0;
+            // 將差異轉換為百分比幅度，以便不同單位的指標能公平比較
+            if (f === 'TST_min' || f === 'N3_pct' || f === 'rMSSD') {
+                // 越低越差：(基準值 - 當前值) / 基準值 => 正值越大代表下降越多
+                deviation = (baseVal - currentVal) / Math.abs(baseVal);
+            } else if (f === 'HBI' || f === 'HR_min') {
+                // 越高越差：(當前值 - 基準值) / 基準值 => 正值越大代表上升越多
+                deviation = (currentVal - baseVal) / Math.abs(baseVal);
+            }
+
+            if (deviation > maxDeviation) {
+                maxDeviation = deviation;
+                worstMetric = f;
+            }
+        }
     });
 
-    const avgTST = sumTST / baselineCount;
-    const avgN3 = sumN3 / baselineCount;
-    const avgRMSSD = sumRMSSD / baselineCount;
-    const avgHBI = sumHBI / baselineCount;
-    const avgHR = sumHR / baselineCount;
-
-    // 計算惡化比例 (比例越高，代表變得越差)
-    // 越低越差的指標： (平均 - 最新) / 平均
-    // 越高越差的指標： (最新 - 平均) / 平均
-    const diffTST = avgTST ? (avgTST - Number(latestRecord.TST_min || 0)) / avgTST : 0;
-    const diffN3 = avgN3 ? (avgN3 - Number(latestRecord.N3_pct || 0)) / avgN3 : 0;
-    const diffRMSSD = avgRMSSD ? (avgRMSSD - Number(latestRecord.rMSSD || 0)) / avgRMSSD : 0;
-    const diffHBI = avgHBI ? (Number(latestRecord.HBI || 0) - avgHBI) / avgHBI : 0;
-    const diffHR = avgHR ? (Number(latestRecord.HR_min || 0) - avgHR) / avgHR : 0;
-
-    // 將結果打包，準備找出最差的 1 項
-    const diffs = [
-        { metric: 'TST_min', value: diffTST, keys: ['Battery 總睡眠時間最差1', 'Battery 總睡眠時間最差2', 'Battery 總睡眠時間最差3'] },
-        { metric: 'N3_pct', value: diffN3, keys: ['Battery N3最差1', 'Battery N3最差2', 'Battery N3最差3'] },
-        { metric: 'rMSSD', value: diffRMSSD, keys: ['Battery rMSSD最差1', 'Battery rMSSD最差2', 'Battery rMSSD最差3'] },
-        { metric: 'HBI', value: diffHBI, keys: ['Battery HBI最差1', 'Battery HBI最差2', 'Battery HBI最差3'] },
-        { metric: 'HR_min', value: diffHR, keys: ['Battery 最低脈搏最差1', 'Battery 最低脈搏最差2', 'Battery 最低脈搏最差3'] }
-    ];
-
-    // 依惡化程度由高到低排序，抓取第 0 筆 (最糟的一項)
-    diffs.sort((a, b) => b.value - a.value);
-    const worstMetric = diffs[0];
-
-    // 如果最差的指標其實沒有比平均退步 (value <= 0)，就顯示預設訊息
-    if (worstMetric.value <= 0) {
-        await appendAiMessage(fallbackMsg);
+    // 4. 如果因為缺少數值算不出任何比較結果，直接顯示 fallback
+    if (!worstMetric) {
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
         return;
     }
 
+    // 5. 轉換為 phrase_library 對應的 logic_key 前綴
+    const metricPrefixMap = {
+        'TST_min': 'Battery 總睡眠時間',
+        'N3_pct': 'Battery N3',
+        'rMSSD': 'Battery rMSSD',
+        'HBI': 'Battery HBI',
+        'HR_min': 'Battery 最低脈搏'
+    };
+
+    const prefix = metricPrefixMap[worstMetric];
+    const randomNum = Math.floor(Math.random() * 3) + 1; // 隨機 1、2、3
+    const logicKey = `${prefix}最差${randomNum}`;
+
     try {
-        // 從 Supabase 撈出那 3 個 key 對應的建議
-        const { data: phrases, error } = await _supabase
+        // 從 Supabase 抓取隨機 1 句回饋
+        const { data: phraseData } = await _supabase
             .from('phrase_library')
             .select('detailed_content')
-            .in('logic_key', worstMetric.keys);
+            .eq('logic_key', logicKey)
+            .limit(1)
+            .maybeSingle();
 
-        if (error || !phrases || phrases.length === 0) {
-            console.error("Supabase 撈取建議失敗:", error);
-            await appendAiMessage(fallbackMsg);
-            return;
+        if (phraseData && phraseData.detailed_content) {
+            // 擇 1 項數值結果並結合前綴輸出
+            await appendAiMessage(`收到了！😊 根據你最新的睡眠數據分析，${phraseData.detailed_content}`);
+        } else {
+            await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
         }
-
-        // 隨機選出 1 句
-        const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)].detailed_content;
-
-        // 組合最終訊息並顯示
-        const finalMsg = `收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。\n${randomPhrase}`;
-        await appendAiMessage(finalMsg);
-
-    } catch (err) {
-        console.error("比對數據或撈取建議時發生錯誤:", err);
-        await appendAiMessage(fallbackMsg);
+    } catch (e) {
+        console.error("讀取 phrase_library 失敗:", e);
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
 
