@@ -106,11 +106,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
 
             return `
-[數據紀錄]
-- (record_date) 入睡日期: ${item.record_date} (${itemWeekday})
-- (record_end) 起床日期: ${raw.record_end || "無"} ${endWeekday}
-- (record_end) 恢復指數: ${batteryDisplay}
-- (record_end) 發炎風險: ${lightDisplay}
+[單日健康紀錄]
+📅 結算日 (主要基準日 record_end): ${raw.record_end || "無"} ${endWeekday}
+📍 【今日結果】：依據前一晚的睡眠品質，計算得出：
+- 恢復指數: ${batteryDisplay}
+- 發炎風險: ${lightDisplay}
+
+🛏️ 【前一晚睡眠數據】 (入睡日 record_date: ${item.record_date} ${itemWeekday}):
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
@@ -169,11 +171,16 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
-2. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
-3. 【星期推算】：描述趨勢時，請嚴格依照數據紀錄中標註的星期幾（如：週一、週二）來回答，絕對不可以自行瞎猜星期！
-4. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
-5. 知識庫僅用於醫學常識查詢。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者的現況。
-6. 【嚴格禁止】：你現在是面對使用者的最終客服，請用自然對話回答，絕對不可以輸出 JSON 格式或程式碼！
+2. 【日期與因果邏輯】(極度重要)：
+   - 使用者詢問「今天」或「某天」的狀態時，主要日期基準是「結算日 (record_end)」。
+   - 「恢復指數」與「發炎風險」是 record_end 當天的結果。
+   - 這個結果是經由前一晚「入睡日 (record_date)」的睡眠數據計算出來的。
+   - 解釋數據時，請將兩者連結起來。例如：「因為你昨晚 (record_date) 的深睡期比例不錯，所以今天 (record_end) 的恢復指數有達到 73% 哦！」
+3. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
+4. 【星期推算】：描述趨勢時，請嚴格依照數據紀錄中標註的星期幾（如：週一、週二）來回答，絕對不可以自行瞎猜星期！
+5. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
+6. 知識庫僅用於醫學常識查詢。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者的現況。
+7. 【嚴格禁止】：你現在是面對使用者的最終客服，請用自然對話回答，絕對不可以輸出 JSON 格式或程式碼！
 
 請用平輩口吻回答，多用 emoji！`;
 
