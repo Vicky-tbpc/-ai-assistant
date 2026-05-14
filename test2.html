@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n70</title>
+    <title>Soosyn 健康夥伴 n71</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -472,18 +472,17 @@ userNickname = name;      // 存入全域變數
 
         if (!existingSurvey) {
             // 如果資料庫沒資料，才顯示問卷
-            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~`);
+            await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~幫助我優化你的健康模型。`);
             appendStatusOptions();
         } else {
             // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
             await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
+            await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
 }
-
-    
-
+ 
 // 1. 日期判斷工具
 function getTargetDate(msg) {
     const today = new Date();
@@ -646,7 +645,7 @@ if (isWaitingForAbnormality) {
 
 
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下列 ①、②、③、④、⑤ 按鈕回饋~`);
+    await appendAiMessage(`你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~幫助我優化你的健康模型。`);
     appendStatusOptions(); // 啟動問卷流程
     return;
 }
@@ -917,8 +916,6 @@ async function fetchSummaryData(targetDate) {
     };
 }
 
-
-
 // --- 確保 showSummaryFlow 也能正確運作 ---
 async function showSummaryFlow(isFirstTime = false) { 
     const todayStr = getLocalDateString();
@@ -927,7 +924,9 @@ async function showSummaryFlow(isFirstTime = false) {
         appendSummaryCard(data);
         // 無論是否為第一次登入，只要有當天數據就顯示隨機建議
         if (data.flowSuggestion) {
-
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage(data.flowSuggestion);
+            await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     }
@@ -1599,7 +1598,7 @@ async function handleAbnormalityInput(msg) {
     const data = await fetchSummaryData(preDateStr);
     
     if (data) {
-        await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
+        await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
 
         // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
         appendSummaryCard(todayStr, data);
@@ -1612,8 +1611,110 @@ async function handleAbnormalityInput(msg) {
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     } else {
-        // 狀況 B：沒數據
-        await appendAiMessage("收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。 ☁️\n現在想從哪個部分開始了解呢？");
+        // 2. 沒數據：啟動進階檢查，抓取歷史紀錄生成建議
+        await generateNoDataAdvice(preDateStr);
+    }
+}
+
+// === 新增：沒數據時，往前尋找歷史紀錄並比對的專屬函式 ===
+async function generateNoDataAdvice(startQueryDateStr) {
+    let historicalRecords = [];
+    let currDateObj = new Date(startQueryDateStr.replace(/-/g, '/'));
+    let attempts = 0;
+
+    // 往前撈資料，最多找 4 筆 (最新 1 筆 + 過去最多 3 筆基準)
+    // 設定最多嘗試 14 次避免無窮迴圈
+    while (historicalRecords.length < 4 && attempts < 14) {
+        const dStr = currDateObj.toLocaleDateString('en-CA');
+        const record = await fetchSummaryData(dStr); 
+        
+        if (record) {
+            historicalRecords.push(record);
+        }
+        currDateObj.setDate(currDateObj.getDate() - 1);
+        attempts++;
+    }
+
+    const fallbackMsg = "收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。 ☁️\n現在想從哪個部分開始了解呢？";
+
+    // 如果連可以比較的「前一天」資料都沒有 (總共少於 2 筆) -> 執行第5點規則
+    if (historicalRecords.length < 2) {
+        await appendAiMessage(fallbackMsg);
+        return;
+    }
+
+    const latestRecord = historicalRecords[0];       // 最新的那一筆
+    const baselineRecords = historicalRecords.slice(1); // 剩下的 1 到 3 筆作為比較基準
+
+    // 根據實際有的天數 (1, 2 或 3 天) 來計算平均
+    const baselineCount = baselineRecords.length;
+    let sumTST = 0, sumN3 = 0, sumRMSSD = 0, sumHBI = 0, sumHR = 0;
+
+    baselineRecords.forEach(r => {
+        sumTST += Number(r.TST_min || 0);
+        sumN3 += Number(r.N3_pct || 0);
+        sumRMSSD += Number(r.rMSSD || 0);
+        sumHBI += Number(r.HBI || 0);
+        sumHR += Number(r.HR_min || 0);
+    });
+
+    const avgTST = sumTST / baselineCount;
+    const avgN3 = sumN3 / baselineCount;
+    const avgRMSSD = sumRMSSD / baselineCount;
+    const avgHBI = sumHBI / baselineCount;
+    const avgHR = sumHR / baselineCount;
+
+    // 計算惡化比例 (比例越高，代表變得越差)
+    // 越低越差的指標： (平均 - 最新) / 平均
+    // 越高越差的指標： (最新 - 平均) / 平均
+    const diffTST = avgTST ? (avgTST - Number(latestRecord.TST_min || 0)) / avgTST : 0;
+    const diffN3 = avgN3 ? (avgN3 - Number(latestRecord.N3_pct || 0)) / avgN3 : 0;
+    const diffRMSSD = avgRMSSD ? (avgRMSSD - Number(latestRecord.rMSSD || 0)) / avgRMSSD : 0;
+    const diffHBI = avgHBI ? (Number(latestRecord.HBI || 0) - avgHBI) / avgHBI : 0;
+    const diffHR = avgHR ? (Number(latestRecord.HR_min || 0) - avgHR) / avgHR : 0;
+
+    // 將結果打包，準備找出最差的 1 項
+    const diffs = [
+        { metric: 'TST_min', value: diffTST, keys: ['Battery 總睡眠時間最差1', 'Battery 總睡眠時間最差2', 'Battery 總睡眠時間最差3'] },
+        { metric: 'N3_pct', value: diffN3, keys: ['Battery N3最差1', 'Battery N3最差2', 'Battery N3最差3'] },
+        { metric: 'rMSSD', value: diffRMSSD, keys: ['Battery rMSSD最差1', 'Battery rMSSD最差2', 'Battery rMSSD最差3'] },
+        { metric: 'HBI', value: diffHBI, keys: ['Battery HBI最差1', 'Battery HBI最差2', 'Battery HBI最差3'] },
+        { metric: 'HR_min', value: diffHR, keys: ['Battery 最低脈搏最差1', 'Battery 最低脈搏最差2', 'Battery 最低脈搏最差3'] }
+    ];
+
+    // 依惡化程度由高到低排序，抓取第 0 筆 (最糟的一項)
+    diffs.sort((a, b) => b.value - a.value);
+    const worstMetric = diffs[0];
+
+    // 如果最差的指標其實沒有比平均退步 (value <= 0)，就顯示預設訊息
+    if (worstMetric.value <= 0) {
+        await appendAiMessage(fallbackMsg);
+        return;
+    }
+
+    try {
+        // 從 Supabase 撈出那 3 個 key 對應的建議
+        const { data: phrases, error } = await _supabase
+            .from('phrase_library')
+            .select('detailed_content')
+            .in('logic_key', worstMetric.keys);
+
+        if (error || !phrases || phrases.length === 0) {
+            console.error("Supabase 撈取建議失敗:", error);
+            await appendAiMessage(fallbackMsg);
+            return;
+        }
+
+        // 隨機選出 1 句
+        const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)].detailed_content;
+
+        // 組合最終訊息並顯示
+        const finalMsg = `收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。\n${randomPhrase}`;
+        await appendAiMessage(finalMsg);
+
+    } catch (err) {
+        console.error("比對數據或撈取建議時發生錯誤:", err);
+        await appendAiMessage(fallbackMsg);
     }
 }
 
