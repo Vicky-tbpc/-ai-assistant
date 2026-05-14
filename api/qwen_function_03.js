@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-   const { prompt, serial_number, history = [], local_date, local_time, is_push = false } = req.body;
+    const { prompt, serial_number, history = [], local_date, local_time } = req.body;
 
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
@@ -37,26 +37,14 @@ export default async function handler(req, res) {
 
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
-// [關鍵 1] 初始化 intent，預設帶上今天日期，但不強制開啟 need_data
-let intent = { need_data: false, start: local_date, end: local_date };
 
-// ==========================================
-// 最佳化邏輯：優先判斷「快速通道」
-// ==========================================
-const fastKeywords = ["都可以", "你好", "分析", "分析數據", "幫我分析"];
+const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+請判斷使用者的問題：「${prompt}」是否需要查詢生理健康數據？
 
-if (is_push || fastKeywords.includes(prompt.trim())) {
-  intent.need_data = true;
-  console.log("🚀 觸發快速通道：強制查詢當天數據");
-} else {  // [關鍵 2] 走 AI Router 判斷邏輯
-  const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
-你的任務是判斷是否需要查詢使用者的生理健康數據。
-
-【判斷準則】
-1. 若使用者詢問具體數值（如：脈搏、睡眠、恢復指數）。
-2. 若使用者語意模糊（如：都可以、你好、今天狀況如何、分析一下）。
-3. 若使用者提到「昨天」、「前天」或「上週」。
--> 以上情況皆請設定 "need_data": true。
+【判斷規則】
+1. 若明確提到健康指標或日期，請輸出對應的 start 和 end。
+2. 若回答模糊（例如：「都可以」、「看看」、「隨便」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
+3. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
 
 【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
 1. 「今天」：${local_date}
@@ -64,7 +52,6 @@ if (is_push || fastKeywords.includes(prompt.trim())) {
 3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
 請「務必只」輸出 JSON：{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`;
 
-try {
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
@@ -72,32 +59,19 @@ try {
     });
 
     let intentData = await intentRes.json();
-    
-    // 【修正點 2】移除這裡原本的 let intent = ... 這一行
-    const jsonMatch = intentData.textResponse.match(/\{[\s\S]*?\}/); 
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      // 【修正點 3】使用合併方式更新外層的 intent
-      intent = { ...intent, ...parsed }; 
-    }
-  } catch (e) { 
-    console.log("意圖解析失敗，改用預設查詢");
-    intent.need_data = true; 
-  }
-} // <--- 確保 else 區塊在這裡結束
+    let intent = { need_data: false };
+    try {
+      const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
+      if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
+    } catch (e) { console.log("意圖解析失敗"); }
 
     // ==========================================
     // 第二階段：抓取並「格式化」數據
     // ==========================================
-   let healthContext = "目前沒有相關數據。";
-if (intent.need_data && intent.start && intent.end) {
-  const protocol = req.headers['x-forwarded-proto'] || 'http'; //
-  const host = req.headers['host']; //
-  
-  // 加上 _t 參數後的完整 URL
-  const healthApiUrl = `${protocol}://${host}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}&_t=${Date.now()}`;
-  
-  console.log("正在請求最新數據:", healthApiUrl); // 偵錯用，可以看到時間戳記
+    let healthContext = "目前沒有相關數據。";
+    if (intent.need_data && intent.start && intent.end) {
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
       
       const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
@@ -191,7 +165,7 @@ if (intent.need_data && intent.start && intent.end) {
     // ==========================================
     // 第三階段：最終回答
     // ==========================================
-    const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
+const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
@@ -199,6 +173,8 @@ if (intent.need_data && intent.start && intent.end) {
 3. 【星期推算】：描述趨勢時，請嚴格依照數據紀錄中標註的星期幾（如：週一、週二）來回答，絕對不可以自行瞎猜星期！
 4. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
 5. 知識庫僅用於醫學常識查詢。嚴禁拿知識庫裡的 PDF 範例數值來回答使用者的現況。
+6. 【嚴格禁止】：你現在是面對使用者的最終客服，請用自然對話回答，絕對不可以輸出 JSON 格式或程式碼！
+
 請用平輩口吻回答，多用 emoji！`;
 
     const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
