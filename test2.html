@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n69</title>
+    <title>Soosyn 健康夥伴 n70</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1575,36 +1575,35 @@ async function handleStatusSelection(text, score) {
     appendAbnormalityOptions();
 }
     
-
 async function handleAbnormalityInput(msg) { 
-const todayStr = getLocalDateString(); 
+    const todayStr = getLocalDateString(); 
 
-// 如果是從「其他」按鈕進入的，格式化文字為 其他(XXX)
+    // 如果是從「其他」按鈕進入的，格式化文字為 其他(XXX)
     let finalAbnormalityText = msg;
     if (isOtherAbnormality) {
         finalAbnormalityText = `其他(${msg})`;
         isOtherAbnormality = false; // 儲存後重置標記
     }
 
+    await _supabase.from('user_daily_surveys').upsert({ 
+        serial_number: currentSerial, 
+        record_date: todayStr, 
+        subjective_score: tempScore, 
+        physical_abnormality: finalAbnormalityText
+    }); 
 
-await _supabase.from('user_daily_surveys').upsert({ 
-serial_number: currentSerial, 
-record_date: todayStr, 
-subjective_score: tempScore, 
-physical_abnormality: finalAbnormalityText
-}); 
+    localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
 
-localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
-
-// 2. 檢查當天是否有健康摘要數據
+    // 2. 檢查當天是否有健康摘要數據
     const data = await fetchSummaryData(todayStr);
-if (data) {
-await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
+    
+    if (data) {
+        await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
 
-// 顯示圖卡
-        appendSummaryCard(data);
+        // 顯示圖卡 (補上 todayStr 確保卡片標題日期正確)
+        appendSummaryCard(todayStr, data);
 
-// 顯示後續建議與導引
+        // 顯示後續建議與導引
         if (data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
             await appendAiMessage(data.flowSuggestion);
@@ -1612,12 +1611,10 @@ await appendAiMessage("收到了！來看看健康摘要吧！ ✨");
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     } else {
-        // 狀況 B：沒數據 (直接顯示您指定的引導文字)
-        await appendAiMessage("收到了！😊 今天想從哪裡開始呢？趨勢圖表、還是健康摘要呢？");
+        // 狀況 B：沒數據 (顯示指定的引導文字)
+        await appendAiMessage("收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。 ☁️\n現在想從哪個部分開始了解呢？");
     }
 }
-
-
 
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
@@ -1730,7 +1727,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
