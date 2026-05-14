@@ -1597,10 +1597,10 @@ async function handleAbnormalityInput(msg) {
     // 2. 用「前一天」的日期去檢查健康摘要數據
     const data = await fetchSummaryData(preDateStr);
     
-    if (data) {
+    // --- 這裡修改判斷方式：檢查 5 項 Battery 指標是否齊全 ---
+    if (isValidBatteryData(data)) {
+        // 狀況 A：5 項指標都有，顯示摘要卡片
         await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
-
-        // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
         appendSummaryCard(todayStr, data);
 
         // 顯示後續建議與導引
@@ -1611,11 +1611,27 @@ async function handleAbnormalityInput(msg) {
             await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
         }
     } else {
-        // 2. 沒數據：啟動進階檢查，抓取歷史紀錄生成建議
+        // 狀況 B：資料不全或沒有資料，進入「一句建議」生成邏輯
         await generateNoDataAdvice(preDateStr);
     }
 }
+/**
+ * 新增：檢查物件中是否包含這 5 個必要的 Battery 指標
+ */
+function isValidBatteryData(data) {
+    if (!data) return false;
+    
+    const requiredKeys = [
+        'Battery_TST_min_A',
+        'Battery_N3_pct_A',
+        'Battery_rMSSD_A',
+        'Battery_HBI_A',
+        'Battery_HR_min_A'
+    ];
 
+    // 檢查每一個 Key 是否都存在且不是 null/undefined
+    return requiredKeys.every(key => data[key] !== undefined && data[key] !== null);
+}
 // === 新增：沒數據時，往前尋找歷史紀錄並比對的專屬函式 ===
 async function generateNoDataAdvice(startQueryDateStr) {
     let historicalRecords = [];
