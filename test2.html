@@ -1594,24 +1594,31 @@ async function handleAbnormalityInput(msg) {
 
     localStorage.setItem(`last_summary_${currentSerial}`, todayStr); 
 
-    // 取得「昨晚」的日期字串來對應地端 JSON
+    // --- 🐛 修正重點在這裡 ---
+    // 因為「昨晚」的睡眠數據，在地端 JSON 的日期其實是「昨天」
+    // 所以我們要把今天的日期往前推一天，再拿去要資料
     const dateObj = new Date(todayStr.replace(/-/g, '/'));
     dateObj.setDate(dateObj.getDate() - 1);
-    const preDateStr = dateObj.toLocaleDateString('en-CA'); 
+    const preDateStr = dateObj.toLocaleDateString('en-CA'); // 變成昨天的格式
 
-    // 檢查是否有健康摘要數據
+    // 2. 用「前一天」的日期去檢查健康摘要數據
     const data = await fetchSummaryData(preDateStr);
     
     if (data) {
-        // 1. 顯示開頭文字
-        await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
+        await appendAiMessage("收到了！來看看健康摘要吧！ ✨"); 
 
-        // 2. 顯示健康摘要圖卡 (標題顯示今天日期)
+        // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
         appendSummaryCard(todayStr, data);
-        
-        // 修改後：這裡直接結束，不再顯示 flowSuggestion 與 CTA_PHRASES
+
+        // 顯示後續建議與導引
+        if (data.flowSuggestion) {
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage(data.flowSuggestion);
+            await new Promise(r => setTimeout(r, 800));
+            
+        }
     } else {
-        // 沒數據時的提示
+        // 狀況 B：沒數據
         await appendAiMessage("收到了！😊 還沒看到你昨晚的睡眠數據喔！可能是沒有上傳，或資料尚未同步完成。 ☁️\n現在想從哪個部分開始了解呢？");
     }
 }
