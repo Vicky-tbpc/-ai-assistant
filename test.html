@@ -2033,42 +2033,32 @@ async function callGreetingAPI(name, aiName, aiData) {
     }
 }
 
-function appendSimpleSummaryCard(metricName, phrase, deviation) {
-    const chatContainer = document.getElementById('chat-container');
-    const cardId = 'simple-card-' + Date.now();
-    
-    // 根據指標決定 Icon 與顏色
+function appendSimpleSummaryCard(metricName, detailedContent, deviation) {
     const config = {
-        'TST_min': { icon: '🌙', label: '總睡眠時間', color: '#6a89cc' },
-        'N3_pct': { icon: '💤', label: '深層睡眠 (N3)', color: '#4a69bd' },
-        'rMSSD': { icon: '❤️', label: 'HRV 狀態 (rMSSD)', color: '#82ccdd' },
-        'HBI': { icon: '💓', label: '心跳間隔 (HBI)', color: '#60a3bc' },
+        'TST_min': { icon: '🌙', label: '總睡眠時間', color: '#8699a3' },
+        'N3_pct': { icon: '💤', label: '深層睡眠 (N3)', color: '#596b75' },
+        'rMSSD': { icon: '💓', label: '心率變異度', color: '#ff8c73' },
+        'HBI': { icon: '📊', label: '脈搏穩定度', color: '#a79d8c' },
         'HR_min': { icon: '🩺', label: '最低脈搏', color: '#78e08f' }
     };
 
-    const style = config[metricName] || { icon: '📊', label: '睡眠指標', color: '#8699a3' };
+    const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#8699a3' };
     const trendText = deviation > 0 ? `較近日平均變動 ${(deviation * 100).toFixed(1)}%` : '';
 
     const html = `
-        <div class="ai-message-wrapper">
-            <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid ${style.color};">
-                <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between;">
-                    <span>最新睡眠觀察</span>
-                    <span style="font-size: 0.8em; background: #eee; padding: 2px 8px; border-radius: 10px;">${style.label}</span>
+        <div class="msg-row ai-row">
+            <div class="ai-bubble" style="border-left: 5px solid ${style.color}; max-width: 85%;">
+                <div style="font-weight: bold; color: #666; margin-bottom: 5px;">最新睡眠觀察 - ${style.label}</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">${style.icon}</span>
+                    <div style="font-size: 0.95em;">${detailedContent}</div>
                 </div>
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <div style="font-size: 24px; margin-right: 12px;">${style.icon}</div>
-                    <div style="font-size: 0.95em; line-height: 1.4; color: #333;">
-                        ${phrase}
-                    </div>
-                </div>
-                ${trendText ? `<div style="font-size: 0.75em; color: #888; text-align: right; font-style: italic;">* ${trendText}</div>` : ''}
+                ${trendText ? `<div style="font-size: 0.8em; color: #999; margin-top: 8px;">${trendText}</div>` : ''}
             </div>
-        </div>
-    `;
-
-    chatContainer.insertAdjacentHTML('beforeend', html);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+        </div>`;
+    
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
 }
 
 </script>
