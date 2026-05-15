@@ -506,6 +506,7 @@ userNickname = name;      // 存入全域變數
                     document.getElementById(typingId)?.remove();
                     await appendAiMessage(greeting);
                     usedAIGreeting = true;
+chatHistory.push({ role: "model", parts: [{ text: greeting }] });
                 }
             }
 
