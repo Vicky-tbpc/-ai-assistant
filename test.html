@@ -2016,8 +2016,6 @@ async function callGreetingAPI(name, aiName, aiData) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'generate_greeting', // 透過此標記攔截
-                user_name: name,
-                ai_name: aiName,
                 metric_data: aiData
             })
         });
