@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     // 記得在這裡接收前端新傳來的變數
-    const { prompt, serial_number, history = [], local_date, local_time, action, user_name, ai_name, metric_data } = req.body;
+    const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
     // ==========================================
     // 新增：客製化 AI 開場白攔截區塊
@@ -23,7 +23,8 @@ export default async function handler(req, res) {
 請根據以下提示，生成一句專屬的開場白。
 
 【規則】
-1. 開場第一句必須完全精準照抄：「歡迎回來 ${user_name}，我是你的健康夥伴 ${ai_name}。 👋」
+1. 第一句請自由發揮，表達歡迎回來的心情，例如：「歡迎回來！我是你的健康夥伴 👋」。
+2. 【絕對禁止】：嚴格禁止在對話中出現使用者的名字或 AI 的名字，請用「你」來稱呼對方即可。
 2. 接著請根據以下指標狀態給予一句${metric_data.type}：
    - 指標：${metric_data.metric}
    - 狀態：${metric_data.status}
