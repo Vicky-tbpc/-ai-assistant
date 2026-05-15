@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n71</title>
+    <title>Soosyn 健康夥伴 n72</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -475,13 +475,49 @@ userNickname = name;      // 存入全域變數
             await appendAiMessage(`哈囉 ${name} 👋，你今天的感覺比較接近哪一種呢？\n請直接點選下方 ①、②、③、④、⑤ 按鈕回饋~幫助我優化你的健康模型。`);
             appendStatusOptions();
         } else {
-            // 如果今天已經在其他裝置填過了，直接顯示歡迎詞
-            await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+            // 檢查是否同意 AI 授權
+            const { data: permission } = await _supabase
+                .from('user_ai_permissions')
+                .select('is_agreed')
+                .eq('serial_number', currentSerial)
+                .maybeSingle();
+
+            let usedAIGreeting = false;
+
+            if (permission && permission.is_agreed) {
+                // 取得 AI 生成開場白所需的數據狀態
+                const aiData = await getAIGreetingPayload(currentSerial);
+                
+                if (aiData) {
+                    // 顯示打字動畫
+                    const typingId = 'typing-greeting-' + Date.now();
+                    document.getElementById('chat-history').insertAdjacentHTML('beforeend', `
+                        <div class="msg-row ai-row" id="${typingId}">
+                            <div class="ai-bubble">
+                                <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            </div>
+                        </div>
+                    `);
+                    scrollToBottom();
+
+                    // 呼叫專屬的 AI 開場白 API
+                    const greeting = await callGreetingAPI(name, aiName, aiData);
+                    
+                    document.getElementById(typingId)?.remove();
+                    await appendAiMessage(greeting);
+                    usedAIGreeting = true;
+                }
+            }
+
+            // 如果沒同意、沒資料或是發生錯誤，走原本的隨機罐頭路線
+            if (!usedAIGreeting) {
+                await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
+                await new Promise(r => setTimeout(r, 600));
+                await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+            }
         }
-    }
-}
+    } // 👈 補上這個：結束 if (!aiName) 的 else 區塊
+} // 👈 補上這個：結束 initApp 函式
  
 // 1. 日期判斷工具
 function getTargetDate(msg) {
@@ -1881,6 +1917,113 @@ async function callGeminiAPI(prompt) {
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
         return "抱歉，我現在連不上線，請稍後再試。 😅";
+    }
+}
+
+// --- 新增：取得 AI 開場白數據狀態 ---
+async function getAIGreetingPayload(serial) {
+    try {
+        const response = await fetch(`/api/health?serial=${serial}`);
+        if (!response.ok) return null;
+        
+        const allData = await response.json();
+        allData.sort((a, b) => b.record_date.localeCompare(a.record_date));
+
+        // 需要至少一筆最新和一筆歷史才能比較
+        if (allData.length < 2) return null; 
+
+        const latestData = allData[0];
+        const pastData = allData.slice(1, 4); // 取前 1~3 天歷史
+
+        // 定義指標與其好壞邏輯
+        const fields = [
+            { key: 'TST_min', higherIsBetter: true, label: '總睡眠時間' },
+            { key: 'N3_pct', higherIsBetter: true, label: '深睡比例 (N3)' },
+            { key: 'rMSSD', higherIsBetter: true, label: 'rMSSD (放鬆指數)' },
+            { key: 'HBI', higherIsBetter: false, label: '低氧負擔指數 (HBI)' },
+            { key: 'HR_min', higherIsBetter: false, label: '睡眠最低脈搏' }
+        ];
+
+        let bestMetric = null;
+        let worstMetric = null;
+        let maxImprovement = -Infinity;
+        let maxDeterioration = -Infinity;
+
+        const currentRaw = latestData.raw_json || {};
+
+        fields.forEach(f => {
+            let sum = 0, count = 0;
+            // 計算過去最多3天的平均 (僅依據實際有數值的筆數除)
+            pastData.forEach(d => {
+                const val = d.raw_json?.[f.key];
+                if (val !== undefined && val !== null) {
+                    sum += Number(val);
+                    count++;
+                }
+            });
+
+            if (count > 0 && currentRaw[f.key] !== undefined) {
+                const baseVal = sum / count;
+                const currentVal = Number(currentRaw[f.key]);
+
+                if (baseVal !== 0) {
+                    let improvementPct = 0;
+                    // 計算進步或退步幅度
+                    if (f.higherIsBetter) {
+                        improvementPct = (currentVal - baseVal) / Math.abs(baseVal);
+                    } else {
+                        improvementPct = (baseVal - currentVal) / Math.abs(baseVal);
+                    }
+
+                    if (improvementPct > maxImprovement) {
+                        maxImprovement = improvementPct;
+                        bestMetric = f;
+                    }
+                    
+                    let deteriorationPct = -improvementPct;
+                    if (deteriorationPct > maxDeterioration) {
+                        maxDeterioration = deteriorationPct;
+                        worstMetric = f;
+                    }
+                }
+            }
+        });
+
+        if (!bestMetric && !worstMetric) return null;
+
+        // 隨機決定要鼓勵(挑最好)還是關懷(挑最差)
+        const isEncourage = Math.random() > 0.5;
+        const chosenMetric = isEncourage && bestMetric ? bestMetric : worstMetric || bestMetric;
+        const statusStr = (chosenMetric === bestMetric) ? '表現良好' : '表現較差';
+
+        return {
+            metric: chosenMetric.label,
+            status: statusStr,
+            type: (chosenMetric === bestMetric) ? '鼓勵' : '關懷'
+        };
+
+    } catch (e) {
+        console.error('AI Greeting Error:', e);
+        return null;
+    }
+}
+
+// --- 新增：呼叫後端專屬開場白 API ---
+async function callGreetingAPI(name, aiName, aiData) {
+    try {
+        const res = await fetch('/api/qwen_function', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'generate_greeting', // 透過此標記攔截
+                metric_data: aiData
+            })
+        });
+        const data = await res.json();
+        return data.text;
+    } catch (err) {
+        console.error("Greeting API Error:", err);
+        return `歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋\n健康是一點一滴累積的！想查看哪個資訊呢？`; 
     }
 }
 
