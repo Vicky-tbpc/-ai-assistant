@@ -1,4 +1,4 @@
-// qwen_function_05.js
+// qwen_function_06.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -12,7 +12,37 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const { prompt, serial_number, history = [], local_date, local_time } = req.body;
+    // 記得在這裡接收前端新傳來的變數
+    const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
+
+    // ==========================================
+    // 新增：客製化 AI 開場白攔截區塊
+    // ==========================================
+    if (action === 'generate_greeting') {
+      const greetingPrompt = `你是一個友好熱情的 AI 健康夥伴。
+請根據以下提示，生成一句專屬的開場白。
+
+【規則】
+1. 第一句請自由發揮，表達歡迎回來的心情，例如：「歡迎回來！我是你的健康夥伴 👋」。
+2. 【絕對禁止】：嚴格禁止在對話中出現使用者的名字或 AI 的名字，請用「你」來稱呼對方即可。
+2. 接著請根據以下指標狀態給予一句${metric_data.type}：
+   - 指標：${metric_data.metric}
+   - 狀態：${metric_data.status}
+3. 說明完後，最後加上一句引導詢問，例如：「接下來想看看哪個健康指標呢？」或「現在想從哪個部分開始了解呢？」
+4. 語氣要像平輩朋友一樣自然。
+5. 【絕對禁止】：嚴格禁止使用敬稱「您」，請全部使用「你」。
+
+請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
+
+      let greetingRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: greetingPrompt, mode: "chat" })
+      });
+      
+      let greetingResult = await greetingRes.json();
+      return res.status(200).json({ text: greetingResult.textResponse });
+    }
 
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
