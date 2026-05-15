@@ -1,4 +1,4 @@
-// qwen_function_05-1.js
+// qwen_function_06.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -12,7 +12,36 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const { prompt, serial_number, history = [], local_date, local_time } = req.body;
+    // 記得在這裡接收前端新傳來的變數
+    const { prompt, serial_number, history = [], local_date, local_time, action, user_name, ai_name, metric_data } = req.body;
+
+    // ==========================================
+    // 新增：客製化 AI 開場白攔截區塊
+    // ==========================================
+    if (action === 'generate_greeting') {
+      const greetingPrompt = `你是一個友好熱情的 AI 健康夥伴。
+請根據以下提示，生成一句專屬的開場白。
+
+【規則】
+1. 開場第一句必須完全精準照抄：「歡迎回來 ${user_name}，我是你的健康夥伴 ${ai_name}。 👋」
+2. 接著請根據以下指標狀態給予一句${metric_data.type}：
+   - 指標：${metric_data.metric}
+   - 狀態：${metric_data.status}
+3. 說明完後，最後加上一句引導詢問，例如：「接下來想看看哪個健康指標呢？」或「現在想從哪個部分開始了解呢？」
+4. 語氣要像平輩朋友一樣自然。
+5. 【絕對禁止】：嚴格禁止使用敬稱「您」，請全部使用「你」。
+
+請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
+
+      let greetingRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: greetingPrompt, mode: "chat" })
+      });
+      
+      let greetingResult = await greetingRes.json();
+      return res.status(200).json({ text: greetingResult.textResponse });
+    }
 
     // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
@@ -176,7 +205,6 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
    - 「恢復指數」與「發炎風險」是 record_end 當天的結果。
    - 這個結果是經由前一晚「入睡日 (record_date)」的睡眠數據計算出來的。
    - 恢復指數和發炎風險要看 record_end 的數據輸出，嚴禁看 record_date 的數據輸出。
-   - 總睡眠時間、總紀錄時間、睡眠效率、睡眠結構、睡眠血氧飽和度、睡眠低血氧時間比例、低氧負擔指數、睡眠血氧下降指數、睡眠呼吸頻率、睡眠脈搏、心率變異度，要看 record_date 的數據輸出，嚴禁看 record_end 的數據輸出。
    - 解釋數據時，請將兩者連結起來。例如：「因為你前一晚 (record_date) 的深睡期比例不錯，所以今天 (record_end) 的恢復指數有達到 73% 哦！」
 3. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
 4. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
