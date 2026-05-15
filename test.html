@@ -516,6 +516,8 @@ userNickname = name;      // 存入全域變數
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
             }
         }
+    } // 👈 補上這個：結束 if (!aiName) 的 else 區塊
+} // 👈 補上這個：結束 initApp 函式
  
 // 1. 日期判斷工具
 function getTargetDate(msg) {
