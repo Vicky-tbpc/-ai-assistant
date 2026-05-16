@@ -2036,11 +2036,11 @@ async function callGreetingAPI(name, aiName, aiData) {
 
 function appendSimpleSummaryCard(metricName, detailedContent, deviation) {
     const config = {
-        'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#8699a3' },
-        'N3_pct': { icon: '🌙', label: '深睡期 (N3)', color: '#596b75' },
-        'rMSSD': { icon: '🌿', label: 'rMSSD', color: '#ff8c73' },
+        'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#a79d8c' },
+        'N3_pct': { icon: '🌙', label: '深睡期 (N3)', color: '#a79d8c' },
+        'rMSSD': { icon: '🌿', label: 'rMSSD', color: '#a79d8c' },
         'HBI': { icon: '🫁', label: 'HBI 低氧負擔指數', color: '#a79d8c' },
-        'HR_min': { icon: '💓', label: '睡眠最低脈搏', color: '#78e08f' }
+        'HR_min': { icon: '💓', label: '睡眠最低脈搏', color: '#a79d8c' }
     };
 
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#8699a3' };
