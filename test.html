@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n73</title>
+    <title>Soosyn 健康夥伴 n073</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -975,10 +975,10 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
-        { name: "😴 深睡期 (N3)", type: "n3" },
-        { name: "🧘 rMSSD", type: "rmssd" },
+        { name: "🌙 深睡期 (N3)", type: "n3" },
+        { name: "🌿 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
-        { name: "☁️ HBI 低氧負擔指數", type: "hbi" }
+        { name: "🫁 HBI 低氧負擔指數", type: "hbi" }
     ];
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
     options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
@@ -1764,14 +1764,14 @@ async function handleAbnormalityInput(msg) {
 
         if (phraseData && phraseData.detailed_content) {
             // --- 修改這裡：先說一句話，然後推派小卡 ---
-            await appendAiMessage(`收到了！😊 幫你分析了一下昨晚的數據：`);
+            await appendAiMessage(`收到了！😊 幫你分析了一下最近的數據：`);
             
             // 呼叫簡易小卡 function
-            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, maxDeviation);
+            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content);
             
             // 小卡出現後，再給一個引導
             await new Promise(r => setTimeout(r, 1000));
-            await appendAiMessage("雖然今天沒有完整的健康分數，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
+            await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
         } else {
             await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
         }
@@ -2036,25 +2036,28 @@ async function callGreetingAPI(name, aiName, aiData) {
 
 function appendSimpleSummaryCard(metricName, detailedContent, deviation) {
     const config = {
-        'TST_min': { icon: '🌙', label: '總睡眠時間', color: '#8699a3' },
-        'N3_pct': { icon: '💤', label: '深層睡眠 (N3)', color: '#596b75' },
-        'rMSSD': { icon: '💓', label: '心率變異度', color: '#ff8c73' },
-        'HBI': { icon: '📊', label: '脈搏穩定度', color: '#a79d8c' },
-        'HR_min': { icon: '🩺', label: '最低脈搏', color: '#78e08f' }
+        'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#8699a3' },
+        'N3_pct': { icon: '🌙', label: '深睡期 (N3)', color: '#596b75' },
+        'rMSSD': { icon: '🌿', label: 'rMSSD', color: '#ff8c73' },
+        'HBI': { icon: '🫁', label: 'HBI 低氧負擔指數', color: '#a79d8c' },
+        'HR_min': { icon: '💓', label: '睡眠最低脈搏', color: '#78e08f' }
     };
 
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#8699a3' };
-    const trendText = deviation > 0 ? `較近日平均變動 ${(deviation * 100).toFixed(1)}%` : '';
 
     const html = `
-        <div class="msg-row ai-row">
-            <div class="ai-bubble" style="border-left: 5px solid ${style.color}; max-width: 85%;">
-                <div style="font-weight: bold; color: #666; margin-bottom: 5px;">最新睡眠觀察 - ${style.label}</div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 24px;">${style.icon}</span>
-                    <div style="font-size: 0.95em;">${detailedContent}</div>
+        <div class="ai-message-wrapper">
+            <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid ${style.color};">
+                <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between;">
+                    <span>近期睡眠分析</span>
+                    <span style="font-size: 0.8em; background: #eee; padding: 2px 8px; border-radius: 10px;">${style.label}</span>
                 </div>
-                ${trendText ? `<div style="font-size: 0.8em; color: #999; margin-top: 8px;">${trendText}</div>` : ''}
+                <div style="display: flex; align-items: center;">
+                    <div style="font-size: 24px; margin-right: 12px;">${style.icon}</div>
+                    <div style="font-size: 0.95em; line-height: 1.4; color: #333;">
+                        ${detailedContent}
+                    </div>
+                </div>
             </div>
         </div>`;
     
