@@ -1,4 +1,4 @@
-// qwen_function_08.js
+// qwen_function_09.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -69,12 +69,13 @@ export default async function handler(req, res) {
     const lastWeekStartStr = getOffsetDate(-7);
 
 const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
-請判斷使用者的問題：「${prompt}」是否需要查詢生理健康數據？
+請判斷使用者的問題：「${prompt}」的意圖。
 
 【判斷規則】
-1. 若明確提到健康指標或日期，請輸出對應的 start 和 end。
-2. 若回答模糊（例如：「都可以」、「看看」、「隨便」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
-3. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
+1. 若使用者想看「趨勢圖」、「圖表」、「折線圖」，或語意上想看「一段時間的數據變化趨勢」(不只是文字說明)，請將 need_trend_chart 設為 true。
+2. 若明確提到健康指標或日期，請輸出對應的 start 和 end，並將 need_data 設為 true。
+3. 若回答模糊（例如：「都可以」、「看看」、「隨便」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
+4. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
 
 【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
 1. 「今天」：${local_date}
@@ -94,6 +95,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
       if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
     } catch (e) { console.log("意圖解析失敗"); }
+    // 👇 2. 新增這段攔截邏輯：如果是要看圖表，就直接回傳，不要去撈資料了
+    if (intent.need_trend_chart) {
+      return res.status(200).json({ 
+        action: 'show_trend_options', 
+        text: "🔍 想查看哪一種趨勢圖表呢？" 
+      });
+    }
 
     // ==========================================
     // 第二階段：抓取並「格式化」數據（完全對齊日曆日期）
