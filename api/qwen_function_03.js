@@ -101,20 +101,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
-      
-      // 💡 新增這段：在發送請求前，將結束日期往後延伸一天，確保後端 API 能撈到當晚入睡、隔天結算的資料
-      let apiEnd = intent.end;
-      if (intent.end) {
-        const endDateObj = new Date(intent.end);
-        endDateObj.setDate(endDateObj.getDate() + 1);
-        const yy = endDateObj.getFullYear();
-        const mm = String(endDateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(endDateObj.getDate()).padStart(2, '0');
-        apiEnd = `${yy}-${mm}-${dd}`;
-      }
-
-      // 💡 修改點：把網址最後面的 &end=${intent.end} 改成 &end=${apiEnd}
-      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${apiEnd}`;
+      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
       
       const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
@@ -214,15 +201,15 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
-2. 【資料搜尋與對應邏輯】(極度重要，請嚴格遵守)：
-   - 每一筆數據列都包含「結算日 (record_end)」與「入睡日 (record_date)」。當使用者詢問特定日期的指標時，請務必按照以下規則「尋找對應的資料列」並「提取數值」：
-   - (A) 睡眠期間的指標（如：最低脈搏、HBI 低氧負擔指數、血氧、睡眠時間等）：
-     👉 【搜尋規則】：使用者詢問的日期，必須完美對應到「入睡日 (record_date)」。請去尋找 record_date 符合詢問日期的那一列資料，並提取該列的數值！
-     👉 【絕對禁止】：嚴禁因為找不到資料就自行向前或向後「平移」一天來湊數！如果提供的數據中沒有該日期的 record_date，請直接老實回答該日期無資料。
-     👉 【標題規範】：回答時，請一律使用 record_date 作為日期標題。
-   - (B) 起床後的結果指標（如：恢復指數、發炎風險）：
-     👉 【搜尋規則】：請務必尋找「結算日 (record_end)」符合詢問日期的資料列，並提取數值。回答時使用 record_end 作為日期標題。
-   - (C) 【解釋數據因果時，請將兩者正確連結】：例如：「因為你前一晚 (record_date) 的深睡期比例不錯，所以今天 (record_end) 的恢復指數有達到 73% 哦！」
+2. 【日期與指標歸屬邏輯】(極度重要，防止日期錯位)：
+   - 【核心原則】：健康資料包含「當日結果（結算日 record_end）」與「前一晚睡眠數據（入睡日 record_date）」，兩者日期通常差一天。
+   - 【恢復指數、發炎風險】：屬於「結算日 (record_end)」當天的結果。當使用者詢問「今天」或「特定日期的恢復指數/發炎風險/整體狀態」時，以 record_end 為基準。
+   - 【因果邏輯連結】：在解釋單日狀態時，請主動將兩者連結起來。例如：「因為你前一晚 (record_date) 的深睡期比例不錯，所以今天 (record_end) 的恢復指數有達到 73% 哦！」
+   - 【睡眠生理指標（如最低/最高/平均脈搏、血氧、睡眠時間等）】：這些是屬於「入睡日 (record_date)」當晚的睡眠數據！
+   - 【特別注意：當使用者詢問特定日期或範圍的「睡眠生理指標」時】：
+     1. 最終回覆清單中的日期，必須嚴格使用數據中的【入睡日 (record_date)】作為每條數據的日期標籤！絕對不可誤用 record_end 的日期，否則會導致數據錯位、位移一天的嚴重錯誤。
+     2. 在條列數據時，請務必在日期後方明確標註 `(record_date)` 或 `(入睡日)`。例如：「**2026-05-09 (週六) (record_date)**：最低脈搏 47 bpm」。
+     3. 請逐一核對數據文本中 🛏️ 【前一晚睡眠數據】 括號內的 record_date，將其各項指標數值精確對齊，嚴禁張冠李戴。
 3. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
 4. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
 5. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
