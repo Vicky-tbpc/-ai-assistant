@@ -245,7 +245,7 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
         serial_number: serial_number,
         user_query: prompt,
         ai_response: aiText,
-        record_date: local_date,
+        record_date: local_date, // 👈 關鍵：確保冒號右手邊的數值是帶入 local_date 變數！
         record_time: local_time,
         ai_model: 'LLM-Qwen-function'
       })
