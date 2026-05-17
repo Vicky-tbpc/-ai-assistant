@@ -101,7 +101,21 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
+      
+      // 新增：日期偏移小工具，用來擴大 API 抓取範圍
+      const getCustomOffsetDate = (baseDateStr, offset) => {
+        const [y, m, d] = baseDateStr.split('-');
+        const dateObj = new Date(y, m - 1, d);
+        dateObj.setDate(dateObj.getDate() + offset);
+        return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+      };
+
+      // 因為後端主要是比對 record_end，為了讓入睡日 (record_date) 也能完整涵蓋使用者要求的結束日期，
+      // 我們將 API 請求的結束日期延後 1 天（例如要求到 05-14，我們就抓到 05-15），確保 05-14 當晚入睡的生理數據有被撈到。
+      const apiStart = intent.start;
+      const apiEnd = getCustomOffsetDate(intent.end, 1);
+      
+      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${apiStart}&end=${apiEnd}`;
       
       const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
@@ -182,8 +196,25 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
   ];
 
             const summaryLines = fieldsToAvg.map(field => {
-              const sum = finalContextData.reduce((acc, cur) => acc + (Number(cur.raw_json?.[field.key]) || 0), 0);
-              const avg = (sum / finalContextData.length).toFixed(1);
+              // 區分睡眠指標與恢復指標，精準過濾出真正屬於使用者指定區間內的資料來計算平均值
+              const filteredData = finalContextData.filter(cur => {
+                const isSleepMetric = [
+                  'TST_min', 'sleep_efficiency_pct', 'N3_pct', 'N1N2_pct', 'REM_pct', 
+                  'SpO2_mean', 'T90_pct', 'T89_pct', 'T88_pct', 'HBI', 'ODI3_total', 
+                  'ODI4_total', 'HR_mean', 'RR_mean', 'SDNN', 'rMSSD', 'LF_ms2', 'HF_ms2', 'LF_HF', 'pNN50_pct'
+                ].includes(field.key);
+                
+                if (isSleepMetric) {
+                  return cur.record_date >= intent.start && cur.record_date <= intent.end;
+                } else {
+                  const rEnd = cur.raw_json?.record_end?.split(' ')[0];
+                  return rEnd && rEnd >= intent.start && rEnd <= intent.end;
+                }
+              });
+
+              const validLength = filteredData.length || 1; // 防呆避免除以 0
+              const sum = filteredData.reduce((acc, cur) => acc + (Number(cur.raw_json?.[field.key]) || 0), 0);
+              const avg = (sum / validLength).toFixed(1);
               return `- ${field.label}：${avg}${field.unit || ''}`;
             });
 
@@ -201,8 +232,10 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 【日期與因果邏輯】(極度重要)：
+   - 使用者本次指定詢問的日期區間為：${intent.start} 至 ${intent.end}。
    - 詢問「恢復指數」與「發炎風險」時，只能看「結算日 (record_end)」的日期來回答。
    - 詢問「睡眠生理指標」（包含：HBI低氧負擔指數、最低/最高/平均脈搏、血氧、睡眠時間等）時，絕對只能看「入睡日 (record_date)」的日期來回答，嚴禁看 record_end。
+   - 【嚴格篩選答覆範圍】：你列出的每一條數據，其對應的目標日期（看恢復指數時比對 record_end，看睡眠指標時比對 record_date）必須「完全落在 ${intent.start} 至 ${intent.end} 區間內」。超出此區間的數據（例如雖然被包裹在上下文中，但日期不符）請自動忽略，絕對不可列在回答中！
    - 兩者之間的關係是：前一晚「入睡日 (record_date)」的睡眠生理狀況，會決定隔天「結算日 (record_end)」的恢復指數。
    - 範例：如果使用者問「5月12日的HBI」，你必須去尋找「入睡日 (record_date)」為 5月12日 那一區塊的 HBI 數值。
 3. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
