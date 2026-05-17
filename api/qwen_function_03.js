@@ -136,13 +136,12 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
 
             return `
-[單日健康紀錄]
-📅 結算日 (主要基準日 record_end): ${raw.record_end || "無"} ${endWeekday}
-📍 【今日結果】：依據前一晚的睡眠品質，計算得出：
+【資料組合】
+📍 屬於結算日 (record_end) [${raw.record_end || "無"} ${endWeekday}] 的結果：
 - 恢復指數: ${batteryDisplay}
 - 發炎風險: ${lightDisplay}
 
-🛏️ 【前一晚睡眠數據】 (入睡日 record_date: ${item.record_date} ${itemWeekday}):
+🛏️ 屬於入睡日 (record_date) [${item.record_date} ${itemWeekday}] 的生理數據：
 - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
 - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
 - 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
@@ -202,13 +201,10 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 【日期與因果邏輯】(極度重要)：
-   - 使用者詢問「今天」或「某天」的「恢復指數」與「發炎風險」時，主要日期基準是「結算日 (record_end)」。
-   - 使用者詢問「今天」或「某天」的「睡眠生理指標（如最低/最高/平均脈搏、血氧、睡眠時間等）」時，主要日期基準是「入睡日 (record_date)」。
-   - 「恢復指數」與「發炎風險」是 record_end 當天的結果。
-   - 這個結果是經由前一晚「入睡日 (record_date)」的睡眠數據計算出來的。
-   - 恢復指數和發炎風險要看 record_end 的數據輸出，嚴禁看 record_date 的數據輸出。
-   - 睡眠生理指標（如最低/最高/平均脈搏、血氧、睡眠時間等，要看 record_date 的數據輸出，嚴禁看 record_end 的數據輸出。
-   - 解釋數據時，請將「恢復指數」/「發炎風險」和「睡眠生理指標」連結起來。例如：「因為你前一晚 (record_date) 的深睡期比例不錯，所以今天 (record_end) 的恢復指數有達到 73% 哦！」
+   - 詢問「恢復指數」與「發炎風險」時，只能看「結算日 (record_end)」的日期來回答。
+   - 詢問「睡眠生理指標」（包含：HBI低氧負擔指數、最低/最高/平均脈搏、血氧、睡眠時間等）時，絕對只能看「入睡日 (record_date)」的日期來回答，嚴禁看 record_end。
+   - 兩者之間的關係是：前一晚「入睡日 (record_date)」的睡眠生理狀況，會決定隔天「結算日 (record_end)」的恢復指數。
+   - 範例：如果使用者問「5月12日的HBI」，你必須去尋找「入睡日 (record_date)」為 5月12日 那一區塊的 HBI 數值。
 3. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
 4. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
 5. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
