@@ -1,4 +1,4 @@
-// qwen_function_07.js
+// qwen_function_08.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -96,13 +96,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     } catch (e) { console.log("意圖解析失敗"); }
 
     // ==========================================
-    // 第二階段：抓取並「格式化」數據
+    // 第二階段：抓取並「格式化」數據（完全對齊日曆日期）
     // ==========================================
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
       
-      // 新增：日期偏移小工具，用來擴大 API 抓取範圍
+      // 日期偏移小工具
       const getCustomOffsetDate = (baseDateStr, offset) => {
         const [y, m, d] = baseDateStr.split('-');
         const dateObj = new Date(y, m - 1, d);
@@ -110,8 +110,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
       };
 
-      // 因為後端主要是比對 record_end，為了讓入睡日 (record_date) 也能完整涵蓋使用者要求的結束日期，
-      // 我們將 API 請求的結束日期延後 1 天（例如要求到 05-14，我們就抓到 05-15），確保 05-14 當晚入睡的生理數據有被撈到。
+      // 為了完整涵蓋邊界，API 結束日期自動延後 1 天
       const apiStart = intent.start;
       const apiEnd = getCustomOffsetDate(intent.end, 1);
       
@@ -122,103 +121,121 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         const finalContextData = await dataRes.json();
         
         if (finalContextData.length > 0) {
-          healthContext = finalContextData.map(item => {
-            const raw = item.raw_json || {}; // 修正點 2：raw 只宣告一次
-            
-            const itemDateObj = parseDate(item.record_date);
-            const itemWeekday = itemDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
+          // 1. 動態產生使用者詢問的精準日期陣列（Calendar Dates）
+          const dateArray = [];
+          let current = parseDate(intent.start);
+          const endLimit = parseDate(intent.end);
+          while (current <= endLimit) {
+            const yy = current.getFullYear();
+            const mm = String(current.getMonth() + 1).padStart(2, '0');
+            const dd = String(current.getDate()).padStart(2, '0');
+            dateArray.push(`${yy}-${mm}-${dd}`);
+            current.setDate(current.getDate() + 1);
+          }
 
-            let endWeekday = "";
-            if (raw.record_end && raw.record_end !== "無") {
-              const endDateObj = parseDate(raw.record_end.split(' ')[0]);
-              endWeekday = `(${endDateObj.toLocaleDateString('zh-TW', { weekday: 'short' })})`;
+          // 2. 依照「日曆日期」重組文字，消滅 AI 的日期混淆
+          const contextBlocks = dateArray.map(targetDate => {
+            const targetDateObj = parseDate(targetDate);
+            const weekday = targetDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
+
+            // 尋找這一天的「當天早晨醒來結算」（比對 record_end 的日期部分）
+            const wakeRow = finalContextData.find(d => d.raw_json?.record_end?.split(' ')[0] === targetDate);
+            // 尋找這一天的「當天晚上入睡生理數據」（比對 record_date）
+            const sleepRow = finalContextData.find(d => d.record_date === targetDate);
+
+            let blockText = `=== 日期：${targetDate} (週${weekday}) ===\n`;
+
+            // 組合早晨數據
+            if (wakeRow) {
+              const rawWake = wakeRow.raw_json || {};
+              const battery = rawWake.Personal_Battery_weighted_round;
+              const light = rawWake.light_status;
+              const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
+              const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
+              blockText += `☀️ 【當天早晨醒來結算報告】：\n`;
+              blockText += `   - 恢復指數: ${batteryDisplay}\n`;
+              blockText += `   - 發炎風險: ${lightDisplay}\n`;
+            } else {
+              blockText += `☀️ 【當天早晨醒來結算報告】：無數據\n`;
             }
 
-            const tst = raw.TST_min || 0;
-            const trt = raw.TRT_min || 0;
-            const n3Min = raw.N3_min || 0;
-            const n1n2Min = raw.N1N2_min || 0;
-            const remMin = raw.REM_min || 0;
-            
-            const n3Time = `${Math.floor(n3Min / 60)}時${n3Min % 60}分`;
-            const n1n2Time = `${Math.floor(n1n2Min / 60)}時${n1n2Min % 60}分`;
-            const remTime = `${Math.floor(remMin / 60)}時${remMin % 60}分`;
+            // 組合夜晚數據
+            if (sleepRow) {
+              const rawSleep = sleepRow.raw_json || {};
+              const tst = rawSleep.TST_min || 0;
+              const trt = rawSleep.TRT_min || 0;
+              const n3Min = rawSleep.N3_min || 0;
+              const n1n2Min = rawSleep.N1N2_min || 0;
+              const remMin = rawSleep.REM_min || 0;
+              const n3Time = `${Math.floor(n3Min / 60)}時${n3Min % 60}分`;
+              const n1n2Time = `${Math.floor(n1n2Min / 60)}時${n1n2Min % 60}分`;
+              const remTime = `${Math.floor(remMin / 60)}時${remMin % 60}分`;
 
-            const battery = raw.Personal_Battery_weighted_round;
-            const light = raw.light_status;
-            const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
-            const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
+              blockText += `🛏️ 【當天晚上入睡生理數據】：\n`;
+              blockText += `   - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分\n`;
+              blockText += `   - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分\n`;
+              blockText += `   - 睡眠效率: ${rawSleep.sleep_efficiency_pct || 0}%\n`;
+              blockText += `   - 睡眠結構: 深睡期 (N3) ${rawSleep.N3_pct || 0}% (${n3Time}), 淺睡期 (N1、N2) ${rawSleep.N1N2_pct || 0}% (${n1n2Time}), 快速動眼期 (REM) ${rawSleep.REM_pct || 0}% (${remTime}), 醒來及清醒期 (Wake) ${rawSleep.wake_minutes || 0}分\n`;
+              blockText += `   - 睡眠血氧飽和度: 平均 ${rawSleep.SpO2_mean || 0}% / 最高 ${rawSleep.SpO2_max || 0}% / 最低 ${rawSleep.SpO2_min || 0}%\n`;
+              blockText += `   - 睡眠低血氧時間比例: T90 ${rawSleep.T90_pct || 0}%, T89 ${rawSleep.T89_pct || 0}%, T88 ${rawSleep.T88_pct || 0}%\n`;
+              blockText += `   - 低氧負擔指數: HBI低氧負擔指數 ${rawSleep.HBI || 0}%min/h\n`;
+              blockText += `   - 睡眠血氧下降指數: ODI 3% ${rawSleep.ODI3_total || 0}次/h, ODI 4% ${rawSleep.ODI4_total || 0}次/h\n`;
+              blockText += `   - 睡眠呼吸頻率: 平均 ${rawSleep.RR_mean || 0} / 最高 ${rawSleep.RR_max || 0} / 最低 ${rawSleep.RR_min || 0} rpm\n`;
+              blockText += `   - 睡眠脈搏: 平均 ${rawSleep.HR_mean || 0} / 最高 ${rawSleep.HR_max || 0} / 最低 ${rawSleep.HR_min || 0} bpm\n`;
+              blockText += `   - 心率變異度: SDNN ${rawSleep.SDNN || 0}ms, rMSSD ${rawSleep.rMSSD || 0}ms, LF ${rawSleep.LF_ms2 || 0}ms2, HF ${rawSleep.HF_ms2 || 0}ms2, LF/HF ${rawSleep.LF_HF || 0}, pNN50 ${rawSleep.pNN50_pct || 0}%\n`;
+            } else {
+              blockText += `🛏️ 【當天晚上入睡生理數據】：無數據\n`;
+            }
 
-            return `
-【資料組合】
-📍 屬於結算日 (record_end) [${raw.record_end || "無"} ${endWeekday}] 的結果：
-- 恢復指數: ${batteryDisplay}
-- 發炎風險: ${lightDisplay}
+            return blockText;
+          });
 
-🛏️ 屬於入睡日 (record_date) [${item.record_date} ${itemWeekday}] 的生理數據：
-- 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分
-- 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分
-- 睡眠效率: ${raw.sleep_efficiency_pct || 0}%
-- 睡眠結構: 深睡期 (N3) ${raw.N3_pct || 0}% (${n3Time}), 淺睡期 (N1、N2) ${raw.N1N2_pct || 0}% (${n1n2Time}), 快速動眼期 (REM) ${raw.REM_pct || 0}% (${remTime}), 醒來及清醒期 (Wake) ${raw.wake_minutes || 0}分
-- 睡眠血氧飽和度: 平均 ${raw.SpO2_mean || 0}% / 最高 ${raw.SpO2_max || 0}% / 最低 ${raw.SpO2_min || 0}%
-- 睡眠低血氧時間比例: T90 ${raw.T90_pct || 0}%, T89 ${raw.T89_pct || 0}%, T88 ${raw.T88_pct || 0}%
-- 低氧負擔指數: HBI低氧負擔指數 ${raw.HBI || 0}%min/h
-- 睡眠血氧下降指數: ODI 3% ${raw.ODI3_total || 0}次/h, ODI 4% ${raw.ODI4_total || 0}次/h
-- 睡眠呼吸頻率: 平均 ${raw.RR_mean || 0} / 最高 ${raw.RR_max || 0} / 最低 ${raw.RR_min || 0} rpm
-- 睡眠脈搏: 平均 ${raw.HR_mean || 0} / 最高 ${raw.HR_max || 0} / 最低 ${raw.HR_min || 0} bpm
-- 心率變異度: SDNN ${raw.SDNN || 0}ms, rMSSD ${raw.rMSSD || 0}ms, LF ${raw.LF_ms2 || 0}ms2, HF ${raw.HF_ms2 || 0}ms2, LF/HF ${raw.LF_HF || 0}, pNN50 ${raw.pNN50_pct || 0}%`;
-          }).join('\n---\n');
+          healthContext = contextBlocks.join('\n---\n');
           
-          if (finalContextData.length > 7) {
-  // 1. 定義你想統計的欄位名稱 (必須與 raw_json 的 key 完全一致)
-  const fieldsToAvg = [
-    { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%' },
-    { key: 'TST_min', label: '平均總睡眠時間', unit: ' min' },
-    { key: 'sleep_efficiency_pct', label: '平均睡眠效率', unit: '%' },
-    { key: 'N3_pct', label: '平均深睡比例 (N3)', unit: '%' },
-    { key: 'N1N2_pct', label: '平均淺睡比例 (N1、N2)', unit: '%' },
-    { key: 'REM_pct', label: '平均快速動眼期比例 (REM)', unit: '%' },
-    { key: 'SpO2_mean', label: '平均血氧飽和度', unit: '%' },
-    { key: 'T90_pct', label: '平均T90比例', unit: '%' },
-    { key: 'T89_pct', label: '平均T89比例', unit: '%' },
-    { key: 'T88_pct', label: '平均T88比例', unit: '%' },
-    { key: 'HBI', label: '平均低氧負擔指數', unit: '%min/h' },
-    { key: 'ODI3_total', label: '平均 ODI 3%', unit: '次/h' },
-    { key: 'ODI4_total', label: '平均 ODI 4%', unit: '次/h' },
-    { key: 'HR_mean', label: '平均脈搏', unit: ' bpm' },
-    { key: 'RR_mean', label: '平均呼吸頻率', unit: 'rpm' },
-    { key: 'SDNN', label: '平均SDNN', unit: 'ms' },
-    { key: 'rMSSD', label: '平均rMSSD', unit: 'ms' },
-    { key: 'LF_ms2', label: '平均LF', unit: 'ms2' },
-    { key: 'HF_ms2', label: '平均HF', unit: 'ms2' },
-    { key: 'LF_HF', label: '平均LF/HF', unit: '' },
-    { key: 'pNN50_pct', label: '平均pNN50', unit: '%' }
-  ];
+          // 多日統計摘要平均值（精準計算使用者指定的這幾天）
+          if (dateArray.length >= 7) {
+            const fieldsToAvg = [
+              { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%', isSleep: false },
+              { key: 'TST_min', label: '平均總睡眠時間', unit: ' min', isSleep: true },
+              { key: 'sleep_efficiency_pct', label: '平均睡眠效率', unit: '%', isSleep: true },
+              { key: 'N3_pct', label: '平均深睡比例 (N3)', unit: '%', isSleep: true },
+              { key: 'N1N2_pct', label: '平均淺睡比例 (N1、N2)', unit: '%', isSleep: true },
+              { key: 'REM_pct', label: '平均快速動眼期比例 (REM)', unit: '%', isSleep: true },
+              { key: 'SpO2_mean', label: '平均血氧飽和度', unit: '%', isSleep: true },
+              { key: 'T90_pct', label: '平均T90比例', unit: '%', isSleep: true },
+              { key: 'T89_pct', label: '平均T89比例', unit: '%', isSleep: true },
+              { key: 'T88_pct', label: '平均T88比例', unit: '%', isSleep: true },
+              { key: 'HBI', label: '平均低氧負擔指數', unit: '%min/h', isSleep: true },
+              { key: 'ODI3_total', label: '平均 ODI 3%', unit: '次/h', isSleep: true },
+              { key: 'ODI4_total', label: '平均 ODI 4%', unit: '次/h', isSleep: true },
+              { key: 'HR_mean', label: '平均脈搏', unit: ' bpm', isSleep: true },
+              { key: 'RR_mean', label: '平均呼吸頻率', unit: 'rpm', isSleep: true },
+              { key: 'SDNN', label: '平均SDNN', unit: 'ms', isSleep: true },
+              { key: 'rMSSD', label: '平均rMSSD', unit: 'ms', isSleep: true },
+              { key: 'LF_ms2', label: '平均LF', unit: 'ms2', isSleep: true },
+              { key: 'HF_ms2', label: '平均HF', unit: 'ms2', isSleep: true },
+              { key: 'LF_HF', label: '平均LF/HF', unit: '', isSleep: true },
+              { key: 'pNN50_pct', label: '平均pNN50', unit: '%', isSleep: true }
+            ];
 
             const summaryLines = fieldsToAvg.map(field => {
-              // 區分睡眠指標與恢復指標，精準過濾出真正屬於使用者指定區間內的資料來計算平均值
-              const filteredData = finalContextData.filter(cur => {
-                const isSleepMetric = [
-                  'TST_min', 'sleep_efficiency_pct', 'N3_pct', 'N1N2_pct', 'REM_pct', 
-                  'SpO2_mean', 'T90_pct', 'T89_pct', 'T88_pct', 'HBI', 'ODI3_total', 
-                  'ODI4_total', 'HR_mean', 'RR_mean', 'SDNN', 'rMSSD', 'LF_ms2', 'HF_ms2', 'LF_HF', 'pNN50_pct'
-                ].includes(field.key);
+              let sum = 0;
+              let count = 0;
+              dateArray.forEach(targetDate => {
+                const row = field.isSleep 
+                  ? finalContextData.find(d => d.record_date === targetDate)
+                  : finalContextData.find(d => d.raw_json?.record_end?.split(' ')[0] === targetDate);
                 
-                if (isSleepMetric) {
-                  return cur.record_date >= intent.start && cur.record_date <= intent.end;
-                } else {
-                  const rEnd = cur.raw_json?.record_end?.split(' ')[0];
-                  return rEnd && rEnd >= intent.start && rEnd <= intent.end;
+                if (row && row.raw_json?.[field.key] !== undefined && row.raw_json?.[field.key] !== null) {
+                  sum += Number(row.raw_json[field.key]) || 0;
+                  count++;
                 }
               });
-
-              const validLength = filteredData.length || 1; // 防呆避免除以 0
-              const sum = filteredData.reduce((acc, cur) => acc + (Number(cur.raw_json?.[field.key]) || 0), 0);
-              const avg = (sum / validLength).toFixed(1);
+              const avg = count > 0 ? (sum / count).toFixed(1) : "0.0";
               return `- ${field.label}：${avg}${field.unit || ''}`;
             });
 
-            healthContext = `【多日統計摘要 (共 ${finalContextData.length} 天)】\n${summaryLines.join('\n')}\n` + healthContext;
+            healthContext = `【多日統計摘要 (共 ${dateArray.length} 天)】\n${summaryLines.join('\n')}\n` + healthContext;
           }
         }
       }
@@ -231,21 +248,23 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
-2. 【日期與因果邏輯】(極度重要)：
-   - 使用者本次指定詢問的日期區間為：${intent.start} 至 ${intent.end}。
-   - 詢問「恢復指數」與「發炎風險」時，只能看「結算日 (record_end)」的日期來回答。
-   - 詢問「睡眠生理指標」（包含：HBI低氧負擔指數、最低/最高/平均脈搏、血氧、睡眠時間等）時，絕對只能看「入睡日 (record_date)」的日期來回答，嚴禁看 record_end。
-   - 【嚴格篩選答覆範圍】：你列出的每一條數據，其對應的目標日期（看恢復指數時比對 record_end，看睡眠指標時比對 record_date）必須「完全落在 ${intent.start} 至 ${intent.end} 區間內」。超出此區間的數據（例如雖然被包裹在上下文中，但日期不符）請自動忽略，絕對不可列在回答中！
-   - 兩者之間的關係是：前一晚「入睡日 (record_date)」的睡眠生理狀況，會決定隔天「結算日 (record_end)」的恢復指數。
-   - 範例：如果使用者問「5月12日的HBI」，你必須去尋找「入睡日 (record_date)」為 5月12日 那一區塊的 HBI 數值。
-3. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
-4. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
-5. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
-6. 【知識庫使用規範】：
+2. 【數據查閱指南】(極度重要)：
+   - 數據文本已經以「=== 日期：YYYY-MM-DD ===」為區塊分好了。
+   - 使用者詢問某一天的任何數據（例如：「5月12日的HBI」或「5月12日的恢復指數」），請直接至該日期的區塊內，尋找對應的「早晨醒來結算報告」或「晚上入睡生理數據」作答。
+   - 後端已經幫你處理好所有的跨日、因果與日期對齊邏輯，請「百分之百相信並照抄」各日期區塊下的數據，你不需要（也絕對禁止）再自行增減日期或推算因果關係。
+
+3. 【健康分析因果邏輯】(僅在分析原因時啟用)：
+   - 若使用者進階詢問「為什麼某天早晨的恢復指數/發炎風險不好？」，請理解這是由「前一天晚上入睡」的生理數據所決定的。
+   - 你應主動查看「前一天日期區塊」的【當天晚上入睡生理數據】（如：血氧、HBI、心率等）來為使用者找出原因並進行關聯分析。
+   - 範例：如果使用者問「為什麼我 5月12日 早上恢復指數這麼低？」，你應該去翻看「5月11日」區塊內的「晚上入睡生理數據」來幫他找出睡眠問題。
+4. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
+5. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
+6. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
+7. 【知識庫使用規範】：
    - 知識庫僅用於「醫學常識」與「各項指標的標準值/參考範圍」查詢。
    - 【嚴格禁止】：絕對不可將知識庫 PDF 裡的「範例個案數值」誤當作是使用者的數據。
-7. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
-8. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
+8. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
+9. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
 
 請用平輩口吻回答，多用 emoji！`;
 
