@@ -101,7 +101,20 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${intent.end}`;
+      
+      // 💡 新增這段：在發送請求前，將結束日期往後延伸一天，確保後端 API 能撈到當晚入睡、隔天結算的資料
+      let apiEnd = intent.end;
+      if (intent.end) {
+        const endDateObj = new Date(intent.end);
+        endDateObj.setDate(endDateObj.getDate() + 1);
+        const yy = endDateObj.getFullYear();
+        const mm = String(endDateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(endDateObj.getDate()).padStart(2, '0');
+        apiEnd = `${yy}-${mm}-${dd}`;
+      }
+
+      // 💡 修改點：把網址最後面的 &end=${intent.end} 改成 &end=${apiEnd}
+      const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${intent.start}&end=${apiEnd}`;
       
       const dataRes = await fetch(healthApiUrl);
       if (dataRes.ok) {
@@ -204,8 +217,9 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 2. 【資料搜尋與對應邏輯】(極度重要，請嚴格遵守)：
    - 每一筆數據列都包含「結算日 (record_end)」與「入睡日 (record_date)」。當使用者詢問特定日期的指標時，請務必按照以下規則「尋找對應的資料列」並「提取數值」：
    - (A) 睡眠期間的指標（如：最低脈搏、HBI 低氧負擔指數、血氧、睡眠時間等）：
-     👉 【搜尋規則】：請務必去尋找「入睡日 (record_date)」符合詢問日期的那一列資料，並提取該列的數值！
-     👉 【絕對禁止】：嚴禁去抓取 record_end 等於該日期的資料列，這會導致你抓到前一天的睡眠數值！回答時，也請一律使用 record_date 作為日期標題。
+     👉 【搜尋規則】：使用者詢問的日期，必須完美對應到「入睡日 (record_date)」。請去尋找 record_date 符合詢問日期的那一列資料，並提取該列的數值！
+     👉 【絕對禁止】：嚴禁因為找不到資料就自行向前或向後「平移」一天來湊數！如果提供的數據中沒有該日期的 record_date，請直接老實回答該日期無資料。
+     👉 【標題規範】：回答時，請一律使用 record_date 作為日期標題。
    - (B) 起床後的結果指標（如：恢復指數、發炎風險）：
      👉 【搜尋規則】：請務必尋找「結算日 (record_end)」符合詢問日期的資料列，並提取數值。回答時使用 record_end 作為日期標題。
    - (C) 【解釋數據因果時，請將兩者正確連結】：例如：「因為你前一晚 (record_date) 的深睡期比例不錯，所以今天 (record_end) 的恢復指數有達到 73% 哦！」
