@@ -72,9 +72,16 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請判斷使用者的問題：「${prompt}」的意圖。
 
 【判斷規則】
-1. 若使用者想看「趨勢圖」、「圖表」、「折線圖」，或語意上想看「一段時間的數據變化趨勢」(不只是文字說明)，請將 need_trend_chart 設為 true。
+1. 若使用者想看「趨勢圖」、「圖表」、「折線圖」，或語意上想看「一段時間的數據變化趨勢」，請將 need_trend_chart 設為 true。並且判斷他想看哪一種，將 trend_type 設為以下之一：
+   - "all"：明確說要「完整」、「全部」圖表
+   - "battery"：提到「恢復指數」
+   - "n3"：提到「深睡期」、「N3」
+   - "rmssd"：提到「rMSSD」
+   - "hrmin"：提到「睡眠最低脈搏」、「最低心率」
+   - "hbi"：提到「HBI」、「低氧負擔指數」
+   - "unknown"：如果沒有明確指定哪一種，或是只說「圖表」、「趨勢」
 2. 若明確提到健康指標或日期，請輸出對應的 start 和 end，並將 need_data 設為 true。
-3. 若回答模糊（例如：「都可以」、「看看」、「隨便」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
+3. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
 4. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
 
 【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
@@ -96,11 +103,30 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
     } catch (e) { console.log("意圖解析失敗"); }
     // 👇 2. 新增這段攔截邏輯：如果是要看圖表，就直接回傳，不要去撈資料了
-    if (intent.need_trend_chart) {
-      return res.status(200).json({ 
-        action: 'show_trend_options', 
-        text: "🔍 想查看哪一種趨勢圖表呢？" 
-      });
+        if (intent.need_trend_chart) {
+      const trendNames = {
+        "all": "📊 完整圖表",
+        "battery": "📈 恢復指數",
+        "n3": "🌙 深睡期 (N3)",
+        "rmssd": "🌿 rMSSD",
+        "hrmin": "💓 睡眠最低脈搏",
+        "hbi": "🫁 HBI 低氧負擔指數"
+      };
+
+      // 如果有明確抓到種類，且不是 unknown
+      if (intent.trend_type && trendNames[intent.trend_type]) {
+        return res.status(200).json({ 
+          action: 'show_specific_trend', 
+          trend_type: intent.trend_type,
+          text: `沒問題！為你送上最近的 ${trendNames[intent.trend_type]} 趨勢 👇` 
+        });
+      } else {
+        // 使用者沒說清楚，維持原本的選單
+        return res.status(200).json({ 
+          action: 'show_trend_options', 
+          text: "🔍 想查看哪一種趨勢圖表呢？" 
+        });
+      }
     }
 
     // ==========================================
@@ -260,7 +286,6 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
    - 數據文本已經以「=== 日期：YYYY-MM-DD ===」為區塊分好了。
    - 使用者詢問某一天的任何數據（例如：「5月12日的HBI」或「5月12日的恢復指數」），請直接至該日期的區塊內，尋找對應的「早晨醒來結算報告」或「晚上入睡生理數據」作答。
    - 後端已經幫你處理好所有的跨日、因果與日期對齊邏輯，請「百分之百相信並照抄」各日期區塊下的數據，你不需要（也絕對禁止）再自行增減日期或推算因果關係。
-
 3. 【健康分析因果邏輯】(僅在分析原因時啟用)：
    - 若使用者進階詢問「為什麼某天早晨的恢復指數/發炎風險不好？」，請理解這是由「前一天晚上入睡」的生理數據所決定的。
    - 你應主動查看「前一天日期區塊」的【當天晚上入睡生理數據】（如：血氧、HBI、心率等）來為使用者找出原因並進行關聯分析。
