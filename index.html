@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n073</title>
+    <title>Soosyn 健康夥伴 n074</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -637,15 +637,6 @@ if (msg.includes("健康摘要")) {
         showDateActions('summary');
     }
     return; 
-}
-
-
-const keywords = ["趨勢圖", "圖表"];
-
-if (keywords.some(key => msg.includes(key))) {
-    await appendAiMessage("🔍 想查看哪一種趨勢圖表呢？");
-    appendTrendOptions();
-    return;
 }
 
     // 百科關鍵字
@@ -1917,6 +1908,19 @@ async function callGeminiAPI(prompt) {
         // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
+
+        // 👇 新增這段：如果後端判定要畫圖，就呼叫按鈕選單
+        if (data.action === 'show_trend_options') {
+            // 使用者沒說清楚，跳出選單
+            setTimeout(() => {
+                appendTrendOptions();
+            }, 500);
+        } else if (data.action === 'show_specific_trend') {
+            // 使用者有明確指定，直接畫特定圖表 (預設顯示 7 天)
+            setTimeout(() => {
+                renderTrendCard(data.trend_type, 7);
+            }, 500);
+        }
 
         return data.text;
     } catch (err) {
