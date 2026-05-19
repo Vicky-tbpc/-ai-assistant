@@ -1,4 +1,4 @@
-// qwen_function_09.js
+// qwen_function_10.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -12,7 +12,6 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    // 記得在這裡接收前端新傳來的變數
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
     // ==========================================
@@ -45,6 +44,52 @@ export default async function handler(req, res) {
     }
 
     // ==========================================
+    // 新增第一層：雲端 Gemini 2.5 Flash 語意校正守門員
+    // ==========================================
+    let refinedPrompt = prompt; // 預設使用原始輸入，作為安全降級的備案
+
+    if (prompt && action !== 'generate_greeting') {
+      try {
+        const geminiSystemPrompt = `你是一個醫療健康數據的「語意校正助手」。你的唯一任務是檢查使用者的輸入，修正模糊或容易混淆的專有名詞（特別是嚴格區分 HBI 與 HRV），並輸出一個最適合餵給 RAG 知識庫檢索的清晰句子。
+
+【核心規則】
+1. HBI 代表「心搏間期 (Heart Beat Interval)」，HRV 代表「心率變異率 (Heart Rate Variability)」，兩者數值與定義完全不同，絕對不可混淆。
+2. 如果使用者提到 HBI（或心搏間期），確保該專有名詞被精準保留，絕對不要被誤改成 HRV。
+3. 只輸出校正與優化後的「最終一句話」，絕對不要包含任何問候、解釋、引號（""）或多餘的聊天文字。`;
+
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: geminiSystemPrompt }]
+            },
+            contents: [{
+              role: "user",
+              parts: [{ text: `請依照規則校正以下句子。使用者輸入：${prompt}` }]
+            }],
+            generationConfig: {
+              temperature: 0.1, // 降低隨機性，確保名詞精準替換
+              maxOutputTokens: 100
+            }
+          })
+        });
+
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json();
+          if (geminiData.candidates && geminiData.candidates.length > 0) {
+            refinedPrompt = geminiData.candidates[0].content.parts[0].text.trim();
+            console.log(`[Gemini 語意校正成功] 原文字: "${prompt}" -> 校正後: "${refinedPrompt}"`);
+          }
+        } else {
+          console.error("[Gemini API 回應錯誤]", await geminiRes.text());
+        }
+      } catch (geminiErr) {
+        console.error("[Gemini 語意校正失敗] 轉為降級模式，維持原始輸入跑後續流程。錯誤:", geminiErr);
+      }
+    }
+
+    // ==========================================
     // 第一階段：極速意圖判斷 (Router) 
     // ==========================================
     const parseDate = (dateStr) => {
@@ -53,7 +98,6 @@ export default async function handler(req, res) {
     };
 
     const todayObj = parseDate(local_date);
-    // 修正點 1：只在這裡宣告一次 dayOfWeek
     const dayOfWeek = todayObj.toLocaleDateString('zh-TW', { weekday: 'long' });
 
     const getOffsetDate = (offset) => {
@@ -68,12 +112,13 @@ export default async function handler(req, res) {
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
 
-const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
-請判斷使用者的問題：「${prompt}」的意圖。
+    // 👇 這裡已經改成使用 refinedPrompt
+    const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+請判斷使用者的問題：「${refinedPrompt}」的意圖。
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
-   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數/電量)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
+   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
 2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
 3. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
 4. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
@@ -96,8 +141,9 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
       if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
     } catch (e) { console.log("意圖解析失敗"); }
-    // 👇 2. 新增這段攔截邏輯：如果是要看圖表，就直接回傳，不要去撈資料了
-        if (intent.need_trend_chart) {
+    
+    // 攔截邏輯：如果是要看圖表，就直接回傳，不要去撈資料了
+    if (intent.need_trend_chart) {
       const trendNames = {
         "all": "📊 完整圖表",
         "battery": "📈 恢復指數",
@@ -107,15 +153,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "hbi": "🫁 HBI 低氧負擔指數"
       };
 
-      // 如果有明確抓到種類，且不是 unknown
       if (intent.trend_type && trendNames[intent.trend_type]) {
         return res.status(200).json({ 
           action: 'show_specific_trend', 
           trend_type: intent.trend_type,
-          text: `沒問題！為你送上最近的 ${trendNames[intent.trend_type]} 趨勢 👇` 
+          text: `沒問題！為你送上最近的 ${trendNames[intent.trend_type]} 趨勢圖表 👇` 
         });
       } else {
-        // 使用者沒說清楚，維持原本的選單
         return res.status(200).json({ 
           action: 'show_trend_options', 
           text: "🔍 想查看哪一種趨勢圖表呢？" 
@@ -124,13 +168,12 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     }
 
     // ==========================================
-    // 第二階段：抓取並「格式化」數據（完全對齊日曆日期）
+    // 第二階段：抓取並「格式化」數據
     // ==========================================
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
       
-      // 日期偏移小工具
       const getCustomOffsetDate = (baseDateStr, offset) => {
         const [y, m, d] = baseDateStr.split('-');
         const dateObj = new Date(y, m - 1, d);
@@ -138,7 +181,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
       };
 
-      // 為了完整涵蓋邊界，API 結束日期自動延後 1 天
       const apiStart = intent.start;
       const apiEnd = getCustomOffsetDate(intent.end, 1);
       
@@ -149,7 +191,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         const finalContextData = await dataRes.json();
         
         if (finalContextData.length > 0) {
-          // 1. 動態產生使用者詢問的精準日期陣列（Calendar Dates）
           const dateArray = [];
           let current = parseDate(intent.start);
           const endLimit = parseDate(intent.end);
@@ -161,19 +202,15 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             current.setDate(current.getDate() + 1);
           }
 
-          // 2. 依照「日曆日期」重組文字，消滅 AI 的日期混淆
           const contextBlocks = dateArray.map(targetDate => {
             const targetDateObj = parseDate(targetDate);
             const weekday = targetDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
 
-            // 尋找這一天的「當天早晨醒來結算」（比對 record_end 的日期部分）
             const wakeRow = finalContextData.find(d => d.raw_json?.record_end?.split(' ')[0] === targetDate);
-            // 尋找這一天的「當天晚上入睡生理數據」（比對 record_date）
             const sleepRow = finalContextData.find(d => d.record_date === targetDate);
 
             let blockText = `=== 日期：${targetDate} (週${weekday}) ===\n`;
 
-            // 組合早晨數據
             if (wakeRow) {
               const rawWake = wakeRow.raw_json || {};
               const battery = rawWake.Personal_Battery_weighted_round;
@@ -187,7 +224,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               blockText += `☀️ 【當天早晨醒來結算報告】：無數據\n`;
             }
 
-            // 組合夜晚數據
             if (sleepRow) {
               const rawSleep = sleepRow.raw_json || {};
               const tst = rawSleep.TST_min || 0;
@@ -220,7 +256,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
           healthContext = contextBlocks.join('\n---\n');
           
-          // 多日統計摘要平均值（精準計算使用者指定的這幾天）
           if (dateArray.length >= 7) {
             const fieldsToAvg = [
               { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%', isSleep: false },
@@ -272,7 +307,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     // ==========================================
     // 第三階段：最終回答
     // ==========================================
-const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
+    const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
@@ -296,7 +331,9 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 請用平輩口吻回答，多用 emoji！`;
 
     const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
-    const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
+    
+    // 👇 這裡也改成使用 refinedPrompt
+    const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${refinedPrompt}`;
 
     let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
@@ -317,7 +354,7 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
       },
       body: JSON.stringify({
         serial_number: serial_number,
-        user_query: prompt,
+        user_query: prompt, // 依然保留原始 prompt，讓後台有正確紀錄
         ai_response: aiText,
         record_date: local_date,
         record_time: local_time,
@@ -325,7 +362,6 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
-    // 2. 關鍵：告訴 Vercel 必須等這個任務跑完才能關掉伺服器環境
     waitUntil(logTask);
 
     return res.status(200).json({ text: aiText });
