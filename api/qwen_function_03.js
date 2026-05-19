@@ -50,10 +50,18 @@ export default async function handler(req, res) {
 
     if (prompt && action !== 'generate_greeting') {
       try {
-        const geminiSystemPrompt = `你是一個醫療健康數據的「語意校正助手」。你的唯一任務是檢查使用者的輸入，修正模糊或容易混淆的專有名詞（特別是嚴格區分 HBI 與 HRV），並輸出一個最適合餵給 RAG 知識庫檢索的清晰句子。
+        const geminiSystemPrompt = `你是一個醫療健康數據的「語意校正助手」。你的任務是檢查使用者的輸入，修正模糊口語、錯字或不流暢的句子。
 
 【核心規則】
-1. 只輸出校正與優化後的「最終一句話」，絕對不要包含任何問候、解釋、引號（""）或多餘的聊天文字。`;
+1. 只輸出校正與優化後的「最終一句話」，絕對不要包含任何問候、解釋、引號（""）或多餘的聊天文字。
+2. 【嚴格禁止過度刪減】：絕對不可刪除使用者原句中的「時間範圍」（例如：最近7天、今天、昨天）以及「核心關鍵字與訴求」（例如：趨勢、分析、圖表、報告、為什麼、原因、HBI、恢復指數）。你必須完整保留使用者原本想詢問的意圖！
+
+【校正範例】
+- 輸入：我的HBI趨勢分析 -> 輸出：我的HBI趨勢分析
+- 輸入：HBI數值的趨勢 -> 輸出：HBI數值的趨勢
+- 輸入：可以給我最近7天的趨勢分析嗎 -> 輸出：請提供我最近7天的趨勢分析
+- 輸入：今天的天氣分析 -> 輸出：今天的天氣分析
+- 輸入：發炎風線5-18是綠燈，5-19是紅燈，為何判斷不同 -> 輸出：發炎風險5-18是綠燈，5-19是紅燈，為何判斷不同`;
 
         const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
           method: 'POST',
