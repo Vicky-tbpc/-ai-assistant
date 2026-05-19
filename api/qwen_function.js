@@ -1,4 +1,4 @@
-// qwen_function_09.js
+// qwen_function_11.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -178,11 +178,14 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               const rawWake = wakeRow.raw_json || {};
               const battery = rawWake.Personal_Battery_weighted_round;
               const light = rawWake.light_status;
+              const rhr = rawWake.RHR_raw;
               const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
               const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
+              const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
               blockText += `☀️ 【當天早晨醒來結算報告】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
+              blockText += `   - 靜息心率: ${rhrDisplay}\n`;
             } else {
               blockText += `☀️ 【當天早晨醒來結算報告】：無數據\n`;
             }
@@ -224,6 +227,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
           if (dateArray.length >= 7) {
             const fieldsToAvg = [
               { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%', isSleep: false },
+              { key: 'RHR_raw', label: '平均靜息心率', unit: 'bpm', isSleep: false },
               { key: 'TST_min', label: '平均總睡眠時間', unit: ' min', isSleep: true },
               { key: 'sleep_efficiency_pct', label: '平均睡眠效率', unit: '%', isSleep: true },
               { key: 'N3_pct', label: '平均深睡比例 (N3)', unit: '%', isSleep: true },
@@ -236,7 +240,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               { key: 'HBI', label: '平均低氧負擔指數', unit: '%min/h', isSleep: true },
               { key: 'ODI3_total', label: '平均 ODI 3%', unit: '次/h', isSleep: true },
               { key: 'ODI4_total', label: '平均 ODI 4%', unit: '次/h', isSleep: true },
-              { key: 'HR_mean', label: '平均脈搏', unit: ' bpm', isSleep: true },
+              { key: 'HR_mean', label: '平均脈搏', unit: 'bpm', isSleep: true },
               { key: 'RR_mean', label: '平均呼吸頻率', unit: 'rpm', isSleep: true },
               { key: 'SDNN', label: '平均SDNN', unit: 'ms', isSleep: true },
               { key: 'rMSSD', label: '平均rMSSD', unit: 'ms', isSleep: true },
