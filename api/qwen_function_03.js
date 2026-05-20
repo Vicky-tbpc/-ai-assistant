@@ -282,7 +282,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     // 第三階段：最終回答 (分流處理)
     // ==========================================
     
-    // 定義 Gemini 呼叫輔助函式
+// 定義 Gemini 呼叫輔助函式
     const callGemini = async (geminiPrompt, currentHistory = []) => {
       let contents = currentHistory.map(h => ({
         role: h.role === 'user' ? 'user' : 'model',
@@ -290,7 +290,9 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       }));
       contents.push({ role: 'user', parts: [{ text: geminiPrompt }] });
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+      // ✅ 修正點：直接使用 process.env.GEMINI_API_KEY，避免作用域抓不到的問題
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
