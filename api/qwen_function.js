@@ -73,7 +73,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
-   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
+   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
 2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
 3. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
 4. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
