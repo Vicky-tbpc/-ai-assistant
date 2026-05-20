@@ -1162,17 +1162,18 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             movingAvgs.push(avg); lowerBounds.push(avg * 0.9); upperBounds.push(avg * 1.1);
         } else if (type === 'hrmin') {
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
-        } else {
-            movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         } else if (type === 'rhr') {
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
+        } else {
+            movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
+        
         }
     });
 
     const pointColors = dailyValues.map((v, i) => {
         const ma = movingAvgs[i];
         if (type === 'battery' && v < ma) return '#ff8c73';
-        if (type === 'rhr' && v < ma) return '#ff8c73';
+        if (type === 'rhr' && v > upperBounds[i]) return '#ff8c73';
         if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
         if (type === 'rmssd' && v < lowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > upperBounds[i]) return '#ff8c73';
