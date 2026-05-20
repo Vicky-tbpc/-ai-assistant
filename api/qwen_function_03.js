@@ -290,12 +290,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         // 1. 處理歷史紀錄，加上嚴格防呆
         if (Array.isArray(currentHistory)) {
           currentHistory.forEach(h => {
-            // 找出文字內容 (相容 content, text, message 等常見命名)
             const textContent = h.content || h.text || h.message;
-            
-            // 確保文字存在且不是空白，才放進去
             if (textContent && textContent.trim() !== "") {
-              // Gemini 只接受 'user' 和 'model' 兩種 role，前端如果傳 'assistant' 會被轉成 'model'
               const role = h.role === 'user' ? 'user' : 'model';
               contents.push({
                 role: role,
@@ -318,7 +314,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             systemInstruction: {
               role: "system",
               parts: [{ text: "你是一個友好熱情的 AI 健康夥伴。絕對禁止使用敬稱「您」，請全部使用「你」，並以平輩口吻、繁體中文回答，可適當加入 emoji 讓對話更生動。" }]
-            }
+            },
+            // ✅ 新增：賦予 AI 使用 Google 搜尋的即時能力
+            tools: [
+              {
+                googleSearch: {}
+              }
+            ]
           })
         });
         
