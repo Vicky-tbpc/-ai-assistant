@@ -1286,7 +1286,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
 }
 
 function renderLegend(type, abnormalLabel) {
-    const isRange = (type === 'rmssd' || type === 'hrmin');
+    const isRange = (type === 'rmssd' || type === 'hrmin' || type === 'rhr');
     let html = `
         <div class="legend-row"><div class="dot-sample" style="background:#596b75"></div> 當日數值</div>
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
