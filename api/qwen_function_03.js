@@ -1,4 +1,4 @@
-// qwen_function_11.js
+// qwen_function_12.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -73,16 +73,20 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
-   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
+   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
 2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
 3. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
-4. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
+4. 【回答模式判定】(極度重要)：請新增一個欄位 "answer_mode"，其值只能是 "local"、"cloud" 或 "hybrid"。
+   - "local": 問題僅與個人的健康數據、睡眠、心率、地端知識庫有關。
+   - "cloud": 問題純粹是外部知識，例如：天氣狀況、飲食建議、大眾醫學標準、一般閒聊，不需要看個人數據。
+   - "hybrid": 問題同時涉及個人健康數據與外部環境因素(天氣/飲食/大眾標準)，需要結合兩者來回答。(例如：「我今天心率很高，跟天氣熱有關係嗎？」)
 
 【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
 1. 「今天」：${local_date}
 2. 「昨天」：${yesterdayStr}
 3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
-請「務必只」輸出 JSON：{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`;
+請「務必只」輸出 JSON 格式，範例如下：
+{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": false, "trend_type": "unknown", "answer_mode": "local"}`;
 
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
@@ -101,6 +105,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const trendNames = {
         "all": "📊 完整圖表",
         "battery": "📈 恢復指數",
+        "rhr": "❤️‍ 靜息心率",
         "n3": "🌙 深睡期 (N3)",
         "rmssd": "🌿 rMSSD",
         "hrmin": "💓 睡眠最低脈搏",
@@ -124,7 +129,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     }
 
     // ==========================================
-    // 第二階段：抓取並「格式化」數據（完全對齊日曆日期）
+    // 第二階段：抓取並「格式化」數據 (僅在需要數據時)
     // ==========================================
     let healthContext = "目前沒有相關數據。";
     if (intent.need_data && intent.start && intent.end) {
@@ -274,9 +279,82 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     }
 
     // ==========================================
-    // 第三階段：最終回答
+    // 第三階段：最終回答 (分流處理)
     // ==========================================
-const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
+    
+    // 定義 Gemini 呼叫輔助函式
+    const callGemini = async (geminiPrompt, currentHistory = []) => {
+      let contents = currentHistory.map(h => ({
+        role: h.role === 'user' ? 'user' : 'model',
+        parts: [{ text: h.content }]
+      }));
+      contents.push({ role: 'user', parts: [{ text: geminiPrompt }] });
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: contents,
+          systemInstruction: {
+            role: "system",
+            parts: [{ text: "你是一個友好熱情的 AI 健康夥伴。絕對禁止使用敬稱「您」，請全部使用「你」，並以平輩口吻、繁體中文回答，可適當加入 emoji 讓對話更生動。" }]
+          }
+        })
+      });
+      const data = await response.json();
+      return data.candidates[0].content.parts[0].text;
+    };
+
+    // 定義 AnythingLLM (Qwen) 呼叫輔助函式
+    const callQwen = async (qwenPrompt) => {
+      const res = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: qwenPrompt, mode: "chat" })
+      });
+      const result = await res.json();
+      return result.textResponse;
+    };
+
+    const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
+    let aiText = "";
+    let usedModel = "";
+
+    if (intent.answer_mode === "cloud") {
+      // 🟢 模式一：純雲端 (Gemini)
+      const cloudPrompt = `今天是 ${local_date}。
+使用者問：「${prompt}」。
+請直接根據你的豐富知識（如天氣狀況、飲食建議、大眾醫學標準等）來回答使用者的問題。`;
+      aiText = await callGemini(cloudPrompt, history);
+      usedModel = 'LLM-Gemini-Cloud';
+
+    } else if (intent.answer_mode === "hybrid") {
+      // 🟡 模式二：混合模式 (先 Qwen 後 Gemini)
+      const qwenSystemPrompt = `你是一個健康數據分析師。請根據以下使用者數據進行初步分析：
+${healthContext}
+使用者問題：「${prompt}」
+請客觀、簡要地列出該數據的觀察與地端知識庫的相關解釋，不用作過多的噓寒問暖，因為接下來會交由最終客服整理。`;
+      
+      const qwenRawAnalysis = await callQwen(`${qwenSystemPrompt}\n\n${historyText}\n使用者: ${prompt}`);
+      
+      const hybridPrompt = `今天是 ${local_date}。
+針對使用者的問題：「${prompt}」
+
+我們有一個地端系統針對使用者的健康數據做出了以下初步分析：
+「${qwenRawAnalysis}」
+
+請你發揮強大的雲端知識庫（例如目前的天氣狀況、普遍的飲食建議、大眾標準），將上述的「地端個人數據分析」與「外部環境/常識」結合在一起，組成一個完整且好懂的回答提供給使用者。
+【規則】：
+1. 嚴禁對使用者提到「根據地端系統分析」等後台運作字眼，請將資訊內化，直接以你的口吻給出融會貫通的答案。
+2. 要像平輩朋友一樣自然，絕對禁止使用敬稱「您」，一律用「你」。`;
+
+      aiText = await callGemini(hybridPrompt, history);
+      usedModel = 'LLM-Hybrid-Qwen+Gemini';
+
+    } else {
+      // 🔵 模式三：純地端 (Qwen)
+      const localSystemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
@@ -296,21 +374,16 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
    - 【嚴格禁止】：絕對不可將知識庫 PDF 裡的「範例個案數值」誤當作是使用者的數據。
 8. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
 9. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
+10. 【語氣要求】：請用平輩朋友的口吻回答。絕對禁止在回覆中使用敬稱「您」，請全部使用「你」。
 
 請用平輩口吻回答，多用 emoji！`;
 
-    const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
-    const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
+      const finalChatPrompt = `${localSystemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
+      aiText = await callQwen(finalChatPrompt);
+      usedModel = 'LLM-Qwen-Local';
+    }
 
-    let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: finalChatPrompt, mode: "chat" })
-    });
-    
-    let finalResult = await finalRes.json();
-    const aiText = finalResult.textResponse;
-
+    // 將紀錄存入 Supabase，順便標記這次是用哪套模型回答的
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: {
@@ -325,11 +398,10 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
         ai_response: aiText,
         record_date: local_date,
         record_time: local_time,
-        ai_model: 'LLM-Qwen-function'
+        ai_model: usedModel // 動態寫入使用的模型
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
-    // 2. 關鍵：告訴 Vercel 必須等這個任務跑完才能關掉伺服器環境
     waitUntil(logTask);
 
     return res.status(200).json({ text: aiText });
