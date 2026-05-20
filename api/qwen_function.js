@@ -101,6 +101,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const trendNames = {
         "all": "📊 完整圖表",
         "battery": "📈 恢復指數",
+        "rhr": "❤️‍ 靜息心率",
         "n3": "🌙 深睡期 (N3)",
         "rmssd": "🌿 rMSSD",
         "hrmin": "💓 睡眠最低脈搏",
