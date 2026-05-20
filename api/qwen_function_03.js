@@ -282,26 +282,35 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     // 第三階段：最終回答 (分流處理)
     // ==========================================
     
-// 定義 Gemini 呼叫輔助函式
-    const callGemini = async (geminiPrompt, currentHistory = []) => {
+    // 💡 提前宣告這兩個變數，讓內層的函式可以動態修改它們
+    let aiText = "";
+    let usedModel = "";
+
+    // 1. 定義 AnythingLLM (Qwen) 呼叫輔助函式
+    const callQwen = async (qwenPrompt) => {
+      const res = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: qwenPrompt, mode: "chat" })
+      });
+      const result = await res.json();
+      return result.textResponse;
+    };
+
+    // 2. 定義 Gemini 呼叫輔助函式 (新增 successModelName 參數)
+    const callGemini = async (geminiPrompt, currentHistory = [], originalUserPrompt = "", successModelName = "") => {
       try {
         let contents = [];
-        
-        // 1. 處理歷史紀錄，加上嚴格防呆
         if (Array.isArray(currentHistory)) {
           currentHistory.forEach(h => {
             const textContent = h.content || h.text || h.message;
             if (textContent && textContent.trim() !== "") {
               const role = h.role === 'user' ? 'user' : 'model';
-              contents.push({
-                role: role,
-                parts: [{ text: textContent }]
-              });
+              contents.push({ role: role, parts: [{ text: textContent }] });
             }
           });
         }
 
-        // 2. 加上這次最新的問題 (Prompt)
         contents.push({ role: 'user', parts: [{ text: geminiPrompt }] });
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
@@ -315,51 +324,40 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               role: "system",
               parts: [{ text: "你是一個友好熱情的 AI 健康夥伴。絕對禁止使用敬稱「您」，請全部使用「你」，並以平輩口吻、繁體中文回答，可適當加入 emoji 讓對話更生動。" }]
             },
-            // ✅ 新增：賦予 AI 使用 Google 搜尋的即時能力
-            tools: [
-              {
-                googleSearch: {}
-              }
-            ]
+            tools: [{ googleSearch: {} }]
           })
         });
         
         const data = await response.json();
         
+        // 【狀況 A：API 拒絕或爆額度】
         if (!data.candidates || data.candidates.length === 0) {
-          console.error("❌ Gemini API 拒絕了請求，回傳內容:", JSON.stringify(data, null, 2));
-          return "抱歉，雲端大腦暫時連不上，或是 API 設定有點狀況，請檢查後台 Log 喔！😅";
+          console.error("❌ Gemini API 拒絕或爆額度，啟動 Qwen 備援:", JSON.stringify(data, null, 2));
+          usedModel = 'LLM-Fallback-Qwen'; // 💡 記帳：這次其實是地端救場的
+          const fallbackPrompt = `[系統提示：雲端大腦暫時連不上，請根據你的知識庫，以平輩的口吻回答]\n使用者問：${originalUserPrompt}`;
+          return await callQwen(fallbackPrompt);
         }
 
+        usedModel = successModelName; // 💡 成功了！正確登記這次用的雲端模型
         return data.candidates[0].content.parts[0].text;
       } catch (error) {
-        console.error("❌ 呼叫 Gemini 時發生程式例外錯誤:", error);
-        return "雲端系統發生了一些小錯誤，請稍後再試！🙏";
+        // 【狀況 B：網路完全斷線或未知的程式錯誤】
+        console.error("❌ 呼叫 Gemini 時發生例外錯誤，啟動 Qwen 備援:", error);
+        usedModel = 'LLM-Fallback-Qwen'; // 💡 記帳：這次也是地端救場的
+        const fallbackPrompt = `[系統提示：雲端大腦暫時連不上，請根據你的知識庫，以平輩的口吻回答]\n使用者問：${originalUserPrompt}`;
+        return await callQwen(fallbackPrompt);
       }
     };
 
-    // 定義 AnythingLLM (Qwen) 呼叫輔助函式
-    const callQwen = async (qwenPrompt) => {
-      const res = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: qwenPrompt, mode: "chat" })
-      });
-      const result = await res.json();
-      return result.textResponse;
-    };
-
     const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
-    let aiText = "";
-    let usedModel = "";
 
     if (intent.answer_mode === "cloud") {
       // 🟢 模式一：純雲端 (Gemini)
       const cloudPrompt = `今天是 ${local_date}。
 使用者問：「${prompt}」。
 請直接根據你的豐富知識（如天氣狀況、飲食建議、大眾醫學標準等）來回答使用者的問題。`;
-      aiText = await callGemini(cloudPrompt, history);
-      usedModel = 'LLM-Gemini-Cloud';
+      // ✅ 把原本想貼的標籤 'LLM-Gemini-Cloud' 當作第四個參數傳進去
+      aiText = await callGemini(cloudPrompt, history, prompt, 'LLM-Gemini-Cloud');
 
     } else if (intent.answer_mode === "hybrid") {
       // 🟡 模式二：混合模式 (先 Qwen 後 Gemini)
@@ -381,11 +379,12 @@ ${healthContext}
 1. 嚴禁對使用者提到「根據地端系統分析」等後台運作字眼，請將資訊內化，直接以你的口吻給出融會貫通的答案。
 2. 要像平輩朋友一樣自然，絕對禁止使用敬稱「您」，一律用「你」。`;
 
-      aiText = await callGemini(hybridPrompt, history);
-      usedModel = 'LLM-Hybrid-Qwen+Gemini';
+      // ✅ 把原本想貼的標籤 'LLM-Hybrid-Qwen+Gemini' 當作第四個參數傳進去
+      aiText = await callGemini(hybridPrompt, history, prompt, 'LLM-Hybrid-Qwen+Gemini');
 
     } else {
       // 🔵 模式三：純地端 (Qwen)
+      usedModel = 'LLM-Qwen-Local'; // 💡 純地端就直接在這邊標記
       const localSystemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 【生理數據解讀規則】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
@@ -412,7 +411,6 @@ ${healthContext}
 
       const finalChatPrompt = `${localSystemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
       aiText = await callQwen(finalChatPrompt);
-      usedModel = 'LLM-Qwen-Local';
     }
 
     // 將紀錄存入 Supabase，順便標記這次是用哪套模型回答的
