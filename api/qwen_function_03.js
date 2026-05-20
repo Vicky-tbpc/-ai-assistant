@@ -284,28 +284,41 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     
 // 定義 Gemini 呼叫輔助函式
     const callGemini = async (geminiPrompt, currentHistory = []) => {
-      let contents = currentHistory.map(h => ({
-        role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: h.content }]
-      }));
-      contents.push({ role: 'user', parts: [{ text: geminiPrompt }] });
+      try {
+        let contents = currentHistory.map(h => ({
+          role: h.role === 'user' ? 'user' : 'model',
+          parts: [{ text: h.content }]
+        }));
+        contents.push({ role: 'user', parts: [{ text: geminiPrompt }] });
 
-      // ✅ 修正點：直接使用 process.env.GEMINI_API_KEY，避免作用域抓不到的問題
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: contents,
-          systemInstruction: {
-            role: "system",
-            parts: [{ text: "你是一個友好熱情的 AI 健康夥伴。絕對禁止使用敬稱「您」，請全部使用「你」，並以平輩口吻、繁體中文回答，可適當加入 emoji 讓對話更生動。" }]
-          }
-        })
-      });
-      const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: contents,
+            systemInstruction: {
+              role: "system",
+              parts: [{ text: "你是一個友好熱情的 AI 健康夥伴。絕對禁止使用敬稱「您」，請全部使用「你」，並以平輩口吻、繁體中文回答，可適當加入 emoji 讓對話更生動。" }]
+            }
+          })
+        });
+        
+        const data = await response.json();
+        
+        // 🚨 新增防呆：檢查有沒有 candidates，沒有的話就把真實錯誤印出來
+        if (!data.candidates || data.candidates.length === 0) {
+          console.error("❌ Gemini API 拒絕了請求，回傳內容:", JSON.stringify(data, null, 2));
+          // 回傳一個溫和的錯誤提示給前端，避免直接當機
+          return "抱歉，雲端大腦暫時連不上，或是 API 設定有點狀況，請檢查後台 Log 喔！😅";
+        }
+
+        return data.candidates[0].content.parts[0].text;
+      } catch (error) {
+        console.error("❌ 呼叫 Gemini 時發生程式例外錯誤:", error);
+        return "雲端系統發生了一些小錯誤，請稍後再試！🙏";
+      }
     };
 
     // 定義 AnythingLLM (Qwen) 呼叫輔助函式
