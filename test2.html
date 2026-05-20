@@ -1120,7 +1120,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     // --- 【修改：動態決定日期標籤與體感數據對齊】 ---
     const labels = rawData.map(d => {
         let displayDate = d.record_date;
-        if (type === 'battery') {
+        if (type === 'battery' || type === 'rhr') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             displayDate = dateObj.toLocaleDateString('en-CA');
@@ -1130,7 +1130,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
 
     // 準備體感數據：battery 對齊隔天，其餘對齊當天
     const subjectiveValues = rawData.map(d => {
-        if (type === 'battery') {
+        if (type === 'battery' || type === 'rhr') {
             // 恢復指數要對齊「隔天」的體感
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
