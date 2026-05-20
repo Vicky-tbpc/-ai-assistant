@@ -285,10 +285,27 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 // 定義 Gemini 呼叫輔助函式
     const callGemini = async (geminiPrompt, currentHistory = []) => {
       try {
-        let contents = currentHistory.map(h => ({
-          role: h.role === 'user' ? 'user' : 'model',
-          parts: [{ text: h.content }]
-        }));
+        let contents = [];
+        
+        // 1. 處理歷史紀錄，加上嚴格防呆
+        if (Array.isArray(currentHistory)) {
+          currentHistory.forEach(h => {
+            // 找出文字內容 (相容 content, text, message 等常見命名)
+            const textContent = h.content || h.text || h.message;
+            
+            // 確保文字存在且不是空白，才放進去
+            if (textContent && textContent.trim() !== "") {
+              // Gemini 只接受 'user' 和 'model' 兩種 role，前端如果傳 'assistant' 會被轉成 'model'
+              const role = h.role === 'user' ? 'user' : 'model';
+              contents.push({
+                role: role,
+                parts: [{ text: textContent }]
+              });
+            }
+          });
+        }
+
+        // 2. 加上這次最新的問題 (Prompt)
         contents.push({ role: 'user', parts: [{ text: geminiPrompt }] });
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
@@ -307,10 +324,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         
         const data = await response.json();
         
-        // 🚨 新增防呆：檢查有沒有 candidates，沒有的話就把真實錯誤印出來
         if (!data.candidates || data.candidates.length === 0) {
           console.error("❌ Gemini API 拒絕了請求，回傳內容:", JSON.stringify(data, null, 2));
-          // 回傳一個溫和的錯誤提示給前端，避免直接當機
           return "抱歉，雲端大腦暫時連不上，或是 API 設定有點狀況，請檢查後台 Log 喔！😅";
         }
 
