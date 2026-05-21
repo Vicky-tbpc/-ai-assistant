@@ -72,7 +72,7 @@ export default async function handler(req, res) {
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
    - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
-2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢'] 或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
+2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
 3. 【外部即時資訊需求】：重要！判斷使用者的問題是否需要外部即時環境資訊或生活常識（例如：天氣、氣溫、中暑風險、流行疾病、節氣、今日運勢等）。
    - 如果需要，請將 need_external 設為 true，並在 external_query 欄位中寫下一個適合拿去詢問外部 Gemini API 的關鍵字或擴充查詢句（例如：「評估今日高溫與中暑風險」）。若不需要則設為 false。
 4. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
@@ -98,7 +98,6 @@ export default async function handler(req, res) {
       if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
     } catch (e) { console.log("意圖解析失敗"); }
 
-    // 🌟 新增 Log：讓你在 Vercel 後台一眼看穿地端 AI 到底有沒有打算抓外部資料
     console.log("👉【地端 Router 意圖解析結果】:", JSON.stringify(intent));
 
     if (intent.need_trend_chart) {
@@ -133,7 +132,8 @@ export default async function handler(req, res) {
     if (intent.need_external && intent.external_query) {
       try {
         const geminiApiKey = process.env.GEMINI_API_KEY;
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+        // 🌟 修正：改用官方推薦、最穩定支援 Google Search 聯網的 v1beta 節點與模型路徑
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
         
         const geminiPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請針對使用者的外部查詢主題：「${intent.external_query}」，提供精簡且關鍵的外部即時環境資訊、天氣分析、或生活健康指引。
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
 2. 字數請精簡控制在 150 字以內，不要有廢話，方便後續與使用者的個人生理數據進行整合。
 3. 請直接輸出內容，不要包含額外的解釋或 JSON 格式。`;
 
-        // 🌟 核心修正：在 body 內傳入 tools 參數，強迫 Gemini 啟用 Google Search 聯網搜尋
+        // 🌟 修正：優化 Google Search tool 的 JSON 結構，對齊官方標準規範
         const geminiRes = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -157,7 +157,21 @@ export default async function handler(req, res) {
           externalContext = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "暫時無法取得外部詳細資訊。";
           console.log("✅【Gemini 聯網搜尋結果】:", externalContext);
         } else {
-          console.error("❌ Gemini API 回傳錯誤狀態碼:", geminiRes.status);
+          const errText = await geminiRes.text();
+          console.error(`❌ Gemini API 回傳錯誤狀態碼: ${geminiRes.status}, 詳情:`, errText);
+          
+          // 備份機制：如果 2.5 依然 404，立刻降級嘗試傳統 1.5-flash 路徑（不帶 tool）確保至少不壞掉
+          const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+          const fallbackRes = await fetch(fallbackUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt + " (請根據你已知的知識回答即可)" }] }] })
+          });
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            externalContext = fallbackData.candidates?.[0]?.content?.parts?.[0]?.text || "暫時無法取得外部詳細資訊。";
+            console.log("⚠️【Gemini 降級無聯網回應】:", externalContext);
+          }
         }
       } catch (e) {
         console.error("💥 呼叫 Gemini 失敗:", e);
@@ -315,6 +329,7 @@ export default async function handler(req, res) {
       }
     }
 
+
     // ==========================================
     // 第三階段：最終地端 AI 整合回答
     // ==========================================
@@ -342,7 +357,7 @@ export default async function handler(req, res) {
 5. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
 6. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
 7. 【知識庫使用規範】：
-   - 知識庫僅用於「醫學常識' 與「各項指標的標準值/參考範圍」查詢。
+   - 知識庫僅用於「醫學常識」與「各項指標的標準值/參考範圍」查詢。
    - 【嚴格禁止】：絕對不可將知識庫 PDF 裡的「範例個案數值」誤當作是使用者的數據。
 8. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
 9. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
