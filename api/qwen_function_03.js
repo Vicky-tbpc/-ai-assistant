@@ -66,6 +66,7 @@ export default async function handler(req, res) {
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
 
+    // 🌟 修正點：強化第3點的意圖判斷，強制綁定個人生理數據
     const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請判斷使用者的問題：「${prompt}」的意圖。
 
@@ -73,8 +74,9 @@ export default async function handler(req, res) {
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
    - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
 2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
-3. 【外部即時資訊需求】：重要！判斷使用者的問題是否需要外部即時環境資訊或生活常識（例如：天氣、氣溫、中暑風險、流行疾病、節氣、今日運勢等）。
-   - 如果需要，請將 need_external 設為 true，並在 external_query 欄位中寫下一個適合拿去詢問外部 Gemini API 的關鍵字或擴充查詢句（例如：「評估今日高溫與中暑風險」）。若不需要則設為 false。
+3. 【外部資訊與綜合風險評估】：(極度重要)
+   - 判斷使用者的問題是否需要外部環境資訊（例如：天氣、氣溫、中暑風險、流行疾病等）。若是，將 need_external 設為 true，並在 external_query 寫下搜尋關鍵字（例如：「評估今日高溫與中暑風險」）。
+   - 🚨【強制綁定數據】：只要使用者詢問「我今天會不會中暑」、「我適合運動嗎」這類需要結合個人身體狀況來判斷的環境風險問題，請「務必同時」將 need_data 設為 true，並將 start 設為昨天 (${yesterdayStr})，end 設為今天 (${local_date})，這樣才能撈取他的生理數據做交叉比對！
 4. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
 5. 只有在明確閒聊且完全無關健康時，才將 need_data 與 need_external 設為 false。
 
@@ -132,7 +134,6 @@ export default async function handler(req, res) {
     if (intent.need_external && intent.external_query) {
       try {
         const geminiApiKey = process.env.GEMINI_API_KEY;
-        // 🌟 修正：改用官方推薦、最穩定支援 Google Search 聯網的 v1beta 節點與模型路徑
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
         
         const geminiPrompt = `今天是 ${local_date} (${dayOfWeek})。
@@ -142,7 +143,6 @@ export default async function handler(req, res) {
 2. 字數請精簡控制在 150 字以內，不要有廢話，方便後續與使用者的個人生理數據進行整合。
 3. 請直接輸出內容，不要包含額外的解釋或 JSON 格式。`;
 
-        // 🌟 修正：優化 Google Search tool 的 JSON 結構，對齊官方標準規範
         const geminiRes = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -160,7 +160,6 @@ export default async function handler(req, res) {
           const errText = await geminiRes.text();
           console.error(`❌ Gemini API 回傳錯誤狀態碼: ${geminiRes.status}, 詳情:`, errText);
           
-          // 備份機制：如果 2.5 依然 404，立刻降級嘗試傳統 1.5-flash 路徑（不帶 tool）確保至少不壞掉
           const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
           const fallbackRes = await fetch(fallbackUrl, {
             method: "POST",
@@ -328,7 +327,6 @@ export default async function handler(req, res) {
         }
       }
     }
-
 
     // ==========================================
     // 第三階段：最終地端 AI 整合回答
