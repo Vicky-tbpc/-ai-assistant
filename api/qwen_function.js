@@ -1,4 +1,4 @@
-// qwen_function_11.js
+// qwen_function_13.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -12,11 +12,10 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    // 記得在這裡接收前端新傳來的變數
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
     // ==========================================
-    // 新增：客製化 AI 開場白攔截區塊
+    // 客製化 AI 開場白攔截區塊
     // ==========================================
     if (action === 'generate_greeting') {
       const greetingPrompt = `你是一個友好熱情的 AI 健康夥伴。
@@ -25,12 +24,12 @@ export default async function handler(req, res) {
 【規則】
 1. 第一句請自由發揮，表達歡迎回來的心情，例如：「歡迎回來！我是你的健康夥伴 👋」。
 2. 【絕對禁止】：嚴格禁止在對話中出現使用者的名字或 AI 的名字，請用「你」來稱呼對方即可。
-2. 接著請根據以下指標狀態給予一句${metric_data.type}：
+3. 接著請根據以下指標狀態給予一句${metric_data.type}：
    - 指標：${metric_data.metric}
    - 狀態：${metric_data.status}
-3. 說明完後，最後加上一句引導詢問，例如：「接下來想看看哪個健康指標呢？」或「現在想從哪個部分開始了解呢？」
-4. 語氣要像平輩朋友一樣自然。
-5. 【絕對禁止】：嚴格禁止使用敬稱「您」，請全部使用「你」。
+4. 說明完後，最後加上一句引導詢問，例如：「接下來想看看哪個健康指標呢？」或「現在想從哪個部分開始了解呢？」
+5. 語氣要像平輩朋友一樣自然。
+6. 【絕對禁止】：嚴格禁止使用敬稱「您」，請全部使用「你」。
 
 請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
 
@@ -45,7 +44,7 @@ export default async function handler(req, res) {
     }
 
     // ==========================================
-    // 第一階段：極速意圖判斷 (Router) 
+    // 第一階段：主控地端 AI 意圖判斷 (Router)
     // ==========================================
     const parseDate = (dateStr) => {
       const [y, m, d] = dateStr.split('-');
@@ -53,7 +52,6 @@ export default async function handler(req, res) {
     };
 
     const todayObj = parseDate(local_date);
-    // 修正點 1：只在這裡宣告一次 dayOfWeek
     const dayOfWeek = todayObj.toLocaleDateString('zh-TW', { weekday: 'long' });
 
     const getOffsetDate = (offset) => {
@@ -68,21 +66,28 @@ export default async function handler(req, res) {
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
 
-const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+    // 🌟 修正點：強化第3點的意圖判斷，強制綁定個人生理數據
+    const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請判斷使用者的問題：「${prompt}」的意圖。
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
    - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
-2. 【純數據查詢】：若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
-3. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
-4. 只有在明確閒聊且完全無關健康時，才將 need_data 設為 false。
+2. 【數據與指標查詢】：
+   - 若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
+   - 🚨【指標科普防呆】：只要使用者的問題中包含了具體的健康指標名稱（例如：「靜息心率」、「深睡」、「血氧」、「HBI」等），不論他是問定義、問科普還是問好壞（例如：「靜息心率愈低愈好嗎」），請「一律強制」將 need_data 設為 true，並將 start 設為上週 (${lastWeekStartStr})，end 設為今天 (${local_date})。因為我們需要撈取他最近的數據，讓回答能結合他的個人現況！
+3. 【外部資訊與綜合風險評估】：(極度重要)
+   - 判斷使用者的問題是否需要外部環境資訊（例如：天氣、氣溫、中暑風險、流行疾病等）。若是，將 need_external 設為 true，並在 external_query 寫下搜尋關鍵字（例如：「評估今日高溫與中暑風險」）。
+   - 🚨【強制綁定數據】：只要使用者詢問「我今天會不會中暑」、「我適合運動嗎」這類需要結合個人身體狀況來判斷的環境風險問題，請「務必同時」將 need_data 設為 true，並將 start 設為昨天 (${yesterdayStr})，end 設為今天 (${local_date})，這樣才能撈取他的生理數據做交叉比對！
+4. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
+5. 只有在明確閒聊且完全無關健康時，才將 need_data 與 need_external 設為 false。
 
 【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
 1. 「今天」：${local_date}
 2. 「昨天」：${yesterdayStr}
 3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
-請「務必只」輸出 JSON：{"need_data": true, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`;
+
+請「務必只」輸出 JSON：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": true/false, "trend_type": "...", "need_external": true/false, "external_query": "..."}`;
 
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
@@ -91,13 +96,15 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     });
 
     let intentData = await intentRes.json();
-    let intent = { need_data: false };
+    let intent = { need_data: false, need_external: false };
     try {
       const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
       if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
     } catch (e) { console.log("意圖解析失敗"); }
-    // 👇 2. 新增這段攔截邏輯：如果是要看圖表，就直接回傳，不要去撈資料了
-        if (intent.need_trend_chart) {
+
+    console.log("👉【地端 Router 意圖解析結果】:", JSON.stringify(intent));
+
+    if (intent.need_trend_chart) {
       const trendNames = {
         "all": "📊 完整圖表",
         "battery": "📈 恢復指數",
@@ -108,7 +115,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "hbi": "🫁 HBI 低氧負擔指數"
       };
 
-      // 如果有明確抓到種類，且不是 unknown
       if (intent.trend_type && trendNames[intent.trend_type]) {
         return res.status(200).json({ 
           action: 'show_specific_trend', 
@@ -116,11 +122,61 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
           text: `沒問題！為你送上最近的 ${trendNames[intent.trend_type]} 趨勢圖表 👇` 
         });
       } else {
-        // 使用者沒說清楚，維持原本的選單
         return res.status(200).json({ 
           action: 'show_trend_options', 
           text: "🔍 想查看哪一種趨勢圖表呢？" 
         });
+      }
+    }
+
+    // ==========================================
+    // 新增階段：呼叫 Gemini API 獲取外部即時資訊
+    // ==========================================
+    let externalContext = "目前無外部即時資訊。";
+    if (intent.need_external && intent.external_query) {
+      try {
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+        
+        const geminiPrompt = `今天是 ${local_date} (${dayOfWeek})。
+請針對使用者的外部查詢主題：「${intent.external_query}」，提供精簡且關鍵的外部即時環境資訊、天氣分析、或生活健康指引。
+【規則】
+1. 請直接給出分析結論或關鍵數據（例如：今日體感溫度高達 38 度、紫外線偏強、或是某流感正處於高峰期等）。
+2. 字數請精簡控制在 150 字以內，不要有廢話，方便後續與使用者的個人生理數據進行整合。
+3. 請直接輸出內容，不要包含額外的解釋或 JSON 格式。`;
+
+        const geminiRes = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: geminiPrompt }] }],
+            tools: [{ googleSearch: {} }] 
+          })
+        });
+
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json();
+          externalContext = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "暫時無法取得外部詳細資訊。";
+          console.log("✅【Gemini 聯網搜尋結果】:", externalContext);
+        } else {
+          const errText = await geminiRes.text();
+          console.error(`❌ Gemini API 回傳錯誤狀態碼: ${geminiRes.status}, 詳情:`, errText);
+          
+          const fallbackUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+          const fallbackRes = await fetch(fallbackUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt + " (請根據你已知的知識回答即可)" }] }] })
+          });
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            externalContext = fallbackData.candidates?.[0]?.content?.parts?.[0]?.text || "暫時無法取得外部詳細資訊。";
+            console.log("⚠️【Gemini 降級無聯網回應】:", externalContext);
+          }
+        }
+      } catch (e) {
+        console.error("💥 呼叫 Gemini 失敗:", e);
+        externalContext = "外部即時資訊連線逾時或取得失敗。";
       }
     }
 
@@ -275,20 +331,28 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     }
 
     // ==========================================
-    // 第三階段：最終回答
+    // 第三階段：最終地端 AI 整合回答
     // ==========================================
-const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
-【生理數據解讀規則】
+    const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
+
+【重要數據與即時環境資訊】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
-2. 【數據查閱指南】(極度重要)：
+2. 外部即時/環境資訊（由外部 API 擷取）：
+   ${externalContext}
+
+【生理數據解讀規則】
+1. 【數據查閱指南】(極度重要)：
    - 數據文本已經以「=== 日期：YYYY-MM-DD ===」為區塊分好了。
    - 使用者詢問某一天的任何數據（例如：「5月12日的HBI」或「5月12日的恢復指數」），請直接至該日期的區塊內，尋找對應的「早晨醒來結算報告」或「晚上入睡生理數據」作答。
    - 後端已經幫你處理好所有的跨日、因果與日期對齊邏輯，請「百分之百相信並照抄」各日期區塊下的數據，你不需要（也絕對禁止）再自行增減日期或推算因果關係。
-3. 【健康分析因果邏輯】(僅在分析原因時啟用)：
+2. 【健康分析因果邏輯】(僅在分析原因時啟用)：
    - 若使用者進階詢問「為什麼某天早晨的恢復指數/發炎風險不好？」，請理解這是由「前一天晚上入睡」的生理數據所決定的。
    - 你應主動查看「前一天日期區塊」的【當天晚上入睡生理數據】（如：血氧、HBI、心率等）來為使用者找出原因並進行關聯分析。
    - 範例：如果使用者問「為什麼我 5月12日 早上恢復指數這麼低？」，你應該去翻看「5月11日」區塊內的「晚上入睡生理數據」來幫他找出睡眠問題。
+3. 【外部與健康數據整合邏輯】(極度重要)：
+   - 你必須將「使用者生理數據」、「外部即時資訊」與你的「RAG知識庫」進行交叉關聯分析。
+   - 範例情境：如果外部資訊顯示今天體感溫度高、中暑風險強，而生理數據顯示使用者「昨晚睡眠不足（總睡眠時間短或深睡 N3 不足）」或「發炎風險/心率偏高」，你必須在回答中主動點出這兩者的危險加乘效應（如：天氣熱 + 你昨晚沒睡飽 = 中暑機率大增！），並給予客製化的貼心提醒。
 4. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
 5. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
 6. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
@@ -298,7 +362,7 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
 8. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
 9. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
 
-請用平輩口吻回答，多用 emoji！`;
+請用平輩口吻回答，多用 emoji！全部使用「你」，絕對禁止使用敬稱「您」。`;
 
     const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
     const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
@@ -312,6 +376,7 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
     let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
+    // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: {
@@ -330,7 +395,6 @@ const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
-    // 2. 關鍵：告訴 Vercel 必須等這個任務跑完才能關掉伺服器環境
     waitUntil(logTask);
 
     return res.status(200).json({ text: aiText });
