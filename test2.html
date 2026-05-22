@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n076</title>
+    <title>Soosyn 健康夥伴 n075</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -278,22 +278,10 @@
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         <!-- 這裡加上警語 -->
-    <div class="disclaimer-text">AI 回覆僅供參考，無法取代專業醫療建議；健康數據皆於地端保存處理，隱私安全有保障。</div>
+    <div class="disclaimer-text">AI 回覆僅供健康參考，無法取代專業醫療。</div>
 </div>
 
 <script>
-
-// 1. 宣告歷史紀錄全域變數
-let chatHistory = [];
-const MAX_HISTORY = 8; // 保留最近 8 筆對話即可
-
-// 2. 建立一個統一寫入歷史紀錄的函式
-function addHistory(role, text) {
-    chatHistory.push({ role: role, content: text });
-    if (chatHistory.length > MAX_HISTORY) {
-        chatHistory.shift(); // 移除最舊的紀錄
-    }
-}
 
 
 // 頁面載入完成後檢查是否有儲存的帳密
@@ -518,7 +506,7 @@ userNickname = name;      // 存入全域變數
                     document.getElementById(typingId)?.remove();
                     await appendAiMessage(greeting);
                     usedAIGreeting = true;
-addHistory("assistant", greeting);
+chatHistory.push({ role: "model", parts: [{ text: greeting }] });
                 }
             }
 
@@ -1016,8 +1004,6 @@ async function renderTrendCard(type, days) {
     document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
     updateTrend(cardId, type, days);
-// 👇 讓 AI 知道剛才畫了什麼趨勢圖
-    addHistory("assistant", `(系統提示：已向使用者展示「${name}」的趨勢圖表)`);
 }
 
 
@@ -1397,8 +1383,6 @@ function renderLegend(type, abnormalLabel) {
             </div>`;
         document.getElementById('chat-history').innerHTML += cardHtml; 
         scrollToBottom();
-// 👇 在函式最後加上這行隱形記憶
-    addHistory("assistant", `(系統提示：已向使用者展示 ${data.record_date.replace(/-/g, '/')} 的睡眠平衡度雷達圖)`);
     }
 // 其他輔助函數
 async function processBalanceSearch(d) {
@@ -1555,8 +1539,6 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
             </div>
         </div>`; 
     scrollToBottom();
-// 👇 在函式最後加上這行隱形記憶
-    addHistory("assistant", `(系統提示：已向使用者展示 ${dateTitle} 的健康摘要卡片，當天恢復指數為 ${data.battery}%)`);
 }
 
 
@@ -1832,7 +1814,7 @@ async function handleGeminiTransfer(userInput) {
             appendAiMessage(aiResponse);
         } else {
             // B. 如果沒紀錄或未同意，顯示詢問介面
-            appendAiMessage("請問您是否同意啟用 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
+            appendAiMessage("請問您是否同意讓 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
             // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
@@ -1877,6 +1859,8 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 }
 
 // --- 修正後的呼叫 Gemini API 函式 ---
+let chatHistory = [];
+
 async function callGeminiAPI(prompt) {
     const typingId = 'typing-' + Date.now();
     const historyElem = document.getElementById('chat-history'); // 確保變數名稱統一
@@ -1893,27 +1877,33 @@ async function callGeminiAPI(prompt) {
         `);
     }
     scrollToBottom();
-const targetDateStr = getTargetDate(prompt); 
 
-    // 👉 這裡就是你要放 payload 的地方！幫你把原本有的參數也一起打包了
-    const payload = {
-        prompt: prompt,
-        serial_number: currentSerial,
-        record_date: targetDateStr,
-        history: chatHistory, // 把剛才收集的上下文傳給地端
-        local_date: getLocalDateString(), // 直接調用你上面寫好的函式
-        local_time: new Date().toLocaleTimeString(),
-    };
+
+    const now = new Date();
+    const currentDate = now.toLocaleDateString('en-CA'); // 格式：YYYY-MM-DD
+    const currentTime = now.toTimeString().split(' ')[0]; // 格式：HH:mm:ss
+
+
+    // 取得當前訊息中提到的日期
+    const targetDateStr = getTargetDate(prompt); 
 
     try {
         const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload) // 👉 然後打包好的 payload 丟給 fetch
+            body: JSON.stringify({ 
+                prompt: prompt,
+                serial_number: currentSerial,
+                record_date: targetDateStr,
+                history: chatHistory, // 重要：要把對話紀錄傳給後端，記憶功能才會動！
+                // --- 新增這兩行 ---
+                local_date: currentDate,     
+                local_time: currentTime
+            })
         });
         const data = await res.json();
 
-        // 2. 記憶功能：更新對話紀錄 (配合你地端接收的格式，維持原本的 parts 寫法)
+        // 2. 記憶功能：更新對話紀錄
         chatHistory.push({ role: "user", parts: [{ text: prompt }] });
         chatHistory.push({ role: "model", parts: [{ text: data.text }] });
 
