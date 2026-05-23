@@ -1929,7 +1929,8 @@ const { error: insertError } = await _supabase.from('chat_logs').insert([
         user_query: prompt,        // 👈 修正：對應資料表的 user_query
         ai_response: data.text,    // 👈 修正：對應資料表的 ai_response
         record_date: targetDateStr, 
-        record_time: targetTimeStr // 👈 新增：順便把時間存進去
+        record_time: targetTimeStr, // 👈 新增：順便把時間存進去
+        ai_model: 'LLM-Qwen-function'
     }
 ]);
 
