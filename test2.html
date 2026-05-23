@@ -1906,7 +1906,7 @@ const targetDateStr = getTargetDate(prompt);
     };
 
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload) // 👉 然後打包好的 payload 丟給 fetch
@@ -1919,6 +1919,21 @@ const targetDateStr = getTargetDate(prompt);
 
         // 限制紀錄長度 (例如只留最近 10 次對話)
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+// 👇👇👇 請在這裡補上這段 Supabase 寫入邏輯 👇👇👇
+try {
+    await _supabase.from('chat_logs').insert([
+        {
+            serial_number: currentSerial,
+            user_message: prompt,
+            ai_message: data.text,
+            // 如果你的資料表有需要記這個日期的話可以保留，沒有的話可刪除
+            record_date: targetDateStr 
+        }
+    ]);
+} catch (err) {
+    console.error("儲存 chat_logs 失敗:", err);
+}
+// 👆👆👆 補上這段 👆👆👆
 
         // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
@@ -2037,7 +2052,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
