@@ -238,7 +238,7 @@ export default async function handler(req, res) {
               const rhr = rawWake.RHR_raw;
               const tag = rawWake.Daily_Tag;
               const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
-              const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
+              const lightDisplay = (light === null || light === undefined || light === "無資料") ? "無資料" : light;
               const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               blockText += `☀️ 【當天早晨醒來結算報告】：\n`;
