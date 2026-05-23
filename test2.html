@@ -1919,21 +1919,25 @@ const targetDateStr = getTargetDate(prompt);
 
         // 限制紀錄長度 (例如只留最近 10 次對話)
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
-// 👇👇👇 請在這裡補上這段 Supabase 寫入邏輯 👇👇👇
-try {
-    await _supabase.from('chat_logs').insert([
-        {
-            serial_number: currentSerial,
-            user_message: prompt,
-            ai_message: data.text,
-            // 如果你的資料表有需要記這個日期的話可以保留，沒有的話可刪除
-            record_date: targetDateStr 
-        }
-    ]);
-} catch (err) {
-    console.error("儲存 chat_logs 失敗:", err);
+// 取得當下的時間 (24小時制，例如 "15:31:23")
+const now = new Date();
+const targetTimeStr = now.toTimeString().split(' ')[0]; 
+
+const { error: insertError } = await _supabase.from('chat_logs').insert([
+    {
+        serial_number: currentSerial,
+        user_query: prompt,        // 👈 修正：對應資料表的 user_query
+        ai_response: data.text,    // 👈 修正：對應資料表的 ai_response
+        record_date: targetDateStr, 
+        record_time: targetTimeStr // 👈 新增：順便把時間存進去
+    }
+]);
+
+if (insertError) {
+    console.error("❌ 寫入 chat_logs 失敗，原因：", insertError);
+} else {
+    console.log("✅ 成功寫入 chat_logs！");
 }
-// 👆👆👆 補上這段 👆👆👆
 
         // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
