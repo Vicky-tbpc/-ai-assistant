@@ -1,4 +1,4 @@
-// qwen_function_13.js
+// qwen_function_14.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -236,13 +236,16 @@ export default async function handler(req, res) {
               const battery = rawWake.Personal_Battery_weighted_round;
               const light = rawWake.light_status;
               const rhr = rawWake.RHR_raw;
+              const tag = rawWake.Daily_Tag;
               const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
               const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
               const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
+              const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               blockText += `☀️ 【當天早晨醒來結算報告】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
               blockText += `   - 靜息心率: ${rhrDisplay}\n`;
+              blockText += `   - 恢復狀態: ${tagDisplay}\n`;
             } else {
               blockText += `☀️ 【當天早晨醒來結算報告】：無數據\n`;
             }
@@ -347,7 +350,7 @@ export default async function handler(req, res) {
    - 使用者詢問某一天的任何數據（例如：「5月12日的HBI」或「5月12日的恢復指數」），請直接至該日期的區塊內，尋找對應的「早晨醒來結算報告」或「晚上入睡生理數據」作答。
    - 後端已經幫你處理好所有的跨日、因果與日期對齊邏輯，請「百分之百相信並照抄」各日期區塊下的數據，你不需要（也絕對禁止）再自行增減日期或推算因果關係。
 2. 【健康分析因果邏輯】(僅在分析原因時啟用)：
-   - 若使用者進階詢問「為什麼某天早晨的恢復指數/發炎風險不好？」，請理解這是由「前一天晚上入睡」的生理數據所決定的。
+   - 若使用者進階詢問「為什麼某天早晨的恢復指數/恢復狀態/發炎風險不好？」，請理解這是由「前一天晚上入睡」的生理數據所決定的。
    - 你應主動查看「前一天日期區塊」的【當天晚上入睡生理數據】（如：血氧、HBI、心率等）來為使用者找出原因並進行關聯分析。
    - 範例：如果使用者問「為什麼我 5月12日 早上恢復指數這麼低？」，你應該去翻看「5月11日」區塊內的「晚上入睡生理數據」來幫他找出睡眠問題。
 3. 【外部與健康數據整合邏輯】(極度重要)：
