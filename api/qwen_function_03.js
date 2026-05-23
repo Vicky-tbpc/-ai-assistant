@@ -1,5 +1,4 @@
-// qwen_function_13.js
-import { waitUntil } from '@vercel/functions';
+// qwen_function_14.js
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -376,27 +375,32 @@ export default async function handler(req, res) {
     let finalResult = await finalRes.json();
     const aiText = finalResult.textResponse;
 
-    // 背景存檔任務
-    const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
-      method: 'POST',
-      headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({
-        serial_number: serial_number,
-        user_query: prompt,
-        ai_response: aiText,
-        record_date: local_date,
-        record_time: local_time,
-        ai_model: 'LLM-Qwen-function'
-      })
-    }).catch(e => console.error("背景存檔錯誤:", e));
+    // 存檔任務
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          serial_number: serial_number,
+          user_query: prompt,
+          ai_response: aiText,
+          record_date: local_date,
+          record_time: local_time,
+          ai_model: 'LLM-Qwen-function'
+        })
+      });
+    } catch (e) {
+      console.error("存檔錯誤:", e);
+    }
 
-    waitUntil(logTask);
+    // 移除原本的 waitUntil(logTask);
 
+    // 確保存檔完成後，再回傳給前端
     return res.status(200).json({ text: aiText });
 
   } catch (error) {
