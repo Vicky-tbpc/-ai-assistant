@@ -240,7 +240,7 @@ export default async function handler(req, res) {
               const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
               const lightDisplay = (light === null || light === undefined || light === "無資料") ? "資料不足" : light;
               const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
-              const tagDisplay = (tag === null || tag === undefined || tag === "無顯著狀態") ? "無顯著狀態" : tag;
+              const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               blockText += `☀️ 【當天早晨醒來結算報告】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
