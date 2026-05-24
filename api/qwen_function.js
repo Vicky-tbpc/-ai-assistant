@@ -1,4 +1,4 @@
-// qwen_function_15.js
+// qwen_function_16.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -409,7 +409,10 @@ export default async function handler(req, res) {
 
 請用平輩口吻回答，多用 emoji！全部使用「你」，絕對禁止使用敬稱「您」。`;
 
-    const historyText = history.map(h => `${h.role === 'user' ? '使用者' : '助理'}: ${h.content}`).join('\n');
+    const historyText = history.map(h => {
+      const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
+      return `${(h.role === 'user' || h.role === 'user') ? '使用者' : '助理'}: ${textContent}`;
+    }).join('\n');
     const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
 
     let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
