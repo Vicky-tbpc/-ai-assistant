@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n076</title>
+    <title>Soosyn 健康夥伴 n077</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1928,8 +1928,8 @@ const { error: insertError } = await _supabase.from('chat_logs').insert([
         serial_number: currentSerial,
         user_query: prompt,        // 👈 修正：對應資料表的 user_query
         ai_response: data.text,    // 👈 修正：對應資料表的 ai_response
-        record_date: local_date,
-        record_time: local_time, // 👈 新增：順便把時間存進去
+        record_date: getLocalDateString(),          // 👈 改成載入裝置本地日期 (YYYY-MM-DD)
+        record_time: new Date().toLocaleTimeString(), // 👈 改成載入裝置本地時間
         ai_model: 'LLM-Qwen-function'
     }
 ]);
