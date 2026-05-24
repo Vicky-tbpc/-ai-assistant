@@ -1,4 +1,4 @@
-// qwen_function_14.js
+// qwen_function_15.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -184,6 +184,7 @@ export default async function handler(req, res) {
     // 第二階段：抓取並「格式化」數據（完全對齊日曆日期）
     // ==========================================
     let healthContext = "目前沒有相關數據。";
+    let uploadStatusContext = ""; // 🌟 新增：用來存放上傳狀態的比對結果
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
       
@@ -205,6 +206,30 @@ export default async function handler(req, res) {
       if (dataRes.ok) {
         const finalContextData = await dataRes.json();
         
+        // ========================================================
+        // 🌟 優化：只提供比對結果狀態，讓 AI 自由發揮語氣
+        // ========================================================
+        const checkUploadStatus = () => {
+          const targetDates = {
+            "今天": local_date,
+            "昨天": getCustomOffsetDate(local_date, -1),
+            "前天": getCustomOffsetDate(local_date, -2)
+          };
+
+          let statusLines = ["【使用者資料上傳實時狀態】"];
+          
+          for (const [label, dateStr] of Object.entries(targetDates)) {
+            // 只比對 record_end 是否存在
+            const hasData = finalContextData.some(d => d.raw_json?.record_end?.split(' ')[0] === dateStr);
+            statusLines.push(`- ${label} (${dateStr}) 的 record_end 資料：${hasData ? "【有收到資料】" : "【尚未收到資料】"}`);
+          }
+          return statusLines.join('\n');
+        };
+
+        // 執行比對並存入變數
+        uploadStatusContext = checkUploadStatus();
+        // ========================================================
+
         if (finalContextData.length > 0) {
           // 1. 動態產生使用者詢問的精準日期陣列（Calendar Dates）
           const dateArray = [];
@@ -329,6 +354,11 @@ export default async function handler(req, res) {
 
             healthContext = `【多日統計摘要 (共 ${dateArray.length} 天)】\n${summaryLines.join('\n')}\n` + healthContext;
           }
+        } else {
+          // 🌟 這裡就是你問的整合點：當資料庫完全沒資料時，強制告訴 AI 這三天都是「尚未收到資料」
+          const yesterdayStr = getCustomOffsetDate(local_date, -1);
+          const beforeYesterdayStr = getCustomOffsetDate(local_date, -2);
+          uploadStatusContext = `【使用者資料上傳實時狀態】\n- 今天 (${local_date}) 的 record_end 資料：【尚未收到資料】\n- 昨天 (${yesterdayStr}) 的 record_end 資料：【尚未收到資料】\n- 前天 (${beforeYesterdayStr}) 的 record_end 資料：【尚未收到資料】`;
         }
       }
     }
@@ -342,6 +372,8 @@ export default async function handler(req, res) {
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 外部即時/環境資訊（由外部 API 擷取）：
+3. 【資料上傳實時狀態】(這是後端精準比對 record_end 的結果)：
+   ${uploadStatusContext}
    ${externalContext}
 
 【生理數據解讀規則】
@@ -370,6 +402,10 @@ export default async function handler(req, res) {
    - 標準：標準修復
    - 注意：精神負荷、高身心壓力、過度疲憊、修復不足
    - 警示：極度疲乏日、睡眠結構混亂、極端負荷、最差睡眠結構、過度訓練/發炎
+11. 【資料上傳狀態回覆邏輯】：
+   - 當使用者關心「今天/昨天/前天有沒有成功上傳資料」或「有沒有收到數據」時，請務必先查看上方【資料上傳實時狀態】對應日期的結果。
+   - 【回覆原則】：如果狀態為「有收到資料」，請用你溫暖、平輩朋友的口吻，高興地告訴對方有收到；如果狀態為「尚未收到資料」，則貼心地提醒對方目前還沒看到。
+   - 【重要】：請保持對話的自然與彈性，你可以自己加上適合的 emoji (例如：🎉, 👀, 喔～)，不要回答得像系統罐頭訊息！
 
 請用平輩口吻回答，多用 emoji！全部使用「你」，絕對禁止使用敬稱「您」。`;
 
