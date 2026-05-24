@@ -1906,7 +1906,7 @@ const targetDateStr = getTargetDate(prompt);
     };
 
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload) // 👉 然後打包好的 payload 丟給 fetch
@@ -1928,8 +1928,8 @@ const { error: insertError } = await _supabase.from('chat_logs').insert([
         serial_number: currentSerial,
         user_query: prompt,        // 👈 修正：對應資料表的 user_query
         ai_response: data.text,    // 👈 修正：對應資料表的 ai_response
-        record_date: targetDateStr, 
-        record_time: targetTimeStr, // 👈 新增：順便把時間存進去
+        record_date: local_date,
+        record_time: local_time, // 👈 新增：順便把時間存進去
         ai_model: 'LLM-Qwen-function'
     }
 ]);
@@ -2057,7 +2057,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
