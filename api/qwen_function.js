@@ -411,7 +411,7 @@ export default async function handler(req, res) {
 
     const historyText = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
-      return `${(h.role === 'user' || h.role === 'user') ? '使用者' : '助理'}: ${textContent}`;
+      return `${h.role === 'user' ? '使用者' : '助理'}: ${textContent}`;
     }).join('\n');
     const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
 
