@@ -1900,13 +1900,14 @@ const targetDateStr = getTargetDate(prompt);
         prompt: prompt,
         serial_number: currentSerial,
         record_date: targetDateStr,
-        history: chatHistory, // 把剛才收集的上下文傳給地端
-        local_date: getLocalDateString(), // 直接調用你上面寫好的函式
-        local_time: new Date().toLocaleTimeString(),
+        history: chatHistory, 
+        local_date: getLocalDateString(), 
+        // 確保時間格式為 HH:mm:ss，符合 Supabase 欄位要求
+        local_time: new Date().toTimeString().split(' ')[0],
     };
 
     try {
-        const res = await fetch('/api/qwen_function', {
+        const res = await fetch('/api/qwen_function_03', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload) // 👉 然後打包好的 payload 丟給 fetch
@@ -1919,26 +1920,6 @@ const targetDateStr = getTargetDate(prompt);
 
         // 限制紀錄長度 (例如只留最近 10 次對話)
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
-// 取得當下的時間 (24小時制，例如 "15:31:23")
-const now = new Date();
-const targetTimeStr = now.toTimeString().split(' ')[0]; 
-
-const { error: insertError } = await _supabase.from('chat_logs').insert([
-    {
-        serial_number: currentSerial,
-        user_query: prompt,        // 👈 修正：對應資料表的 user_query
-        ai_response: data.text,    // 👈 修正：對應資料表的 ai_response
-        record_date: getLocalDateString(),          // 👈 改成載入裝置本地日期 (YYYY-MM-DD)
-        record_time: new Date().toLocaleTimeString(), // 👈 改成載入裝置本地時間
-        ai_model: 'LLM-Qwen-function'
-    }
-]);
-
-if (insertError) {
-    console.error("❌ 寫入 chat_logs 失敗，原因：", insertError);
-} else {
-    console.log("✅ 成功寫入 chat_logs！");
-}
 
         // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
@@ -2057,7 +2038,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function', {
+        const res = await fetch('/api/qwen_function_03', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
