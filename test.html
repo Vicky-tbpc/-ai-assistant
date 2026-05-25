@@ -1568,7 +1568,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                 `;
             }
 
-            // 卡片式排版：高度與間距微調，配合放大後的圖表元素
+            // 卡片式排版：7日平均單位處已修正，不再使用任何替代取代邏輯
             miniChartsRowsHtml += `
                 <div class="mini-chart-item" style="background: #faf9f6; border-radius: 12px; padding: 12px; margin: 10px 0; border: 1px solid #eee;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -1584,14 +1584,13 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         </div>
                         <div style="width: 75px; text-align: right; border-left: 1px dashed #e2ddd4; padding-left: 8px; shrink: 0;">
                             <div style="font-size: 0.68rem; color: #999; text-align: right; white-space: nowrap;">7日平均</div>
-                            <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent-red); text-align: right; white-space: nowrap;">${avgValStr} <span style="font-size:0.7rem; font-weight:normal;">${cfg.unit.replace('%min/h', '%')}</span></div>
+                            <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent-red); text-align: right; white-space: nowrap;">${avgValStr} <span style="font-size:0.7rem; font-weight:normal;">${cfg.unit}</span></div>
                         </div>
                     </div>
                 </div>
             `;
         });
     }
-
     
  document.getElementById('chat-history').innerHTML += `
         <div class="msg-row ai-row">
@@ -1624,7 +1623,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         <div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div>
                     </div>
                 </div>
-                
+
                 <div class="toggle-charts-btn" onclick="event.stopPropagation(); toggleMiniChartsRows(this);" style="text-align: center; margin: 12px 0 6px 0; cursor: pointer; color: var(--tbp-blue); font-size: 1.1rem; padding: 6px 0; border-top: 1px solid #f0ede6;">
                     <span class="toggle-text" style="font-size: 0.85rem; font-weight: bold; margin-right: 4px; vertical-align: middle;">查看近期指標趨勢</span><span class="toggle-icon" style="vertical-align: middle;">▼</span>
                 </div>
