@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n074</title>
+    <title>Soosyn 健康夥伴 n076</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -278,7 +278,7 @@
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         <!-- 這裡加上警語 -->
-    <div class="disclaimer-text">AI 回覆僅供健康參考，無法取代專業醫療。</div>
+    <div class="disclaimer-text">AI 回覆僅供參考，無法取代專業醫療建議；健康數據皆於地端保存處理，隱私安全有保障。</div>
 </div>
 
 <script>
@@ -359,7 +359,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 一步一步邁向更健康的生活！現在想從哪個部分開始了解呢？",
         "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["黃金修復", "精神負荷", "過度疲憊", "修復不足", "什麼是睡眠平衡", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？", "標準修復", "高身心壓力", "極度疲乏日", "睡眠結構混亂", "極端負荷", "最差睡眠結構", "過度訓練/發炎"];
+    const ENCYCLOPEDIA_KEYWORDS = ["什麼是睡眠平衡", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -852,10 +852,8 @@ async function fetchSummaryData(targetDate) {
         
         const allData = await response.json();
 
-        // 確保排序正確並取出目標日與前一次紀錄
-        healths = allData
-            .sort((a, b) => b.record_date.localeCompare(a.record_date))
-            .slice(0, 2);
+        // 確保排序正確
+        healths = allData.sort((a, b) => b.record_date.localeCompare(a.record_date));
 
     } catch (err) {
         console.error("讀取個人資料發生錯誤:", err);
@@ -870,6 +868,9 @@ async function fetchSummaryData(targetDate) {
     const current = healths[0];
     const raw = current.raw_json;
     const currentBattery = raw.Personal_Battery_weighted_round || 0;
+
+    // 【新增】：切出最近 7 筆歷史資料供圖表使用
+    const history7 = healths.slice(0, 7);
 
     // --- 2. 抓取全體資料 (計算排名用)：僅請求目標日期當天數據，體積最小 ---
     let allUsersData = [];
@@ -940,7 +941,8 @@ async function fetchSummaryData(targetDate) {
         bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
         worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
         raw_json: raw, 
-        flowSuggestion: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差${randomIdx}`)?.detailed_content 
+        flowSuggestion: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差${randomIdx}`)?.detailed_content,
+        history7: history7 // 【新增】：包進回傳物件中
     };
 }
 
@@ -966,6 +968,7 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
+        { name: "❤️‍ 靜息心率", type: "rhr" },
         { name: "🌙 深睡期 (N3)", type: "n3" },
         { name: "🌿 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
@@ -1091,7 +1094,7 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
@@ -1108,7 +1111,7 @@ if (healthData.length === 0) {
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-     
+        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
@@ -1119,7 +1122,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     // --- 【修改：動態決定日期標籤與體感數據對齊】 ---
     const labels = rawData.map(d => {
         let displayDate = d.record_date;
-        if (type === 'battery') {
+        if (type === 'battery' || type === 'rhr') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             displayDate = dateObj.toLocaleDateString('en-CA');
@@ -1129,7 +1132,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
 
     // 準備體感數據：battery 對齊隔天，其餘對齊當天
     const subjectiveValues = rawData.map(d => {
-        if (type === 'battery') {
+        if (type === 'battery' || type === 'rhr') {
             // 恢復指數要對齊「隔天」的體感
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
@@ -1161,14 +1164,18 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             movingAvgs.push(avg); lowerBounds.push(avg * 0.9); upperBounds.push(avg * 1.1);
         } else if (type === 'hrmin') {
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
+        } else if (type === 'rhr') {
+            movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
         } else {
             movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
+        
         }
     });
 
     const pointColors = dailyValues.map((v, i) => {
         const ma = movingAvgs[i];
         if (type === 'battery' && v < ma) return '#ff8c73';
+        if (type === 'rhr' && v > upperBounds[i]) return '#ff8c73';
         if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
         if (type === 'rmssd' && v < lowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > upperBounds[i]) return '#ff8c73';
@@ -1240,7 +1247,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
 
 
 
-    if (type === 'rmssd' || type === 'hrmin') {
+    if (type === 'rmssd' || type === 'hrmin' || type === 'rhr') {
         datasets.push({
             type: 'bar',
             data: rawData.map((_, i) => [lowerBounds[i], upperBounds[i]]),
@@ -1281,7 +1288,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
 }
 
 function renderLegend(type, abnormalLabel) {
-    const isRange = (type === 'rmssd' || type === 'hrmin');
+    const isRange = (type === 'rmssd' || type === 'hrmin' || type === 'rhr');
     let html = `
         <div class="legend-row"><div class="dot-sample" style="background:#596b75"></div> 當日數值</div>
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
@@ -1495,7 +1502,86 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                      ? '#ff8c73' 
                      : '#8699a3';
 
+    // 依據傳入的日期標題，動態計算圖表所需的 M/D 標籤格式
+    const cleanDateStr = dateTitle.replace(/\//g, '-');
+    const dObj = new Date(cleanDateStr + 'T00:00:00');
+    const labelChart1 = `${String(dObj.getMonth() + 1).padStart(2, '0')}/${String(dObj.getDate()).padStart(2, '0')}`;
+    
+    const prevDObj = new Date(dObj);
+    prevDObj.setDate(prevDObj.getDate() - 1);
+    const labelCharts2To5 = `${String(prevDObj.getMonth() + 1).padStart(2, '0')}/${String(prevDObj.getDate()).padStart(2, '0')}`;
 
+    // 建立 5 個簡易趨勢圖表的 HTML
+    let miniChartsRowsHtml = '';
+    if (data.history7 && data.history7.length > 0) {
+        // 反轉陣列，讓圖表由左到右呈現「舊到新」的趨勢
+        const trendData = [...data.history7].reverse();
+        
+        const chartConfigs = [
+            { title: "靜息心率", field: "RHR_raw", unit: "bpm", dateLabel: labelChart1, isRound: true },
+            { title: "深睡期 (N3)", field: "N3_pct", unit: "%", dateLabel: labelCharts2To5, isRound: true },
+            { title: "rMSSD", field: "rMSSD", unit: "ms", dateLabel: labelCharts2To5, isRound: false },
+            { title: "睡眠最低脈搏", field: "HR_min", unit: "bpm", dateLabel: labelCharts2To5, isRound: true },
+            { title: "HBI 低氧負擔指數", field: "HBI", unit: "%min/h", dateLabel: labelCharts2To5, isRound: true }
+        ];
+
+        chartConfigs.forEach(cfg => {
+            const pts = trendData.map(d => d.raw_json ? d.raw_json[cfg.field] : null).filter(v => v !== undefined && v !== null);
+            
+            let currValStr = '--';
+            let avgValStr = '--';
+            let svgHtml = '';
+
+            if (pts.length > 0) {
+                const latestVal = pts[pts.length - 1];
+                currValStr = cfg.isRound ? Math.round(latestVal).toString() : Number(latestVal).toFixed(1);
+                
+                // 計算平均值（除以實際有效天數，完美相容少於 7 筆的情況）
+                const avg = pts.reduce((a, b) => a + b, 0) / pts.length;
+                avgValStr = cfg.isRound ? Math.round(avg).toString() : Number(avg).toFixed(1);
+
+                // 計算 SVG 繪圖 Y 軸上下限比例
+                let min = Math.min(...pts, avg);
+                let max = Math.max(...pts, avg);
+                if (max === min) { max += 1; min -= 1; }
+                const padding = (max - min) * 0.25 || 2;
+                const yMin = min - padding;
+                const yMax = max + padding;
+
+                const getX = (i) => 15 + (i * (130 / Math.max(1, pts.length - 1)));
+                const getY = (val) => 30 - ((val - yMin) / (yMax - yMin)) * 22;
+
+                // 繪製圓點
+                let svgCircles = '';
+                pts.forEach((pt, idx) => {
+                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="3" fill="#8699a3" />`;
+                });
+
+                const yAvg = getY(avg);
+                svgHtml = `
+                    <svg viewBox="0 0 160 40" style="width:100%; height:100%; overflow:visible;">
+                        <!-- 平均線 -->
+                        <line x1="5" y1="${yAvg}" x2="155" y2="${yAvg}" stroke="#ff8c73" stroke-width="1.2" />
+                        <!-- 數據點 -->
+                        ${svgCircles}
+                        <!-- 日期標籤 -->
+                        <text x="${getX(pts.length - 1)}" y="39" font-size="8" fill="#999" text-anchor="middle">${cfg.dateLabel}</text>
+                    </svg>
+                `;
+            }
+
+            miniChartsRowsHtml += `
+                <div class="mini-chart-row" style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0; font-size: 0.88rem; color: #444;">
+                    <div style="width: 35%; text-align: left; font-weight: 500; color: #555;">${cfg.title}</div>
+                    <div style="width: 40%; height: 40px; position: relative;">${svgHtml}</div>
+                    <div style="width: 25%; text-align: right; line-height: 1.2;">
+                        <div style="font-size: 1.05rem; font-weight: bold; color: #333;">${currValStr} <span style="font-size: 0.7rem; font-weight: normal; color: #777;">${cfg.unit}</span></div>
+                        <div style="font-size: 0.68rem; color: #999; margin-top: 2px;">7日平均: ${avgValStr}</div>
+                    </div>
+                </div>
+            `;
+        });
+    }
     
  document.getElementById('chat-history').innerHTML += `
         <div class="msg-row ai-row">
@@ -1529,13 +1615,22 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                     </div>
                 </div>
                 
+                <!-- 1. 新增的收合/展開按鈕（加入 stopPropagation 防止觸發小卡放大放大鏡功能） -->
+                <div class="toggle-charts-btn" onclick="event.stopPropagation(); toggleMiniChartsRows(this);" style="text-align: center; margin: 10px 0; cursor: pointer; color: var(--tbp-blue); font-size: 1.1rem; padding: 4px 0;">
+                    <span class="toggle-icon">▼</span>
+                </div>
+
+                <!-- 2. 容納 5 個簡易趨勢圖表的容器（預設隱藏） -->
+                <div class="mini-charts-wrapper hidden" onclick="event.stopPropagation();" style="border-top: 1px dashed #eee; border-bottom: 1px dashed #eee; padding: 8px 0; margin-bottom: 12px;">
+                    ${miniChartsRowsHtml}
+                </div>
+                
                 <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
                 <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
             </div>
         </div>`; 
     scrollToBottom();
 }
-
 
     function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
@@ -1772,6 +1867,17 @@ async function handleAbnormalityInput(msg) {
     }
 }
 
+function toggleMiniChartsRows(btn) {
+    const wrapper = btn.nextElementSibling;
+    const icon = btn.querySelector('.toggle-icon');
+    if (wrapper.classList.contains('hidden')) {
+        wrapper.classList.remove('hidden');
+        icon.innerText = '▲';
+    } else {
+        wrapper.classList.add('hidden');
+        icon.innerText = '▼';
+    }
+}
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; scrollToBottom(); await new Promise(r => setTimeout(r, 800)); const typingElem = document.getElementById(typingId); if (typingElem) typingElem.querySelector('.ai-bubble').innerHTML = text.replace(/\n/g, '<br>'); scrollToBottom(); }
@@ -1809,7 +1915,7 @@ async function handleGeminiTransfer(userInput) {
             appendAiMessage(aiResponse);
         } else {
             // B. 如果沒紀錄或未同意，顯示詢問介面
-            appendAiMessage("請問您是否同意讓 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
+            appendAiMessage("請問您是否同意啟用 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
             // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
@@ -1883,7 +1989,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -2022,7 +2128,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
