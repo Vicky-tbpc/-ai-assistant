@@ -1490,7 +1490,6 @@ function showDateActions(type, metricConfig = null) {
     scrollToBottom();
 }
 
-
 function appendSummaryCard(dateTitle, data) {
     const colors = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
     const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
@@ -1511,18 +1510,18 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
     prevDObj.setDate(prevDObj.getDate() - 1);
     const labelCharts2To5 = `${String(prevDObj.getMonth() + 1).padStart(2, '0')}/${String(prevDObj.getDate()).padStart(2, '0')}`;
 
-    // 建立 5 個簡易趨勢圖表的 HTML
+    // 建立 5 個全新設計、適合閱讀的簡易趨勢圖表 HTML
     let miniChartsRowsHtml = '';
     if (data.history7 && data.history7.length > 0) {
         // 反轉陣列，讓圖表由左到右呈現「舊到新」的趨勢
         const trendData = [...data.history7].reverse();
         
         const chartConfigs = [
-            { title: "靜息心率", field: "RHR_raw", unit: "bpm", dateLabel: labelChart1, isRound: true },
-            { title: "深睡期 (N3)", field: "N3_pct", unit: "%", dateLabel: labelCharts2To5, isRound: true },
-            { title: "rMSSD", field: "rMSSD", unit: "ms", dateLabel: labelCharts2To5, isRound: false },
-            { title: "睡眠最低脈搏", field: "HR_min", unit: "bpm", dateLabel: labelCharts2To5, isRound: true },
-            { title: "HBI 低氧負擔指數", field: "HBI", unit: "%min/h", dateLabel: labelCharts2To5, isRound: true }
+            { title: "靜息心率", field: "RHR_raw", unit: "bpm", dateLabel: labelChart1 },
+            { title: "深睡期 (N3)", field: "N3_pct", unit: "%", dateLabel: labelCharts2To5 },
+            { title: "rMSSD", field: "rMSSD", unit: "ms", dateLabel: labelCharts2To5 },
+            { title: "睡眠最低脈搏", field: "HR_min", unit: "bpm", dateLabel: labelCharts2To5 },
+            { title: "HBI 低氧負擔指數", field: "HBI", unit: "%min/h", dateLabel: labelCharts2To5 }
         ];
 
         chartConfigs.forEach(cfg => {
@@ -1534,54 +1533,65 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
 
             if (pts.length > 0) {
                 const latestVal = pts[pts.length - 1];
-                currValStr = cfg.isRound ? Math.round(latestVal).toString() : Number(latestVal).toFixed(1);
+                // 直接使用原始數據，不進行四捨五入
+                currValStr = latestVal.toString();
                 
-                // 計算平均值（除以實際有效天數，完美相容少於 7 筆的情況）
+                // 計算平均值後，四捨五入到小數點第 1 位
                 const avg = pts.reduce((a, b) => a + b, 0) / pts.length;
-                avgValStr = cfg.isRound ? Math.round(avg).toString() : Number(avg).toFixed(1);
+                avgValStr = avg.toFixed(1);
 
                 // 計算 SVG 繪圖 Y 軸上下限比例
                 let min = Math.min(...pts, avg);
                 let max = Math.max(...pts, avg);
                 if (max === min) { max += 1; min -= 1; }
-                const padding = (max - min) * 0.25 || 2;
+                const padding = (max - min) * 0.3 || 2;
                 const yMin = min - padding;
                 const yMax = max + padding;
 
-                const getX = (i) => 15 + (i * (130 / Math.max(1, pts.length - 1)));
-                const getY = (val) => 30 - ((val - yMin) / (yMax - yMin)) * 22;
+                // 微調 X 與 Y 的分佈，留出底部空間給放大的日期字體
+                const getX = (i) => 15 + (i * (190 / Math.max(1, pts.length - 1)));
+                const getY = (val) => 33 - ((val - yMin) / (yMax - yMin)) * 22;
 
-                // 繪製圓點
+                // 繪製圓點：半徑放大到 5.5，增加外邊框寬度
                 let svgCircles = '';
                 pts.forEach((pt, idx) => {
-                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="3" fill="#8699a3" />`;
+                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="5.5" fill="var(--tbp-blue)" stroke="#ffffff" stroke-width="1.2" />`;
                 });
 
                 const yAvg = getY(avg);
                 svgHtml = `
-                    <svg viewBox="0 0 160 40" style="width:100%; height:100%; overflow:visible;">
-                        <!-- 平均線 -->
-                        <line x1="5" y1="${yAvg}" x2="155" y2="${yAvg}" stroke="#ff8c73" stroke-width="1.2" />
-                        <!-- 數據點 -->
+                    <svg viewBox="0 0 220 60" style="width:100%; height:100%; overflow:visible;">
+                        <line x1="5" y1="${yAvg}" x2="215" y2="${yAvg}" stroke="var(--accent-red)" stroke-width="2.2" stroke-dasharray="4,3" />
                         ${svgCircles}
-                        <!-- 日期標籤 -->
-                        <text x="${getX(pts.length - 1)}" y="39" font-size="8" fill="#999" text-anchor="middle">${cfg.dateLabel}</text>
+                        <text x="${getX(pts.length - 1)}" y="55" font-size="13" font-weight="bold" fill="#666" text-anchor="middle">${cfg.dateLabel}</text>
                     </svg>
                 `;
             }
 
+            // 卡片式排版：高度與間距微調，配合放大後的圖表元素
             miniChartsRowsHtml += `
-                <div class="mini-chart-row" style="display: flex; align-items: center; justify-content: space-between; margin: 12px 0; font-size: 0.88rem; color: #444;">
-                    <div style="width: 35%; text-align: left; font-weight: 500; color: #555;">${cfg.title}</div>
-                    <div style="width: 40%; height: 40px; position: relative;">${svgHtml}</div>
-                    <div style="width: 25%; text-align: right; line-height: 1.2;">
-                        <div style="font-size: 1.05rem; font-weight: bold; color: #333;">${currValStr} <span style="font-size: 0.7rem; font-weight: normal; color: #777;">${cfg.unit}</span></div>
-                        <div style="font-size: 0.68rem; color: #999; margin-top: 2px;">7日平均: ${avgValStr}</div>
+                <div class="mini-chart-item" style="background: #faf9f6; border-radius: 12px; padding: 12px; margin: 10px 0; border: 1px solid #eee;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <div style="font-size: 0.92rem; font-weight: bold; color: #444;">${cfg.title}</div>
+                        <div style="text-align: right;">
+                            <span style="font-size: 1.15rem; font-weight: bold; color: #222;">${currValStr}</span>
+                            <span style="font-size: 0.75rem; color: #666; margin-left: 2px;">${cfg.unit}</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="flex: 1; height: 60px; position: relative;">
+                            ${svgHtml}
+                        </div>
+                        <div style="width: 75px; text-align: right; border-left: 1px dashed #e2ddd4; padding-left: 8px; shrink: 0;">
+                            <div style="font-size: 0.68rem; color: #999; text-align: right; white-space: nowrap;">7日平均</div>
+                            <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent-red); text-align: right; white-space: nowrap;">${avgValStr} <span style="font-size:0.7rem; font-weight:normal;">${cfg.unit.replace('%min/h', '%')}</span></div>
+                        </div>
                     </div>
                 </div>
             `;
         });
     }
+
     
  document.getElementById('chat-history').innerHTML += `
         <div class="msg-row ai-row">
@@ -1615,13 +1625,11 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                     </div>
                 </div>
                 
-                <!-- 1. 新增的收合/展開按鈕（加入 stopPropagation 防止觸發小卡放大放大鏡功能） -->
-                <div class="toggle-charts-btn" onclick="event.stopPropagation(); toggleMiniChartsRows(this);" style="text-align: center; margin: 10px 0; cursor: pointer; color: var(--tbp-blue); font-size: 1.1rem; padding: 4px 0;">
-                    <span class="toggle-icon">▼</span>
+                <div class="toggle-charts-btn" onclick="event.stopPropagation(); toggleMiniChartsRows(this);" style="text-align: center; margin: 12px 0 6px 0; cursor: pointer; color: var(--tbp-blue); font-size: 1.1rem; padding: 6px 0; border-top: 1px solid #f0ede6;">
+                    <span class="toggle-text" style="font-size: 0.85rem; font-weight: bold; margin-right: 4px; vertical-align: middle;">查看近期指標趨勢</span><span class="toggle-icon" style="vertical-align: middle;">▼</span>
                 </div>
 
-                <!-- 2. 容納 5 個簡易趨勢圖表的容器（預設隱藏） -->
-                <div class="mini-charts-wrapper hidden" onclick="event.stopPropagation();" style="border-top: 1px dashed #eee; border-bottom: 1px dashed #eee; padding: 8px 0; margin-bottom: 12px;">
+                <div class="mini-charts-wrapper hidden" onclick="event.stopPropagation();" style="padding: 2px 0; margin-bottom: 12px;">
                     ${miniChartsRowsHtml}
                 </div>
                 
@@ -1866,16 +1874,18 @@ async function handleAbnormalityInput(msg) {
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
-
 function toggleMiniChartsRows(btn) {
     const wrapper = btn.nextElementSibling;
     const icon = btn.querySelector('.toggle-icon');
+    const txt = btn.querySelector('.toggle-text');
     if (wrapper.classList.contains('hidden')) {
         wrapper.classList.remove('hidden');
         icon.innerText = '▲';
+        txt.innerText = '收合近期指標趨勢';
     } else {
         wrapper.classList.add('hidden');
         icon.innerText = '▼';
+        txt.innerText = '查看近期指標趨勢';
     }
 }
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
