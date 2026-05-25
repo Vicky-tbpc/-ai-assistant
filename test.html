@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n076</title>
+    <title>Soosyn 健康夥伴 n077</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -889,9 +889,15 @@ async function fetchSummaryData(targetDate) {
         console.error("計算排名時讀取失敗:", err);
     }
 
-    // 計算排名百分比
+// 計算排名百分比與樣本數
     let percentage = 0;
+    let sampleSize = 0; // 新增這行存放樣本數
+
     if (allUsersData && allUsersData.length > 0) {
+        // 利用 Set 過濾出不重複的 serial_number 來計算實際人數
+        const uniqueSerials = new Set(allUsersData.map(d => d.serial_number).filter(Boolean));
+        sampleSize = uniqueSerials.size;
+
         const totalUsers = allUsersData.length;
         const lowerUsers = allUsersData.filter(d => 
             (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
@@ -936,7 +942,8 @@ async function fetchSummaryData(targetDate) {
     return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
-        percentage: percentage, 
+        percentage: percentage,
+        sampleSize: sampleSize, // 👈 新增這行 
         light: statusLight, 
         bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
         worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
@@ -1616,7 +1623,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         <span>恢復指數</span>
                         <div style="text-align: right;">
                             <span class="battery-val" style="color:${colors}">${data.battery}</span><br>
-                            <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人)</span>
                         </div>
                     </div>
                     <div class="progress-bg">
