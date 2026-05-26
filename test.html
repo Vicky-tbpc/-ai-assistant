@@ -876,7 +876,7 @@ async function fetchSummaryData(targetDate) {
     let allUsersData = [];
     try {
         const rankParams = new URLSearchParams({
-            start: current.record_date,
+            start: current.record_date, // 這裡會是 2026-05-25
             end: current.record_date
             // 不帶 serial，獲取該日所有人的資料
         }).toString();
@@ -889,20 +889,30 @@ async function fetchSummaryData(targetDate) {
         console.error("計算排名時讀取失敗:", err);
     }
 
-// 計算排名百分比與樣本數
+    // 計算排名百分比與樣本總數
     let percentage = 0;
-    let sampleSize = 0; // 新增這行存放樣本數
+    let validUsersCount = 0; // 用來儲存有效的樣本數
 
     if (allUsersData && allUsersData.length > 0) {
-        // 利用 Set 過濾出不重複的 serial_number 來計算實際人數
-        const uniqueSerials = new Set(allUsersData.map(d => d.serial_number).filter(Boolean));
-        sampleSize = uniqueSerials.size;
+        // 過濾出該日期中，Personal_Battery_weighted_round 有數值(不是 null 或 undefined) 的所有紀錄
+        // 這裡抓回來的所有使用者，自然也包含了當下查詢的 A 使用者
+        const validUsers = allUsersData.filter(d => 
+            d.raw_json && 
+            d.raw_json.Personal_Battery_weighted_round !== null && 
+            d.raw_json.Personal_Battery_weighted_round !== undefined
+        );
 
-        const totalUsers = allUsersData.length;
-        const lowerUsers = allUsersData.filter(d => 
-            (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
-        ).length;
-        percentage = Math.round((lowerUsers / totalUsers) * 100);
+        validUsersCount = validUsers.length; // 這是包含 A 使用者的分母總數
+
+        if (validUsersCount > 0) {
+            // 找出分數比 A 使用者還要低的人數
+            const lowerUsers = validUsers.filter(d => 
+                d.raw_json.Personal_Battery_weighted_round < currentBattery
+            ).length;
+            
+            // 換算成百分比
+            percentage = Math.round((lowerUsers / validUsersCount) * 100);
+        }
     }
 
     // --- 3. 指標增減比較邏輯 (與前一次數據比較) ---
@@ -943,7 +953,7 @@ async function fetchSummaryData(targetDate) {
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
         percentage: percentage,
-        sampleSize: sampleSize, // 👈 新增這行 
+        totalUsers: validUsersCount, // 👈 新增這行：把樣本數傳給卡片 
         light: statusLight, 
         bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
         worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
@@ -1623,7 +1633,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         <span>恢復指數</span>
                         <div style="text-align: right;">
                             <span class="battery-val" style="color:${colors}">${data.battery}</span><br>
-                            <span class="rank-text">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人)</span>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者 (樣本數 ${data.totalUsers} 人)</span>
                         </div>
                     </div>
                     <div class="progress-bg">
@@ -2005,7 +2015,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -2144,7 +2154,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
