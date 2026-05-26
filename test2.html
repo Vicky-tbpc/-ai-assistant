@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n076</title>
+    <title>Soosyn 健康夥伴 n077</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -876,8 +876,8 @@ async function fetchSummaryData(targetDate) {
     let allUsersData = [];
     try {
         const rankParams = new URLSearchParams({
-            start: current.record_date,
-            end: current.record_date
+            start: current.record_end,
+            end: current.record_end
             // 不帶 serial，獲取該日所有人的資料
         }).toString();
 
@@ -889,9 +889,15 @@ async function fetchSummaryData(targetDate) {
         console.error("計算排名時讀取失敗:", err);
     }
 
-    // 計算排名百分比
+// 計算排名百分比與樣本數
     let percentage = 0;
+    let sampleSize = 0; // 新增這行存放樣本數
+
     if (allUsersData && allUsersData.length > 0) {
+        // 利用 Set 過濾出不重複的 serial_number 來計算實際人數
+        const uniqueSerials = new Set(allUsersData.map(d => d.serial_number).filter(Boolean));
+        sampleSize = uniqueSerials.size;
+
         const totalUsers = allUsersData.length;
         const lowerUsers = allUsersData.filter(d => 
             (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
@@ -936,7 +942,8 @@ async function fetchSummaryData(targetDate) {
     return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
-        percentage: percentage, 
+        percentage: percentage,
+        sampleSize: sampleSize, // 👈 新增這行 
         light: statusLight, 
         bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
         worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
@@ -1533,10 +1540,10 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
 
             if (pts.length > 0) {
                 const latestVal = pts[pts.length - 1];
-                // 修改 1：直接使用原始數據，不進行四捨五入
+                // 直接使用原始數據，不進行四捨五入
                 currValStr = latestVal.toString();
                 
-                // 修改 2：計算平均值後，四捨五入到小數點第 1 位
+                // 計算平均值後，四捨五入到小數點第 1 位
                 const avg = pts.reduce((a, b) => a + b, 0) / pts.length;
                 avgValStr = avg.toFixed(1);
 
@@ -1548,27 +1555,27 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                 const yMin = min - padding;
                 const yMax = max + padding;
 
-                // 加大畫布到 220x55，留出更舒適的上下邊距給點線與日期標籤
+                // 微調 X 與 Y 的分佈，留出底部空間給放大的日期字體
                 const getX = (i) => 15 + (i * (190 / Math.max(1, pts.length - 1)));
-                const getY = (val) => 38 - ((val - yMin) / (yMax - yMin)) * 26;
+                const getY = (val) => 33 - ((val - yMin) / (yMax - yMin)) * 22;
 
-                // 繪製圓點
+                // 繪製圓點：半徑放大到 5.5，增加外邊框寬度
                 let svgCircles = '';
                 pts.forEach((pt, idx) => {
-                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="4" fill="var(--tbp-blue)" stroke="#ffffff" stroke-width="1" />`;
+                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="5.5" fill="var(--tbp-blue)" stroke="#ffffff" stroke-width="1.2" />`;
                 });
 
                 const yAvg = getY(avg);
                 svgHtml = `
-                    <svg viewBox="0 0 220 55" style="width:100%; height:100%; overflow:visible;">
-                        <line x1="5" y1="${yAvg}" x2="215" y2="${yAvg}" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="3,2" />
+                    <svg viewBox="0 0 220 60" style="width:100%; height:100%; overflow:visible;">
+                        <line x1="5" y1="${yAvg}" x2="215" y2="${yAvg}" stroke="var(--accent-red)" stroke-width="2.2" stroke-dasharray="4,3" />
                         ${svgCircles}
-                        <text x="${getX(pts.length - 1)}" y="52" font-size="9" font-weight="bold" fill="#999" text-anchor="middle">${cfg.dateLabel}</text>
+                        <text x="${getX(pts.length - 1)}" y="55" font-size="13" font-weight="bold" fill="#666" text-anchor="middle">${cfg.dateLabel}</text>
                     </svg>
                 `;
             }
 
-            // 修改 3：全新卡片式優化排版，加大圖表比重與間距
+            // 卡片式排版：7日平均單位處已修正，不再使用任何替代取代邏輯
             miniChartsRowsHtml += `
                 <div class="mini-chart-item" style="background: #faf9f6; border-radius: 12px; padding: 12px; margin: 10px 0; border: 1px solid #eee;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -1579,12 +1586,12 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="flex: 1; height: 55px; position: relative;">
+                        <div style="flex: 1; height: 60px; position: relative;">
                             ${svgHtml}
                         </div>
                         <div style="width: 75px; text-align: right; border-left: 1px dashed #e2ddd4; padding-left: 8px; shrink: 0;">
                             <div style="font-size: 0.68rem; color: #999; text-align: right; white-space: nowrap;">7日平均</div>
-                            <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent-red); text-align: right; white-space: nowrap;">${avgValStr} <span style="font-size:0.7rem; font-weight:normal;">${cfg.unit.replace('%min/h', '%')}</span></div>
+                            <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent-red); text-align: right; white-space: nowrap;">${avgValStr} <span style="font-size:0.7rem; font-weight:normal;">${cfg.unit}</span></div>
                         </div>
                     </div>
                 </div>
@@ -1616,14 +1623,14 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         <span>恢復指數</span>
                         <div style="text-align: right;">
                             <span class="battery-val" style="color:${colors}">${data.battery}</span><br>
-                            <span class="rank-text">超過 ${data.percentage}% 的使用者</span>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人)</span>
                         </div>
                     </div>
                     <div class="progress-bg">
                         <div class="progress-fill" style="width:${data.battery}%; background:${colors}"></div>
                     </div>
                 </div>
-                
+
                 <div class="toggle-charts-btn" onclick="event.stopPropagation(); toggleMiniChartsRows(this);" style="text-align: center; margin: 12px 0 6px 0; cursor: pointer; color: var(--tbp-blue); font-size: 1.1rem; padding: 6px 0; border-top: 1px solid #f0ede6;">
                     <span class="toggle-text" style="font-size: 0.85rem; font-weight: bold; margin-right: 4px; vertical-align: middle;">查看近期指標趨勢</span><span class="toggle-icon" style="vertical-align: middle;">▼</span>
                 </div>
