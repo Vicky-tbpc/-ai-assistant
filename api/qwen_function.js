@@ -1,4 +1,4 @@
-// qwen_function_16.js
+// qwen_function_17.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -295,7 +295,7 @@ export default async function handler(req, res) {
               blockText += `   - 睡眠血氧飽和度: 平均 ${rawSleep.SpO2_mean || 0}% / 最高 ${rawSleep.SpO2_max || 0}% / 最低 ${rawSleep.SpO2_min || 0}%\n`;
               blockText += `   - 睡眠低血氧時間比例: T90 ${rawSleep.T90_pct || 0}%, T89 ${rawSleep.T89_pct || 0}%, T88 ${rawSleep.T88_pct || 0}%\n`;
               blockText += `   - 低氧負擔指數: HBI低氧負擔指數 ${rawSleep.HBI || 0}%min/h\n`;
-              blockText += `   - 睡眠血氧下降指數: ODI 3% ${rawSleep.ODI3_total || 0}次/h, ODI 4% ${rawSleep.ODI4_total || 0}次/h\n`;
+              blockText += `   - 睡眠血氧下降指數: ODI 3% ${rawSleep.ODI3_per_hour || 0}次/h, ODI 4% ${rawSleep.ODI4_per_hour || 0}次/h\n`;
               blockText += `   - 睡眠呼吸頻率: 平均 ${rawSleep.RR_mean || 0} / 最高 ${rawSleep.RR_max || 0} / 最低 ${rawSleep.RR_min || 0} rpm\n`;
               blockText += `   - 睡眠脈搏: 平均 ${rawSleep.HR_mean || 0} / 最高 ${rawSleep.HR_max || 0} / 最低 ${rawSleep.HR_min || 0} bpm\n`;
               blockText += `   - 心率變異度: SDNN ${rawSleep.SDNN || 0}ms, rMSSD ${rawSleep.rMSSD || 0}ms, LF ${rawSleep.LF_ms2 || 0}ms2, HF ${rawSleep.HF_ms2 || 0}ms2, LF/HF ${rawSleep.LF_HF || 0}, pNN50 ${rawSleep.pNN50_pct || 0}%\n`;
@@ -323,8 +323,8 @@ export default async function handler(req, res) {
               { key: 'T89_pct', label: '平均T89比例', unit: '%', isSleep: true },
               { key: 'T88_pct', label: '平均T88比例', unit: '%', isSleep: true },
               { key: 'HBI', label: '平均低氧負擔指數', unit: '%min/h', isSleep: true },
-              { key: 'ODI3_total', label: '平均 ODI 3%', unit: '次/h', isSleep: true },
-              { key: 'ODI4_total', label: '平均 ODI 4%', unit: '次/h', isSleep: true },
+              { key: 'ODI3_per_hour', label: '平均 ODI 3%', unit: '次/h', isSleep: true },
+              { key: 'ODI4_per_hour', label: '平均 ODI 4%', unit: '次/h', isSleep: true },
               { key: 'HR_mean', label: '平均脈搏', unit: 'bpm', isSleep: true },
               { key: 'RR_mean', label: '平均呼吸頻率', unit: 'rpm', isSleep: true },
               { key: 'SDNN', label: '平均SDNN', unit: 'ms', isSleep: true },
