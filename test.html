@@ -893,16 +893,18 @@ async function fetchSummaryData(targetDate) {
     let percentage = 0;
     let validUsersCount = 0; // 用來儲存有效的樣本數
 
-    if (allUsersData && allUsersData.length > 0) {
-        // 過濾出該日期中，Personal_Battery_weighted_round 有數值(不是 null 或 undefined) 的所有紀錄
-        // 這裡抓回來的所有使用者，自然也包含了當下查詢的 A 使用者
+if (allUsersData && allUsersData.length > 0) {
+        // 過濾出該日期中：
+        // 1. 排除 serial_number 為 "未對應帳號" 的資料
+        // 2. Personal_Battery_weighted_round 有數值 (不是 null 或 undefined) 的紀錄
         const validUsers = allUsersData.filter(d => 
+            d.serial_number !== "未對應帳號" &&
             d.raw_json && 
             d.raw_json.Personal_Battery_weighted_round !== null && 
             d.raw_json.Personal_Battery_weighted_round !== undefined
         );
 
-        validUsersCount = validUsers.length; // 這是包含 A 使用者的分母總數
+        validUsersCount = validUsers.length; // 這是包含 A 使用者，且已排除未對應帳號的分母總數
 
         if (validUsersCount > 0) {
             // 找出分數比 A 使用者還要低的人數
