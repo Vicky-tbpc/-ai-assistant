@@ -876,7 +876,7 @@ async function fetchSummaryData(targetDate) {
     let allUsersData = [];
     try {
         const rankParams = new URLSearchParams({
-            start: current.record_date, // 這裡會是 2026-05-25
+            start: current.record_date,
             end: current.record_date
             // 不帶 serial，獲取該日所有人的資料
         }).toString();
@@ -889,31 +889,28 @@ async function fetchSummaryData(targetDate) {
         console.error("計算排名時讀取失敗:", err);
     }
 
-    // 計算排名百分比與樣本總數
+    // 計算排名百分比
     let percentage = 0;
-    let validUsersCount = 0; // 用來儲存有效的樣本數
+    let validSampleCount = 0; // 新增：用來記錄有效樣本數
 
-if (allUsersData && allUsersData.length > 0) {
-        // 過濾出該日期中：
-        // 1. 排除 serial_number 為 "未對應帳號" 的資料
-        // 2. Personal_Battery_weighted_round 有數值 (不是 null 或 undefined) 的紀錄
-        const validUsers = allUsersData.filter(d => 
-            d.serial_number !== "未對應帳號" &&
-            d.raw_json && 
-            d.raw_json.Personal_Battery_weighted_round !== null && 
-            d.raw_json.Personal_Battery_weighted_round !== undefined
-        );
+    if (allUsersData && allUsersData.length > 0) {
+        // 1. 過濾有效樣本：排除「未對應帳號」，且 Personal_Battery_weighted_round 必須有數值 (排除 null 與 undefined)
+        const validUsersData = allUsersData.filter(d => {
+            const sn = d.serial_number;
+            const battery = d.raw_json?.Personal_Battery_weighted_round;
+            return sn !== "未對應帳號" && battery !== null && battery !== undefined;
+        });
 
-        validUsersCount = validUsers.length; // 這是包含 A 使用者，且已排除未對應帳號的分母總數
+        validSampleCount = validUsersData.length;
 
-        if (validUsersCount > 0) {
-            // 找出分數比 A 使用者還要低的人數
-            const lowerUsers = validUsers.filter(d => 
-                d.raw_json.Personal_Battery_weighted_round < currentBattery
+        if (validSampleCount > 0) {
+            // 2. 計算登入者的分數超過了幾位有效使用者
+            const lowerUsers = validUsersData.filter(d => 
+                Number(d.raw_json.Personal_Battery_weighted_round) < currentBattery
             ).length;
             
-            // 換算成百分比
-            percentage = Math.round((lowerUsers / validUsersCount) * 100);
+            // 3. 換算百分比 (以有效樣本數為分母)
+            percentage = Math.round((lowerUsers / validSampleCount) * 100);
         }
     }
 
@@ -955,7 +952,7 @@ if (allUsersData && allUsersData.length > 0) {
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
         percentage: percentage,
-        totalUsers: validUsersCount, // 👈 新增這行：把樣本數傳給卡片 
+        sampleCount: validSampleCount, // 👈 新增這行，把樣本數加入回傳資料中 
         light: statusLight, 
         bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
         worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
@@ -1635,7 +1632,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                         <span>恢復指數</span>
                         <div style="text-align: right;">
                             <span class="battery-val" style="color:${colors}">${data.battery}</span><br>
-                            <span class="rank-text">超過 ${data.percentage}% 的使用者 (樣本數 ${data.totalUsers} 人)</span>
+                            <span class="rank-text">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleCount} 人)</span>
                         </div>
                     </div>
                     <div class="progress-bg">
