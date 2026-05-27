@@ -876,8 +876,8 @@ async function fetchSummaryData(targetDate) {
     let allUsersData = [];
     try {
         const rankParams = new URLSearchParams({
-            start: current.record_end,
-            end: current.record_end
+            start: current.record_date,
+            end: current.record_date
             // 不帶 serial，獲取該日所有人的資料
         }).toString();
 
@@ -889,20 +889,32 @@ async function fetchSummaryData(targetDate) {
         console.error("計算排名時讀取失敗:", err);
     }
 
-// 計算排名百分比與樣本數
+    // 計算排名百分比
     let percentage = 0;
-    let sampleSize = 0; // 新增這行存放樣本數
+    let sampleSize = 0;
 
     if (allUsersData && allUsersData.length > 0) {
-        // 利用 Set 過濾出不重複的 serial_number 來計算實際人數
-        const uniqueSerials = new Set(allUsersData.map(d => d.serial_number).filter(Boolean));
-        sampleSize = uniqueSerials.size;
+        // 1.1 篩選條件：排除 Personal_Battery_weighted_round 為 null/undefined，以及 serial_number 為 "未對應帳號" 的使用者
+        const validUsersData = allUsersData.filter(d => {
+            const serial = d.serial_number || (d.raw_json && d.raw_json.serial_number);
+            const isInvalidSerial = serial === "未對應帳號";
+            const hasValidBattery = d.raw_json && 
+                                    d.raw_json.Personal_Battery_weighted_round !== undefined && 
+                                    d.raw_json.Personal_Battery_weighted_round !== null;
+            
+            return !isInvalidSerial && hasValidBattery;
+        });
 
-        const totalUsers = allUsersData.length;
-        const lowerUsers = allUsersData.filter(d => 
-            (d.raw_json?.Personal_Battery_weighted_round || 0) < currentBattery
-        ).length;
-        percentage = Math.round((lowerUsers / totalUsers) * 100);
+        // 1.2 計算有效樣本數
+        sampleSize = validUsersData.length;
+
+        // 2.1 以篩選後的母體來計算登入者超過的百分比
+        if (sampleSize > 0) {
+            const lowerUsers = validUsersData.filter(d => 
+                Number(d.raw_json.Personal_Battery_weighted_round) < currentBattery
+            ).length;
+            percentage = Math.round((lowerUsers / sampleSize) * 100);
+        }
     }
 
     // --- 3. 指標增減比較邏輯 (與前一次數據比較) ---
@@ -942,8 +954,8 @@ async function fetchSummaryData(targetDate) {
     return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
-        percentage: percentage,
-        sampleSize: sampleSize, // 👈 新增這行 
+        percentage: percentage, 
+        sampleSize: sampleSize, // 👈 這裡新增：把計算好的樣本數一起回傳
         light: statusLight, 
         bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
         worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
