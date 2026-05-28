@@ -1,4 +1,4 @@
-// qwen_function_17.js
+// qwen_function_18.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -40,7 +40,10 @@ export default async function handler(req, res) {
       });
       
       let greetingResult = await greetingRes.json();
-      return res.status(200).json({ text: greetingResult.textResponse });
+      
+      // ✨ 貼在這裡！過濾開場白的內心戲
+      const cleanGreeting = greetingResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      return res.status(200).json({ text: cleanGreeting });
     }
 
     // ==========================================
@@ -415,7 +418,9 @@ export default async function handler(req, res) {
     });
     
     let finalResult = await finalRes.json();
-    const aiText = finalResult.textResponse;
+    
+    // ✨ 貼在這裡！直接把過濾後的文字存進 aiText
+    const aiText = finalResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
     // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
@@ -432,7 +437,7 @@ export default async function handler(req, res) {
         ai_response: aiText,
         record_date: local_date,
         record_time: local_time,
-        ai_model: 'LLM-Qwen-function'
+        ai_model: 'LLM-Qwen3-function'
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
