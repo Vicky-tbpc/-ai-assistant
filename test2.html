@@ -291,7 +291,35 @@
     text-decoration-thickness: 2px; 
     text-underline-offset: 5px; /* 將橘紅色橫線往下移 5px，不再緊貼文字 */
 }
+/* 自定義日曆圖片按鈕 */
+.custom-calendar-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;  /* 請將數值改成跟你 .avatar 一樣的大小 */
+    height: 40px; /* 請將數值改成跟你 .avatar 一樣的大小 */
+    border-radius: 50%;
+    overflow: hidden; /* 確保圖片超出圓角的部分被隱藏 */
+    background-color: #f0f4f8; /* 如果你的圖是透明背景，可以加個底色，不需要的話可刪除 */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
 
+/* 加上 hover 效果，讓它看起來是個可以點擊的按鈕 */
+.custom-calendar-btn:hover {
+    transform: scale(1.05); /* 滑鼠游標移過去時微放大 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); /* 加點陰影提升質感 */
+}
+
+/* 確保圖片完美填滿圓形框框 */
+.calendar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* 如果圖片原本不是正方形，cover 可以確保它不變形並填滿 */
+}
 </style>
 </head>
 <body>
@@ -358,9 +386,13 @@
         <header>
             <div class="logo-text">Soosyn Health Companion</div>
             <div style="display: flex; align-items: center; gap: 12px;">
-                <button onclick="openCalendarModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--tbp-blue); padding: 4px; display: flex; align-items: center; justify-content: center;" title="歷史摘要日曆">📅</button>
-                
-                <div class="user-info" onclick="toggleDropdown()">
+    <!-- 改用自定義圖片的圓形按鈕 -->
+    <button onclick="openCalendarModal()" class="custom-calendar-btn" title="健康摘要日曆">
+        <img src="images/calendar.svg" alt="日曆" class="calendar-img">
+    </button>
+    
+    <div class="user-info" onclick="toggleDropdown()">
+
                     <div id="display-name" style="display: none;">User</div>
                     <div class="avatar" id="avatar-char">U</div>
                     <div id="settings-menu" class="dropdown hidden">
