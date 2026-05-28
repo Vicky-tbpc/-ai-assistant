@@ -206,7 +206,20 @@
     display: flex;
     align-items: center;
 }
-
+/* 日曆樣式 */
+.calendar-card { max-width: 320px; padding: 25px 20px; }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; color: var(--tbp-blue); font-size: 1.1rem; font-weight: bold; }
+.calendar-header button { background: var(--tbp-light-blue); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--tbp-blue); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.calendar-header button:hover { background: var(--tbp-blue); color: white; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+.calendar-day-header { font-size: 0.8rem; color: #888; font-weight: bold; margin-bottom: 5px; }
+.calendar-day { padding: 8px 0; border-radius: 50%; font-size: 0.9rem; cursor: pointer; color: #333; transition: 0.2s; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; }
+.calendar-day:hover:not(.empty):not(.disabled) { background: #f0f0f0; }
+.calendar-day.empty { cursor: default; }
+.calendar-day.disabled { color: #ccc; cursor: default; }
+.calendar-day.has-data { background: var(--tbp-light-blue); color: var(--tbp-blue); font-weight: bold; border: 1px solid transparent; }
+.calendar-day.has-data:hover { background: var(--tbp-blue); color: white; }
+.calendar-day.today { text-decoration: underline; text-decoration-color: var(--accent-red); text-decoration-thickness: 2px; }
 
 </style>
 </head>
@@ -256,12 +269,26 @@
             <button style="margin-top:10px; background:none; border:none; color:#888; cursor:pointer;" onclick="closePwModal()">取消</button>
         </div>
     </div>
-
+<div id="calendar-overlay" class="modal-overlay hidden" onclick="closeCalendarModal(event)">
+        <div class="modal-card calendar-card" onclick="event.stopPropagation()">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">◀</button>
+                <h3 id="calendar-month-year"></h3>
+                <button onclick="changeMonth(1)">▶</button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid">
+                </div>
+            <button class="primary-btn" style="margin-top: 20px; background: white; color: var(--tbp-blue); border: 1px solid var(--tbp-blue);" onclick="closeCalendarModal()">關閉</button>
+        </div>
+    </div>
     <div id="zoom-overlay" class="hidden" onclick="closeZoom()"><div id="zoom-container" onclick="event.stopPropagation()"></div></div>
 
     <div id="app-container" class="hidden">
         <header>
-            <div class="logo-text">Soosyn Health Companion</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="logo-text">Soosyn Health Companion</div>
+                <button onclick="openCalendarModal()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--tbp-blue); padding: 0;" title="歷史摘要日曆">📅</button>
+            </div>
             <div class="user-info" onclick="toggleDropdown()">
                 <div id="display-name" style="font-size: 14px; color: #666;">User</div>
                 <div class="avatar" id="avatar-char">U</div>
@@ -2219,7 +2246,118 @@ function appendSimpleSummaryCard(metricName, detailedContent) {
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 }
+// --- 日曆功能 ---
+let currentCalDate = new Date();
+let availableSummaryDates = new Set();
 
+// 打開日曆並獲取有資料的日期
+async function openCalendarModal() {
+    if (!currentSerial) {
+        alert("請先登入才能查看日曆喔！");
+        return;
+    }
+    
+    // 每次打開時重置為當前月份
+    currentCalDate = new Date();
+    document.getElementById('calendar-overlay').classList.remove('hidden');
+    
+    // 渲染骨架，並顯示載入中... (可視需求)
+    renderCalendar(); 
+    
+    await fetchAvailableSummaryDates();
+    renderCalendar(); // 資料回來後重新渲染上色
+}
+
+// 關閉日曆
+function closeCalendarModal(event) {
+    if (event && event.target !== document.getElementById('calendar-overlay') && event.target.tagName !== 'BUTTON') return;
+    document.getElementById('calendar-overlay').classList.add('hidden');
+}
+
+// 向地端請求使用者的所有資料，推算出哪些日期有「健康摘要」
+async function fetchAvailableSummaryDates() {
+    try {
+        const params = new URLSearchParams({ serial: currentSerial }).toString();
+        const response = await fetch(`/api/health?${params}`);
+        if (response.ok) {
+            const allData = await response.json();
+            availableSummaryDates.clear();
+            allData.forEach(d => {
+                // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
+                const dateObj = new Date(d.record_date.replace(/-/g, '/'));
+                dateObj.setDate(dateObj.getDate() + 1);
+                availableSummaryDates.add(dateObj.toLocaleDateString('en-CA'));
+            });
+        }
+    } catch (e) {
+        console.error("無法取得日曆資料，請確認地端伺服器是否開啟", e);
+    }
+}
+
+// 切換月份
+function changeMonth(offset) {
+    currentCalDate.setMonth(currentCalDate.getMonth() + offset);
+    renderCalendar();
+}
+
+// 渲染日曆畫面
+function renderCalendar() {
+    const year = currentCalDate.getFullYear();
+    const month = currentCalDate.getMonth();
+    
+    document.getElementById('calendar-month-year').innerText = `${year}年 ${month + 1}月`;
+    
+    const firstDay = new Date(year, month, 1).getDay(); // 0(日) ~ 6(六)
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const grid = document.getElementById('calendar-grid');
+    let html = '';
+    
+    const dayHeaders = ['日', '一', '二', '三', '四', '五', '六'];
+    dayHeaders.forEach(day => {
+        html += `<div class="calendar-day-header">${day}</div>`;
+    });
+    
+    // 填補當月第一天前面的空格
+    for (let i = 0; i < firstDay; i++) {
+        html += `<div class="calendar-day empty"></div>`;
+    }
+    
+    const todayStr = getLocalDateString();
+
+    // 產生每一天
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const hasData = availableSummaryDates.has(dateStr);
+        const isToday = dateStr === todayStr;
+        
+        let classNames = 'calendar-day';
+        if (hasData) classNames += ' has-data';
+        else classNames += ' disabled'; // 無資料反灰
+        if (isToday) classNames += ' today';
+        
+        if (hasData) {
+            html += `<div class="${classNames}" onclick="selectCalendarDate('${dateStr}')">${day}</div>`;
+        } else {
+            html += `<div class="${classNames}">${day}</div>`;
+        }
+    }
+    
+    grid.innerHTML = html;
+}
+
+// 點選日期後執行查詢
+async function selectCalendarDate(dateStr) {
+    closeCalendarModal();
+    appendUserMessage(`查詢 ${dateStr} 健康摘要`);
+    
+    // 因為 processSummarySearch 需要傳入前一天的日期去抓資料
+    const dateObj = new Date(dateStr.replace(/-/g, '/'));
+    dateObj.setDate(dateObj.getDate() - 1);
+    const preDateStr = dateObj.toLocaleDateString('en-CA');
+    
+    await processSummarySearch(preDateStr, dateStr);
+}
 </script>
 </body>
 </html>
