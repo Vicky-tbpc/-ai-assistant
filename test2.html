@@ -1723,7 +1723,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                 // 繪製圓點：套用判斷邏輯變更顏色
                 let svgCircles = '';
                 pts.forEach((pt, idx) => {
-                    const dotColor = cfg.checkAbnormal(pt, avg) ? "#ff8c73" : "var(--tbp-blue)";
+                    const dotColor = cfg.checkAbnormal(pt, avg) ? "#ffb4a3" : "var(--tbp-blue)";
                     svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="5.5" fill="${dotColor}" stroke="#ffffff" stroke-width="1.2" />`;
                 });
 
