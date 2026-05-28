@@ -207,19 +207,90 @@
     align-items: center;
 }
 /* 日曆樣式 */
-.calendar-card { max-width: 320px; padding: 25px 20px; }
-.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; color: var(--tbp-blue); font-size: 1.1rem; font-weight: bold; }
-.calendar-header button { background: var(--tbp-light-blue); border: none; width: 32px; height: 32px; border-radius: 50%; color: var(--tbp-blue); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-.calendar-header button:hover { background: var(--tbp-blue); color: white; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
-.calendar-day-header { font-size: 0.8rem; color: #888; font-weight: bold; margin-bottom: 5px; }
-.calendar-day { padding: 8px 0; border-radius: 50%; font-size: 0.9rem; cursor: pointer; color: #333; transition: 0.2s; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; }
-.calendar-day:hover:not(.empty):not(.disabled) { background: #f0f0f0; }
-.calendar-day.empty { cursor: default; }
-.calendar-day.disabled { color: #ccc; cursor: default; }
-.calendar-day.has-data { background: var(--tbp-light-blue); color: var(--tbp-blue); font-weight: bold; border: 1px solid transparent; }
-.calendar-day.has-data:hover { background: var(--tbp-blue); color: white; }
-.calendar-day.today { text-decoration: underline; text-decoration-color: var(--accent-red); text-decoration-thickness: 2px; }
+/* 日曆樣式優化 */
+.calendar-card { 
+    max-width: 320px; 
+    padding: 25px 20px; 
+}
+.calendar-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 15px; 
+    color: #2b3a42; /* 提高對比度：使用深色灰藍，閱讀更舒適 */
+    font-size: 1.1rem; 
+    font-weight: bold; 
+}
+.calendar-header button { 
+    background: var(--tbp-light-blue); 
+    border: none; 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%; 
+    color: #2b3a42; /* 提高箭頭對比度 */
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    transition: 0.2s; 
+}
+.calendar-header button:hover { 
+    background: var(--tbp-blue); 
+    color: white; 
+}
+.calendar-grid { 
+    display: grid; 
+    grid-template-columns: repeat(7, 1fr); 
+    gap: 5px; 
+    text-align: center; 
+    align-items: center;
+}
+.calendar-day-header { 
+    font-size: 0.85rem; 
+    color: #444; /* 提高星期標題對比度 */
+    font-weight: bold; 
+    margin-bottom: 5px; 
+}
+.calendar-day { 
+    width: 36px;        /* 固定寬度，確保在各種螢幕上都是正圓 */
+    height: 36px;       /* 固定高度，確保在各種螢幕上都是正圓 */
+    border-radius: 50%; 
+    font-size: 0.9rem; 
+    cursor: pointer; 
+    color: #222;        /* 提高一般日期數字對比度 */
+    transition: 0.2s; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    margin: auto;       /* 在網格格中完美居中 */
+    box-sizing: border-box;
+}
+.calendar-day:hover:not(.empty):not(.disabled) { 
+    background: #e2ddd4; 
+}
+.calendar-day.empty { 
+    cursor: default; 
+}
+.calendar-day.disabled { 
+    color: #a0a0a0;     /* 無資料日期維持淡色，但調整到清晰可讀的範圍 */
+    cursor: default; 
+}
+.calendar-day.has-data { 
+    background: var(--tbp-light-blue); 
+    color: #1a2a30;     /* 提高對比度：深藍黑字體搭配淺藍底，極為清晰 */
+    font-weight: bold; 
+    border: 1px solid transparent; 
+}
+.calendar-day.has-data:hover { 
+    background: var(--tbp-blue); 
+    color: white; 
+}
+.calendar-day.today { 
+    text-decoration: underline; 
+    text-decoration-color: var(--accent-red); 
+    text-decoration-thickness: 2px; 
+    text-underline-offset: 5px; /* 將橘紅色橫線往下移 5px，不再緊貼文字 */
+}
 
 </style>
 </head>
@@ -285,16 +356,17 @@
 
     <div id="app-container" class="hidden">
         <header>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="logo-text">Soosyn Health Companion</div>
-                <button onclick="openCalendarModal()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--tbp-blue); padding: 0;" title="歷史摘要日曆">📅</button>
-            </div>
-            <div class="user-info" onclick="toggleDropdown()">
-                <div id="display-name" style="font-size: 14px; color: #666;">User</div>
-                <div class="avatar" id="avatar-char">U</div>
-                <div id="settings-menu" class="dropdown hidden">
-                    <button onclick="openPwModal(event)">🔒 修改密碼</button>
-                    <button onclick="logout(event)" style="color: #ff8c73;">📤 登出系統</button>
+            <div class="logo-text">Soosyn Health Companion</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button onclick="openCalendarModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--tbp-blue); padding: 4px; display: flex; align-items: center; justify-content: center;" title="歷史摘要日曆">📅</button>
+                
+                <div class="user-info" onclick="toggleDropdown()">
+                    <div id="display-name" style="display: none;">User</div>
+                    <div class="avatar" id="avatar-char">U</div>
+                    <div id="settings-menu" class="dropdown hidden">
+                        <button onclick="openPwModal(event)">🔒 修改密碼</button>
+                        <button onclick="logout(event)" style="color: #ff8c73;">📤 登出系統</button>
+                    </div>
                 </div>
             </div>
         </header>
