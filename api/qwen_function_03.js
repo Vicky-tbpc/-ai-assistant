@@ -1,4 +1,4 @@
-// qwen_function_16.js
+// qwen_function_18.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -40,7 +40,10 @@ export default async function handler(req, res) {
       });
       
       let greetingResult = await greetingRes.json();
-      return res.status(200).json({ text: greetingResult.textResponse });
+      
+      // ✨ 貼在這裡！過濾開場白的內心戲
+      const cleanGreeting = greetingResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      return res.status(200).json({ text: cleanGreeting });
     }
 
     // ==========================================
@@ -295,7 +298,7 @@ export default async function handler(req, res) {
               blockText += `   - 睡眠血氧飽和度: 平均 ${rawSleep.SpO2_mean || 0}% / 最高 ${rawSleep.SpO2_max || 0}% / 最低 ${rawSleep.SpO2_min || 0}%\n`;
               blockText += `   - 睡眠低血氧時間比例: T90 ${rawSleep.T90_pct || 0}%, T89 ${rawSleep.T89_pct || 0}%, T88 ${rawSleep.T88_pct || 0}%\n`;
               blockText += `   - 低氧負擔指數: HBI低氧負擔指數 ${rawSleep.HBI || 0}%min/h\n`;
-              blockText += `   - 睡眠血氧下降指數: ODI 3% ${rawSleep.ODI3_total || 0}次/h, ODI 4% ${rawSleep.ODI4_total || 0}次/h\n`;
+              blockText += `   - 睡眠血氧下降指數: ODI 3% ${rawSleep.ODI3_per_hour || 0}次/h, ODI 4% ${rawSleep.ODI4_per_hour || 0}次/h\n`;
               blockText += `   - 睡眠呼吸頻率: 平均 ${rawSleep.RR_mean || 0} / 最高 ${rawSleep.RR_max || 0} / 最低 ${rawSleep.RR_min || 0} rpm\n`;
               blockText += `   - 睡眠脈搏: 平均 ${rawSleep.HR_mean || 0} / 最高 ${rawSleep.HR_max || 0} / 最低 ${rawSleep.HR_min || 0} bpm\n`;
               blockText += `   - 心率變異度: SDNN ${rawSleep.SDNN || 0}ms, rMSSD ${rawSleep.rMSSD || 0}ms, LF ${rawSleep.LF_ms2 || 0}ms2, HF ${rawSleep.HF_ms2 || 0}ms2, LF/HF ${rawSleep.LF_HF || 0}, pNN50 ${rawSleep.pNN50_pct || 0}%\n`;
@@ -323,8 +326,8 @@ export default async function handler(req, res) {
               { key: 'T89_pct', label: '平均T89比例', unit: '%', isSleep: true },
               { key: 'T88_pct', label: '平均T88比例', unit: '%', isSleep: true },
               { key: 'HBI', label: '平均低氧負擔指數', unit: '%min/h', isSleep: true },
-              { key: 'ODI3_total', label: '平均 ODI 3%', unit: '次/h', isSleep: true },
-              { key: 'ODI4_total', label: '平均 ODI 4%', unit: '次/h', isSleep: true },
+              { key: 'ODI3_per_hour', label: '平均 ODI 3%', unit: '次/h', isSleep: true },
+              { key: 'ODI4_per_hour', label: '平均 ODI 4%', unit: '次/h', isSleep: true },
               { key: 'HR_mean', label: '平均脈搏', unit: 'bpm', isSleep: true },
               { key: 'RR_mean', label: '平均呼吸頻率', unit: 'rpm', isSleep: true },
               { key: 'SDNN', label: '平均SDNN', unit: 'ms', isSleep: true },
@@ -381,28 +384,21 @@ export default async function handler(req, res) {
    - 數據文本已經以「=== 日期：YYYY-MM-DD ===」為區塊分好了。
    - 使用者詢問某一天的任何數據（例如：「5月12日的HBI」或「5月12日的恢復指數」），請直接至該日期的區塊內，尋找對應的「早晨醒來結算報告」或「晚上入睡生理數據」作答。
    - 後端已經幫你處理好所有的跨日、因果與日期對齊邏輯，請「百分之百相信並照抄」各日期區塊下的數據，你不需要（也絕對禁止）再自行增減日期或推算因果關係。
-2. 【健康分析因果邏輯】：
+2. 【健康分析因果邏輯】(僅在分析原因時啟用)：
    - 若使用者進階詢問「為什麼某天早晨的恢復指數/恢復狀態/發炎風險不好？」，請理解這是由「前一天晚上入睡」的生理數據所決定的。
    - 你應主動查看「前一天日期區塊」的【當天晚上入睡生理數據】（如：血氧、HBI、心率等）來為使用者找出原因並進行關聯分析。
    - 範例：如果使用者問「為什麼我 5月12日 早上恢復指數這麼低？」，你應該去翻看「5月11日」區塊內的「晚上入睡生理數據」來幫他找出睡眠問題。
 3. 【外部與健康數據整合邏輯】(極度重要)：
    - 你必須將「使用者生理數據」、「外部即時資訊」與你的「RAG知識庫」進行交叉關聯分析。
    - 範例情境：如果外部資訊顯示今天體感溫度高、中暑風險強，而生理數據顯示使用者「昨晚睡眠不足（總睡眠時間短或深睡 N3 不足）」或「發炎風險/心率偏高」，你必須在回答中主動點出這兩者的危險加乘效應（如：天氣熱 + 你昨晚沒睡飽 = 中暑機率大增！），並給予客製化的貼心提醒。
-4. 【禁止捏造】：深睡期 (N3) 比例生理上絕不可能達到 100%。若看到 100，那是「恢復指數」，請勿混淆！
-5. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
-6. 若數據中顯示「資料不足」，請誠實告知使用者，不要猜測。
-7. 【知識庫使用規範】：
+4. 【嚴禁自行推算星期】：數據文本中已經在日期後方標註了正確的星期幾（例如：2026-05-14 (週四)）。請直接「照抄」文本裡的星期，絕對不要自己推算或猜測！
+5. 若數據中顯示「資料不足」或是「無資料」，請誠實告知使用者，不要猜測。
+6. 【知識庫使用規範】：
    - 知識庫僅用於「醫學常識」與「各項指標的標準值/參考範圍」查詢。
    - 【嚴格禁止】：絕對不可將知識庫 PDF 裡的「範例個案數值」誤當作是使用者的數據。
-8. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
-9. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
-10. 【Daily_Tag 恢復狀態輔助參考】：
-   數據中的「恢復狀態」(Daily_Tag) 可作為評估當天狀況的輔助參考。若有出現以下關鍵字，請結合其他生理數據（如心率、睡眠效率等）一同為使用者做綜合分析：
-   - 優秀：黃金修復
-   - 標準：標準修復
-   - 注意：精神負荷、高身心壓力、過度疲憊、修復不足
-   - 警示：極度疲乏日、睡眠結構混亂、極端負荷、最差睡眠結構、過度訓練/發炎
-11. 【資料上傳狀態回覆邏輯】：
+7. 【禁止輸出 JSON】：你現在是面對使用者的最終客服，請用自然、親切的對話回答，絕對不可以輸出 JSON 格式或任何程式碼字串。
+8. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
+9. 【資料上傳狀態回覆邏輯】：
    - 當使用者關心「今天/昨天/前天有沒有成功上傳資料」或「有沒有收到數據」時，請務必先查看上方【資料上傳實時狀態】對應日期的結果。
    - 【回覆原則】：如果狀態為「有收到資料」，請用你溫暖、平輩朋友的口吻，高興地告訴對方有收到；如果狀態為「尚未收到資料」，則貼心地提醒對方目前還沒看到。
    - 【重要】：請保持對話的自然與彈性，你可以自己加上適合的 emoji (例如：🎉, 👀, 喔～)，不要回答得像系統罐頭訊息！
@@ -411,7 +407,7 @@ export default async function handler(req, res) {
 
     const historyText = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
-      return `${(h.role === 'user' || h.role === 'user') ? '使用者' : '助理'}: ${textContent}`;
+      return `${h.role === 'user' ? '使用者' : '助理'}: ${textContent}`;
     }).join('\n');
     const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
 
@@ -422,7 +418,9 @@ export default async function handler(req, res) {
     });
     
     let finalResult = await finalRes.json();
-    const aiText = finalResult.textResponse;
+    
+    // ✨ 貼在這裡！直接把過濾後的文字存進 aiText
+    const aiText = finalResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
     // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
