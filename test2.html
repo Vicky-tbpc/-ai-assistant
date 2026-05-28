@@ -387,7 +387,7 @@
             <div class="logo-text">Soosyn Health Companion</div>
             <div style="display: flex; align-items: center; gap: 12px;">
     <!-- 改用自定義圖片的圓形按鈕 -->
-    <button onclick="openCalendarModal()" class="custom-calendar-btn" title="健康摘要日曆">
+    <button onclick="openCalendarModal()" class="custom-calendar-btn" title="健康摘要">
         <img src="images/calendar.svg" alt="日曆" class="calendar-img">
     </button>
     
@@ -1683,12 +1683,13 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
         // 反轉陣列，讓圖表由左到右呈現「舊到新」的趨勢
         const trendData = [...data.history7].reverse();
         
+        // 加入 checkAbnormal 函數，用來判斷圓點何時要變成橘紅色 (#FF8C73)
         const chartConfigs = [
-            { title: "靜息心率", field: "RHR_raw", unit: "bpm", dateLabel: labelChart1 },
-            { title: "深睡期 (N3)", field: "N3_pct", unit: "%", dateLabel: labelCharts2To5 },
-            { title: "rMSSD", field: "rMSSD", unit: "ms", dateLabel: labelCharts2To5 },
-            { title: "睡眠最低脈搏", field: "HR_min", unit: "bpm", dateLabel: labelCharts2To5 },
-            { title: "HBI 低氧負擔指數", field: "HBI", unit: "%min/h", dateLabel: labelCharts2To5 }
+            { title: "靜息心率", field: "RHR_raw", unit: "bpm", dateLabel: labelChart1, checkAbnormal: (val, avg) => val > avg },
+            { title: "深睡期 (N3)", field: "N3_pct", unit: "%", dateLabel: labelCharts2To5, checkAbnormal: (val, avg) => val < avg },
+            { title: "rMSSD", field: "rMSSD", unit: "ms", dateLabel: labelCharts2To5, checkAbnormal: (val, avg) => val < avg },
+            { title: "睡眠最低脈搏", field: "HR_min", unit: "bpm", dateLabel: labelCharts2To5, checkAbnormal: (val, avg) => val > avg },
+            { title: "HBI 低氧負擔指數", field: "HBI", unit: "%min/h", dateLabel: labelCharts2To5, checkAbnormal: (val, avg) => val > avg }
         ];
 
         chartConfigs.forEach(cfg => {
@@ -1719,23 +1720,24 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                 const getX = (i) => 15 + (i * (190 / Math.max(1, pts.length - 1)));
                 const getY = (val) => 33 - ((val - yMin) / (yMax - yMin)) * 22;
 
-                // 繪製圓點：半徑放大到 5.5，增加外邊框寬度
+                // 繪製圓點：套用判斷邏輯變更顏色
                 let svgCircles = '';
                 pts.forEach((pt, idx) => {
-                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="5.5" fill="var(--tbp-blue)" stroke="#ffffff" stroke-width="1.2" />`;
+                    const dotColor = cfg.checkAbnormal(pt, avg) ? "#ff8c73" : "var(--tbp-blue)";
+                    svgCircles += `<circle cx="${getX(idx)}" cy="${getY(pt)}" r="5.5" fill="${dotColor}" stroke="#ffffff" stroke-width="1.2" />`;
                 });
 
                 const yAvg = getY(avg);
                 svgHtml = `
                     <svg viewBox="0 0 220 60" style="width:100%; height:100%; overflow:visible;">
-                        <line x1="5" y1="${yAvg}" x2="215" y2="${yAvg}" stroke="var(--accent-red)" stroke-width="2.2" stroke-dasharray="4,3" />
+                        <line x1="5" y1="${yAvg}" x2="215" y2="${yAvg}" stroke="#FFB4A3" stroke-width="2.2" stroke-dasharray="4,3" />
                         ${svgCircles}
                         <text x="${getX(pts.length - 1)}" y="55" font-size="13" font-weight="bold" fill="#666" text-anchor="middle">${cfg.dateLabel}</text>
                     </svg>
                 `;
             }
 
-            // 卡片式排版：7日平均單位處已修正，不再使用任何替代取代邏輯
+            // 卡片式排版
             miniChartsRowsHtml += `
                 <div class="mini-chart-item" style="background: #faf9f6; border-radius: 12px; padding: 12px; margin: 10px 0; border: 1px solid #eee;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
