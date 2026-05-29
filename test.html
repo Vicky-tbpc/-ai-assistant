@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n079</title>
+    <title>Soosyn 健康夥伴 n080</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -18,7 +18,17 @@
             --ai-msg-bg: #ffffff;
             --accent-red: #ff8c73;
         }
-        body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+        body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: var(--bg-color);
+    color: var(--text-dark);
+    font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+}
         .hidden { display: none !important; }
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
@@ -26,10 +36,12 @@
         .modal-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; background: #fff; box-sizing: border-box; font-size: 16px; }
         .primary-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--tbp-blue); color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
-        #app-container { 
-    display: flex; 
-    flex-direction: column; 
-    height: 100dvh; /* 這裡原本是 100vh，改成 100dvh 可以完美避開手機網址列縮放問題 */
+        #app-container {
+    display: flex;
+    flex-direction: column;
+
+    height: 100vh;
+    min-height: -webkit-fill-available;
 }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
@@ -70,14 +82,17 @@
         .radar-result-text { font-size: 1.2rem; font-weight: bold; fill: #5a5a5a; text-anchor: middle; }
         .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .action-btn { background: white; border: 1px solid var(--tbp-blue); color: var(--tbp-blue); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
-        /* 修改原有的 .footer-input，加入 flex-direction: column 與安全距離 */
-.footer-input { 
-    /* 底部 padding 加上系統安全距離，避免被手機底部導覽條遮住 */
-    padding: 15px 20px calc(12px + env(safe-area-inset-bottom, 0px)) 20px; 
-    background: var(--bg-color); 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
+.footer-input {
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    background: var(--bg-color);
+
+    padding:
+      15px
+      20px
+      calc(12px + env(safe-area-inset-bottom, 0px))
+      20px;
 }
 
 /* 新增警語專用樣式 */
@@ -405,7 +420,10 @@
         <main id="main-area"><div id="chat-history"></div></main>
         <div class="footer-input">
             <div class="input-box">
-                <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <input
+  type="text"
+  id="user-input"
+  placeholder="說點什麼...">
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         <!-- 這裡加上警語 -->
