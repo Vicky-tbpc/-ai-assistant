@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n079</title>
+    <title>Soosyn 健康夥伴 n080</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -18,7 +18,17 @@
             --ai-msg-bg: #ffffff;
             --accent-red: #ff8c73;
         }
-        body, html { margin: 0; padding: 0; height: 100%; background-color: var(--bg-color); color: var(--text-dark); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; overflow: hidden; }
+        body, html { 
+    margin: 0; 
+    padding: 0; 
+    height: 100%; 
+    width: 100%; /* 新增 */
+    position: fixed; /* 新增：固定底層，交由內部容器去滾動 */
+    background-color: var(--bg-color); 
+    color: var(--text-dark); 
+    font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; 
+    overflow: hidden; 
+}
         .hidden { display: none !important; }
         .modal-overlay { position: fixed; inset: 0; background: #f5f1eb; display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         #zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: flex; justify-content: center; align-items: center; cursor: zoom-out; }
@@ -29,8 +39,13 @@
         #app-container { 
     display: flex; 
     flex-direction: column; 
-    /* 將 100dvh 改為 100svh 或 100% */
-    height: 100svh; 
+    /* 移除 height: 100dvh; */
+    position: absolute; /* 新增 */
+    top: 0; /* 新增 */
+    bottom: 0; /* 新增 */
+    left: 0; /* 新增 */
+    right: 0; /* 新增 */
+    width: 100%; /* 新增 */
 }
         header { height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: white; border-bottom: 1px solid #eee; z-index: 100; }
         .logo-text { font-weight: bold; color: var(--tbp-blue); font-size: 1.1rem; }
@@ -90,7 +105,18 @@
     letter-spacing: 0.5px;
 }
         .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
-        #user-input { flex: 1; border: none; outline: none; padding: 10px; font-size: 16px; background: transparent; }
+        #user-input { 
+    flex: 1; 
+    border: none; 
+    outline: none; 
+    padding: 10px; 
+    font-size: 16px; 
+    background: transparent; 
+    /* 以下為新增：確保 Android 裝置能正常觸控與輸入文字 */
+    -webkit-user-select: auto !important;
+    user-select: auto !important;
+    touch-action: manipulation;
+}
         .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
@@ -429,6 +455,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// 👇 這裡就是你要插入的新程式碼：修正 Android LINE 鍵盤彈出失去焦點的 Bug
+document.addEventListener('DOMContentLoaded', () => {
+    const userInput = document.getElementById('user-input');
+    
+    if (userInput) {
+        // 確保點擊時確實獲得焦點
+        userInput.addEventListener('touchstart', function() {
+            setTimeout(() => {
+                this.focus();
+            }, 100);
+        }, { passive: false });
+
+        // 當 Android 鍵盤彈起改變視窗大小時，確保輸入框不會被遮擋或失焦
+        window.addEventListener('resize', () => {
+            if (document.activeElement === userInput) {
+                setTimeout(() => {
+                    userInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    // 再次推播焦點，防止被強制 blur
+                    userInput.focus(); 
+                }, 150);
+            }
+        });
+    }
+});
 
 // 初始化 LIFF
 async function initLIFF() {
@@ -2390,10 +2440,13 @@ async function fetchAvailableSummaryDates() {
             const allData = await response.json();
             availableSummaryDates.clear();
             allData.forEach(d => {
-                // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
-                const dateObj = new Date(d.record_date.replace(/-/g, '/'));
-                dateObj.setDate(dateObj.getDate() + 1);
-                availableSummaryDates.add(dateObj.toLocaleDateString('en-CA'));
+                // 先確認有 raw_json，再檢查裡面的 Personal_Battery_weighted_round 是否有值
+                if (d.raw_json && d.raw_json.Personal_Battery_weighted_round != null) {
+                    // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
+                    const dateObj = new Date(d.record_date.replace(/-/g, '/'));
+                    dateObj.setDate(dateObj.getDate() + 1);
+                    availableSummaryDates.add(dateObj.toLocaleDateString('en-CA'));
+                }
             });
         }
     } catch (e) {
