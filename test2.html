@@ -460,20 +460,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     
     if (userInput) {
-        // 確保點擊時確實獲得焦點
-        userInput.addEventListener('touchstart', function() {
-            setTimeout(() => {
-                this.focus();
-            }, 100);
-        }, { passive: false });
-
-        // 當 Android 鍵盤彈起改變視窗大小時，確保輸入框不會被遮擋或失焦
+        // 當 Android 鍵盤彈起改變視窗大小時，確保輸入框不會被遮擋
         window.addEventListener('resize', () => {
+            // 如果目前焦點已經在輸入框上
             if (document.activeElement === userInput) {
                 setTimeout(() => {
+                    // 只需要確保滾動到可視範圍即可
                     userInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                    // 再次推播焦點，防止被強制 blur
-                    userInput.focus(); 
+                    // ⚠️ 已經移除 userInput.focus(); 避免打斷中文輸入法的組字緩衝區
                 }, 150);
             }
         });
