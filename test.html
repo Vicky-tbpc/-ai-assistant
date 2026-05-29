@@ -2389,21 +2389,30 @@ async function fetchAvailableSummaryDates() {
             const allData = await response.json();
             availableSummaryDates.clear();
             
+            console.log("後端回傳的完整原始資料：", allData); // 👈 檢查整個陣列
+
             allData.forEach(d => {
-                // 新增判斷：若對應的 Personal_Battery_weighted_round 是 null 或 undefined，則跳過不標示
-                if (d.Personal_Battery_weighted_round != null) {
-                    // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
+                console.log("當前該筆資料的欄位值：", d.Personal_Battery_weighted_round); // 👈 檢查這個欄位到底拿到什麼
+
+                // 安全防禦：同時排除真正的 null/undefined，以及字串型的 "null"/"undefined"
+                if (
+                    d.Personal_Battery_weighted_round !== null && 
+                    d.Personal_Battery_weighted_round !== undefined && 
+                    d.Personal_Battery_weighted_round !== "null" && 
+                    d.Personal_Battery_weighted_round !== "undefined"
+                ) {
                     const dateObj = new Date(d.record_date.replace(/-/g, '/'));
                     dateObj.setDate(dateObj.getDate() + 1);
                     availableSummaryDates.add(dateObj.toLocaleDateString('en-CA'));
                 }
             });
+            
+            console.log("最後篩選出來有標示的日期：", Array.from(availableSummaryDates));
         }
     } catch (e) {
         console.error("無法取得日曆資料，請確認地端伺服器是否開啟", e);
     }
 }
-
 // 切換月份
 function changeMonth(offset) {
     currentCalDate.setMonth(currentCalDate.getMonth() + offset);
