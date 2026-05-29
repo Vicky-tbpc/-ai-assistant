@@ -2388,9 +2388,10 @@ async function fetchAvailableSummaryDates() {
         if (response.ok) {
             const allData = await response.json();
             availableSummaryDates.clear();
+            
             allData.forEach(d => {
-                // 檢查是否具有 record_date 且 Personal_Battery_weighted_round 不是 null 也不是 undefined
-                if (d.record_date && d.Personal_Battery_weighted_round != null) {
+                // 新增判斷：若對應的 Personal_Battery_weighted_round 是 null 或 undefined，則跳過不標示
+                if (d.Personal_Battery_weighted_round != null) {
                     // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
                     const dateObj = new Date(d.record_date.replace(/-/g, '/'));
                     dateObj.setDate(dateObj.getDate() + 1);
