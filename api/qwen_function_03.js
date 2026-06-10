@@ -222,6 +222,9 @@ export default async function handler(req, res) {
         },
         cache: 'no-store'
       });
+
+      const dataResult = await dataRes.json();
+      const finalContextData = dataResult.data || dataResult || [];
         
         // ========================================================
         // 🌟 優化：只提供比對結果狀態，讓 AI 自由發揮語氣
@@ -378,7 +381,6 @@ export default async function handler(req, res) {
           uploadStatusContext = `【使用者資料上傳實時狀態】\n- 今天 (${local_date}) 的 record_end 資料：【尚未收到資料】\n- 昨天 (${yesterdayStr}) 的 record_end 資料：【尚未收到資料】\n- 前天 (${beforeYesterdayStr}) 的 record_end 資料：【尚未收到資料】`;
         }
       }
-    }
 
     // ==========================================
     // 第三階段：最終地端 AI 整合回答
