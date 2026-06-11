@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n081</title>
+    <title>Soosyn 健康夥伴 n082</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -303,15 +303,30 @@
     cursor: default; 
 }
 .calendar-day.has-data { 
-    background: var(--tbp-light-blue); 
-    color: #1a2a30;     /* 提高對比度：深藍黑字體搭配淺藍底，極為清晰 */
+    color: #1a2a30;     
     font-weight: bold; 
     border: 1px solid transparent; 
 }
-.calendar-day.has-data:hover { 
-    background: var(--tbp-blue); 
-    color: white; 
-}
+
+/* 🟢 綠燈：柔和淺綠色 */
+.calendar-day.has-data.status-green { background: #e8f7ec; }
+.calendar-day.has-data.status-green:hover { background: #018837; color: white; }
+
+/* 🟡 黃燈：柔和淺黃色 */
+.calendar-day.has-data.status-yellow { background: #fcf4d9; }
+.calendar-day.has-data.status-yellow:hover { background: #ffb400; color: white; }
+
+/* 🔴 紅燈：柔和淺紅色 */
+.calendar-day.has-data.status-red { background: #fae8e8; }
+.calendar-day.has-data.status-red:hover { background: #dc0000; color: white; }
+
+/* 🟠 預防有黃紅燈：柔和淺橘色 */
+.calendar-day.has-data.status-orange { background: #fcecd9; }
+.calendar-day.has-data.status-orange:hover { background: #f06400; color: white; }
+
+/* 🔵 預設/其他：維持原本的淺藍色 */
+.calendar-day.has-data.status-default { background: var(--tbp-light-blue); }
+.calendar-day.has-data.status-default:hover { background: var(--tbp-blue); color: white; }
 .calendar-day.today { 
     text-decoration: underline; 
     text-decoration-color: var(--accent-red); 
@@ -2230,7 +2245,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -2369,7 +2384,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function_03', {
+        const res = await fetch('/api/qwen_function', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2417,7 +2432,7 @@ function appendSimpleSummaryCard(metricName, detailedContent) {
 }
 // --- 日曆功能 ---
 let currentCalDate = new Date();
-let availableSummaryDates = new Set();
+let availableSummaryDates = new Map();
 
 // 打開日曆並獲取有資料的日期
 async function openCalendarModal() {
@@ -2443,21 +2458,27 @@ function closeCalendarModal(event) {
     document.getElementById('calendar-overlay').classList.add('hidden');
 }
 
-// 向地端請求使用者的所有資料，推算出哪些日期有「健康摘要」
+// 向地端請求使用者的所有資料，推算出哪些日期有「健康摘要」與對應的燈號
 async function fetchAvailableSummaryDates() {
     try {
         const params = new URLSearchParams({ serial: currentSerial }).toString();
         const response = await fetch(`/api/health?${params}`);
         if (response.ok) {
             const allData = await response.json();
-            availableSummaryDates.clear();
+            availableSummaryDates.clear(); // 清空舊資料
+            
             allData.forEach(d => {
-                // 先確認有 raw_json，再檢查裡面的 Personal_Battery_weighted_round 是否有值
                 if (d.raw_json && d.raw_json.Personal_Battery_weighted_round != null) {
                     // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
                     const dateObj = new Date(d.record_date.replace(/-/g, '/'));
                     dateObj.setDate(dateObj.getDate() + 1);
-                    availableSummaryDates.add(dateObj.toLocaleDateString('en-CA'));
+                    const displayDate = dateObj.toLocaleDateString('en-CA');
+                    
+                    // 取得 raw_json 裡面的燈號，如果沒有就給空字串
+                    const light = d.raw_json.light_status || '';
+                    
+                    // 將「日期」作為 key，「燈號」作為 value 存起來
+                    availableSummaryDates.set(displayDate, light);
                 }
             });
         }
@@ -2497,15 +2518,32 @@ function renderCalendar() {
     
     const todayStr = getLocalDateString();
 
-    // 產生每一天
+// 產生每一天
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // 使用 .has() 判斷有沒有資料
         const hasData = availableSummaryDates.has(dateStr);
         const isToday = dateStr === todayStr;
         
         let classNames = 'calendar-day';
-        if (hasData) classNames += ' has-data';
-        else classNames += ' disabled'; // 無資料反灰
+        
+        if (hasData) {
+            classNames += ' has-data';
+            // 取出之前存好的燈號
+            const light = availableSummaryDates.get(dateStr);
+            
+            // 根據燈號加上對應的 CSS class
+            if (light === '綠燈') classNames += ' status-green';
+            else if (light === '黃燈') classNames += ' status-yellow';
+            else if (light === '黃紅燈') classNames += ' status-orange';
+            else if (light === '紅燈') classNames += ' status-red';
+            else classNames += ' status-default'; 
+            
+        } else {
+            classNames += ' disabled'; // 無資料反灰
+        }
+        
         if (isToday) classNames += ' today';
         
         if (hasData) {
