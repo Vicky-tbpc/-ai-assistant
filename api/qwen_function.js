@@ -1,4 +1,4 @@
-// qwen_function_18.js
+// qwen_function_19.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -13,6 +13,9 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
+
+    // 🌟 產生獨立的 Session ID，避免 AI 對話記憶互相污染
+    const generateSessionId = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     // ==========================================
     // 客製化 AI 開場白攔截區塊
@@ -36,7 +39,7 @@ export default async function handler(req, res) {
       let greetingRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: greetingPrompt, mode: "chat" })
+        body: JSON.stringify({ message: greetingPrompt, mode: "chat", sessionId: generateSessionId('greet') })
       });
       
       let greetingResult = await greetingRes.json();
@@ -68,6 +71,8 @@ export default async function handler(req, res) {
 
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
+    const twoWeeksStartStr = getOffsetDate(-14); // 🌟 新增 14 天
+    const monthStartStr = getOffsetDate(-30);    // 🌟 新增 30 天
 
     // 🌟 修正點：強化第3點的意圖判斷，強制綁定個人生理數據
     const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
@@ -77,25 +82,27 @@ export default async function handler(req, res) {
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
    - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
 2. 【數據與指標查詢】：
-   - 若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
-   - 🚨【指標科普防呆】：只要使用者的問題中包含了具體的健康指標名稱（例如：「靜息心率」、「深睡」、「血氧」、「HBI」等），不論他是問定義、問科普還是問好壞（例如：「靜息心率愈低愈好嗎」），請「一律強制」將 need_data 設為 true，並將 start 設為上週 (${lastWeekStartStr})，end 設為今天 (${local_date})。因為我們需要撈取他最近的數據，讓回答能結合他的個人現況！
-3. 【外部資訊與綜合風險評估】：(極度重要)
-   - 判斷使用者的問題是否需要外部環境資訊（例如：天氣、氣溫、中暑風險、流行疾病等）。若是，將 need_external 設為 true，並在 external_query 寫下搜尋關鍵字（例如：「評估今日高溫與中暑風險」）。
-   - 🚨【強制綁定數據】：只要使用者詢問「我今天會不會中暑」、「我適合運動嗎」這類需要結合個人身體狀況來判斷的環境風險問題，請「務必同時」將 need_data 設為 true，並將 start 設為昨天 (${yesterdayStr})，end 設為今天 (${local_date})，這樣才能撈取他的生理數據做交叉比對！
-4. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
-5. 只有在明確閒聊且完全無關健康時，才將 need_data 與 need_external 設為 false。
+   - 若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true。
+   - 🚨只要使用者的問題中包含了具體的健康指標名稱（例如：「靜息心率」、「深睡」、「血氧」、「HBI」等），不論他是問定義、問科普還是問好壞，請「一律強制」將 need_data 設為 true 以撈取個人數據。
+3. 【外部資訊與綜合風險評估】：
+   - 判斷是否需要外部環境資訊（例如：天氣、氣溫、中暑風險、流行疾病等）。若是，將 need_external 設為 true。
+   - 🚨只要詢問「會不會中暑」、「適合運動嗎」等風險評估，請將 need_data 設為 true，並將日期設為昨天到今天。
 
-【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
-1. 「今天」：${local_date}
-2. 「昨天」：${yesterdayStr}
-3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
+【日期填寫絕對規則】(你是機器人，請完全複製以下字串，不准自己發明或推算日期！)
+- 只要遇到「今天」，start 和 end 必須填： "${local_date}"
+- 只要遇到「昨天 / 昨晚」，start 和 end 必須填： "${yesterdayStr}"
+- 只要遇到「7天 / 過去一週 / 這週」，start 必須填： "${lastWeekStartStr}"，end 必須填： "${local_date}"
+- 只要遇到「14天 / 兩週」，start 必須填： "${twoWeeksStartStr}"，end 必須填： "${local_date}"
+- 只要遇到「一個月 / 30天」，start 必須填： "${monthStartStr}"，end 必須填： "${local_date}"
+- 若沒提到時間，或只是打招呼閒聊，start 請填： "${yesterdayStr}"，end 請填： "${local_date}"
 
-請「務必只」輸出 JSON：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": true/false, "trend_type": "...", "need_external": true/false, "external_query": "..."}`;
+請「務必只」輸出 JSON，不要有任何其他文字：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": true/false, "trend_type": "...", "need_external": true/false, "external_query": "..."}`;
 
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: routerPrompt, mode: "chat" })
+      // 🌟 修改這裡：加入隨機 sessionId
+      body: JSON.stringify({ message: routerPrompt, mode: "chat", sessionId: generateSessionId('router') })
     });
 
     let intentData = await intentRes.json();
@@ -205,9 +212,19 @@ export default async function handler(req, res) {
       
       const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${apiStart}&end=${apiEnd}`;
       
-      const dataRes = await fetch(healthApiUrl);
-      if (dataRes.ok) {
-        const finalContextData = await dataRes.json();
+      // 🌟 修改這裡：加入 cache: 'no-store' 和 Headers，確保拿到最新資料
+      const dataRes = await fetch(healthApiUrl, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store'
+      });
+
+      const dataResult = await dataRes.json();
+      const finalContextData = dataResult.data || dataResult || [];
         
         // ========================================================
         // 🌟 優化：只提供比對結果狀態，讓 AI 自由發揮語氣
@@ -293,7 +310,7 @@ export default async function handler(req, res) {
               blockText += `🛏️ 【當天晚上入睡生理數據】：\n`;
               blockText += `   - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分\n`;
               blockText += `   - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分\n`;
-              blockText += `   - 睡眠效率: ${rawSleep.sleep_efficiency_pct || 0}%\n`;
+              
               blockText += `   - 睡眠結構: 深睡期 (N3) ${rawSleep.N3_pct || 0}% (${n3Time}), 淺睡期 (N1、N2) ${rawSleep.N1N2_pct || 0}% (${n1n2Time}), 快速動眼期 (REM) ${rawSleep.REM_pct || 0}% (${remTime}), 醒來及清醒期 (Wake) ${rawSleep.wake_minutes || 0}分\n`;
               blockText += `   - 睡眠血氧飽和度: 平均 ${rawSleep.SpO2_mean || 0}% / 最高 ${rawSleep.SpO2_max || 0}% / 最低 ${rawSleep.SpO2_min || 0}%\n`;
               blockText += `   - 睡眠低血氧時間比例: T90 ${rawSleep.T90_pct || 0}%, T89 ${rawSleep.T89_pct || 0}%, T88 ${rawSleep.T88_pct || 0}%\n`;
@@ -317,7 +334,7 @@ export default async function handler(req, res) {
               { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%', isSleep: false },
               { key: 'RHR_raw', label: '平均靜息心率', unit: 'bpm', isSleep: false },
               { key: 'TST_min', label: '平均總睡眠時間', unit: ' min', isSleep: true },
-              { key: 'sleep_efficiency_pct', label: '平均睡眠效率', unit: '%', isSleep: true },
+              
               { key: 'N3_pct', label: '平均深睡比例 (N3)', unit: '%', isSleep: true },
               { key: 'N1N2_pct', label: '平均淺睡比例 (N1、N2)', unit: '%', isSleep: true },
               { key: 'REM_pct', label: '平均快速動眼期比例 (REM)', unit: '%', isSleep: true },
@@ -364,7 +381,6 @@ export default async function handler(req, res) {
           uploadStatusContext = `【使用者資料上傳實時狀態】\n- 今天 (${local_date}) 的 record_end 資料：【尚未收到資料】\n- 昨天 (${yesterdayStr}) 的 record_end 資料：【尚未收到資料】\n- 前天 (${beforeYesterdayStr}) 的 record_end 資料：【尚未收到資料】`;
         }
       }
-    }
 
     // ==========================================
     // 第三階段：最終地端 AI 整合回答
@@ -400,8 +416,9 @@ export default async function handler(req, res) {
 8. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
 9. 【資料上傳狀態回覆邏輯】：
    - 當使用者關心「今天/昨天/前天有沒有成功上傳資料」或「有沒有收到數據」時，請務必先查看上方【資料上傳實時狀態】對應日期的結果。
-   - 【回覆原則】：如果狀態為「有收到資料」，請用你溫暖、平輩朋友的口吻，高興地告訴對方有收到；如果狀態為「尚未收到資料」，則貼心地提醒對方目前還沒看到。
-   - 【重要】：請保持對話的自然與彈性，你可以自己加上適合的 emoji (例如：🎉, 👀, 喔～)，不要回答得像系統罐頭訊息！
+   - 【回覆原則】：如果狀態為「有收到資料」，請高興地告訴對方有收到；如果狀態為「尚未收到資料」，則貼心地提醒對方目前還沒看到。
+   - 🚨【極度重要防呆】：如果使用者說他「已經收到分析完成的通知了」，但目前的【資料上傳實時狀態】卻還是顯示「尚未收到資料」，這代表資料庫正在同步中！請安撫使用者：「系統後台正在努力把資料同步過來，可能會有幾分鐘的小落差，可以先去喝口水，稍等一下再問我一次喔！💦」
+   - 請保持對話的自然與彈性，你可以自己加上適合的 emoji，不要回答得像系統罐頭訊息！
 
 請用平輩口吻回答，多用 emoji！全部使用「你」，絕對禁止使用敬稱「您」。`;
 
@@ -414,7 +431,8 @@ export default async function handler(req, res) {
     let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: finalChatPrompt, mode: "chat" })
+      // 🌟 修改這裡：加入隨機 sessionId
+      body: JSON.stringify({ message: finalChatPrompt, mode: "chat", sessionId: generateSessionId('final') })
     });
     
     let finalResult = await finalRes.json();
