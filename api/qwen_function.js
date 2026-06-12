@@ -375,9 +375,9 @@ export default async function handler(req, res) {
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 外部即時/環境資訊（由外部 API 擷取）：
+   ${externalContext}
 3. 【資料上傳實時狀態】(這是後端精準比對 record_end 的結果)：
    ${uploadStatusContext}
-   ${externalContext}
 
 【生理數據解讀規則】
 1. 【數據查閱指南】(極度重要)：
