@@ -1,4 +1,4 @@
-// qwen_function_17.js
+// qwen_function_18.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -40,7 +40,10 @@ export default async function handler(req, res) {
       });
       
       let greetingResult = await greetingRes.json();
-      return res.status(200).json({ text: greetingResult.textResponse });
+      
+      // ✨ 貼在這裡！過濾開場白的內心戲
+      const cleanGreeting = greetingResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      return res.status(200).json({ text: cleanGreeting });
     }
 
     // ==========================================
@@ -290,7 +293,7 @@ export default async function handler(req, res) {
               blockText += `🛏️ 【當天晚上入睡生理數據】：\n`;
               blockText += `   - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分\n`;
               blockText += `   - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分\n`;
-              blockText += `   - 睡眠效率: ${rawSleep.sleep_efficiency_pct || 0}%\n`;
+              
               blockText += `   - 睡眠結構: 深睡期 (N3) ${rawSleep.N3_pct || 0}% (${n3Time}), 淺睡期 (N1、N2) ${rawSleep.N1N2_pct || 0}% (${n1n2Time}), 快速動眼期 (REM) ${rawSleep.REM_pct || 0}% (${remTime}), 醒來及清醒期 (Wake) ${rawSleep.wake_minutes || 0}分\n`;
               blockText += `   - 睡眠血氧飽和度: 平均 ${rawSleep.SpO2_mean || 0}% / 最高 ${rawSleep.SpO2_max || 0}% / 最低 ${rawSleep.SpO2_min || 0}%\n`;
               blockText += `   - 睡眠低血氧時間比例: T90 ${rawSleep.T90_pct || 0}%, T89 ${rawSleep.T89_pct || 0}%, T88 ${rawSleep.T88_pct || 0}%\n`;
@@ -314,7 +317,7 @@ export default async function handler(req, res) {
               { key: 'Personal_Battery_weighted_round', label: '平均恢復指數', unit: '%', isSleep: false },
               { key: 'RHR_raw', label: '平均靜息心率', unit: 'bpm', isSleep: false },
               { key: 'TST_min', label: '平均總睡眠時間', unit: ' min', isSleep: true },
-              { key: 'sleep_efficiency_pct', label: '平均睡眠效率', unit: '%', isSleep: true },
+              
               { key: 'N3_pct', label: '平均深睡比例 (N3)', unit: '%', isSleep: true },
               { key: 'N1N2_pct', label: '平均淺睡比例 (N1、N2)', unit: '%', isSleep: true },
               { key: 'REM_pct', label: '平均快速動眼期比例 (REM)', unit: '%', isSleep: true },
@@ -415,7 +418,9 @@ export default async function handler(req, res) {
     });
     
     let finalResult = await finalRes.json();
-    const aiText = finalResult.textResponse;
+    
+    // ✨ 貼在這裡！直接把過濾後的文字存進 aiText
+    const aiText = finalResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
     // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
@@ -432,7 +437,7 @@ export default async function handler(req, res) {
         ai_response: aiText,
         record_date: local_date,
         record_time: local_time,
-        ai_model: 'LLM-Qwen-function'
+        ai_model: 'LLM-Qwen3-function'
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
