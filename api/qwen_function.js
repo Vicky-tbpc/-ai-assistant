@@ -1,4 +1,4 @@
-// qwen_function_20.js
+// qwen_function_18.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -14,15 +14,12 @@ export default async function handler(req, res) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
-    // 🌟 產生獨立的 Session ID，避免 AI 對話記憶互相污染
-    const generateSessionId = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
     // ==========================================
     // 客製化 AI 開場白攔截區塊
     // ==========================================
     if (action === 'generate_greeting') {
       const greetingPrompt = `你是一個友好熱情的 AI 健康夥伴。
-請根據以下提示，生成一句專專屬的開場白。
+請根據以下提示，生成一句專屬的開場白。
 
 【規則】
 1. 第一句請自由發揮，表達歡迎回來的心情，例如：「歡迎回來！我是你的健康夥伴 👋」。
@@ -39,11 +36,12 @@ export default async function handler(req, res) {
       let greetingRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: greetingPrompt, mode: "chat", sessionId: generateSessionId('greet') })
+        body: JSON.stringify({ message: greetingPrompt, mode: "chat" })
       });
       
       let greetingResult = await greetingRes.json();
       
+      // ✨ 貼在這裡！過濾開場白的內心戲
       const cleanGreeting = greetingResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       return res.status(200).json({ text: cleanGreeting });
     }
@@ -70,65 +68,42 @@ export default async function handler(req, res) {
 
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
-    const twoWeeksStartStr = getOffsetDate(-14); 
-    const monthStartStr = getOffsetDate(-30);    
 
-    // 🌟 優化關鍵：重構 routerPrompt，加入「明確日期」與「RMSSD指標」的嚴格防呆
-    const routerPrompt = `你是精準的意圖分析機器人。今天是 ${local_date} (${dayOfWeek})。
-請分析使用者的問題：「${prompt}」，並嚴格依照以下規則輸出 JSON。
+    // 🌟 修正點：強化第3點的意圖判斷，強制綁定個人生理數據
+    const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+請判斷使用者的問題：「${prompt}」的意圖。
 
-【功能判定規則】
+【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。
-   - 若為 true，請判斷 trend_type 為以下之一："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", "unknown"。
-2. 【生理數據與指標查詢】：
-   - 🚨只要問題中包含任何健康指標名稱（例如：「RMSSD」、「發炎風險」、「靜息心率」、「深睡」、「血氧」、「HBI」、「脈搏」等），不論是問數據、問定義還是問好壞，請「一律強制」將 need_data 設為 true 以撈取個人數據。
-   - 🚨只要詢問風險評估（例如：「會不會中暑」、「適合運動嗎」），請將 need_data 設為 true，日期範圍設為昨天到今天。
-3. 【外部資訊查詢】：
-   - 只要問題涉及天氣、氣溫、紫外線、中暑風險、外部流行疾病等需要聯網查詢的資訊，請將 need_external 設為 true，並將查詢關鍵字填入 external_query（例如："台灣明天天氣"）。
+   - 若 need_trend_chart 為 true，請判斷他想看哪一種，將 trend_type 設為以下之一："all"(完整/全部)、"battery"(恢復指數)、"rhr"(靜息心率)、"n3"(深睡期)、"rmssd"、"hrmin"(最低脈搏)、"hbi"(低氧負擔)、"unknown"(未指定)。
+2. 【數據與指標查詢】：
+   - 若使用者只是提到「7天」、「最近」、「變化」、「趨勢」或單純詢問各項指標數據，但「沒有明確提到畫圖或圖表」，請務必將 need_trend_chart 設為 false，並將 need_data 設為 true，輸出對應的 start 和 end 日期。
+   - 🚨【指標科普防呆】：只要使用者的問題中包含了具體的健康指標名稱（例如：「靜息心率」、「深睡」、「血氧」、「HBI」等），不論他是問定義、問科普還是問好壞（例如：「靜息心率愈低愈好嗎」），請「一律強制」將 need_data 設為 true，並將 start 設為上週 (${lastWeekStartStr})，end 設為今天 (${local_date})。因為我們需要撈取他最近的數據，讓回答能結合他的個人現況！
+3. 【外部資訊與綜合風險評估】：(極度重要)
+   - 判斷使用者的問題是否需要外部環境資訊（例如：天氣、氣溫、中暑風險、流行疾病等）。若是，將 need_external 設為 true，並在 external_query 寫下搜尋關鍵字（例如：「評估今日高溫與中暑風險」）。
+   - 🚨【強制綁定數據】：只要使用者詢問「我今天會不會中暑」、「我適合運動嗎」這類需要結合個人身體狀況來判斷的環境風險問題，請「務必同時」將 need_data 設為 true，並將 start 設為昨天 (${yesterdayStr})，end 設為今天 (${local_date})，這樣才能撈取他的生理數據做交叉比對！
+4. 若回答模糊（例如：「都可以」、「看看」）或只是打招呼，請「一律視為需要數據」，並將日期設為昨天到今天：${yesterdayStr} 到 ${local_date}。
+5. 只有在明確閒聊且完全無關健康時，才將 need_data 與 need_external 設為 false。
 
-【日期填寫絕對規則】(請依優先級由高到低判斷，不准自己發明或胡亂推算！)
-1. 優先級 1 - 提及具體日期：若使用者提及明確日期（例如「2026-06-08」或「6/8」），請自動轉換或補全為 "YYYY-MM-DD" 格式（若只有月日，年份請一律帶入今年 2026，例如「6/8」請轉換為 "2026-06-08"），並將 start 與 end 同時填入該日期！
-2. 優先級 2 - 相對時間詞彙：
-   - 只要遇到「今天」，start 和 end 必須填： "${local_date}"
-   - 只要遇到「昨天 / 昨晚」，start 和 end 必須填： "${yesterdayStr}"
-   - 只要遇到「7天 / 過去一週 / 這週」，start 必須填： "${lastWeekStartStr}"，end 必須填： "${local_date}"
-   - 只要遇到「14天 / 兩週」，start 必須填： "${twoWeeksStartStr}"，end 必須填： "${local_date}"
-   - 只要遇到「一個月 / 30天」，start 必須填： "${monthStartStr}"，end 必須填： "${local_date}"
-3. 優先級 3 - 未提及時間/打招呼閒聊：start 請填： "${yesterdayStr}"，end 請填： "${local_date}"
+【日期對照表】(請直接使用以下計算好的日期，絕對不要自己推算)
+1. 「今天」：${local_date}
+2. 「昨天」：${yesterdayStr}
+3. 「上週 / 本週 / 最近一週 / 過去七天」：${lastWeekStartStr} 到 ${yesterdayStr}
 
-【輸出格式限制】
-你必須「只」輸出一個標準的 JSON 物件，絕對不能包含任何 <think> 標籤、Markdown 語法（不要用 \`\`\`json）、解釋或任何額外文字。
-JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": true/false, "trend_type": "...", "need_external": true/false, "external_query": "..."}`;
+請「務必只」輸出 JSON：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": true/false, "trend_type": "...", "need_external": true/false, "external_query": "..."}`;
 
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: routerPrompt, mode: "chat", sessionId: generateSessionId('router') })
+      body: JSON.stringify({ message: routerPrompt, mode: "chat" })
     });
 
     let intentData = await intentRes.json();
-    
-    // 🌟 優化關鍵：給予安全的預設欄位，防止解析失敗時程式碼報錯崩潰
-    let intent = { 
-      need_data: false, 
-      start: yesterdayStr, 
-      end: local_date, 
-      need_trend_chart: false, 
-      trend_type: "unknown", 
-      need_external: false, 
-      external_query: "" 
-    };
-
+    let intent = { need_data: false, need_external: false };
     try {
-      // 🌟 核心修正：先徹底濾除地端 AI 可能吐出的 <think> 內心戲與 Markdown 標籤，再進行 JSON 匹配
-      let cleanIntentText = intentData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-      cleanIntentText = cleanIntentText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-      const jsonMatch = cleanIntentText.match(/\{[\s\S]*\}/);
+      const jsonMatch = intentData.textResponse.match(/\{.*\}/s);
       if (jsonMatch) intent = JSON.parse(jsonMatch[0]);
-    } catch (e) { 
-      console.log("❌ 意圖解析失敗，原始回應為:", intentData.textResponse); 
-    }
+    } catch (e) { console.log("意圖解析失敗"); }
 
     console.log("👉【地端 Router 意圖解析結果】:", JSON.stringify(intent));
 
@@ -212,35 +187,31 @@ JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-D
     // 第二階段：抓取並「格式化」數據（完全對齊日曆日期）
     // ==========================================
     let healthContext = "目前沒有相關數據。";
-    let uploadStatusContext = ""; 
+    let uploadStatusContext = ""; // 🌟 新增：用來存放上傳狀態的比對結果
     if (intent.need_data && intent.start && intent.end) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
       
+      // 日期偏移小工具
       const getCustomOffsetDate = (baseDateStr, offset) => {
         const [y, m, d] = baseDateStr.split('-');
         const dateObj = new Date(y, m - 1, d);
         dateObj.setDate(dateObj.getDate() + offset);
-        return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0 flights')}`;
+        return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
       };
 
+      // 為了完整涵蓋邊界，API 結束日期自動延後 1 天
       const apiStart = intent.start;
       const apiEnd = getCustomOffsetDate(intent.end, 1);
       
       const healthApiUrl = `${protocol}://${req.headers['host']}/api/health?serial=${serial_number}&start=${apiStart}&end=${apiEnd}`;
       
-      const dataRes = await fetch(healthApiUrl, {
-        method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
-        cache: 'no-store'
-      });
-
-      const dataResult = await dataRes.json();
-      const finalContextData = dataResult.data || dataResult || [];
+      const dataRes = await fetch(healthApiUrl);
+      if (dataRes.ok) {
+        const finalContextData = await dataRes.json();
         
+        // ========================================================
+        // 🌟 優化：只提供比對結果狀態，讓 AI 自由發揮語氣
+        // ========================================================
         const checkUploadStatus = () => {
           const targetDates = {
             "今天": local_date,
@@ -251,15 +222,19 @@ JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-D
           let statusLines = ["【使用者資料上傳實時狀態】"];
           
           for (const [label, dateStr] of Object.entries(targetDates)) {
+            // 只比對 record_end 是否存在
             const hasData = finalContextData.some(d => d.raw_json?.record_end?.split(' ')[0] === dateStr);
             statusLines.push(`- ${label} (${dateStr}) 的 record_end 資料：${hasData ? "【有收到資料】" : "【尚未收到資料】"}`);
           }
           return statusLines.join('\n');
         };
 
+        // 執行比對並存入變數
         uploadStatusContext = checkUploadStatus();
+        // ========================================================
 
         if (finalContextData.length > 0) {
+          // 1. 動態產生使用者詢問的精準日期陣列（Calendar Dates）
           const dateArray = [];
           let current = parseDate(intent.start);
           const endLimit = parseDate(intent.end);
@@ -271,11 +246,14 @@ JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-D
             current.setDate(current.getDate() + 1);
           }
 
+          // 2. 依照「日曆日期」重組文字，消滅 AI 的日期混淆
           const contextBlocks = dateArray.map(targetDate => {
             const targetDateObj = parseDate(targetDate);
             const weekday = targetDateObj.toLocaleDateString('zh-TW', { weekday: 'short' });
 
+            // 尋找這一天的「當天早晨醒來結算」（比對 record_end 的日期部分）
             const wakeRow = finalContextData.find(d => d.raw_json?.record_end?.split(' ')[0] === targetDate);
+            // 尋找這一天的「當天晚上入睡生理數據」（比對 record_date）
             const sleepRow = finalContextData.find(d => d.record_date === targetDate);
 
             let blockText = `=== 日期：${targetDate} (週${weekday}) ===\n`;
@@ -380,25 +358,26 @@ JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-D
             healthContext = `【多日統計摘要 (共 ${dateArray.length} 天)】\n${summaryLines.join('\n')}\n` + healthContext;
           }
         } else {
+          // 🌟 這裡就是你問的整合點：當資料庫完全沒資料時，強制告訴 AI 這三天都是「尚未收到資料」
           const yesterdayStr = getCustomOffsetDate(local_date, -1);
           const beforeYesterdayStr = getCustomOffsetDate(local_date, -2);
           uploadStatusContext = `【使用者資料上傳實時狀態】\n- 今天 (${local_date}) 的 record_end 資料：【尚未收到資料】\n- 昨天 (${yesterdayStr}) 的 record_end 資料：【尚未收到資料】\n- 前天 (${beforeYesterdayStr}) 的 record_end 資料：【尚未收到資料】`;
         }
       }
+    }
 
     // ==========================================
     // 第三階段：最終地端 AI 整合回答
     // ==========================================
-    // 🌟 修正點：將 ${externalContext} 放回正確的第 2 點位置，避免上下文排版混亂
     const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 
 【重要數據與即時環境資訊】
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 外部即時/環境資訊（由外部 API 擷取）：
-   ${externalContext}
 3. 【資料上傳實時狀態】(這是後端精準比對 record_end 的結果)：
    ${uploadStatusContext}
+   ${externalContext}
 
 【生理數據解讀規則】
 1. 【數據查閱指南】(極度重要)：
@@ -421,9 +400,8 @@ JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-D
 8. 【極度重要！對話延續規則】：你和使用者已經打過招呼了！後續的回覆請「直接針對問題回答」，嚴格禁止再說出「歡迎回來」、「我是你的健康夥伴」或任何類似的自我介紹開場白！
 9. 【資料上傳狀態回覆邏輯】：
    - 當使用者關心「今天/昨天/前天有沒有成功上傳資料」或「有沒有收到數據」時，請務必先查看上方【資料上傳實時狀態】對應日期的結果。
-   - 【回覆原則】：如果狀態為「有收到資料」，請高興地告訴對方有收到；如果狀態為「尚未收到資料」，則貼心地提醒對方目前還沒看到。
-   - 🚨【極度重要防呆】：如果使用者說他「已經收到分析完成的通知了」，但目前的【資料上傳實時狀態】卻還是顯示「尚未收到資料」，這代表資料庫正在同步中！請安撫使用者：「系統後台正在努力把資料同步過來，可能會有幾分鐘的小落差，可以先去喝口水，稍等一下再問我一次喔！💦」
-   - 請保持對話的自然與彈性，你可以自己加上適合的 emoji，不要回答得像系統罐頭訊息！
+   - 【回覆原則】：如果狀態為「有收到資料」，請用你溫暖、平輩朋友的口吻，高興地告訴對方有收到；如果狀態為「尚未收到資料」，則貼心地提醒對方目前還沒看到。
+   - 【重要】：請保持對話的自然與彈性，你可以自己加上適合的 emoji (例如：🎉, 👀, 喔～)，不要回答得像系統罐頭訊息！
 
 請用平輩口吻回答，多用 emoji！全部使用「你」，絕對禁止使用敬稱「您」。`;
 
@@ -436,13 +414,15 @@ JSON 格式：{"need_data": true/false, "start": "YYYY-MM-DD", "end": "YYYY-MM-D
     let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: finalChatPrompt, mode: "chat", sessionId: generateSessionId('final') })
+      body: JSON.stringify({ message: finalChatPrompt, mode: "chat" })
     });
     
     let finalResult = await finalRes.json();
     
+    // ✨ 貼在這裡！直接把過濾後的文字存進 aiText
     const aiText = finalResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
+    // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: {
