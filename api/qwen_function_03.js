@@ -1,4 +1,4 @@
-// qwen_function_18.js
+// qwen_function_19.js
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       let greetingRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: greetingPrompt, mode: "chat" })
+        body: JSON.stringify({ message: greetingPrompt, mode: "query" })
       });
       
       let greetingResult = await greetingRes.json();
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     let intentRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: routerPrompt, mode: "chat" })
+      body: JSON.stringify({ message: routerPrompt, mode: "query" })
     });
 
     let intentData = await intentRes.json();
@@ -375,9 +375,9 @@ export default async function handler(req, res) {
 1. 以下是使用者從 ${intent.start || '今日'} 到 ${intent.end || '今日'} 的真實數據：
    ${healthContext}
 2. 外部即時/環境資訊（由外部 API 擷取）：
+   ${externalContext}
 3. 【資料上傳實時狀態】(這是後端精準比對 record_end 的結果)：
    ${uploadStatusContext}
-   ${externalContext}
 
 【生理數據解讀規則】
 1. 【數據查閱指南】(極度重要)：
@@ -409,18 +409,25 @@ export default async function handler(req, res) {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
       return `${h.role === 'user' ? '使用者' : '助理'}: ${textContent}`;
     }).join('\n');
-    const finalChatPrompt = `${systemPrompt}\n\n${historyText}\n使用者: ${prompt}`;
+    const finalChatPrompt = `${systemPrompt}\n\n【歷史對話紀錄】\n${historyText}\n\n使用者: ${prompt}\nAI夥伴請直接回答(不要輸出任何JSON或標籤)：`;
 
     let finalRes = await fetch(`${process.env.ANYTHING_LLM_URL}/api/v1/workspace/${process.env.ANYTHING_LLM_SLUG}/chat`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${process.env.ANYTHING_LLM_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: finalChatPrompt, mode: "chat" })
+      body: JSON.stringify({ message: finalChatPrompt, mode: "query" })
     });
     
     let finalResult = await finalRes.json();
     
     // ✨ 貼在這裡！直接把過濾後的文字存進 aiText
     const aiText = finalResult.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+ 
+    // ✨ 加上終極防呆機制 👇
+    let finalText = aiText;
+    if (finalText.startsWith('{') && finalText.includes('need_data')) {
+      console.error("⚠️ AI 依然輸出了 JSON，觸發防呆攔截！", finalText);
+      finalText = "哎呀，我剛剛腦袋稍微打結了 😅。根據你的數據，看起來目前沒有太異常的狀況喔！如果有特定的健康指標想了解，可以再問我一次！";
+    }
 
     // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
@@ -434,7 +441,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         serial_number: serial_number,
         user_query: prompt,
-        ai_response: aiText,
+        ai_response: finalText,
         record_date: local_date,
         record_time: local_time,
         ai_model: 'LLM-Qwen3-function'
@@ -443,7 +450,7 @@ export default async function handler(req, res) {
 
     waitUntil(logTask);
 
-    return res.status(200).json({ text: aiText });
+    return res.status(200).json({ text: finalText });
 
   } catch (error) {
     console.error(error);
