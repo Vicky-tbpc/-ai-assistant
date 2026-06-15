@@ -383,7 +383,7 @@
 
 <div id="sleep-record-overlay" class="modal-overlay hidden">
     <div class="modal-card" style="display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 350px;">
-        <h3 style="color: var(--tbp-blue); margin-top: 5px;">記錄昨晚的睡眠 🌙</h3>
+        <h3 style="color: var(--tbp-blue); margin-top: 5px; margin-bottom: 5px;">記錄昨晚的睡眠 🌙</h3>
         <p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 20px;">
             開始對話前，請先記錄你昨晚的入睡與醒來時間，讓我們更了解你的睡眠狀況，提供更貼近需求的分析。
         </p>
@@ -398,6 +398,12 @@
             <input type="datetime-local" id="sleep-end-time" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; text-align: center; box-sizing: border-box; -webkit-appearance: none;">
         </div>
         
+        <div style="display: flex; gap: 12px; width: 100%;">
+            <button type="button" style="flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 8px; background-color: #fff; color: #666; font-size: 16px; font-weight: bold; cursor: pointer;" onclick="resetSleepInputs()">重置</button>
+            <button type="button" class="primary-btn" style="flex: 1; padding: 12px; margin: 0;" onclick="saveSleepRecord()">完成</button>
+        </div>
+    </div>
+</div>  
         <button class="primary-btn" style="width: 100%;" onclick="saveSleepRecord()">儲存並進入</button>
     </div>
 </div>
@@ -618,18 +624,36 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-// 檢查今日是否已填寫睡眠紀錄 (僅限完整資料的使用者)
+// 自動計算並預填時間的共用邏輯 (昨晚 23:00 ~ 今早 07:00)
+function resetSleepInputs() {
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(23, 0, 0, 0); 
+    
+    const todayMorning = new Date(now);
+    todayMorning.setHours(7, 0, 0, 0); 
+
+    // 格式化符合 datetime-local 要求 的 YYYY-MM-DDTHH:mm
+    const formatDt = (d) => {
+        const tzOffset = d.getTimezoneOffset() * 60000;
+        return (new Date(d - tzOffset)).toISOString().slice(0, 16);
+    };
+
+    document.getElementById('sleep-start-time').value = formatDt(yesterday);
+    document.getElementById('sleep-end-time').value = formatDt(todayMorning);
+}
+
+// 檢查今日是否已填寫睡眠紀錄 (僅限完整資料的老手)
 async function checkSleepRecordFlow(userData) {
-    // 判斷：是否暱稱、AI名字、LINE ID 都已經存在
     const isCompleteUser = userData.nickname && userData.ai_name && userData.line_user_id;
 
-    // 如果資料還沒填齊，直接跳過睡眠紀錄，去跑原本的新手設定流程
+    // 如果資料未齊全，直接走原本的新手設定流程
     if (!isCompleteUser) {
         proceedAfterSleepRecord(userData);
         return;
     }
 
-    // 如果是老手 (資料完整)，才開始檢查今天有沒有填過睡眠時間
     const todayStr = getLocalDateString();
     
     try {
@@ -641,39 +665,23 @@ async function checkSleepRecordFlow(userData) {
             .maybeSingle();
 
         if (!sleepData) {
-            // 如果沒填過，自動計算預設時間 (昨晚 23:00 ~ 今早 07:00)
-            const now = new Date();
-            const yesterday = new Date(now);
-            yesterday.setDate(yesterday.getDate() - 1);
-            yesterday.setHours(23, 0, 0, 0); 
+            // 沒填過，執行重置/預填時間邏輯
+            resetSleepInputs();
             
-            const todayMorning = new Date(now);
-            todayMorning.setHours(7, 0, 0, 0); 
-
-            // 轉換為 datetime-local 吃的 YYYY-MM-DDTHH:mm 格式
-            const formatDt = (d) => {
-                const tzOffset = d.getTimezoneOffset() * 60000;
-                return (new Date(d - tzOffset)).toISOString().slice(0, 16);
-            };
-
-            document.getElementById('sleep-start-time').value = formatDt(yesterday);
-            document.getElementById('sleep-end-time').value = formatDt(todayMorning);
-            
+            // 顯示對話框
             document.getElementById('sleep-record-overlay').classList.remove('hidden');
-            
-            // 暫存 userData，等填完再繼續後續流程
             window.pendingUserData = userData; 
         } else {
-            // 已經填過，直接跑後面的流程
+            // 填過就直接進入
             proceedAfterSleepRecord(userData);
         }
     } catch (err) {
         console.error("檢查睡眠紀錄失敗:", err);
-        proceedAfterSleepRecord(userData); // 發生錯誤防呆，還是讓使用者進去
+        proceedAfterSleepRecord(userData); 
     }
 }
 
-// 寫入 Supabase
+// 按下「完成」按鈕時的儲存與防呆邏輯
 async function saveSleepRecord() {
     const startInput = document.getElementById('sleep-start-time').value;
     const endInput = document.getElementById('sleep-end-time').value;
@@ -683,7 +691,6 @@ async function saveSleepRecord() {
         return;
     }
 
-    // 將 YYYY-MM-DDTHH:mm 轉換為你要求的 YYYY-MM-DD HH:mm (24小時制)
     const startFormatted = startInput.replace('T', ' ');
     const endFormatted = endInput.replace('T', ' ');
     const todayStr = getLocalDateString();
@@ -701,7 +708,7 @@ async function saveSleepRecord() {
         return;
     }
 
-    // 關閉視窗，繼續原有流程
+    // 關閉對話框並進入開場白對話
     document.getElementById('sleep-record-overlay').classList.add('hidden');
     proceedAfterSleepRecord(window.pendingUserData);
 }
