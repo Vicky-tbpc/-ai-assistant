@@ -385,17 +385,17 @@
         <div class="modal-card">
             <h3 style="color: var(--tbp-blue); margin-top: 5px;">紀錄昨晚的睡眠 🌙</h3>
             <p style="font-size: 14px; color: #666; text-align: left; margin-bottom: 20px;">
-                在開始對話前，請確認你的入睡與醒來時間，系統已經幫你預填了大概時間，可以直接點擊微調喔！
+                開始對話前，請先確認你昨晚的入睡與醒來時間，讓我們更了解你的睡眠狀況，提供更貼近需求的分析。
             </p>
             
-            <div style="text-align: left; margin-bottom: 15px;">
-                <label style="font-size: 14px; font-weight: bold; color: #555;">入睡時間</label>
-                <input type="datetime-local" id="sleep-start-time" style="margin-top: 5px;">
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 14px; font-weight: bold; color: #555; display: block; margin-bottom: 8px; text-align: left;">入睡時間</label>
+                <input type="datetime-local" id="sleep-start-time" style="width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; text-align: center; background-color: #fff; font-family: inherit;">
             </div>
             
-            <div style="text-align: left; margin-bottom: 25px;">
-                <label style="font-size: 14px; font-weight: bold; color: #555;">醒來時間</label>
-                <input type="datetime-local" id="sleep-end-time" style="margin-top: 5px;">
+            <div style="margin-bottom: 25px;">
+                <label style="font-size: 14px; font-weight: bold; color: #555; display: block; margin-bottom: 8px; text-align: left;">醒來時間</label>
+                <input type="datetime-local" id="sleep-end-time" style="width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; text-align: center; background-color: #fff; font-family: inherit;">
             </div>
             
             <button class="primary-btn" onclick="saveSleepRecord()">儲存並進入</button>
