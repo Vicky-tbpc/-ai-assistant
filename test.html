@@ -418,9 +418,8 @@
             </div>
         </div>
         
-        <div style="display: flex; gap: 12px; width: 100%;">
-            <button type="button" style="flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 8px; background-color: #fff; color: #666; font-size: 16px; font-weight: bold; cursor: pointer;" onclick="resetSleepInputs()">重置</button>
-            <button type="button" class="primary-btn" style="flex: 1; padding: 12px; margin: 0;" onclick="saveSleepRecord()">儲存</button>
+        <div style="width: 100%; margin-top: 5px;">
+            <button type="button" class="primary-btn" style="width: 100%; padding: 12px; margin: 0;" onclick="saveSleepRecord()">儲存</button>
         </div>
     </div>
 </div>
@@ -641,32 +640,6 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-// 自動計算並預填時間 (拆分為獨立的日期與時間欄位)
-function resetSleepInputs() {
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(23, 0, 0, 0); 
-    
-    const todayMorning = new Date(now);
-    todayMorning.setHours(7, 0, 0, 0); 
-
-    // 分別格式化日期(YYYY-MM-DD)與時間(HH:mm)
-    const formatDate = (d) => {
-        const tzOffset = d.getTimezoneOffset() * 60000;
-        return (new Date(d - tzOffset)).toISOString().slice(0, 10);
-    };
-    const formatTime = (d) => {
-        const tzOffset = d.getTimezoneOffset() * 60000;
-        return (new Date(d - tzOffset)).toISOString().slice(11, 16);
-    };
-
-    document.getElementById('sleep-start-date').value = formatDate(yesterday);
-    document.getElementById('sleep-start-time').value = formatTime(yesterday);
-    document.getElementById('sleep-end-date').value = formatDate(todayMorning);
-    document.getElementById('sleep-end-time').value = formatTime(todayMorning);
-}
-
 // 檢查今日是否已填寫睡眠紀錄 (僅限完整資料的使用者)
 async function checkSleepRecordFlow(userData) {
     // 判斷：是否暱稱、AI名字、LINE ID 都已經存在
@@ -690,9 +663,32 @@ async function checkSleepRecordFlow(userData) {
             .maybeSingle();
 
         if (!sleepData) {
-            // 如果沒填過，呼叫獨立出來的預填函式
-            resetSleepInputs();
+            // 如果沒填過，自動計算並預填時間 (昨晚 23:00 ~ 今早 07:00)
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(23, 0, 0, 0); 
             
+            const todayMorning = new Date(now);
+            todayMorning.setHours(7, 0, 0, 0); 
+
+            // 分別格式化日期(YYYY-MM-DD)與時間(HH:mm)
+            const formatDate = (d) => {
+                const tzOffset = d.getTimezoneOffset() * 60000;
+                return (new Date(d - tzOffset)).toISOString().slice(0, 10);
+            };
+            const formatTime = (d) => {
+                const tzOffset = d.getTimezoneOffset() * 60000;
+                return (new Date(d - tzOffset)).toISOString().slice(11, 16);
+            };
+
+            // 寫入畫面上的輸入框
+            document.getElementById('sleep-start-date').value = formatDate(yesterday);
+            document.getElementById('sleep-start-time').value = formatTime(yesterday);
+            document.getElementById('sleep-end-date').value = formatDate(todayMorning);
+            document.getElementById('sleep-end-time').value = formatTime(todayMorning);
+            
+            // 顯示對話框
             document.getElementById('sleep-record-overlay').classList.remove('hidden');
             
             // 暫存 userData，等填完再繼續後續流程
