@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理者後台 08</title>
+    <title>管理者後台 09</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -94,6 +94,16 @@
         <input type="date" id="export-date-picker" style="width: auto; margin: 0;">
         <button onclick="exportChatLogs()" id="exportBtn" style="background-color: #6c838f; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
             🚀 依日期匯出 (.xlsx)
+        </button>
+    </div>
+</div>
+
+<div class="tool-section" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+    <h3>睡眠紀錄管理</h3>
+    <p style="color: #666; font-size: 0.9rem;">匯出所有使用者的睡眠時間紀錄（依使用者序號自動分頁）。</p>
+    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <button onclick="exportSleepRecords()" id="exportSleepBtn" style="background-color: #5a7d9a; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
+            🌙 下載全部睡眠紀錄 (.xlsx)
         </button>
     </div>
 </div>
@@ -315,6 +325,34 @@ function exportChatLogs() {
         // 將日期作為 Query String 傳給 API
         window.location.href = `/api/export-logs?date=${selectedDate}`;
 
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.opacity = '1';
+            btn.disabled = false;
+        }, 3000);
+    } catch (err) {
+        console.error("匯出失敗:", err);
+        alert("匯出失敗，請檢查網路或 API 狀態。");
+        btn.innerText = originalText;
+        btn.style.opacity = '1';
+        btn.disabled = false;
+    }
+}
+
+// 匯出睡眠紀錄功能
+function exportSleepRecords() {
+    const btn = document.getElementById('exportSleepBtn');
+    const originalText = btn.innerText;
+    
+    btn.innerText = '⌛ 正在準備睡眠紀錄檔案...';
+    btn.style.opacity = '0.7';
+    btn.disabled = true;
+
+    try {
+        // 直接呼叫我們將在 Vercel 新增的 API
+        window.location.href = '/api/export-sleep';
+
+        // 3秒後恢復按鈕狀態
         setTimeout(() => {
             btn.innerText = originalText;
             btn.style.opacity = '1';
