@@ -384,6 +384,34 @@ document.addEventListener('DOMContentLoaded', () => {
     if(picker) picker.value = today;
 });
 
+// 匯出自評問卷功能
+function exportSurveys() {
+    const btn = document.getElementById('exportSurveyBtn');
+    const originalText = btn.innerText;
+    
+    btn.innerText = '⌛ 正在準備問卷檔案...';
+    btn.style.opacity = '0.7';
+    btn.disabled = true;
+
+    try {
+        // 呼叫 Vercel API
+        window.location.href = '/api/export-surveys';
+
+        // 3秒後恢復按鈕狀態
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.opacity = '1';
+            btn.disabled = false;
+        }, 3000);
+    } catch (err) {
+        console.error("匯出失敗:", err);
+        alert("匯出失敗，請檢查網路或 API 狀態。");
+        btn.innerText = originalText;
+        btn.style.opacity = '1';
+        btn.disabled = false;
+    }
+}
+
  </script>
 </body>
 </html>
