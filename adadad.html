@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理者後台 09</title>
+    <title>管理者後台 10</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -104,6 +104,16 @@
     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
         <button onclick="exportSleepRecords()" id="exportSleepBtn" style="background-color: #5a7d9a; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
             🌙 下載全部睡眠紀錄 (.xlsx)
+        </button>
+    </div>
+</div>
+
+<div class="tool-section" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+    <h3>自評問卷管理</h3>
+    <p style="color: #666; font-size: 0.9rem;">匯出所有使用者的自評問卷紀錄（依使用者序號自動分頁，固定檔名）。</p>
+    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <button onclick="exportSurveys()" id="exportSurveyBtn" style="background-color: #a38699; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">
+            📋 下載自評問卷 (.xlsx)
         </button>
     </div>
 </div>
