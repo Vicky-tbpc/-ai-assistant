@@ -1,4 +1,4 @@
-// api/gemini.js 21
+// api/gemini.js 21-2
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -19,11 +19,10 @@ export default async function handler(req, res) {
     
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
-    // 定義 Gemini API 共用 URL
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
     // ==========================================
-    // 客製化 AI 開場白攔截區塊 (交給 Gemini)
+    // 客製化 AI 開場白攔截區塊
     // ==========================================
     if (action === 'generate_greeting') {
       const greetingPrompt = `你是一個友好熱情的 AI 健康夥伴。
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
 3. 接著請根據以下指標狀態給予一句${metric_data.type}：
    - 指標：${metric_data.metric}
    - 狀態：${metric_data.status}
-4. 說明完後，最後加上一句引導詢問，例如：「接下來想看看哪個健康指標呢？」或「現在想從哪個部分開始了解呢？」
+4. 說明完後，最後加上一句引導詢問。
 5. 語氣要像平輩朋友一樣自然。
 6. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
 
@@ -75,14 +74,15 @@ export default async function handler(req, res) {
     const yesterdayStr = getOffsetDate(-1);
     const lastWeekStartStr = getOffsetDate(-7);
 
+    // 🌟 調整 1：精準定義 knowledge_query 的提取方式，強制抓出具體的名詞
     const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請判斷使用者的問題：「${prompt}」的意圖。
 
 【判斷規則】
-1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
-2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱（靜息心率、血氧等），強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(新增)：若使用者詢問健康指標的定義、裝置說明、標準範圍、計算原理或衛教知識（例如：「靜息心率多少正常」、「裝置按鈕在哪」、「什麼是深睡期」），請將 need_knowledge 設為 true，並在 knowledge_query 寫下精簡的查詢關鍵字。
-4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。若是結合風險的詢問，同時強制將 need_data 設為 true (日期 ${yesterdayStr} 到 ${local_date})。
+1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
+2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
+3. 【知識庫查詢】(優化)：若使用者詢問健康指標（如：N3深睡期、血氧、AHI）的定義與「標準參考範圍」，或是詢問「如何使用 Soosyn APP、ST-50 裝置操作、說明書、教學網址」，請將 need_knowledge 設為 true，並在 knowledge_query 中提取「最核心的專有名詞」（例如：「N3 淺睡期 標準參考範圍」、「Soosyn APP ST-50 教學 說明書」），這將用於向量資料庫精準檢索。
+4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。
 
 【日期對照表】
 1. 今天：${local_date}
@@ -112,7 +112,6 @@ export default async function handler(req, res) {
 
     console.log("👉【Gemini Router 意圖解析結果】:", JSON.stringify(intent));
 
-    // 處理圖表意圖
     if (intent.need_trend_chart) {
       const trendNames = { "all": "📊 完整圖表", "battery": "📈 恢復指數", "rhr": "❤️‍ 靜息心率", "n3": "🌙 深睡期 (N3)", "rmssd": "🌿 rMSSD", "hrmin": "💓 睡眠最低脈搏", "hbi": "🫁 HBI 低氧負擔指數" };
       if (intent.trend_type && trendNames[intent.trend_type]) {
@@ -130,9 +129,13 @@ export default async function handler(req, res) {
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
       try {
-        // 🌟 調整 1：要求 AnythingLLM 直接提供原汁原味的資料，禁止摘要
-        const ragPrompt = `請在知識庫中尋找關於「${intent.knowledge_query}」的完整資訊（包含衛教文章、計算原理、標準範圍表格或硬體裝置說明）。
-請直接提取並完整呈現相關的「原文段落與數據」，不要自己進行摘要、縮減或改寫，以避免遺漏任何細節。不要加入任何問候語或自我介紹。`;
+        // 🌟 調整 2：大幅簡化 Prompt，把關鍵字放最前面提升檢索命中率，並命令模型當個無情的搬運工
+        const ragPrompt = `查詢目標：「${intent.knowledge_query}」與「${prompt}」
+
+請在知識庫中檢索上述目標，並嚴格遵守以下輸出規則：
+1. 你的唯一任務是「精準搬運」：只要找到相關的 Markdown 表格數據（如睡眠標準範圍）或超連結網址（如說明書連結 [連結名稱](網址)），請「原封不動、完整照抄」提取出來。
+2. 絕對不要自己進行摘要、縮減、改寫或解釋。
+3. 不要加入任何問候語或自我介紹。`;
         
         const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
           method: "POST",
@@ -350,7 +353,7 @@ export default async function handler(req, res) {
     // 第三階段：Gemini 2.5 Flash 超級大腦最終整合
     // ==========================================
     
-    // 🌟 調整 2~5：修改系統提示詞，明確規定知識庫的絕對優先級、因果邏輯與字數
+    // 🌟 調整 3：強制 Gemini 老實交出網址連結，並且字數限制只算他講的話
     const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 
 【重要數據與參考資訊】
@@ -368,11 +371,12 @@ export default async function handler(req, res) {
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
-4. 【絕對忠於知識庫】：當涉及裝置說明、指標定義或標準範圍時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。
-   👉 警告：禁止隨意捏造或引入衝突的外部資訊。例如：若知識庫寫裝置「沒有按鈕」，絕不可虛構出長按按鈕的操作。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可用來重塑或推翻知識庫的原有內容。
-5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒（例如：天氣熱 + 沒睡飽 = 中暑風險高）。
+4. 【絕對忠於知識庫】：當涉及裝置說明(APP、ST-50)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。
+   👉 超連結強制輸出：若地端知識庫中提供了任何 Markdown 超連結（如 [說明書](網址)），請你「務必原封不動地完整輸出這些連結」，方便使用者點擊。
+   👉 警告：禁止隨意捏造或引入衝突的外部資訊。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
-7. 【字數控制】：請將最終回覆的內容長度盡量控制在 200 到 250 字左右，保持精簡扼要，避免長篇大論。`;
+7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
 
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
