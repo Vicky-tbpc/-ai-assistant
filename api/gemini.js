@@ -1,4 +1,4 @@
-// api/gemini.js 20
+// api/gemini.js 21
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
    - 狀態：${metric_data.status}
 4. 說明完後，最後加上一句引導詢問，例如：「接下來想看看哪個健康指標呢？」或「現在想從哪個部分開始了解呢？」
 5. 語氣要像平輩朋友一樣自然。
-6. 【絕對禁止】：嚴格禁止使用敬稱「您」，請全部使用「你」。
+6. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
 
 請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
 
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」（例如：「趨勢圖」、「圖表」、「折線圖」、「畫圖」、「看圖」）時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
 2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱（靜息心率、血氧等），強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(新增)：若使用者詢問健康指標的定義、標準範圍、計算原理或衛教知識（例如：「靜息心率多少正常」、「什麼是深睡期」、「睡眠報告怎麼看」），請將 need_knowledge 設為 true，並在 knowledge_query 寫下精簡的查詢關鍵字（例如：「靜息心率 正常範圍」）。
+3. 【知識庫查詢】(新增)：若使用者詢問健康指標的定義、裝置說明、標準範圍、計算原理或衛教知識（例如：「靜息心率多少正常」、「裝置按鈕在哪」、「什麼是深睡期」），請將 need_knowledge 設為 true，並在 knowledge_query 寫下精簡的查詢關鍵字。
 4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。若是結合風險的詢問，同時強制將 need_data 設為 true (日期 ${yesterdayStr} 到 ${local_date})。
 
 【日期對照表】
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
         contents: [{ parts: [{ text: routerPrompt }] }],
-        generationConfig: { responseMimeType: "application/json" } // 🌟 強制 Gemini 穩定輸出 JSON
+        generationConfig: { responseMimeType: "application/json" }
       })
     });
 
@@ -130,7 +130,10 @@ export default async function handler(req, res) {
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
       try {
-        const ragPrompt = `請在知識庫中尋找關於「${intent.knowledge_query}」的衛教文章、計算原理或數據標準範圍表格(MD檔)。\n請用條列式精簡摘要核心重點與標準數值範圍，不要加入任何問候語、開場白或自我介紹。`;
+        // 🌟 調整 1：要求 AnythingLLM 直接提供原汁原味的資料，禁止摘要
+        const ragPrompt = `請在知識庫中尋找關於「${intent.knowledge_query}」的完整資訊（包含衛教文章、計算原理、標準範圍表格或硬體裝置說明）。
+請直接提取並完整呈現相關的「原文段落與數據」，不要自己進行摘要、縮減或改寫，以避免遺漏任何細節。不要加入任何問候語或自我介紹。`;
+        
         const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
@@ -139,7 +142,6 @@ export default async function handler(req, res) {
         
         if (ragRes.ok) {
           let ragData = await ragRes.json();
-          // 過濾掉可能殘留的 <think> 標籤
           ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
           console.log("📚【地端 AnythingLLM 知識庫檢索】:", ragContext);
         }
@@ -247,13 +249,13 @@ export default async function handler(req, res) {
               const lightDisplay = (light === null || light === undefined || light === "無資料") ? "無資料" : light;
               const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
-              blockText += `☀️ 【當天早晨醒來結算報告】：\n`;
+              blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
               blockText += `   - 靜息心率: ${rhrDisplay}\n`;
               blockText += `   - 恢復狀態: ${tagDisplay}\n`;
             } else {
-              blockText += `☀️ 【當天早晨醒來結算報告】：無數據\n`;
+              blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：無數據\n`;
             }
 
             // 組合夜晚數據
@@ -268,7 +270,7 @@ export default async function handler(req, res) {
               const n1n2Time = `${Math.floor(n1n2Min / 60)}時${n1n2Min % 60}分`;
               const remTime = `${Math.floor(remMin / 60)}時${remMin % 60}分`;
 
-              blockText += `🛏️ 【當天晚上入睡生理數據】：\n`;
+              blockText += `🛏️ 【當天晚上入睡生理數據 (record_date: ${targetDate})】：\n`;
               blockText += `   - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分\n`;
               blockText += `   - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分\n`;
               
@@ -281,7 +283,7 @@ export default async function handler(req, res) {
               blockText += `   - 睡眠脈搏: 平均 ${rawSleep.HR_mean || 0} / 最高 ${rawSleep.HR_max || 0} / 最低 ${rawSleep.HR_min || 0} bpm\n`;
               blockText += `   - 心率變異度: SDNN ${rawSleep.SDNN || 0}ms, rMSSD ${rawSleep.rMSSD || 0}ms, LF ${rawSleep.LF_ms2 || 0}ms2, HF ${rawSleep.HF_ms2 || 0}ms2, LF/HF ${rawSleep.LF_HF || 0}, pNN50 ${rawSleep.pNN50_pct || 0}%\n`;
             } else {
-              blockText += `🛏️ 【當天晚上入睡生理數據】：無數據\n`;
+              blockText += `🛏️ 【當天晚上入睡生理數據 (record_date: ${targetDate})】：無數據\n`;
             }
 
             return blockText;
@@ -344,16 +346,17 @@ export default async function handler(req, res) {
       }
     }
 
-
     // ==========================================
     // 第三階段：Gemini 2.5 Flash 超級大腦最終整合
     // ==========================================
+    
+    // 🌟 調整 2~5：修改系統提示詞，明確規定知識庫的絕對優先級、因果邏輯與字數
     const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
 
 【重要數據與參考資訊】
 1. 🧑‍⚕️ 使用者個人健康數據：
    ${healthContext}
-2. 📚 專業醫療標準與衛教庫 (來自地端知識庫的標準值，請依據此數據作為回答標準)：
+2. 📚 專業醫療標準與地端知識庫 (請100%絕對遵照此區塊資訊)：
    ${ragContext}
 3. ☁️ 外部即時環境資訊：
    ${externalContext}
@@ -361,23 +364,21 @@ export default async function handler(req, res) {
    ${uploadStatusContext}
 
 【對話與邏輯規則】
-1. 嚴禁使用「您」，請一律用「你」稱呼對方。語氣要像平輩朋友一樣自然，加上適合的 emoji。
+1. 嚴禁使用敬稱，請一律用「你」稱呼對方。語氣要像平輩朋友一樣自然，可加上適合的 emoji。
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
-3. 如果使用者問到為什麼某天的恢復不好，請主動翻找「前一天」的晚上入睡生理數據來幫他找原因。
-4. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒（例如天氣熱 + 沒睡飽 = 中暑風險高）。
-5. 針對問題直接回答，不要再說「歡迎回來」等開場白。
-6. 如果判斷使用者的數值（如靜息心率、睡眠）是否正常，請【優先參考上方的專業醫療標準與衛教庫 (📚)】來解釋。`;
+3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
+   👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
+4. 【絕對忠於知識庫】：當涉及裝置說明、指標定義或標準範圍時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。
+   👉 警告：禁止隨意捏造或引入衝突的外部資訊。例如：若知識庫寫裝置「沒有按鈕」，絕不可虛構出長按按鈕的操作。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可用來重塑或推翻知識庫的原有內容。
+5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒（例如：天氣熱 + 沒睡飽 = 中暑風險高）。
+6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
+7. 【字數控制】：請將最終回覆的內容長度盡量控制在 200 到 250 字左右，保持精簡扼要，避免長篇大論。`;
 
-    // 格式化歷史對話，轉換為 Gemini 的 role / parts 格式
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
-      return {
-        role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: textContent }]
-      };
+      return { role: h.role === 'user' ? 'user' : 'model', parts: [{ text: textContent }] };
     });
     
-    // 加入本次問題
     geminiHistory.push({ role: 'user', parts: [{ text: prompt }] });
 
     let finalRes = await fetch(geminiUrl, {
@@ -392,7 +393,6 @@ export default async function handler(req, res) {
     let finalResult = await finalRes.json();
     let finalText = finalResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "哎呀，我剛剛腦袋稍微打結了 😅。請再問我一次好嗎？";
 
-    // 背景存檔任務
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
