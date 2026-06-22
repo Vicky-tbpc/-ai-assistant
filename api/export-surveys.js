@@ -9,8 +9,8 @@ export default async function handler(req, res) {
 
     // 初始化 Supabase
     // 請確認 Vercel 環境變數有設定 SUPABASE_URL 和 SUPABASE_KEY
-    const supabaseUrl = process.env.SUPABASE_URL || "https://gcvwebgfbrsrezxvjafe.supabase.co";
-    const supabaseKey = process.env.SUPABASE_KEY || "你的_SUPABASE_KEY"; 
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     try {
