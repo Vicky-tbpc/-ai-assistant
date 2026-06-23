@@ -1,4 +1,4 @@
-// export-surveys.js
+// export-surveys.js 02
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
@@ -37,9 +37,9 @@ export default async function handler(req, res) {
             // 整理匯出的欄位格式與中文標題
             groupedData[sn].push({
                 "使用者序號": row.serial_number,
-                "紀錄日期": row.record_date,
-                "主觀電量評分": row.subjective_score !== null ? row.subjective_score : "",
-                "身體異常狀況": row.physical_abnormality || "",
+                "日期": row.record_date,
+                "自評電量": row.subjective_score !== null ? row.subjective_score : "",
+                "反饋": row.physical_abnormality || "",
                 "系統寫入時間": new Date(row.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
             });
         });
@@ -56,9 +56,9 @@ export default async function handler(req, res) {
             // 稍微調整一下欄位寬度讓 Excel 打開比較好看 (選擇性)
             ws['!cols'] = [
                 { wch: 12 }, // 使用者序號
-                { wch: 12 }, // 紀錄日期
-                { wch: 15 }, // 主觀電量評分
-                { wch: 30 }, // 身體異常狀況
+                { wch: 12 }, // 日期
+                { wch: 15 }, // 自評電量
+                { wch: 30 }, // 反饋
                 { wch: 22 }  // 系統寫入時間
             ];
 
