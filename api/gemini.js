@@ -1,4 +1,4 @@
-// api/gemini.js 21-2
+// api/gemini.js 22
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -22,21 +22,65 @@ export default async function handler(req, res) {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
     // ==========================================
+    // 🛡️ 絕對防錯區塊：即時撈取使用者專屬名稱
+    // 嚴格綁定本次請求的 serial_number，避免任何全域變數污染
+    // ==========================================
+    let nickname = "使用者";
+    let ai_name = "健康夥伴";
+    
+    console.log(`[檢查] 準備撈取名稱，收到的 serial_number: ${serial_number}`);
+
+    if (!serial_number) {
+      console.log("[警告] ⚠️ 前端沒有傳送 serial_number！請檢查前端 fetch 的 body。");
+    } else {
+      try {
+        const userRes = await fetch(`${supabaseUrl}/rest/v1/user_credentials?select=nickname,ai_name&serial_number=eq.${serial_number}`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          console.log("[檢查] Supabase 回傳結果:", userData);
+          
+          if (userData && userData.length > 0) {
+            nickname = userData[0].nickname || nickname;
+            ai_name = userData[0].ai_name || ai_name;
+            console.log(`[成功] 替換名稱為 nickname: ${nickname}, ai_name: ${ai_name}`);
+          } else {
+            console.log(`[警告] ⚠️ Supabase 找不到 serial_number 為 ${serial_number} 的資料！請確認資料表裡有這筆序號。`);
+          }
+        } else {
+          const errText = await userRes.text();
+          console.log(`[錯誤] ❌ Supabase 查詢失敗: ${userRes.status} ${errText}`);
+        }
+      } catch (e) {
+        console.error("[錯誤] ❌ 撈取使用者名稱時發生 Exception:", e);
+      }
+    }
+
+    // ==========================================
     // 客製化 AI 開場白攔截區塊
     // ==========================================
     if (action === 'generate_greeting') {
-      const greetingPrompt = `你是一個友好熱情的 AI 健康夥伴。
-請根據以下提示，生成一句專屬的開場白。
+      const greetingPrompt = `【身份鎖定】
+你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
+絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
+若被問到模型來源，請回答：「我是 Soosyn Health Companion 的 AI 健康夥伴，專門協助你解讀健康數據與提供健康管理建議。」
+你的名字：${ai_name}
+使用者暱稱：${nickname}
 
+請根據以下提示，生成一句專屬的開場白。
 【規則】
-1. 第一句請自由發揮，表達歡迎回來的心情，例如：「歡迎回來！我是你的健康夥伴 👋」。
-2. 【絕對禁止】：嚴格禁止在對話中出現使用者的名字或 AI 的名字，請用「你」來稱呼對方即可。
-3. 接著請根據以下指標狀態給予一句${metric_data.type}：
+1. 第一句請自然地打招呼，表達歡迎回來的心情。你可以稱呼對方的暱稱「${nickname}」，也可以帶入你自己的名字「${ai_name}」。例如：「歡迎回來 ${nickname}！我是 ${ai_name} 👋」。
+2. 接著請根據以下指標狀態給予一句${metric_data.type}：
    - 指標：${metric_data.metric}
    - 狀態：${metric_data.status}
-4. 說明完後，最後加上一句引導詢問。
-5. 語氣要像平輩朋友一樣自然。
-6. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
+3. 說明完後，最後加上一句引導詢問。
+4. 語氣要像平輩朋友一樣自然。
+5. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
 
 請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
 
@@ -47,7 +91,7 @@ export default async function handler(req, res) {
       });
       
       let greetingResult = await greetingRes.json();
-      const cleanGreeting = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "歡迎回來！今天想了解哪些健康數據呢？";
+      const cleanGreeting = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
       return res.status(200).json({ text: cleanGreeting });
     }
 
@@ -353,8 +397,15 @@ export default async function handler(req, res) {
     // 第三階段：Gemini 2.5 Flash 超級大腦最終整合
     // ==========================================
     
-    // 🌟 調整 3：強制 Gemini 老實交出網址連結，並且字數限制只算他講的話
-    const systemPrompt = `你是一個友好熱情的 AI 健康夥伴。今天是 ${local_date}。
+    // 🌟 調整 3：注入【身份鎖定】並強制控制語氣
+    const systemPrompt = `【身份鎖定】
+你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
+絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
+若被問到模型來源，請回答：「我是 Soosyn Health Companion 的 AI 健康夥伴，專門協助你解讀健康數據與提供健康管理建議。」
+你的名字：${ai_name}
+使用者暱稱：${nickname}
+
+今天是 ${local_date}。
 
 【重要數據與參考資訊】
 1. 🧑‍⚕️ 使用者個人健康數據：
@@ -367,7 +418,7 @@ export default async function handler(req, res) {
    ${uploadStatusContext}
 
 【對話與邏輯規則】
-1. 嚴禁使用敬稱，請一律用「你」稱呼對方。語氣要像平輩朋友一樣自然，可加上適合的 emoji。
+1. 嚴禁使用敬稱，請一律用「你」稱呼對方（${nickname}）。語氣要像平輩朋友一樣自然，可加上適合的 emoji。
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
