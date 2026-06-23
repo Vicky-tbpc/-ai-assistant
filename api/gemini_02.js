@@ -28,22 +28,37 @@ export default async function handler(req, res) {
     let nickname = "使用者";
     let ai_name = "健康夥伴";
     
-    try {
-      const userRes = await fetch(`${supabaseUrl}/rest/v1/user_credentials?select=nickname,ai_name&serial_number=eq.${serial_number}`, {
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`
+    console.log(`[檢查] 準備撈取名稱，收到的 serial_number: ${serial_number}`);
+
+    if (!serial_number) {
+      console.log("[警告] ⚠️ 前端沒有傳送 serial_number！請檢查前端 fetch 的 body。");
+    } else {
+      try {
+        const userRes = await fetch(`${supabaseUrl}/rest/v1/user_credentials?select=nickname,ai_name&serial_number=eq.${serial_number}`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          console.log("[檢查] Supabase 回傳結果:", userData);
+          
+          if (userData && userData.length > 0) {
+            nickname = userData[0].nickname || nickname;
+            ai_name = userData[0].ai_name || ai_name;
+            console.log(`[成功] 替換名稱為 nickname: ${nickname}, ai_name: ${ai_name}`);
+          } else {
+            console.log(`[警告] ⚠️ Supabase 找不到 serial_number 為 ${serial_number} 的資料！請確認資料表裡有這筆序號。`);
+          }
+        } else {
+          const errText = await userRes.text();
+          console.log(`[錯誤] ❌ Supabase 查詢失敗: ${userRes.status} ${errText}`);
         }
-      });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        if (userData && userData.length > 0) {
-          nickname = userData[0].nickname || nickname;
-          ai_name = userData[0].ai_name || ai_name;
-        }
+      } catch (e) {
+        console.error("[錯誤] ❌ 撈取使用者名稱時發生 Exception:", e);
       }
-    } catch (e) {
-      console.error("撈取使用者名稱失敗:", e);
     }
 
     // ==========================================
