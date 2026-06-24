@@ -1,4 +1,4 @@
-// api/gemini.js 22
+// api/gemini.js 23
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -20,6 +20,21 @@ export default async function handler(req, res) {
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+
+    // ==========================================
+    // 🚀 全動態超連結字典撈取 (消滅程式碼肥大，免重新部署)
+    // ==========================================
+    let linkRules = [];
+    try {
+      const linksRes = await fetch(`${supabaseUrl}/rest/v1/reference_links?select=tag,markdown_content,keywords`, {
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+      });
+      if (linksRes.ok) {
+        linkRules = await linksRes.json();
+      }
+    } catch (e) {
+      console.error("[錯誤] ❌ 撈取動態超連結字典失敗:", e);
+    }
 
     // ==========================================
     // 🛡️ 絕對防錯區塊：即時撈取使用者專屬名稱
@@ -194,6 +209,27 @@ export default async function handler(req, res) {
         }
       } catch (e) { console.error("💥 地端 RAG 呼叫失敗:", e); }
     }
+
+    // ==========================================
+    // 🛡️ 雙重保險：用 Supabase 資料表動態補刀，防止 RAG 漏抓
+    // ==========================================
+    const userPromptLow = prompt.toLowerCase();
+    let forceLinkInstruction = "";
+
+    linkRules.forEach(rule => {
+      if (rule.keywords) {
+        // 將資料庫的關鍵字欄位依逗號拆開成陣列
+        const kwArray = rule.keywords.split(',');
+        // 只要使用者輸入包含其中一個關鍵字，就強灌規則給 AI
+        const hasKeyword = kwArray.some(kw => userPromptLow.includes(kw.trim().toLowerCase()));
+        
+        if (hasKeyword) {
+          forceLinkInstruction += `\n【系統強制規則】：請在回覆中適當位置原封不動附上這行標籤：${rule.tag}，絕對禁止自己寫出任何 http 或 https 網址！`;
+        }
+      }
+    });
+
+    ragContext = ragContext + forceLinkInstruction;
 
     // 2-2. 呼叫 Gemini API 獲取外部即時資訊
     let externalContext = "目前無外部即時資訊。";
@@ -422,9 +458,10 @@ export default async function handler(req, res) {
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
-4. 【絕對忠於知識庫】：當涉及裝置說明(APP、ST-50)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。
-   👉 超連結強制輸出：若地端知識庫中提供了任何 Markdown 超連結（如 [說明書](網址)），請你「務必原封不動地完整輸出這些連結」，方便使用者點擊。
-   👉 警告：禁止隨意捏造或引入衝突的外部資訊。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+4. 【絕對忠於知識庫與超連結限制】：
+   - 內容忠誠：當涉及裝置操作(APP、ST-50)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+   - 網址輸出限制：當需要引導使用者查看說明書、APP下載或健康指標的深入文章時，請務必根據系統在知識庫中強制附加的特殊標籤（例如 %%開頭與結尾的代碼%%）「原封不動」地輸出在對話中。
+   👉 【鐵律】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！你絕對只能輸出系統給予的 %% 格式標籤代碼。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
 7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
@@ -447,6 +484,15 @@ export default async function handler(req, res) {
     
     let finalResult = await finalRes.json();
     let finalText = finalResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "哎呀，我剛剛腦袋稍微打結了 😅。請再問我一次好嗎？";
+
+    // ==========================================
+    // 🚀 全動態標籤真實網址還原區塊 (不論未來新增多少連結，行數永遠固定)
+    // ==========================================
+    linkRules.forEach(rule => {
+      // 建立動態正則表達式，全域替換該標籤
+      const regex = new RegExp(rule.tag, 'g');
+      finalText = finalText.replace(regex, rule.markdown_content);
+    });
 
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
