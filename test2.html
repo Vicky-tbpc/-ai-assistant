@@ -794,8 +794,9 @@ function openSleepReport(dateStr) {
     // 把 YYYY/MM/DD 統一轉換為 YYYY-MM-DD
     const formattedDate = dateStr.replace(/\//g, '-');
     
-    // 呼叫我們剛剛在 Python 寫好的 API
-    const pdfUrl = `/api/pdf?account=${encodeURIComponent(currentSerial)}&date=${encodeURIComponent(formattedDate)}`;
+    // 💡 加上你專屬的 Vercel 完整網址 (避免本地測試時路徑跑掉)
+    const baseUrl = "https://ai-assistant-eight-puce.vercel.app";
+    const pdfUrl = `${baseUrl}/api/health?action=pdf&account=${encodeURIComponent(currentSerial)}&date=${encodeURIComponent(formattedDate)}`;
     
     // 開啟新分頁來顯示 PDF
     window.open(pdfUrl, '_blank');
