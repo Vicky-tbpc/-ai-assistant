@@ -18,7 +18,11 @@ export default async function handler(req, res) {
           'ngrok-skip-browser-warning': 'true' // 確保 ngrok 不會跳出警告頁面擋住 fetch
         }
       });
-      if (!response.ok) return res.status(response.status).send('無法取得 PDF');
+      if (!response.ok) {
+        // 把地端 Python 回傳的真正原因抓出來顯示
+        const errorText = await response.text();
+        return res.status(response.status).send(`無法取得 PDF，地端伺服器說：${errorText}`);
+      }
       
       const buffer = Buffer.from(await response.arrayBuffer());
       res.setHeader('Content-Type', 'application/pdf');
