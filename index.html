@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n083</title>
+    <title>Soosyn 健康夥伴 n084</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2391,7 +2391,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/qwen_function', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -2530,10 +2530,11 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                serial_number: currentSerial,                
                 action: 'generate_greeting', // 透過此標記攔截
                 metric_data: aiData
             })
