@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n084</title>
+    <title>Soosyn 健康夥伴 n086</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -70,6 +70,9 @@
     box-shadow: 0 10px 20px rgba(0,0,0,0.05); 
     cursor: pointer; 
 }
+
+/* 新增這一行，單獨把健康摘要的滑鼠游標改回一般箭頭 */
+.summary-card { cursor: default; }
 
         .summary-header { font-size: 1.1rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .battery-container { margin: 15px 0; }
@@ -782,6 +785,24 @@ async function bindLineAccount() {
 // 關閉綁定視窗
 function closeBindingModal() {
     document.getElementById('line-binding-overlay').classList.add('hidden');
+}
+
+// --- 新增：開啟 PDF 睡眠報告的函數 ---
+function openSleepReport(dateStr) {
+    if (!currentSerial) {
+        alert("找不到當前帳號資訊！");
+        return;
+    }
+    
+    // 把 YYYY/MM/DD 統一轉換為 YYYY-MM-DD
+    const formattedDate = dateStr.replace(/\//g, '-');
+    
+    // 💡 加上你專屬的 Vercel 完整網址 (避免本地測試時路徑跑掉)
+    const baseUrl = "https://ai-assistant-eight-puce.vercel.app";
+    const pdfUrl = `${baseUrl}/api/health?action=pdf&account=${encodeURIComponent(currentSerial)}&date=${encodeURIComponent(formattedDate)}`;
+    
+    // 開啟新分頁來顯示 PDF
+    window.open(pdfUrl, '_blank');
 }
 
 // --- 修改後的 initApp 函式不同裝置的第一次登入統一計算 ---
@@ -1969,7 +1990,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
     
  document.getElementById('chat-history').innerHTML += `
         <div class="msg-row ai-row">
-            <div class="summary-card" onclick="zoomChart(this)">
+            <div class="summary-card">
                 <div class="summary-header">
                     <span>📅 ${dateTitle} 健康摘要</span>
                    <span style="color:${lightMap[data.light] || '#ccc'}; display: flex; align-items: center;">
@@ -2009,6 +2030,14 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
                 
                 <div class="analysis-capsule capsule-best"><span class="capsule-icon">😊</span><div>${data.bestText}</div></div>
                 <div class="analysis-capsule capsule-worst"><span class="capsule-icon">😟</span><div>${data.worstText}</div></div>
+
+<!-- 新增：睡眠報告 PDF 下載按鈕 -->
+<div style="margin: 20px 0 5px 0;">
+    <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">
+        📄 開啟睡眠報告
+    </button>
+</div>
+
             </div>
         </div>`; 
     scrollToBottom();
