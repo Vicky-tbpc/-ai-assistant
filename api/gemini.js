@@ -1,4 +1,4 @@
-// api/gemini.js 23
+// api/gemini.js 24
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -211,25 +211,31 @@ export default async function handler(req, res) {
     }
 
     // ==========================================
-    // 🛡️ 雙重保險：用 Supabase 資料表動態補刀，防止 RAG 漏抓
+    // 🛡️ 雙重保險：用 Supabase 資料表動態補刀，並建立標籤白名單
     // ==========================================
     const userPromptLow = prompt.toLowerCase();
-    let forceLinkInstruction = "";
+    let allowedTagsInstruction = "";
+    let matchedTags = [];
 
     linkRules.forEach(rule => {
       if (rule.keywords) {
         // 將資料庫的關鍵字欄位依逗號拆開成陣列
         const kwArray = rule.keywords.split(',');
-        // 只要使用者輸入包含其中一個關鍵字，就強灌規則給 AI
+        // 只要使用者輸入包含其中一個關鍵字，就把這個標籤加入白名單
         const hasKeyword = kwArray.some(kw => userPromptLow.includes(kw.trim().toLowerCase()));
         
         if (hasKeyword) {
-          forceLinkInstruction += `\n【系統強制規則】：請在回覆中適當位置原封不動附上這行標籤：${rule.tag}，絕對禁止自己寫出任何 http 或 https 網址！`;
+          matchedTags.push(rule.tag);
         }
       }
     });
 
-    ragContext = ragContext + forceLinkInstruction;
+    // 依據是否有配對到關鍵字，產生不同的系統鐵律
+    if (matchedTags.length > 0) {
+      allowedTagsInstruction = `你本次對話【只能】使用以下系統提供的超連結標籤：${matchedTags.join('、')}。請在適當位置原封不動貼上。`;
+    } else {
+      allowedTagsInstruction = `本次對話【沒有】提供任何可用的超連結標籤。如果需要引導使用者，請直接用文字說明，絕對不准給任何連結或標籤。`;
+    }
 
     // 2-2. 呼叫 Gemini API 獲取外部即時資訊
     let externalContext = "目前無外部即時資訊。";
@@ -459,9 +465,9 @@ export default async function handler(req, res) {
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
 4. 【絕對忠於知識庫與超連結限制】：
-   - 內容忠誠：當涉及裝置操作(APP、ST-50)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
-   - 網址輸出限制：當需要引導使用者查看說明書、APP下載或健康指標的深入文章時，請務必根據系統在知識庫中強制附加的特殊標籤（例如 %%開頭與結尾的代碼%%）「原封不動」地輸出在對話中。
-   👉 【鐵律】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！你絕對只能輸出系統給予的 %% 格式標籤代碼。
+   - 內容忠誠：當涉及裝置操作(APP、ST-50、手環、Soosyn)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+   - 【標籤輸出鐵律】：${allowedTagsInstruction}
+   - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤（例如 %%手環說明書%%、%%發炎%% 等都是嚴格禁止的），你只能用系統明確給你的標籤。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
 7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
