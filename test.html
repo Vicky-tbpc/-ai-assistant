@@ -112,11 +112,11 @@
     max-width: 800px; 
     background: white; 
     border-radius: 25px; 
-    padding: 5px 15px; 
+    /* 調整上下 padding，讓單行時視覺置中 */
+    padding: 8px 15px; 
     display: flex; 
-    align-items: flex-end; /* 改成 flex-end，讓按鈕對齊底部 */
+    align-items: flex-end; /* 底部對齊，確保多行時按鈕在最下面 */
     border: 1px solid #ddd; 
-    min-height: 47px; /* 確保基本高度與原本一致 */
     box-sizing: border-box;
 }
 
@@ -124,17 +124,21 @@
     flex: 1; 
     border: none; 
     outline: none; 
-    padding: 10px 0; 
+    /* 調整 padding，確保「說點什麼」不會被切掉 */
+    padding: 6px 0; 
     font-size: 16px; 
     background: transparent; 
     -webkit-user-select: auto !important;
     user-select: auto !important;
     touch-action: manipulation;
-    resize: none; /* 隱藏右下角的拖曳縮放角 */
-    overflow-y: hidden; /* 隱藏多餘的捲軸 */
+    resize: none; 
+    overflow-y: hidden; 
     line-height: 1.5; 
-    max-height: 120px; /* 設定最高高度，大約 4~5 行，超過才出現捲軸 */
+    max-height: 120px; 
     font-family: inherit;
+    /* 移除 iOS 預設表單樣式，避免文字被裁切 */
+    -webkit-appearance: none; 
+    box-sizing: border-box;
 }
 
 .send-btn { 
@@ -148,8 +152,10 @@
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    margin-bottom: 5px; /* 稍微推高對齊輸入框文字 */
-    flex-shrink: 0; /* 防止按鈕被壓縮 */
+    flex-shrink: 0; 
+    /* 移除 margin-bottom，配合 input-box 的 padding 自動置中 */
+    margin-bottom: 0px; 
+    margin-left: 10px; /* 和輸入文字保持一點距離 */
 }
         .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
@@ -574,20 +580,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // 監聽輸入事件來調整高度
         userInput.addEventListener('input', autoResize);
 
-        // 3. 處理 Enter 鍵發送與手機選字防誤觸
+        // 3. 處理 Enter 鍵發送與手機換行
         userInput.addEventListener('keydown', (e) => {
-            // 關鍵：isComposing 代表使用者正在用輸入法拼字，這時按 Enter 絕對不能送出
+            // 避免中文輸入法組字時誤觸
             if (e.isComposing || e.keyCode === 229) return;
             
-            // 按下 Enter 且沒按住 Shift 時發送訊息
+            // 判斷是否為手機/平板等觸控裝置
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0;
+
+            // 當按下 Enter 且沒有按住 Shift 時
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // 阻止 textarea 預設的換行行為
-                sendMessage();
+                if (isMobile) {
+                    // 手機版：什麼都不做，讓系統原生行為去換行
+                    return;
+                } else {
+                    // 電腦版：阻止換行，並發送訊息
+                    e.preventDefault();
+                    sendMessage();
+                }
             }
         });
 
-        // 初始化時調整一次高度
-        autoResize();
+        // 初始調整一次高度，稍微延遲確保畫面已經渲染完成，避免高度計算錯誤
+        setTimeout(autoResize, 50);
     }
 });
 
