@@ -124,8 +124,7 @@
     flex: 1; 
     border: none; 
     outline: none; 
-    /* 調整 padding，確保「說點什麼」不會被切掉 */
-    padding: 6px 0; 
+    padding: 8px 0; /* 給定明確的上下內距 */
     font-size: 16px; 
     background: transparent; 
     -webkit-user-select: auto !important;
@@ -133,10 +132,11 @@
     touch-action: manipulation;
     resize: none; 
     overflow-y: hidden; 
-    line-height: 1.5; 
+    line-height: 20px; /* 給定絕對數值的行高 */
+    height: 36px; /* 初始高度 = 行高20 + 上下padding各8 = 36 */
+    min-height: 36px; /* 絕對不准縮小低於這高度，防止字被切掉 */
     max-height: 120px; 
     font-family: inherit;
-    /* 移除 iOS 預設表單樣式，避免文字被裁切 */
     -webkit-appearance: none; 
     box-sizing: border-box;
 }
@@ -567,7 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. 自動調整高度函數
         const autoResize = () => {
-            userInput.style.height = 'auto'; // 先重置高度
+            userInput.style.height = '36px'; // 👈 用 36px 取代原本的 'auto'，這是關鍵！
             if (userInput.scrollHeight > 120) { 
                 userInput.style.height = '120px'; // 最高限制 120px
                 userInput.style.overflowY = 'auto';
@@ -1000,7 +1000,7 @@ async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
     input.value = '';
-    input.style.height = 'auto'; // 👈 新增這一行：發送後高度變回原本的一行 
+    input.style.height = '36px'; // 👈 把原本的 'auto' 換成 '36px' 
     appendUserMessage(msg);
 
     // 每次發送新訊息時，先嘗試移除舊的按鈕列
