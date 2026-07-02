@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n086</title>
+    <title>Soosyn 健康夥伴 n087</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -107,20 +107,50 @@
     text-align: center;
     letter-spacing: 0.5px;
 }
-        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
-        #user-input { 
+.input-box { 
+    width: 100%; 
+    max-width: 800px; 
+    background: white; 
+    border-radius: 25px; 
+    padding: 5px 15px; 
+    display: flex; 
+    align-items: flex-end; /* 改成 flex-end，讓按鈕對齊底部 */
+    border: 1px solid #ddd; 
+    min-height: 47px; /* 確保基本高度與原本一致 */
+    box-sizing: border-box;
+}
+
+#user-input { 
     flex: 1; 
     border: none; 
     outline: none; 
-    padding: 10px; 
+    padding: 10px 0; 
     font-size: 16px; 
     background: transparent; 
-    /* 以下為新增：確保 Android 裝置能正常觸控與輸入文字 */
     -webkit-user-select: auto !important;
     user-select: auto !important;
     touch-action: manipulation;
+    resize: none; /* 隱藏右下角的拖曳縮放角 */
+    overflow-y: hidden; /* 隱藏多餘的捲軸 */
+    line-height: 1.5; 
+    max-height: 120px; /* 設定最高高度，大約 4~5 行，超過才出現捲軸 */
+    font-family: inherit;
 }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+.send-btn { 
+    background: var(--tbp-blue); 
+    color: white; 
+    border: none; 
+    width: 35px; 
+    height: 35px; 
+    border-radius: 50%; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    margin-bottom: 5px; /* 稍微推高對齊輸入框文字 */
+    flex-shrink: 0; /* 防止按鈕被壓縮 */
+}
         .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -492,7 +522,7 @@
         <main id="main-area"><div id="chat-history"></div></main>
         <div class="footer-input">
             <div class="input-box">
-                <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <textarea id="user-input" placeholder="說點什麼..." rows="1"></textarea>
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         <!-- 這裡加上警語 -->
@@ -515,22 +545,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 👇 這裡就是你要插入的新程式碼：修正 Android LINE 鍵盤彈出失去焦點的 Bug
+// 修復鍵盤與輸入框自動調整高度邏輯 (替換掉原本第二個 DOMContentLoaded)
 document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     
     if (userInput) {
-        // 當 Android 鍵盤彈起改變視窗大小時，確保輸入框不會被遮擋
+        // 1. Android 鍵盤彈起確保不遮擋
         window.addEventListener('resize', () => {
-            // 如果目前焦點已經在輸入框上
             if (document.activeElement === userInput) {
                 setTimeout(() => {
-                    // 只需要確保滾動到可視範圍即可
                     userInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                    // ⚠️ 已經移除 userInput.focus(); 避免打斷中文輸入法的組字緩衝區
                 }, 150);
             }
         });
+
+        // 2. 自動調整高度函數
+        const autoResize = () => {
+            userInput.style.height = 'auto'; // 先重置高度
+            if (userInput.scrollHeight > 120) { 
+                userInput.style.height = '120px'; // 最高限制 120px
+                userInput.style.overflowY = 'auto';
+            } else {
+                userInput.style.height = userInput.scrollHeight + 'px';
+                userInput.style.overflowY = 'hidden';
+            }
+        };
+
+        // 監聽輸入事件來調整高度
+        userInput.addEventListener('input', autoResize);
+
+        // 3. 處理 Enter 鍵發送與手機選字防誤觸
+        userInput.addEventListener('keydown', (e) => {
+            // 關鍵：isComposing 代表使用者正在用輸入法拼字，這時按 Enter 絕對不能送出
+            if (e.isComposing || e.keyCode === 229) return;
+            
+            // 按下 Enter 且沒按住 Shift 時發送訊息
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // 阻止 textarea 預設的換行行為
+                sendMessage();
+            }
+        });
+
+        // 初始化時調整一次高度
+        autoResize();
     }
 });
 
@@ -927,7 +984,8 @@ return getLocalDateString(); // <-- 修改這裡，不要用 ISOString
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
-    input.value = ''; 
+    input.value = '';
+    input.style.height = 'auto'; // 👈 新增這一行：發送後高度變回原本的一行 
     appendUserMessage(msg);
 
     // 每次發送新訊息時，先嘗試移除舊的按鈕列
