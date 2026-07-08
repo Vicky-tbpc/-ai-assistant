@@ -141,7 +141,7 @@ export default async function handler(req, res) {
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
 2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
 3. 【知識庫查詢】(優化)：若使用者詢問健康指標（如：N3深睡期、血氧、AHI）的定義與「標準參考範圍」，或是詢問「如何使用 Soosyn APP、ST-50 裝置操作、說明書、教學網址」，請將 need_knowledge 設為 true。
-   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞」本身，絕對不能包含「是什麼」、「意思」等疑問詞。例如問「低氧負擔指數是什麼意思？」，knowledge_query 只能輸出「低氧負擔指數」。
+   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞」。若使用者輸入縮寫或不完整的詞彙（例如「低氧負擔」），請運用你的常識將其補齊為完整的醫療專有名詞（例如「低氧負擔指數 HBI」），以利精準檢索。絕對不能包含「是什麼」、「意思」等疑問詞。
 4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。
 
 【日期對照表】
@@ -192,9 +192,9 @@ export default async function handler(req, res) {
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
       try {
-        // 🌟 調整 2：大幅簡化 Prompt，消滅「向量污染 (Vector Pollution)」。
-        // AnythingLLM 只負責「找資料」，格式化與語氣控制交給最後一關的 Gemini 就好。
-        const ragPrompt = `請從知識庫中找出關於「${intent.knowledge_query}」的定義、說明或標準範圍。請直接提取原文內容，不要加入問候語。`;
+        // 🌟 調整 2：完全捨棄任何對話與格式指令，只用「純關鍵字」進行純粹的向量檢索 (Vector Search)
+        // 這樣 AnythingLLM 的向量庫就能 100% 命中你的 Markdown 表格
+        const ragPrompt = `${intent.knowledge_query} 定義 說明 標準範圍`;
         
         const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
           method: "POST",
