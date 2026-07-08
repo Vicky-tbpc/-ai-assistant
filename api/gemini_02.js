@@ -1,4 +1,4 @@
-// api/gemini.js 22
+// api/gemini.js 25
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -20,6 +20,21 @@ export default async function handler(req, res) {
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+
+    // ==========================================
+    // 🚀 全動態超連結字典撈取 (消滅程式碼肥大，免重新部署)
+    // ==========================================
+    let linkRules = [];
+    try {
+      const linksRes = await fetch(`${supabaseUrl}/rest/v1/reference_links?select=tag,markdown_content,keywords`, {
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+      });
+      if (linksRes.ok) {
+        linkRules = await linksRes.json();
+      }
+    } catch (e) {
+      console.error("[錯誤] ❌ 撈取動態超連結字典失敗:", e);
+    }
 
     // ==========================================
     // 🛡️ 絕對防錯區塊：即時撈取使用者專屬名稱
@@ -125,7 +140,8 @@ export default async function handler(req, res) {
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
 2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(優化)：若使用者詢問健康指標（如：N3深睡期、血氧、AHI）的定義與「標準參考範圍」，或是詢問「如何使用 Soosyn APP、ST-50 裝置操作、說明書、教學網址」，請將 need_knowledge 設為 true，並在 knowledge_query 中提取「最核心的專有名詞」（例如：「N3 淺睡期 標準參考範圍」、「Soosyn APP ST-50 教學 說明書」），這將用於向量資料庫精準檢索。
+3. 【知識庫查詢】(優化)：若使用者詢問健康指標（如：N3深睡期、血氧、AHI）的定義與「標準參考範圍」，或是詢問「如何使用 Soosyn APP、ST-50 裝置操作、說明書、教學網址」，請將 need_knowledge 設為 true。
+   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞」本身，絕對不能包含「是什麼」、「意思」等疑問詞。例如問「低氧負擔指數是什麼意思？」，knowledge_query 只能輸出「低氧負擔指數」。
 4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。
 
 【日期對照表】
@@ -141,7 +157,10 @@ export default async function handler(req, res) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
         contents: [{ parts: [{ text: routerPrompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
+        generationConfig: { 
+          responseMimeType: "application/json",
+          temperature: 0 // 🛑 絕對防錯：強制溫度為 0，確保意圖解析與關鍵字提取 100% 穩定
+        }
       })
     });
 
@@ -173,13 +192,9 @@ export default async function handler(req, res) {
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
       try {
-        // 🌟 調整 2：大幅簡化 Prompt，把關鍵字放最前面提升檢索命中率，並命令模型當個無情的搬運工
-        const ragPrompt = `查詢目標：「${intent.knowledge_query}」與「${prompt}」
-
-請在知識庫中檢索上述目標，並嚴格遵守以下輸出規則：
-1. 你的唯一任務是「精準搬運」：只要找到相關的 Markdown 表格數據（如睡眠標準範圍）或超連結網址（如說明書連結 [連結名稱](網址)），請「原封不動、完整照抄」提取出來。
-2. 絕對不要自己進行摘要、縮減、改寫或解釋。
-3. 不要加入任何問候語或自我介紹。`;
+        // 🌟 調整 2：大幅簡化 Prompt，消滅「向量污染 (Vector Pollution)」。
+        // AnythingLLM 只負責「找資料」，格式化與語氣控制交給最後一關的 Gemini 就好。
+        const ragPrompt = `請從知識庫中找出關於「${intent.knowledge_query}」的定義、說明或標準範圍。請直接提取原文內容，不要加入問候語。`;
         
         const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
           method: "POST",
@@ -193,6 +208,33 @@ export default async function handler(req, res) {
           console.log("📚【地端 AnythingLLM 知識庫檢索】:", ragContext);
         }
       } catch (e) { console.error("💥 地端 RAG 呼叫失敗:", e); }
+    }
+
+    // ==========================================
+    // 🛡️ 雙重保險：用 Supabase 資料表動態補刀，並建立標籤白名單
+    // ==========================================
+    const userPromptLow = prompt.toLowerCase();
+    let allowedTagsInstruction = "";
+    let matchedTags = [];
+
+    linkRules.forEach(rule => {
+      if (rule.keywords) {
+        // 將資料庫的關鍵字欄位依逗號拆開成陣列
+        const kwArray = rule.keywords.split(',');
+        // 只要使用者輸入包含其中一個關鍵字，就把這個標籤加入白名單
+        const hasKeyword = kwArray.some(kw => userPromptLow.includes(kw.trim().toLowerCase()));
+        
+        if (hasKeyword) {
+          matchedTags.push(rule.tag);
+        }
+      }
+    });
+
+    // 依據是否有配對到關鍵字，產生不同的系統鐵律
+    if (matchedTags.length > 0) {
+      allowedTagsInstruction = `你本次對話【只能】使用以下系統提供的超連結標籤：${matchedTags.join('、')}。請在適當位置原封不動貼上。`;
+    } else {
+      allowedTagsInstruction = `本次對話【沒有】提供任何可用的超連結標籤。如果需要引導使用者，請直接用文字說明，絕對不准給任何連結或標籤。`;
     }
 
     // 2-2. 呼叫 Gemini API 獲取外部即時資訊
@@ -422,9 +464,10 @@ export default async function handler(req, res) {
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
-4. 【絕對忠於知識庫】：當涉及裝置說明(APP、ST-50)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。
-   👉 超連結強制輸出：若地端知識庫中提供了任何 Markdown 超連結（如 [說明書](網址)），請你「務必原封不動地完整輸出這些連結」，方便使用者點擊。
-   👉 警告：禁止隨意捏造或引入衝突的外部資訊。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+4. 【絕對忠於知識庫與超連結限制】：
+   - 內容忠誠：當涉及裝置操作(APP、ST-50、手環、Soosyn)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+   - 【標籤輸出鐵律】：${allowedTagsInstruction}
+   - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤（例如 %%手環說明書%%、%%發炎%% 等都是嚴格禁止的），你只能用系統明確給你的標籤。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
 7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
@@ -447,6 +490,15 @@ export default async function handler(req, res) {
     
     let finalResult = await finalRes.json();
     let finalText = finalResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "哎呀，我剛剛腦袋稍微打結了 😅。請再問我一次好嗎？";
+
+    // ==========================================
+    // 🚀 全動態標籤真實網址還原區塊 (不論未來新增多少連結，行數永遠固定)
+    // ==========================================
+    linkRules.forEach(rule => {
+      // 建立動態正則表達式，全域替換該標籤
+      const regex = new RegExp(rule.tag, 'g');
+      finalText = finalText.replace(regex, rule.markdown_content);
+    });
 
     const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
       method: 'POST',
