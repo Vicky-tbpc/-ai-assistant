@@ -139,10 +139,13 @@ export default async function handler(req, res) {
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
-2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(全面放寬)：只要使用者的問題涉及「是什麼意思」、「名詞解釋」、「定義」、「正常範圍」，或是提到任何「專有名詞/健康指標」（如：低氧負擔、HBI、N3深睡期、血氧、APP教學等），請務必將 need_knowledge 設為 true。
-   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞」。若使用者輸入「低氧負擔是什麼？」，請直接轉化為「低氧負擔指數 HBI」。絕對不可把「是什麼」、「意思」等疑問詞放進 query，確保向量資料庫能 100% 命中。
-4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。
+2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。3. 【知識庫查詢】(全面涵蓋)：只要問題涉及「健康指標的定義與正常範圍」(如：低氧負擔、HBI、N3、血氧)，或是「硬體裝置操作與APP教學」(如：APP下載、ST-50配戴、藍牙連線、說明書)，或是「報告判讀教學」(如：睡眠報告怎麼看)，請務必將 need_knowledge 設為 true。
+   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。
+   - 若問健康指標（如「低氧負擔是什麼」），轉為「低氧負擔指數 HBI」。
+   - 若問操作與教學（如「手環怎麼連線」），轉為「ST-50 藍牙連線 說明書」。
+   - 若問報告（如「睡眠報告有問題」），轉為「睡眠報告判讀 AHI」。
+   絕對不可把「是什麼」、「怎麼用」、「意思」等疑問詞放進 query，確保向量資料庫能 100% 命中。
+4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養、醫療疑問」（例如：怎麼吃比較好、感冒怎麼辦等），請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
 
 【日期對照表】
 1. 今天：${local_date}
@@ -192,8 +195,8 @@ export default async function handler(req, res) {
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
       try {
-        // 🌟 修正 3：讓 RAG 查詢字串更自然且不稀釋向量。請 AnythingLLM 的語言模型專注回答該名詞。
-        const ragPrompt = `請從知識庫中找出「${intent.knowledge_query}」的意思與標準範圍。如果知識庫有表格資訊，請直接解釋相關內容。`;
+        // 🌟 修正 3：讓 RAG 查詢字串更通用，涵蓋教學與說明書，不要只找「標準範圍」
+        const ragPrompt = `請從知識庫中找出與「${intent.knowledge_query}」最相關的資訊。如果是健康指標，請說明定義與標準範圍；如果是 APP、裝置操作或報告判讀，請直接提供知識庫中的教學說明、對應連結與回覆規則。`;
         
         console.log(`[檢查] 準備呼叫 AnythingLLM，關鍵字: ${intent.knowledge_query}`);
         
@@ -208,7 +211,6 @@ export default async function handler(req, res) {
           ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
           console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
         } else {
-          // 🌟 捕捉 AnythingLLM 塞車或當機的狀態
           console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
         }
       } catch (e) { 
@@ -247,7 +249,7 @@ export default async function handler(req, res) {
     let externalContext = "目前無外部即時資訊。";
     if (intent.need_external && intent.external_query) {
       try {
-        const extPrompt = `今天是 ${local_date} (${dayOfWeek})。請針對查詢主題：「${intent.external_query}」，提供精簡關鍵的即時環境或天氣分析。字數150字內，不包含 JSON。`;
+        const extPrompt = `今天是 ${local_date} (${dayOfWeek})。請針對查詢主題：「${intent.external_query}」，利用聯網搜尋提供精簡關鍵的即時資訊或一般知識補充。字數150字內，不包含 JSON。`;
         const extRes = await fetch(geminiUrl, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: extPrompt }] }], tools: [{ googleSearch: {} }] })
@@ -470,10 +472,11 @@ export default async function handler(req, res) {
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
-4. 【絕對忠於知識庫與超連結限制】：
-   - 內容忠誠：當涉及裝置操作(APP、ST-50、手環、Soosyn)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
+4. 【地端為主，智能補充為輔】：
+   - 內容忠誠：當涉及「Soosyn裝置操作(APP、ST-50)、tBPC專屬名詞」或「特定睡眠/血氧指標定義」時，【絕對必須】依照【📚 專業醫療標準與地端知識庫】的內容回答，不可推翻。
+   - 智能補充 (Fallback)：如果使用者問的是一般性問題，且【📚 地端知識庫】沒有相關資料（例如顯示無特別知識，或找不到對應內容），請放心「啟動你自身的醫學常識」或結合【☁️ 外部即時環境資訊】來回答，並給予實用的建議。
    - 【標籤輸出鐵律】：${allowedTagsInstruction}
-   - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤（例如 %%手環說明書%%、%%發炎%% 等都是嚴格禁止的），你只能用系統明確給你的標籤。
+   - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
 7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
