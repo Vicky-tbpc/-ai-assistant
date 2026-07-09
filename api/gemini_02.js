@@ -140,8 +140,8 @@ export default async function handler(req, res) {
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
 2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(優化)：若使用者詢問健康指標（如：N3深睡期、血氧、AHI）的定義與「標準參考範圍」，或是詢問「如何使用 Soosyn APP、ST-50 裝置操作、說明書、教學網址」，請將 need_knowledge 設為 true。
-   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞」。若使用者輸入縮寫或不完整的詞彙（例如「低氧負擔」），請運用你的常識將其補齊為完整的醫療專有名詞（例如「低氧負擔指數 HBI」），以利精準檢索。絕對不能包含「是什麼」、「意思」等疑問詞。
+3. 【知識庫查詢】(全面放寬)：只要使用者的問題涉及「是什麼意思」、「名詞解釋」、「定義」、「正常範圍」，或是提到任何「專有名詞/健康指標」（如：低氧負擔、HBI、N3深睡期、血氧、APP教學等），請務必將 need_knowledge 設為 true。
+   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞」。若使用者輸入「低氧負擔是什麼？」，請直接轉化為「低氧負擔指數 HBI」。絕對不可把「是什麼」、「意思」等疑問詞放進 query，確保向量資料庫能 100% 命中。
 4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。
 
 【日期對照表】
@@ -167,13 +167,13 @@ export default async function handler(req, res) {
     let intentData = await intentRes.json();
     let intent = { need_data: false, need_external: false, need_knowledge: false };
     try {
-      const intentText = intentData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      let intentText = intentData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      intentText = intentText.replace(/```json/gi, '').replace(/```/g, '').trim();
       intent = JSON.parse(intentText);
+      console.log("👉【Gemini Router 意圖解析結果】:", JSON.stringify(intent));
     } catch (e) { 
-      console.log("意圖解析失敗", e); 
+      console.error("❌ 意圖解析失敗，回退至預設值", e); 
     }
-
-    console.log("👉【Gemini Router 意圖解析結果】:", JSON.stringify(intent));
 
     if (intent.need_trend_chart) {
       const trendNames = { "all": "📊 完整圖表", "battery": "📈 恢復指數", "rhr": "❤️‍ 靜息心率", "n3": "🌙 深睡期 (N3)", "rmssd": "🌿 rMSSD", "hrmin": "💓 睡眠最低脈搏", "hbi": "🫁 HBI 低氧負擔指數" };
@@ -192,9 +192,10 @@ export default async function handler(req, res) {
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
       try {
-        // 🌟 調整 2：完全捨棄任何對話與格式指令，只用「純關鍵字」進行純粹的向量檢索 (Vector Search)
-        // 這樣 AnythingLLM 的向量庫就能 100% 命中你的 Markdown 表格
-        const ragPrompt = `${intent.knowledge_query} 定義 說明 標準範圍`;
+        // 🌟 修正 3：讓 RAG 查詢字串更自然且不稀釋向量。請 AnythingLLM 的語言模型專注回答該名詞。
+        const ragPrompt = `請從知識庫中找出「${intent.knowledge_query}」的意思與標準範圍。如果知識庫有表格資訊，請直接解釋相關內容。`;
+        
+        console.log(`[檢查] 準備呼叫 AnythingLLM，關鍵字: ${intent.knowledge_query}`);
         
         const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
           method: "POST",
@@ -205,9 +206,14 @@ export default async function handler(req, res) {
         if (ragRes.ok) {
           let ragData = await ragRes.json();
           ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-          console.log("📚【地端 AnythingLLM 知識庫檢索】:", ragContext);
+          console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
+        } else {
+          // 🌟 捕捉 AnythingLLM 塞車或當機的狀態
+          console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
         }
-      } catch (e) { console.error("💥 地端 RAG 呼叫失敗:", e); }
+      } catch (e) { 
+        console.error("💥 地端 RAG 呼叫完全失敗 (可能 Timeout 或沒開):", e); 
+      }
     }
 
     // ==========================================
