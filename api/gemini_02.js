@@ -194,27 +194,83 @@ export default async function handler(req, res) {
     // 2-1. 呼叫地端 AnythingLLM (圖書館管理員) 獲取 RAG 知識
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
-      try {
-        // 🌟 修正 3：讓 RAG 查詢字串更通用，涵蓋教學與說明書，不要只找「標準範圍」
-        const ragPrompt = `請從知識庫中找出與「${intent.knowledge_query}」最相關的資訊。如果是健康指標，請說明定義與標準範圍；如果是 APP、裝置操作或報告判讀，請直接提供知識庫中的教學說明、對應連結與回覆規則。`;
+      
+      // 🌟 [升級 A]：醫療名詞 Alias 正規化 (程式碼字典層級，比 Prompt 更暴力有效)
+      let finalQuery = intent.knowledge_query;
+      
+      const aliasDictionary = {
+        // --- 獨有商業模型 (多檔案) ---
+        // 塞入涵蓋該主題的廣泛核心關鍵字，讓向量庫自己去找最適合的段落
+        "恢復指數": "恢復指數 Recovery Index 關鍵指標 原理 摘要",
+        "恢復": "恢復指數 Recovery Index",
+        "發炎風險": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "發炎預警": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "發炎": "動態發炎預警 發炎風險 靜息心率 RHR",
         
-        console.log(`[檢查] 準備呼叫 AnythingLLM，關鍵字: ${intent.knowledge_query}`);
-        
-        const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: ragPrompt, mode: "query" })
-        });
-        
-        if (ragRes.ok) {
-          let ragData = await ragRes.json();
-          ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-          console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
-        } else {
-          console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
+        // --- 原始設定 (單一精準指標) ---
+        "低氧負擔": "低氧負擔指數 HBI",
+        "HBI": "低氧負擔指數 HBI",
+        "RHR": "靜息心率 RHR",
+        "靜息心率": "靜息心率 RHR",
+        "ODI": "ODI 3% ODI 4%",
+        "睡眠最低脈搏": "睡眠脈搏 PR T50 T120",
+        "T50": "睡眠脈搏 PR T50 T120",
+        "T120": "睡眠脈搏 PR T50 T120",
+        "CBP": "CBP 心血管壓力",
+        "心血管壓力": "CBP 心血管壓力",
+        "Soosyn": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
+        "APP": "APP 安裝教學",
+        "ST-50": "硬體裝置說明書",
+        "手環": "硬體裝置說明書"
+      };
+
+      // 💡 優化：把字典的 key 依照「字串長度」由長到短排序
+      // 確保「睡眠最低脈搏」會比「脈搏」優先被比對到
+      const sortedKeys = Object.keys(aliasDictionary).sort((a, b) => b.length - a.length);
+
+      for (const key of sortedKeys) {
+        if (finalQuery.includes(key)) {
+          finalQuery = aliasDictionary[key];
+          break;
         }
-      } catch (e) { 
-        console.error("💥 地端 RAG 呼叫完全失敗 (可能 Timeout 或沒開):", e); 
+      }
+
+      console.log(`[檢查] 準備呼叫 AnythingLLM，正規化後關鍵字: ${finalQuery}`);
+      const ragPrompt = `請從知識庫中找出與「${finalQuery}」最相關的資訊。如果是健康指標，請說明定義與標準範圍；如果是 APP、裝置操作或報告判讀，請直接提供知識庫中的教學說明、對應連結與回覆規則。`;
+
+      // 🌟 [升級 B]：加入 Retry 機制 (最多重試 2 次，解決擁塞時有時無的問題)
+      const MAX_RETRIES = 2;
+      let attempt = 0;
+      let success = false;
+
+      while (attempt <= MAX_RETRIES && !success) {
+        try {
+          if (attempt > 0) console.log(`🔄 [Retry] AnythingLLM 第 ${attempt} 次重試...`);
+          
+          const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ message: ragPrompt, mode: "query" })
+          });
+          
+          if (ragRes.ok) {
+            let ragData = await ragRes.json();
+            ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
+            success = true; // 成功就跳出迴圈
+          } else {
+            console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
+            if (attempt === MAX_RETRIES) throw new Error("超過最大重試次數");
+          }
+        } catch (e) { 
+          if (attempt === MAX_RETRIES) {
+            console.error("💥 地端 RAG 呼叫完全失敗 (已達重試上限):", e); 
+          } else {
+            // 停頓 1.5 秒後再重試，給本地端伺服器一點喘息空間
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          }
+        }
+        attempt++;
       }
     }
 
