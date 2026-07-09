@@ -1,4 +1,4 @@
-// api/gemini.js 25
+// api/gemini.js 24
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -140,14 +140,8 @@ export default async function handler(req, res) {
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
 2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(全面涵蓋)：只要問題涉及「健康指標的定義與正常範圍」(如：低氧負擔、HBI、N3、血氧)，或是「硬體裝置操作與APP教學」(如：APP下載、ST-50配戴、藍牙連線、說明書)，或是「報告判讀教學」(如：睡眠報告怎麼看)，請務必將 need_knowledge 設為 true。
-   🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！嚴禁當作一般常識或機構簡稱。
-   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。
-   - 若問健康指標（如「低氧負擔是什麼」），轉為「低氧負擔指數 HBI」。
-   - 若問操作與教學（如「手環怎麼連線」），轉為「ST-50 藍牙連線 說明書」。
-   - 若問報告（如「睡眠報告有問題」），轉為「睡眠報告判讀 AHI」。
-   絕對不可把「是什麼」、「怎麼用」、「意思」等疑問詞放進 query，確保向量資料庫能 100% 命中。
-4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養、醫療疑問」（例如：怎麼吃比較好、感冒怎麼辦等），請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
+3. 【知識庫查詢】(優化)：若使用者詢問健康指標（如：N3深睡期、血氧、AHI）的定義與「標準參考範圍」，或是詢問「如何使用 Soosyn APP、ST-50 裝置操作、說明書、教學網址」，請將 need_knowledge 設為 true，並在 knowledge_query 中提取「最核心的專有名詞」（例如：「N3 淺睡期 標準參考範圍」、「Soosyn APP ST-50 教學 說明書」），這將用於向量資料庫精準檢索。
+4. 【外部即時資訊】：若問天氣、氣溫、中暑風險等，將 need_external 設為 true，並產生 external_query。
 
 【日期對照表】
 1. 今天：${local_date}
@@ -162,23 +156,20 @@ export default async function handler(req, res) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
         contents: [{ parts: [{ text: routerPrompt }] }],
-        generationConfig: { 
-          responseMimeType: "application/json",
-          temperature: 0 // 🛑 絕對防錯：強制溫度為 0，確保意圖解析與關鍵字提取 100% 穩定
-        }
+        generationConfig: { responseMimeType: "application/json" }
       })
     });
 
     let intentData = await intentRes.json();
     let intent = { need_data: false, need_external: false, need_knowledge: false };
     try {
-      let intentText = intentData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      intentText = intentText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const intentText = intentData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       intent = JSON.parse(intentText);
-      console.log("👉【Gemini Router 意圖解析結果】:", JSON.stringify(intent));
     } catch (e) { 
-      console.error("❌ 意圖解析失敗，回退至預設值", e); 
+      console.log("意圖解析失敗", e); 
     }
+
+    console.log("👉【Gemini Router 意圖解析結果】:", JSON.stringify(intent));
 
     if (intent.need_trend_chart) {
       const trendNames = { "all": "📊 完整圖表", "battery": "📈 恢復指數", "rhr": "❤️‍ 靜息心率", "n3": "🌙 深睡期 (N3)", "rmssd": "🌿 rMSSD", "hrmin": "💓 睡眠最低脈搏", "hbi": "🫁 HBI 低氧負擔指數" };
@@ -196,92 +187,27 @@ export default async function handler(req, res) {
     // 2-1. 呼叫地端 AnythingLLM (圖書館管理員) 獲取 RAG 知識
     let ragContext = "無特別的衛教與標準知識。";
     if (intent.need_knowledge && intent.knowledge_query) {
-      
-      // 🌟 [升級 A]：醫療名詞 Alias 正規化 (程式碼字典層級，比 Prompt 更暴力有效)
-      let finalQuery = intent.knowledge_query;
-      
-      const aliasDictionary = {
-        // --- 獨有商業模型 (多檔案) ---
-        // 塞入涵蓋該主題的廣泛核心關鍵字，讓向量庫自己去找最適合的段落
-        "恢復指數": "恢復指數 Recovery Index 關鍵指標 原理 摘要",
-        "恢復": "恢復指數 Recovery Index",
-        "發炎風險": "動態發炎預警 發炎風險 靜息心率 RHR",
-        "發炎預警": "動態發炎預警 發炎風險 靜息心率 RHR",
-        "發炎": "動態發炎預警 發炎風險 靜息心率 RHR",
+      try {
+        // 🌟 調整 2：大幅簡化 Prompt，把關鍵字放最前面提升檢索命中率，並命令模型當個無情的搬運工
+        const ragPrompt = `查詢目標：「${intent.knowledge_query}」與「${prompt}」
+
+請在知識庫中檢索上述目標，並嚴格遵守以下輸出規則：
+1. 你的唯一任務是「精準搬運」：只要找到相關的 Markdown 表格數據（如睡眠標準範圍）或超連結網址（如說明書連結 [連結名稱](網址)），請「原封不動、完整照抄」提取出來。
+2. 絕對不要自己進行摘要、縮減、改寫或解釋。
+3. 不要加入任何問候語或自我介紹。`;
         
-        // --- 睡眠低血氧時間比例 ---
-        "T90": "T90 睡眠期間 血氧濃度小於 90% 的時間百分比 SpO2",
-        "T89": "T89 睡眠期間 血氧濃度小於 89% 的時間百分比 SpO2",
-        "T88": "T88 睡眠期間 血氧濃度小於 88% 的時間百分比 SpO2",
+        const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ message: ragPrompt, mode: "query" })
+        });
         
-        // --- 原始設定 (單一精準指標) ---
-        "低氧負擔": "低氧負擔指數 HBI",
-        "HBI": "低氧負擔指數 HBI",
-        "RHR": "靜息心率 RHR",
-        "靜息心率": "靜息心率 RHR",
-        "ODI": "ODI 3% ODI 4%",
-        "睡眠最低脈搏": "睡眠脈搏 PR T50 T120",
-        "T50": "T50 睡眠期間，脈搏頻率小於50 bpm的時間百分比",
-        "T120": "T120 睡眠期間，脈搏頻率大於120 bpm的時間百分比",
-        "T10": "T10 睡眠期間，呼吸頻率小於10 rpm的時間百分比",
-        "T20": "T20 睡眠期間，呼吸頻率大於20 rpm的時間百分比",
-        "pNN50": "pNN50 相鄰正常心跳間距超過50毫秒的個數，佔所有正常心跳間距個數的比例",
-        "CBP": "CBP 綜合心血管壓力 壓力峰值",
-        "心血管壓力": "CBP 綜合心血管壓力 壓力峰值",
-        "Soosyn": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
-        "APP": "APP 安裝教學",
-        "ST-50": "硬體裝置說明書",
-        "手環": "硬體裝置說明書"
-      };
-
-      // 💡 優化：把字典的 key 依照「字串長度」由長到短排序
-      // 確保「睡眠最低脈搏」會比「脈搏」優先被比對到
-      const sortedKeys = Object.keys(aliasDictionary).sort((a, b) => b.length - a.length);
-
-      for (const key of sortedKeys) {
-        if (finalQuery.includes(key)) {
-          finalQuery = aliasDictionary[key];
-          break;
+        if (ragRes.ok) {
+          let ragData = await ragRes.json();
+          ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+          console.log("📚【地端 AnythingLLM 知識庫檢索】:", ragContext);
         }
-      }
-
-      console.log(`[檢查] 準備呼叫 AnythingLLM，正規化後關鍵字: ${finalQuery}`);
-      const ragPrompt = `請從知識庫中找出與「${finalQuery}」最相關的資訊。如果是健康指標，請說明定義與標準範圍；如果是 APP、裝置操作或報告判讀，請直接提供知識庫中的教學說明、對應連結與回覆規則。`;
-
-      // 🌟 [升級 B]：加入 Retry 機制 (最多重試 2 次，解決擁塞時有時無的問題)
-      const MAX_RETRIES = 2;
-      let attempt = 0;
-      let success = false;
-
-      while (attempt <= MAX_RETRIES && !success) {
-        try {
-          if (attempt > 0) console.log(`🔄 [Retry] AnythingLLM 第 ${attempt} 次重試...`);
-          
-          const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ message: ragPrompt, mode: "query" })
-          });
-          
-          if (ragRes.ok) {
-            let ragData = await ragRes.json();
-            ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
-            success = true; // 成功就跳出迴圈
-          } else {
-            console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
-            if (attempt === MAX_RETRIES) throw new Error("超過最大重試次數");
-          }
-        } catch (e) { 
-          if (attempt === MAX_RETRIES) {
-            console.error("💥 地端 RAG 呼叫完全失敗 (已達重試上限):", e); 
-          } else {
-            // 停頓 1.5 秒後再重試，給本地端伺服器一點喘息空間
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
-        }
-        attempt++;
-      }
+      } catch (e) { console.error("💥 地端 RAG 呼叫失敗:", e); }
     }
 
     // ==========================================
@@ -315,7 +241,7 @@ export default async function handler(req, res) {
     let externalContext = "目前無外部即時資訊。";
     if (intent.need_external && intent.external_query) {
       try {
-        const extPrompt = `今天是 ${local_date} (${dayOfWeek})。請針對查詢主題：「${intent.external_query}」，利用聯網搜尋提供精簡關鍵的即時資訊或一般知識補充。字數150字內，不包含 JSON。`;
+        const extPrompt = `今天是 ${local_date} (${dayOfWeek})。請針對查詢主題：「${intent.external_query}」，提供精簡關鍵的即時環境或天氣分析。字數150字內，不包含 JSON。`;
         const extRes = await fetch(geminiUrl, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: extPrompt }] }], tools: [{ googleSearch: {} }] })
@@ -538,11 +464,10 @@ export default async function handler(req, res) {
 2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
-4. 【地端為主，智能補充為輔】：
-   - 內容忠誠：嚴格以地端知識庫 (ragContext) 為最高優先級！當涉及「Soosyn裝置操作」、「tBPC專屬名詞」或遇到同名英文縮寫（例如：CBP、HRV），絕對只能使用知識庫中的醫療健康定義（如：CBP 代表綜合心血管壓力），嚴禁回答「美國海關」等與健康無關的外部資訊。不可推翻地端知識庫。
-   - 智能補充 (Fallback)：如果使用者問的是一般性問題，且【📚 地端知識庫】沒有相關資料（例如顯示無特別知識，或找不到對應內容），請放心「啟動你自身的醫學常識」或結合【☁️ 外部即時環境資訊】來回答，並給予實用的建議。
+4. 【絕對忠於知識庫與超連結限制】：
+   - 內容忠誠：當涉及裝置操作(APP、ST-50、手環、Soosyn)、指標定義或標準範圍(如 N3、血氧)時，請「完全依照」上述【📚 專業醫療標準與地端知識庫】的內容回答。你的自有知識與外部資訊僅用於「補充」地端知識庫未涵蓋的生活建議，絕不可推翻知識庫原有內容。
    - 【標籤輸出鐵律】：${allowedTagsInstruction}
-   - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤。
+   - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤（例如 %%手環說明書%%、%%發炎%% 等都是嚴格禁止的），你只能用系統明確給你的標籤。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
 7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
