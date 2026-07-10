@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n085</title>
+    <title>Soosyn 健康夥伴 n088</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -71,6 +71,9 @@
     cursor: pointer; 
 }
 
+/* 新增這一行，單獨把健康摘要的滑鼠游標改回一般箭頭 */
+.summary-card { cursor: default; }
+
         .summary-header { font-size: 1.1rem; color: #888; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .battery-container { margin: 15px 0; }
         .battery-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -104,20 +107,56 @@
     text-align: center;
     letter-spacing: 0.5px;
 }
-        .input-box { width: 100%; max-width: 800px; background: white; border-radius: 25px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid #ddd; }
-        #user-input { 
+.input-box { 
+    width: 100%; 
+    max-width: 800px; 
+    background: white; 
+    border-radius: 25px; 
+    /* 調整上下 padding，讓單行時視覺置中 */
+    padding: 8px 15px; 
+    display: flex; 
+    align-items: flex-end; /* 底部對齊，確保多行時按鈕在最下面 */
+    border: 1px solid #ddd; 
+    box-sizing: border-box;
+}
+
+#user-input { 
     flex: 1; 
     border: none; 
     outline: none; 
-    padding: 10px; 
+    padding: 8px 0; /* 給定明確的上下內距 */
     font-size: 16px; 
     background: transparent; 
-    /* 以下為新增：確保 Android 裝置能正常觸控與輸入文字 */
     -webkit-user-select: auto !important;
     user-select: auto !important;
     touch-action: manipulation;
+    resize: none; 
+    overflow-y: hidden; 
+    line-height: 20px; /* 給定絕對數值的行高 */
+    height: 36px; /* 初始高度 = 行高20 + 上下padding各8 = 36 */
+    min-height: 36px; /* 絕對不准縮小低於這高度，防止字被切掉 */
+    max-height: 120px; 
+    font-family: inherit;
+    -webkit-appearance: none; 
+    box-sizing: border-box;
 }
-        .send-btn { background: var(--tbp-blue); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+.send-btn { 
+    background: var(--tbp-blue); 
+    color: white; 
+    border: none; 
+    width: 35px; 
+    height: 35px; 
+    border-radius: 50%; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    flex-shrink: 0; 
+    /* 移除 margin-bottom，配合 input-box 的 padding 自動置中 */
+    margin-bottom: 0px; 
+    margin-left: 10px; /* 和輸入文字保持一點距離 */
+}
         .typing-dots { display: flex; gap: 4px; padding: 5px 10px; }
         .dot { width: 6px; height: 6px; background: #ccc; border-radius: 50%; animation: blink 1.4s infinite both; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -489,7 +528,7 @@
         <main id="main-area"><div id="chat-history"></div></main>
         <div class="footer-input">
             <div class="input-box">
-                <input type="text" id="user-input" placeholder="說點什麼..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <textarea id="user-input" placeholder="說點什麼..." rows="1"></textarea>
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         <!-- 這裡加上警語 -->
@@ -512,22 +551,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 👇 這裡就是你要插入的新程式碼：修正 Android LINE 鍵盤彈出失去焦點的 Bug
+// 修復鍵盤與輸入框自動調整高度邏輯 (替換掉原本第二個 DOMContentLoaded)
 document.addEventListener('DOMContentLoaded', () => {
     const userInput = document.getElementById('user-input');
     
     if (userInput) {
-        // 當 Android 鍵盤彈起改變視窗大小時，確保輸入框不會被遮擋
+        // 1. Android 鍵盤彈起確保不遮擋
         window.addEventListener('resize', () => {
-            // 如果目前焦點已經在輸入框上
             if (document.activeElement === userInput) {
                 setTimeout(() => {
-                    // 只需要確保滾動到可視範圍即可
                     userInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                    // ⚠️ 已經移除 userInput.focus(); 避免打斷中文輸入法的組字緩衝區
                 }, 150);
             }
         });
+
+        // 2. 自動調整高度函數
+        const autoResize = () => {
+            userInput.style.height = '36px'; // 👈 用 36px 取代原本的 'auto'，這是關鍵！
+            if (userInput.scrollHeight > 120) { 
+                userInput.style.height = '120px'; // 最高限制 120px
+                userInput.style.overflowY = 'auto';
+            } else {
+                userInput.style.height = userInput.scrollHeight + 'px';
+                userInput.style.overflowY = 'hidden';
+            }
+        };
+
+        // 監聽輸入事件來調整高度
+        userInput.addEventListener('input', autoResize);
+
+        // 3. 處理 Enter 鍵發送與手機換行
+        userInput.addEventListener('keydown', (e) => {
+            // 避免中文輸入法組字時誤觸
+            if (e.isComposing || e.keyCode === 229) return;
+            
+            // 判斷是否為手機/平板等觸控裝置
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0;
+
+            // 當按下 Enter 且沒有按住 Shift 時
+            if (e.key === 'Enter' && !e.shiftKey) {
+                if (isMobile) {
+                    // 手機版：什麼都不做，讓系統原生行為去換行
+                    return;
+                } else {
+                    // 電腦版：阻止換行，並發送訊息
+                    e.preventDefault();
+                    sendMessage();
+                }
+            }
+        });
+
+        // 初始調整一次高度，稍微延遲確保畫面已經渲染完成，避免高度計算錯誤
+        setTimeout(autoResize, 50);
     }
 });
 
@@ -592,7 +667,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 一步一步邁向更健康的生活！現在想從哪個部分開始了解呢？",
         "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["什麼是睡眠平衡", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？"];
+    const ENCYCLOPEDIA_KEYWORDS = [];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -924,7 +999,8 @@ return getLocalDateString(); // <-- 修改這裡，不要用 ISOString
 async function sendMessage() {
     const input = document.getElementById('user-input'), msg = input.value.trim();
     if (!msg) return; 
-    input.value = ''; 
+    input.value = '';
+    input.style.height = '36px'; // 👈 把原本的 'auto' 換成 '36px' 
     appendUserMessage(msg);
 
     // 每次發送新訊息時，先嘗試移除舊的按鈕列
@@ -1359,11 +1435,14 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
-        { name: "❤️‍ 靜息心率", type: "rhr" },
+        { name: "🌙 總睡眠時間", type: "tst" },
         { name: "🌙 深睡期 (N3)", type: "n3" },
+        { name: "🌙 作息規律性", type: "onsetdev" },
+        { name: "🌙 睡眠清醒時間", type: "wake" },
         { name: "🌿 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
-        { name: "🫁 HBI 低氧負擔指數", type: "hbi" }
+        { name: "🫁 HBI 低氧負擔指數", type: "hbi" },
+        { name: "❤️‍ 靜息心率", type: "rhr" }
     ];
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
     options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
@@ -1485,7 +1564,7 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'onsetdev', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
@@ -1502,11 +1581,14 @@ if (healthData.length === 0) {
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
+        tst: { title: "總睡眠時間", unit: "單位：小時/分鐘", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        onsetdev: { title: "作息規律性", unit: "單位：分鐘", field: "HBI", color: "#596b75", abnormalLabel: "早於/晚於個人平均" },
+        wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
-        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
+        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" },
+        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
     }[type];
 
     
@@ -1559,6 +1641,10 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
         } else {
             movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
+        } else {
+            movingAvgs.push(type === 'tst' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
+        } else {
+            movingAvgs.push(type === 'wake' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         
         }
     });
@@ -1571,6 +1657,8 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         if (type === 'rmssd' && v < lowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > upperBounds[i]) return '#ff8c73';
         if (type === 'hbi' && v > ma) return '#ff8c73';
+        if (type === 'tst' && (v < ma || v < 7)) return '#ff8c73';
+        if (type === 'wake' && v > ma) return '#ff8c73';
         return config.color;
     });
 
@@ -1597,6 +1685,20 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             const { ctx, chartArea: { left, top, width, height }, scales: { y } } = chart;
             const yStart = y.getPixelForValue(20);
             const yEnd = y.getPixelForValue(10);
+            ctx.save();
+            ctx.fillStyle = '#f0f8f9'; // 指定的標準參考範圍底色
+            ctx.fillRect(left, yStart, width, yEnd - yStart);
+            ctx.restore();
+        }
+    };
+
+    const tstBackgroundPlugin = {
+        id: 'tstBackground',
+        beforeDraw: (chart) => {
+            if (type !== 'tst') return;
+            const { ctx, chartArea: { left, top, width, height }, scales: { y } } = chart;
+            const yStart = y.getPixelForValue(0);
+            const yEnd = y.getPixelForValue(7);
             ctx.save();
             ctx.fillStyle = '#f0f8f9'; // 指定的標準參考範圍底色
             ctx.fillRect(left, yStart, width, yEnd - yStart);
@@ -1634,9 +1736,6 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             zIndex: 5
         });
     }
-
-
-
 
     if (type === 'rmssd' || type === 'hrmin' || type === 'rhr') {
         datasets.push({
@@ -1691,9 +1790,11 @@ function renderLegend(type, abnormalLabel) {
         html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
 
-
     if (type === 'n3') {
         html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (10-20)</div>`;
+    }
+    if (type === 'tst') {
+        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (7)</div>`;
     }
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
@@ -1987,7 +2088,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
     
  document.getElementById('chat-history').innerHTML += `
         <div class="msg-row ai-row">
-            <div class="summary-card" onclick="zoomChart(this)">
+            <div class="summary-card">
                 <div class="summary-header">
                     <span>📅 ${dateTitle} 健康摘要</span>
                    <span style="color:${lightMap[data.light] || '#ccc'}; display: flex; align-items: center;">
@@ -2031,7 +2132,7 @@ const dailyTag = data.raw_json && data.raw_json.Daily_Tag;
 <!-- 新增：睡眠報告 PDF 下載按鈕 -->
 <div style="margin: 20px 0 5px 0;">
     <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">
-        📄 開啟 ${dateTitle.replace(/-/g, '/')} 睡眠報告
+        📄 開啟睡眠報告
     </button>
 </div>
 
@@ -2417,7 +2518,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/qwen_function', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -2556,7 +2657,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/qwen_function', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
