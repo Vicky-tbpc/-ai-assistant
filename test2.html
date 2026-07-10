@@ -1723,6 +1723,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     // --- 【修正點 2：這裡的範圍區間必須用 dailyValues 去 map，長度才跟 lowerBounds 對得起來】 ---
     if (type === 'rmssd' || type === 'hrmin' || type === 'rhr') {
         datasets.push({
+            label: '7日平均範圍',
             type: 'bar',
             data: dailyValues.map((_, i) => [lowerBounds[i], upperBounds[i]]),
             backgroundColor: '#c1cdd3',
@@ -1730,6 +1731,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         });
     } else {
         datasets.push({
+            label: '7日平均',
             type: 'bar',
             data: movingAvgs,
             backgroundColor: '#c1cdd3',
@@ -1750,13 +1752,25 @@ new Chart(ctx, {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
+                            let label = context.dataset.label || ''; // 取得剛才設定的 label
+                            
+                            // 👇 額外優化：如果是範圍長條圖，讓提示框顯示「低標 ~ 高標」
+                            if (context.dataset.type === 'bar' && Array.isArray(context.raw)) {
+                                let low = context.raw[0];
+                                let high = context.raw[1];
+                                // 避免小數點後面過長（例如 HBI 或是平均值算出來有小數）
+                                low = Number.isInteger(low) ? low : low.toFixed(1);
+                                high = Number.isInteger(high) ? high : high the.toFixed(1);
+                                return `${label}: ${low} ~ ${high}`;
+                            }
+
                             let val = context.parsed.y;
                             if (type === 'tst') {
                                 let h = Math.floor(val / 60);
                                 let m = Math.round(val % 60);
-                                return `${context.dataset.label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
+                                return `${label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
                             }
-                            return `${context.dataset.label}: ${val}`;
+                            return `${label}: ${val}`;
                         }
                     }
                 }
