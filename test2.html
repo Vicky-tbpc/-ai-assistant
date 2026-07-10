@@ -1737,20 +1737,49 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         });
     }
 
-    new Chart(ctx, {
-        plugins: [n3BackgroundPlugin],
+new Chart(ctx, {
+        plugins: [n3BackgroundPlugin, tstBackgroundPlugin], // 👈 修正點 1：要把 tst 插件加進來陣列裡
         data: { labels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             layout: { padding: { right: 10 } }, 
-            plugins: { legend: { display: false } },
+            plugins: { 
+                legend: { display: false },
+                // 👇 優化：讓滑鼠 hover 時的提示框也能顯示小時/分鐘
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let val = context.parsed.y;
+                            if (type === 'tst') {
+                                let h = Math.floor(val / 60);
+                                let m = val % 60;
+                                return `${context.dataset.label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
+                            }
+                            return `${context.dataset.label}: ${val}`;
+                        }
+                    }
+                }
+            },
             scales: {
                 y: { 
-                    afterFit: (scale) => { scale.width = 45; }, 
-                    beginAtZero: true, // 👈 改成 true，這樣所有圖表（包含 hrmin）都會從 0 開始了
+                    // 👇 修正點 2：因為「X小時Y分鐘」字比較長，所以遇到 tst 時把 Y 軸寬度給到 65，避免字被卡掉
+                    afterFit: (scale) => { scale.width = type === 'tst' ? 65 : 45; }, 
+                    beginAtZero: true,
                     grid: { color: '#f2f2f2' },
-                    ticks: { font: { size: 11 }, color: '#888' }
+                    ticks: { 
+                        font: { size: 11 }, 
+                        color: '#888',
+                        // 👇 修正點 3：在這裡把數值攔截，換算成小時與分鐘
+                        callback: function(value) {
+                            if (type === 'tst') {
+                                const h = Math.floor(value / 60);
+                                const m = value % 60;
+                                return h > 0 ? `${h}小時${m}分鐘` : `${m}分鐘`;
+                            }
+                            return value;
+                        }
+                    }
                 },
                 x: { 
                     grid: { display: false },
@@ -1760,6 +1789,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     });
 }
+
 function renderLegend(type, abnormalLabel) {
     const isRange = (type === 'rmssd' || type === 'hrmin' || type === 'rhr');
     let html = `
