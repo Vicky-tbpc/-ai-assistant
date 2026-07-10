@@ -1502,8 +1502,8 @@ try {
 
     // 3. 前端只負責「排序」與「取出最近幾天 (days)」
     healthData = filteredJsonData
-        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
-        .slice(0, days) // 取得最近的筆數 (例如 7 天或 30 天)
+    .sort((a, b) => new Date(a.record_date) - new Date(b.record_date)) // 👈 直接改成「正序」（舊到新）
+    .slice(-days); // 👈 點選 7 日就切出最後 7 筆（也就是最近 7 天）
         .map(item => ({
             record_date: item.record_date,
             raw_json: item.raw_json
