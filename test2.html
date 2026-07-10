@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n088</title>
+    <title>Soosyn 健康夥伴 n089</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1748,17 +1748,31 @@ new Chart(ctx, {
             layout: { padding: { right: 10 } }, 
             plugins: { 
                 legend: { display: false },
-                // Tooltip 保持原本的設計，滑鼠游標停在圖表上時，依舊可以看到精準的「X小時Y分鐘」
+                // 👇 替換這個 tooltip 區塊
                 tooltip: {
+                    mode: 'index',      // 讓同一天的資料合併在一個提示框顯示
+                    intersect: false,   // 滑鼠不用精準對準圓點也能觸發
                     callbacks: {
                         label: function(context) {
+                            let label = context.dataset.label || '';
+                            
+                            // 👇 關鍵修改：如果是範圍長條圖 (資料是 [下限, 上限] 的陣列)
+                            if (context.dataset.type === 'bar' && Array.isArray(context.raw)) {
+                                let low = Math.round(context.raw[0]);
+                                let high = Math.round(context.raw[1]);
+                                return `${label}: ${low} ~ ${high}`;
+                            }
+
+                            // 👇 處理一般的單一數值 (當日數值、一般平均)
                             let val = context.parsed.y;
+                            
                             if (type === 'tst') {
                                 let h = Math.floor(val / 60);
                                 let m = Math.round(val % 60);
-                                return `${context.dataset.label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
+                                return `${label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
                             }
-                            return `${context.dataset.label}: ${val}`;
+                            
+                            return `${label}: ${val}`;
                         }
                     }
                 }
