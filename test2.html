@@ -1727,7 +1727,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
             scales: {
                 y: { 
                     afterFit: (scale) => { scale.width = 45; }, 
-                    beginAtZero: type !== 'hrmin',
+                    beginAtZero: true, // 👈 改成 true，這樣所有圖表（包含 hrmin）都會從 0 開始了
                     grid: { color: '#f2f2f2' },
                     ticks: { font: { size: 11 }, color: '#888' }
                 },
