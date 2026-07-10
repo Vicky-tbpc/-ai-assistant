@@ -1635,7 +1635,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
         } else if (type === 'rhr') {
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
-        } else {
+        } else if {
             movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         } else {
             movingAvgs.push(type === 'wake' ? parseFloat(avg.toFixed(1)) : Math.round(avg)); 
