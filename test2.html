@@ -1752,25 +1752,13 @@ new Chart(ctx, {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            let label = context.dataset.label || ''; // 取得剛才設定的 label
-                            
-                            // 👇 額外優化：如果是範圍長條圖，讓提示框顯示「低標 ~ 高標」
-                            if (context.dataset.type === 'bar' && Array.isArray(context.raw)) {
-                                let low = context.raw[0];
-                                let high = context.raw[1];
-                                // 避免小數點後面過長（例如 HBI 或是平均值算出來有小數）
-                                low = Number.isInteger(low) ? low : low.toFixed(1);
-                                high = Number.isInteger(high) ? high : high the.toFixed(1);
-                                return `${label}: ${low} ~ ${high}`;
-                            }
-
                             let val = context.parsed.y;
                             if (type === 'tst') {
                                 let h = Math.floor(val / 60);
                                 let m = Math.round(val % 60);
-                                return `${label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
+                                return `${context.dataset.label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
                             }
-                            return `${label}: ${val}`;
+                            return `${context.dataset.label}: ${val}`;
                         }
                     }
                 }
