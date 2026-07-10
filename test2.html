@@ -1573,7 +1573,7 @@ if (healthData.length === 0) {
 function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-        tst: { title: "總睡眠時間", unit: "單位：分鐘", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        tst: { title: "總睡眠時間", unit: "單位：小時", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },        
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
@@ -1681,8 +1681,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         beforeDraw: (chart) => {
             if (type !== 'tst') return;
             const { ctx, chartArea: { left, top, width, height }, scales: { y } } = chart;
-            const yStart = y.getPixelForValue(420);
-            const yEnd = y.getPixelForValue(0);
+            const yStart = y.getPixelForValue(1440);
+            const yEnd = y.getPixelForValue(420);
             ctx.save();
             ctx.fillStyle = '#f0f8f9'; 
             ctx.fillRect(left, yStart, width, yEnd - yStart);
@@ -1738,7 +1738,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     }
 
 new Chart(ctx, {
-        plugins: [n3BackgroundPlugin, tstBackgroundPlugin], // 👈 修正點 1：要把 tst 插件加進來陣列裡
+        plugins: [n3BackgroundPlugin, tstBackgroundPlugin],
         data: { labels, datasets },
         options: {
             responsive: true,
@@ -1746,14 +1746,14 @@ new Chart(ctx, {
             layout: { padding: { right: 10 } }, 
             plugins: { 
                 legend: { display: false },
-                // 👇 優化：讓滑鼠 hover 時的提示框也能顯示小時/分鐘
+                // Tooltip 保持原本的設計，滑鼠游標停在圖表上時，依舊可以看到精準的「X小時Y分鐘」
                 tooltip: {
                     callbacks: {
                         label: function(context) {
                             let val = context.parsed.y;
                             if (type === 'tst') {
                                 let h = Math.floor(val / 60);
-                                let m = val % 60;
+                                let m = Math.round(val % 60);
                                 return `${context.dataset.label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
                             }
                             return `${context.dataset.label}: ${val}`;
@@ -1763,19 +1763,19 @@ new Chart(ctx, {
             },
             scales: {
                 y: { 
-                    // 👇 修正點 2：因為「X小時Y分鐘」字比較長，所以遇到 tst 時把 Y 軸寬度給到 65，避免字被卡掉
-                    afterFit: (scale) => { scale.width = type === 'tst' ? 65 : 45; }, 
+                    // 👇 修改 2：加寬不需要了，全部統一改回 45
+                    afterFit: (scale) => { scale.width = 45; }, 
                     beginAtZero: true,
                     grid: { color: '#f2f2f2' },
                     ticks: { 
                         font: { size: 11 }, 
                         color: '#888',
-                        // 👇 修正點 3：在這裡把數值攔截，換算成小時與分鐘
+                        // 👇 強制讓總睡眠時間的 Y 軸刻度以 60 分鐘（1小時）為一階
+                        stepSize: type === 'tst' ? 60 : undefined, 
                         callback: function(value) {
+                            // 👇 修改 1：Y 軸刻度只呈現小時
                             if (type === 'tst') {
-                                const h = Math.floor(value / 60);
-                                const m = value % 60;
-                                return h > 0 ? `${h}小時${m}分鐘` : `${m}分鐘`;
+                                return (value / 60) + '小時';
                             }
                             return value;
                         }
@@ -1803,10 +1803,14 @@ function renderLegend(type, abnormalLabel) {
         html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
 
-
     if (type === 'n3') {
         html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (10-20)</div>`;
     }
+
+    if (type === 'tst') {
+        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (7小時)</div>`;
+    }
+
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
 }
