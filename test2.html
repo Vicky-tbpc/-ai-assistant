@@ -1435,12 +1435,11 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
+        { name: "❤️‍ 靜息心率", type: "rhr" },
         { name: "🌙 深睡期 (N3)", type: "n3" },
         { name: "🌿 rMSSD", type: "rmssd" },
-        { name: "⏱️ 睡眠清醒時間", type: "wake" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
-        { name: "🫁 HBI 低氧負擔指數", type: "hbi" },
-        { name: "❤️‍ 靜息心率", type: "rhr" }
+        { name: "🫁 HBI 低氧負擔指數", type: "hbi" }
     ];
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
     options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
@@ -1499,11 +1498,12 @@ try {
     
     // 現在拿到的資料已經是被地端過濾過的「該使用者全量資料」
     const filteredJsonData = await response.json();
+    const totalDaysToFetch = days + 6; 
 
     // 3. 前端只負責「排序」與「取出最近幾天 (days)」
     healthData = filteredJsonData
-    .sort((a, b) => new Date(a.record_date) - new Date(b.record_date)) // 👈 直接改成「正序」（舊到新）
-    .slice(-days); // 👈 點選 7 日就切出最後 7 筆（也就是最近 7 天）
+        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
+        .slice(0, totalDaysToFetch) // 取得最近的筆數 (例如 7+6=13 筆，確保第一天也有足夠的前期資料算平均)
         .map(item => ({
             record_date: item.record_date,
             raw_json: item.raw_json
@@ -1521,9 +1521,10 @@ if (healthData.length === 0) {
     return;
 }
 
+
 // 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
 
-    const sortedData = [...healthData];
+    const sortedData = [...healthData].reverse();
     
     // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
     // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
@@ -1556,33 +1557,30 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi', 'wake'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
         // 將原始數據與 map 傳入，讓繪圖函式自己決定日期顯示
-        drawSingleChart(chartBox, t, sortedData, subjectiveMap);
+        drawSingleChart(chartBox, t, sortedData, subjectiveMap, days);
     }
 }
 
-
-function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
+function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-        
+        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
-        wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },         
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
-        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" },
-        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" }
+        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
     
     // --- 【修改：動態決定日期標籤與體感數據對齊】 ---
-    const labels = rawData.map(d => {
+    const allLabels = rawData.map(d => {
         let displayDate = d.record_date;
         if (type === 'battery' || type === 'rhr') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
@@ -1606,46 +1604,44 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
         }
     });
 
-
-
-
-
 const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
     const movingAvgs = [];
     const lowerBounds = []; 
     const upperBounds = [];
 
-
-
-    // 計算平均值邏輯 (保持不變)
-    dailyValues.forEach((val, i) => {
+    // 計算平均值邏輯不變，但因為前面多抓了 6 天，此時 07/01 (原本的第一筆) 就有足夠的歷史資料算滿 7 天平均了
+    allDailyValues.forEach((val, i) => {
         const start = Math.max(0, i - 6);
-        const chunk = dailyValues.slice(start, i + 1);
+        const chunk = allDailyValues.slice(start, i + 1);
         const avg = chunk.reduce((a, b) => a + b, 0) / chunk.length;
         if (type === 'rmssd') {
-            movingAvgs.push(avg); lowerBounds.push(avg * 0.9); upperBounds.push(avg * 1.1);
-        } else if (type === 'hrmin') {
-            movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
-        } else if (type === 'rhr') {
-            movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
-        } else if (type === 'hbi' || type === 'wake') {  // 修正原本的語法錯誤
-            movingAvgs.push(parseFloat(avg.toFixed(1)));
+            allMovingAvgs.push(avg); allLowerBounds.push(avg * 0.9); allUpperBounds.push(avg * 1.1);
+        } else if (type === 'hrmin' || type === 'rhr') {
+            allMovingAvgs.push(avg); allLowerBounds.push(avg - 5); allUpperBounds.push(avg + 5);
         } else {
-            movingAvgs.push(Math.round(avg));
+            allMovingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         }
     });
 
-    const pointColors = dailyValues.map((v, i) => {
-        const ma = movingAvgs[i];
+    const allPointColors = allDailyValues.map((v, i) => {
+        const ma = allMovingAvgs[i];
         if (type === 'battery' && v < ma) return '#ff8c73';
-        if (type === 'rhr' && v > upperBounds[i]) return '#ff8c73';
+        if (type === 'rhr' && v > allUpperBounds[i]) return '#ff8c73';
         if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
-        if (type === 'rmssd' && v < lowerBounds[i]) return '#ff8c73';
-        if (type === 'hrmin' && v > upperBounds[i]) return '#ff8c73';
+        if (type === 'rmssd' && v < allLowerBounds[i]) return '#ff8c73';
+        if (type === 'hrmin' && v > allUpperBounds[i]) return '#ff8c73';
         if (type === 'hbi' && v > ma) return '#ff8c73';
-        if (type === 'wake' && v > ma) return '#ff8c73';
         return config.color;
     });
+
+    // --- 【修改點 5：關鍵！算完正確的滾動平均後，切出最後要顯示的 days 天數】 ---
+    const labels = allLabels.slice(-days);
+    const dailyValues = allDailyValues.slice(-days);
+    const movingAvgs = allMovingAvgs.slice(-days);
+    const lowerBounds = allLowerBounds.slice(-days);
+    const upperBounds = allUpperBounds.slice(-days);
+    const pointColors = allPointColors.slice(-days);
+    const subjectiveValues = allSubjectiveValues.slice(-days);
 
     // 建立結構：將圖例移至上方
     container.innerHTML = `
@@ -1657,7 +1653,6 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
         </div>
         <div class="chart-wrapper"><canvas></canvas></div>
-     
     `;
 
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -1707,6 +1702,9 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             zIndex: 5
         });
     }
+
+
+
 
     if (type === 'rmssd' || type === 'hrmin' || type === 'rhr') {
         datasets.push({
