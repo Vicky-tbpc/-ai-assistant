@@ -667,7 +667,7 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 一步一步邁向更健康的生活！現在想從哪個部分開始了解呢？",
         "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = [睡眠平衡];
+    const ENCYCLOPEDIA_KEYWORDS = ["什麼是睡眠平衡", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -1435,11 +1435,10 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
-        { name: "🌙 總睡眠時間", type: "tst" },
+        
         { name: "🌙 深睡期 (N3)", type: "n3" },
-        { name: "🌙 作息規律性", type: "onsetdev" },
-        { name: "🌙 睡眠清醒時間", type: "wake" },
         { name: "🌿 rMSSD", type: "rmssd" },
+        { name: "⏱️ 睡眠清醒時間", type: "wake" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
         { name: "🫁 HBI 低氧負擔指數", type: "hbi" },
         { name: "❤️‍ 靜息心率", type: "rhr" }
@@ -1564,7 +1563,7 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'onsetdev', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
@@ -1576,19 +1575,16 @@ if (healthData.length === 0) {
 }
 
 
-
-
 function drawSingleChart(container, type, rawData, subjectiveMap = {}) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-        tst: { title: "總睡眠時間", unit: "單位：小時/分鐘", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
-        onsetdev: { title: "作息規律性", unit: "單位：分鐘", field: "HBI", color: "#596b75", abnormalLabel: "早於/晚於個人平均" },
-        wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },
+        wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },         
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
         hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" },
-        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
+        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" }
     }[type];
 
     
@@ -1642,10 +1638,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         } else {
             movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         } else {
-            movingAvgs.push(type === 'tst' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
-        } else {
-            movingAvgs.push(type === 'wake' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
-        
+            movingAvgs.push(type === 'wake' ? parseFloat(avg.toFixed(1)) : Math.round(avg)); 
         }
     });
 
@@ -1657,7 +1650,6 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         if (type === 'rmssd' && v < lowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > upperBounds[i]) return '#ff8c73';
         if (type === 'hbi' && v > ma) return '#ff8c73';
-        if (type === 'tst' && (v < ma || v < 7)) return '#ff8c73';
         if (type === 'wake' && v > ma) return '#ff8c73';
         return config.color;
     });
@@ -1776,11 +1768,9 @@ function renderLegend(type, abnormalLabel) {
         html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
 
+
     if (type === 'n3') {
         html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (10-20)</div>`;
-    }
-    if (type === 'tst') {
-        html += `<div class="legend-row"><div class="bar-sample" style="background:#f0f8f9; border:1px solid #ddd"></div> 參考標準 (7)</div>`;
     }
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
@@ -2504,7 +2494,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -2643,7 +2633,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
