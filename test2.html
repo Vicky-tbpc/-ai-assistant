@@ -1435,11 +1435,13 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
-        { name: "❤️‍ 靜息心率", type: "rhr" },
+        
         { name: "🌙 深睡期 (N3)", type: "n3" },
+        { name: "⏱️ 睡眠清醒時間", type: "wake" },        
         { name: "🌿 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
-        { name: "🫁 HBI 低氧負擔指數", type: "hbi" }
+        { name: "🫁 HBI 低氧負擔指數", type: "hbi" },
+        { name: "❤️‍ 靜息心率", type: "rhr" }
     ];
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
     options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
@@ -1571,11 +1573,13 @@ if (healthData.length === 0) {
 function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
+        
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },        
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
-        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
+        hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" },
+        rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" }
     }[type];
 
     // 1. 先動態決定「所有緩衝區資料」的日期標籤與體感數據
@@ -1616,7 +1620,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         } else if (type === 'hrmin' || type === 'rhr') {
             allMovingAvgs.push(avg); allLowerBounds.push(avg - 5); allUpperBounds.push(avg + 5);
         } else {
-            allMovingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
+            allMovingAvgs.push((type === 'hbi' || type === 'wake') ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         }
     });
 
@@ -1628,6 +1632,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         if (type === 'rmssd' && v < allLowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > allUpperBounds[i]) return '#ff8c73';
         if (type === 'hbi' && v > ma) return '#ff8c73';
+        if (type === 'rhr' && v > ma) return '#ff8c73';
         return config.color;
     });
 
