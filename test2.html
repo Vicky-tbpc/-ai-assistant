@@ -1578,8 +1578,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         hbi: { title: "HBI 低氧負擔指數", unit: "單位：%min/h", field: "HBI", color: "#596b75", abnormalLabel: "高於個人平均" }
     }[type];
 
-    
-    // --- 【修改：動態決定日期標籤與體感數據對齊】 ---
+    // 1. 先動態決定「所有緩衝區資料」的日期標籤與體感數據
     const allLabels = rawData.map(d => {
         let displayDate = d.record_date;
         if (type === 'battery' || type === 'rhr') {
@@ -1590,26 +1589,24 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         return displayDate.slice(5).replace('-', '/');
     });
 
-    // 準備體感數據：battery 對齊隔天，其餘對齊當天
-    const subjectiveValues = rawData.map(d => {
+    const allSubjectiveValues = rawData.map(d => {
         if (type === 'battery' || type === 'rhr') {
-            // 恢復指數要對齊「隔天」的體感
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             const nextDayStr = dateObj.toLocaleDateString('en-CA');
             return subjectiveMap[nextDayStr] || null;
         } else {
-            // 其他指標如果也要顯示體感（雖然你目前沒畫），則對齊「當天」
             return subjectiveMap[d.record_date] || null;
         }
     });
 
-const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
-    const movingAvgs = [];
-    const lowerBounds = []; 
-    const upperBounds = [];
+    // --- 【修正點 1：全部加上 all 前綴，避免與下方的切片變數衝突】 ---
+    const allDailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
+    const allMovingAvgs = [];
+    const allLowerBounds = []; 
+    const allUpperBounds = [];
 
-    // 計算平均值邏輯不變，但因為前面多抓了 6 天，此時 07/01 (原本的第一筆) 就有足夠的歷史資料算滿 7 天平均了
+    // 計算平均值邏輯（基於包含緩衝的完整陣列）
     allDailyValues.forEach((val, i) => {
         const start = Math.max(0, i - 6);
         const chunk = allDailyValues.slice(start, i + 1);
@@ -1634,7 +1631,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         return config.color;
     });
 
-    // --- 【修改點 5：關鍵！算完正確的滾動平均後，切出最後要顯示的 days 天數】 ---
+    // --- 【核心步驟：算完滾動平均後，切出最後要顯示的 days 天數】 ---
     const labels = allLabels.slice(-days);
     const dailyValues = allDailyValues.slice(-days);
     const movingAvgs = allMovingAvgs.slice(-days);
@@ -1643,7 +1640,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
     const pointColors = allPointColors.slice(-days);
     const subjectiveValues = allSubjectiveValues.slice(-days);
 
-    // 建立結構：將圖例移至上方
+    // 建立結構
     container.innerHTML = `
         <div class="chart-info-header">
             <div class="chart-title-row">
@@ -1657,7 +1654,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
 
     const ctx = container.querySelector('canvas').getContext('2d');
     
-    // N3 背景色區塊插件 (只在 N3 圖表執行)
+    // N3 背景色區塊插件
     const n3BackgroundPlugin = {
         id: 'n3Background',
         beforeDraw: (chart) => {
@@ -1666,7 +1663,7 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             const yStart = y.getPixelForValue(20);
             const yEnd = y.getPixelForValue(10);
             ctx.save();
-            ctx.fillStyle = '#f0f8f9'; // 指定的標準參考範圍底色
+            ctx.fillStyle = '#f0f8f9'; 
             ctx.fillRect(left, yStart, width, yEnd - yStart);
             ctx.restore();
         }
@@ -1681,35 +1678,32 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             borderWidth: 1.5,
             pointBackgroundColor: pointColors,
             pointRadius: 4,
-            pointBorderWidth: 0, // Point 2: 圓點不要有外框
+            pointBorderWidth: 0, 
             zIndex: 10
         }
     ];
 
-
-// 如果是恢復指數，新增一條「個人感受」曲線
+    // 如果是恢復指數，新增一條「個人感受」曲線
     if (type === 'battery') {
         datasets.push({
             label: '體感數值',
             type: 'line',
             data: subjectiveValues,
-            borderColor: '#a79d8c', // 大地色/褐色
+            borderColor: '#a79d8c', 
             borderWidth: 2,
-            borderDash: [5, 3], // 虛線區分
+            borderDash: [5, 3], 
             pointBackgroundColor: '#a79d8c',
             pointRadius: 3,
-            spanGaps: true, // 沒填問卷時連起來
+            spanGaps: true, 
             zIndex: 5
         });
     }
 
-
-
-
+    // --- 【修正點 2：這裡的範圍區間必須用 dailyValues 去 map，長度才跟 lowerBounds 對得起來】 ---
     if (type === 'rmssd' || type === 'hrmin' || type === 'rhr') {
         datasets.push({
             type: 'bar',
-            data: rawData.map((_, i) => [lowerBounds[i], upperBounds[i]]),
+            data: dailyValues.map((_, i) => [lowerBounds[i], upperBounds[i]]),
             backgroundColor: '#c1cdd3',
             barPercentage: 0.5
         });
@@ -1728,11 +1722,11 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { right: 10 } }, // 確保右側不貼邊
+            layout: { padding: { right: 10 } }, 
             plugins: { legend: { display: false } },
             scales: {
                 y: { 
-                    afterFit: (scale) => { scale.width = 45; }, // 固定 Y 軸寬度以便與下方 Tag 對齊
+                    afterFit: (scale) => { scale.width = 45; }, 
                     beginAtZero: type !== 'hrmin',
                     grid: { color: '#f2f2f2' },
                     ticks: { font: { size: 11 }, color: '#888' }
@@ -1745,7 +1739,6 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         }
     });
 }
-
 function renderLegend(type, abnormalLabel) {
     const isRange = (type === 'rmssd' || type === 'hrmin' || type === 'rhr');
     let html = `
