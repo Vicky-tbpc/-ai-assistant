@@ -1559,7 +1559,7 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'n3', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
