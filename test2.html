@@ -1435,7 +1435,6 @@ function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
-        
         { name: "🌙 深睡期 (N3)", type: "n3" },
         { name: "🌿 rMSSD", type: "rmssd" },
         { name: "⏱️ 睡眠清醒時間", type: "wake" },
@@ -1522,12 +1521,6 @@ if (healthData.length === 0) {
     return;
 }
 
-// 3. 檢查是否有資料 (保留你原本的判斷邏輯)
-if (healthData.length === 0) {
-    card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
-    return;
-}
-
 // 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
 
     const sortedData = [...healthData].reverse();
@@ -1563,7 +1556,7 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'rhr', 'n3', 'rmssd', 'hrmin', 'hbi', 'wake'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
@@ -1635,10 +1628,10 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
         } else if (type === 'rhr') {
             movingAvgs.push(avg); lowerBounds.push(avg - 5); upperBounds.push(avg + 5);
-        } else if {
-            movingAvgs.push(type === 'hbi' ? parseFloat(avg.toFixed(1)) : Math.round(avg));
+        } else if (type === 'hbi' || type === 'wake') {  // 修正原本的語法錯誤
+            movingAvgs.push(parseFloat(avg.toFixed(1)));
         } else {
-            movingAvgs.push(type === 'wake' ? parseFloat(avg.toFixed(1)) : Math.round(avg)); 
+            movingAvgs.push(Math.round(avg));
         }
     });
 
