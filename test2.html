@@ -1758,8 +1758,18 @@ new Chart(ctx, {
                             
                             // 👇 關鍵修改：如果是範圍長條圖 (資料是 [下限, 上限] 的陣列)
                             if (context.dataset.type === 'bar' && Array.isArray(context.raw)) {
-                                let low = Math.round(context.raw[0]);
-                                let high = Math.round(context.raw[1]);
+                                let low = context.raw[0];
+                                let high = context.raw[1];
+
+                                // 👇 針對 rMSSD 顯示到小數點第一位，其他維持整數
+                                if (type === 'rmssd') {
+                                    low = low.toFixed(1);
+                                    high = high.toFixed(1);
+                                } else {
+                                    low = Math.round(low);
+                                    high = Math.round(high);
+                                }
+                                
                                 return `${label}: ${low} ~ ${high}`;
                             }
 
