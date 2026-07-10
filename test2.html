@@ -1523,7 +1523,7 @@ if (healthData.length === 0) {
 
 // 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
 
-    const sortedData = [...healthData].reverse();
+    const sortedData = [...healthData];
     
     // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
     // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
