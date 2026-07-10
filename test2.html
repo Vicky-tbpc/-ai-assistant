@@ -1692,20 +1692,6 @@ const dailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
         }
     };
 
-    const tstBackgroundPlugin = {
-        id: 'tstBackground',
-        beforeDraw: (chart) => {
-            if (type !== 'tst') return;
-            const { ctx, chartArea: { left, top, width, height }, scales: { y } } = chart;
-            const yStart = y.getPixelForValue(0);
-            const yEnd = y.getPixelForValue(7);
-            ctx.save();
-            ctx.fillStyle = '#f0f8f9'; // 指定的標準參考範圍底色
-            ctx.fillRect(left, yStart, width, yEnd - yStart);
-            ctx.restore();
-        }
-    };
-
     const datasets = [
         {
             label: '當日數值',             
