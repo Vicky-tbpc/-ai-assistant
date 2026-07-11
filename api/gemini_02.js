@@ -181,7 +181,7 @@ export default async function handler(req, res) {
     }
 
     if (intent.need_trend_chart) {
-      const trendNames = { "all": "📊 完整圖表", "battery": "📈 恢復指數", "tst": "🛌 總睡眠時間", "n3": "🌙 深睡期 (N3)", "onset": "⏰ 作息規律性", "wake": "⏱️ 睡眠清醒時間", "rmssd": "🌿 rMSSD", "hrmin": "💓 睡眠最低脈搏", "hbi": "🫁 HBI 低氧負擔指數", "rhr": "❤️ 靜息心率" };
+      const trendNames = { "all": "📊 完整圖表", "battery": "📈 恢復指數", "tst": "🛌 總睡眠時間", "n3": "💤 深睡期 (N3)", "start": "🌙 入睡規律性", "end": "☀️ 醒來規律性", "wake": "⏱️ 睡眠清醒時間", "rmssd": "🌿 rMSSD", "hrmin": "💓 睡眠最低脈搏", "hbi": "🫁 HBI 低氧負擔指數", "rhr": "❤️ 靜息心率" };
       if (intent.trend_type && trendNames[intent.trend_type]) {
         return res.status(200).json({ action: 'show_specific_trend', trend_type: intent.trend_type, text: `沒問題！為你送上最近的 ${trendNames[intent.trend_type]} 趨勢圖表 👇` });
       } else {
