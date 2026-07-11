@@ -1849,20 +1849,31 @@ new Chart(ctx, {
             },
             scales: {
                 y: { 
-                    // 👇 修改 2：加寬不需要了，全部統一改回 45
-                    afterFit: (scale) => { scale.width = 45; }, 
-                    beginAtZero: true,
+                    // 為了避免「上午 10:00」這種字串被切斷，如果是這兩種圖表，把 Y 軸寬度加寬到 70
+                    afterFit: (scale) => { scale.width = (type === 'start' || type === 'end') ? 70 : 45; }, 
+                    
+                    // 入睡與醒來時間不要從 0 開始，讓 Chart.js 自動抓最適合的起始點
+                    beginAtZero: !(type === 'start' || type === 'end'),
+                    
                     grid: { color: '#f2f2f2' },
                     ticks: { 
                         font: { size: 11 }, 
                         color: '#888',
-                        // 👇 強制讓總睡眠時間的 Y 軸刻度以 60 分鐘（1小時）為一階
-                        stepSize: type === 'tst' ? 60 : undefined, 
+                        
+                        // 將入睡 (start)、醒來 (end)、總睡眠 (tst) 的 Y 軸間距都強制設定為 60 分鐘 (1小時)
+                        stepSize: (type === 'tst' || type === 'start' || type === 'end') ? 60 : undefined, 
+                        
                         callback: function(value) {
-                            // 👇 修改 1：Y 軸刻度只呈現小時
+                            // 針對入睡與醒來時間，呼叫你原本寫好的函數，轉成 "上午/下午 時:分"
+                            if (type === 'start' || type === 'end') {
+                                return formatMinutesToAmPm(value);
+                            }
+                            
+                            // 總睡眠時間維持原本的邏輯
                             if (type === 'tst') {
                                 return (value / 60) + '小時';
                             }
+                            
                             return value;
                         }
                     }
