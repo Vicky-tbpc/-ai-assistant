@@ -1848,28 +1848,39 @@ new Chart(ctx, {
                 }
             },
             scales: {
-                y: { 
-                    // 為了避免「上午 10:00」這種字串被切斷，如果是這兩種圖表，把 Y 軸寬度加寬到 70
-                    afterFit: (scale) => { scale.width = (type === 'start' || type === 'end') ? 70 : 45; }, 
+               y: { 
+                    // 維持原本的寬度 45
+                    afterFit: (scale) => { scale.width = 45; }, 
                     
-                    // 入睡與醒來時間不要從 0 開始，讓 Chart.js 自動抓最適合的起始點
                     beginAtZero: !(type === 'start' || type === 'end'),
                     
+                    // 透過 afterDataLimits 攔截 Chart.js 算好的資料範圍，並向外擴充正負 1 小時 (60 分鐘)
+                    afterDataLimits: (scale) => {
+                        if (type === 'start' || type === 'end') {
+                            scale.min = scale.min - 60;
+                            scale.max = scale.max + 60;
+                        }
+                    },
+
                     grid: { color: '#f2f2f2' },
                     ticks: { 
                         font: { size: 11 }, 
                         color: '#888',
                         
-                        // 將入睡 (start)、醒來 (end)、總睡眠 (tst) 的 Y 軸間距都強制設定為 60 分鐘 (1小時)
                         stepSize: (type === 'tst' || type === 'start' || type === 'end') ? 60 : undefined, 
                         
                         callback: function(value) {
-                            // 針對入睡與醒來時間，呼叫你原本寫好的函數，轉成 "上午/下午 時:分"
                             if (type === 'start' || type === 'end') {
-                                return formatMinutesToAmPm(value);
+                                let timeStr = formatMinutesToAmPm(value);
+                                
+                                // 取出前兩個字 (上午/下午)，以及後面的時間 (10:00)
+                                let ampm = timeStr.substring(0, 2);
+                                let time = timeStr.substring(2).trim();
+                                
+                                // 回傳陣列 [ "上午", "10:00" ]，Chart.js 就會自動折成兩行
+                                return [ampm, time];
                             }
                             
-                            // 總睡眠時間維持原本的邏輯
                             if (type === 'tst') {
                                 return (value / 60) + '小時';
                             }
