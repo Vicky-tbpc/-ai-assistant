@@ -1572,6 +1572,45 @@ if (healthData.length === 0) {
     }
 }
 
+// --- 處理時間字串與分鐘數的轉換 ---
+function parseTimeToMinutes(dateStr, type) {
+    if (!dateStr) return 0;
+    // 預期格式 "YYYY-MM-DD HH:mm:ss"
+    const parts = dateStr.split(' ');
+    if (parts.length !== 2) return 0;
+    
+    const timeParts = parts[1].split(':');
+    let h = parseInt(timeParts[0], 10);
+    let m = parseInt(timeParts[1], 10);
+    let totalMins = h * 60 + m;
+
+    // 針對「入睡時間」，如果是凌晨 (00:00~11:59)，加上 24 小時確保圖表連續性
+    if (type === 'start' && h < 12) {
+        totalMins += 1440; 
+    }
+    return totalMins;
+}
+
+function formatMinutesToAmPm(totalMins) {
+    if (isNaN(totalMins) || totalMins === null) return "";
+    let m = Math.round(totalMins);
+    
+    // 如果大於等於 24 小時，扣除 24 小時來計算顯示時間
+    if (m >= 1440) m -= 1440;
+    if (m < 0) m += 1440;
+
+    let h = Math.floor(m / 60);
+    let mins = m % 60;
+    let period = h >= 12 ? "下午" : "上午";
+
+    // 轉為 12 小時制
+    let displayH = h % 12;
+    if (displayH === 0) displayH = 12;
+
+    let displayM = mins.toString().padStart(2, '0');
+    return `${period} ${displayH}:${displayM}`;
+}
+
 function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
@@ -1609,7 +1648,13 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     });
 
     // --- 【修正點 1：全部加上 all 前綴，避免與下方的切片變數衝突】 ---
-    const allDailyValues = rawData.map(d => Number(d.raw_json[config.field]) || 0);
+    const allDailyValues = rawData.map(d => {
+        const rawVal = d.raw_json[config.field];
+        if (type === 'start' || type === 'end') {
+            return parseTimeToMinutes(rawVal, type);
+        }
+        return Number(rawVal) || 0;
+    });
     const allMovingAvgs = [];
     const allLowerBounds = []; 
     const allUpperBounds = [];
@@ -1637,8 +1682,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
         if (type === 'rmssd' && v < allLowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > allUpperBounds[i]) return '#ff8c73';
-        if (type === 'start' && v > allUpperBounds[i]) return '#ff8c73';
-        if (type === 'end' && v > allUpperBounds[i]) return '#ff8c73';
+        if ((type === 'start' || type === 'end') && (v > allUpperBounds[i] || v < allLowerBounds[i])) return '#ff8c73';
         if (type === 'hbi' && v > ma) return '#ff8c73';
         if (type === 'rhr' && v > ma) return '#ff8c73';
         if (type === 'tst' && (v < ma || v < 420)) return '#ff8c73';
@@ -1729,7 +1773,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     }
 
     // --- 【修正點 2：這裡的範圍區間必須用 dailyValues 去 map，長度才跟 lowerBounds 對得起來】 ---
-    if (type === 'rmssd' || type === 'hrmin' || type === 'rhr') {
+    const isRangeType = (type === 'rmssd' || type === 'hrmin' || type === 'rhr' || type === 'start' || type === 'end');
+    if (isRangeType) {
         datasets.push({
             label: '7日平均範圍',
             type: 'bar',
@@ -1773,11 +1818,13 @@ new Chart(ctx, {
                                 if (type === 'rmssd') {
                                     low = low.toFixed(1);
                                     high = high.toFixed(1);
+                                } else if (type === 'start' || type === 'end') {
+                                    // 👇 修改 5：範圍工具提示轉換為時間格式
+                                    return `${label}: ${formatMinutesToAmPm(low)} ~ ${formatMinutesToAmPm(high)}`;
                                 } else {
                                     low = Math.round(low);
                                     high = Math.round(high);
                                 }
-                                
                                 return `${label}: ${low} ~ ${high}`;
                             }
 
@@ -1788,6 +1835,11 @@ new Chart(ctx, {
                                 let h = Math.floor(val / 60);
                                 let m = Math.round(val % 60);
                                 return `${label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
+                            }
+                            
+                            if (type === 'start' || type === 'end') {
+                                // 👇 修改 6：單點工具提示轉換為時間格式
+                                return `${label}: ${formatMinutesToAmPm(val)}`;
                             }
                             
                             return `${label}: ${val}`;
