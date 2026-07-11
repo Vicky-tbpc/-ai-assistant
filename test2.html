@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089</title>
+    <title>Soosyn 健康夥伴 n090</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1628,7 +1628,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     // 1. 先動態決定「所有緩衝區資料」的日期標籤與體感數據
     const allLabels = rawData.map(d => {
         let displayDate = d.record_date;
-        if (type === 'battery' || type === 'rhr') {
+        if (type === 'battery' || type === 'rhr' || type === 'end') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             displayDate = dateObj.toLocaleDateString('en-CA');
@@ -1637,7 +1637,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     });
 
     const allSubjectiveValues = rawData.map(d => {
-        if (type === 'battery' || type === 'rhr') {
+        if (type === 'battery' || type === 'rhr' || type === 'end') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             const nextDayStr = dateObj.toLocaleDateString('en-CA');
