@@ -1436,7 +1436,9 @@ function appendTrendOptions() {
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery" },
         { name: "🛌 總睡眠時間", type: "tst" },
-        { name: "🌙 深睡期 (N3)", type: "n3" },
+        { name: "💤 深睡期 (N3)", type: "n3" },
+        { name: "🌙 入睡規律性", type: "start" },
+        { name: "☀️ 醒來規律性", type: "end" },
         { name: "⏱️ 睡眠清醒時間", type: "wake" },        
         { name: "🌿 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
@@ -1559,7 +1561,7 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
+    const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'start', 'end', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
@@ -1575,6 +1577,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
         tst: { title: "總睡眠時間", unit: "單位：小時", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        start: { title: "入睡規律性", unit: " ", field: "record_start", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },        
+        end: { title: "醒來規律性", unit: " ", field: "record_end", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },         
         wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },        
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
@@ -1619,6 +1623,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
             allMovingAvgs.push(avg); allLowerBounds.push(avg * 0.9); allUpperBounds.push(avg * 1.1);
         } else if (type === 'hrmin' || type === 'rhr') {
             allMovingAvgs.push(avg); allLowerBounds.push(avg - 5); allUpperBounds.push(avg + 5);
+        } else if (type === 'start' || type === 'end') {
+            allMovingAvgs.push(avg); allLowerBounds.push(avg - 30); allUpperBounds.push(avg + 30);
         } else {
             allMovingAvgs.push((type === 'hbi' || type === 'wake' || type === 'tst') ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         }
@@ -1631,6 +1637,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
         if (type === 'rmssd' && v < allLowerBounds[i]) return '#ff8c73';
         if (type === 'hrmin' && v > allUpperBounds[i]) return '#ff8c73';
+        if (type === 'start' && v > allUpperBounds[i]) return '#ff8c73';
+        if (type === 'end' && v > allUpperBounds[i]) return '#ff8c73';
         if (type === 'hbi' && v > ma) return '#ff8c73';
         if (type === 'rhr' && v > ma) return '#ff8c73';
         if (type === 'tst' && (v < ma || v < 420)) return '#ff8c73';
@@ -2718,7 +2726,7 @@ async function callGreetingAPI(name, aiName, aiData) {
 function appendSimpleSummaryCard(metricName, detailedContent) {
     const config = {
         'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#a79d8c' },
-        'N3_pct': { icon: '🌙', label: '深睡期 (N3)', color: '#a79d8c' },
+        'N3_pct': { icon: '💤', label: '深睡期 (N3)', color: '#a79d8c' },
         'rMSSD': { icon: '🌿', label: 'rMSSD', color: '#a79d8c' },
         'HBI': { icon: '🫁', label: 'HBI 低氧負擔指數', color: '#a79d8c' },
         'HR_min': { icon: '💓', label: '睡眠最低脈搏', color: '#a79d8c' }
