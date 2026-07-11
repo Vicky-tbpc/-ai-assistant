@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089</title>
+    <title>Soosyn 健康夥伴 n090</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1437,8 +1437,7 @@ function appendTrendOptions() {
         { name: "📈 恢復指數", type: "battery" },
         { name: "🛌 總睡眠時間", type: "tst" },
         { name: "💤 深睡期 (N3)", type: "n3" },
-        { name: "🌙 入睡規律性", type: "start" },
-        { name: "☀️ 醒來規律性", type: "end" },
+        { name: "⏰ 作息規律", type: "schedule" }, // 整合後的作息規律圖表
         { name: "⏱️ 睡眠清醒時間", type: "wake" },        
         { name: "🌿 rMSSD", type: "rmssd" },
         { name: "💓 睡眠最低脈搏", type: "hrmin" },
@@ -1487,51 +1486,41 @@ async function updateTrend(cardId, type, days) {
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 將原本的 Supabase 呼叫註解掉或替換掉
-let healthData = [];
-try {
-    // 1. 準備參數：只抓取目前這個使用者的資料
-    const queryParams = new URLSearchParams({
-        serial: currentSerial
-    }).toString();
+    let healthData = [];
+    try {
+        const queryParams = new URLSearchParams({
+            serial: currentSerial
+        }).toString();
 
-    // 2. 呼叫地端中轉 API (加上 serial 參數)
-    const response = await fetch(`/api/health?${queryParams}`);
-    
-    if (!response.ok) throw new Error("地端連線失敗");
-    
-    // 現在拿到的資料已經是被地端過濾過的「該使用者全量資料」
-    const filteredJsonData = await response.json();
-    const totalDaysToFetch = days + 6; 
+        const response = await fetch(`/api/health?${queryParams}`);
+        
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        const filteredJsonData = await response.json();
+        const totalDaysToFetch = days + 6; 
 
-    // 3. 前端只負責「排序」與「取出最近幾天 (days)」
-    healthData = filteredJsonData
-        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
-        .slice(0, totalDaysToFetch) // 取得最近的筆數 (例如 7+6=13 筆，確保第一天也有足夠的前期資料算平均)
-        .map(item => ({
-            record_date: item.record_date,
-            raw_json: item.raw_json
-        }));
+        healthData = filteredJsonData
+            .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) 
+            .slice(0, totalDaysToFetch) 
+            .map(item => ({
+                record_date: item.record_date,
+                raw_json: item.raw_json
+            }));
 
-} catch (err) {
-    console.error("讀取地端資料錯誤:", err);
-    card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
-    return;
-}
+    } catch (err) {
+        console.error("讀取地端資料錯誤:", err);
+        card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
+        return;
+    }
 
-// 4. 檢查是否有資料 (保留你原本的判斷邏輯)
-if (healthData.length === 0) {
-    card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
-    return;
-}
-
-
-// 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
+    if (healthData.length === 0) {
+        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+        return;
+    }
 
     const sortedData = [...healthData].reverse();
     
-    // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
-    // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
+    // --- 【準備體感數據要對齊的日期範圍】 ---
     const originalDates = sortedData.map(d => d.record_date);
     const shiftedDates = originalDates.map(dStr => {
         let d = new Date(dStr + 'T00:00:00');
@@ -1541,13 +1530,11 @@ if (healthData.length === 0) {
     const queryDateRange = [...new Set([...originalDates, ...shiftedDates])];
     // ------------------------------------------
 
-    // 2. 抓取個人感受數據 (使用擴大後的日期範圍)
     const [feedbackRes, surveyRes] = await Promise.all([
         _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', queryDateRange),
         _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', queryDateRange)
     ]);
 
-    // 3. 建立體感數據地圖 (這部分邏輯不變)
     const subjectiveMap = {};
     if (surveyRes.data) {
         surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
@@ -1561,13 +1548,13 @@ if (healthData.length === 0) {
 
     const container = card.querySelector('.trend-content');
     container.innerHTML = ''; 
-    const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'start', 'end', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
+    // 把 schedule 放進完整圖表的渲染清單中
+    const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'schedule', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
     
     for (const t of typesToRender) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
-        // 將原始數據與 map 傳入，讓繪圖函式自己決定日期顯示
         drawSingleChart(chartBox, t, sortedData, subjectiveMap, days);
     }
 }
@@ -1575,7 +1562,6 @@ if (healthData.length === 0) {
 // --- 處理時間字串與分鐘數的轉換 ---
 function parseTimeToMinutes(dateStr, type) {
     if (!dateStr) return 0;
-    // 預期格式 "YYYY-MM-DD HH:mm:ss"
     const parts = dateStr.split(' ');
     if (parts.length !== 2) return 0;
     
@@ -1584,7 +1570,6 @@ function parseTimeToMinutes(dateStr, type) {
     let m = parseInt(timeParts[1], 10);
     let totalMins = h * 60 + m;
 
-    // 針對「入睡時間」，如果是凌晨 (00:00~11:59)，加上 24 小時確保圖表連續性
     if (type === 'start' && h < 12) {
         totalMins += 1440; 
     }
@@ -1595,7 +1580,6 @@ function formatMinutesToAmPm(totalMins) {
     if (isNaN(totalMins) || totalMins === null) return "";
     let m = Math.round(totalMins);
     
-    // 如果大於等於 24 小時，扣除 24 小時來計算顯示時間
     if (m >= 1440) m -= 1440;
     if (m < 0) m += 1440;
 
@@ -1603,7 +1587,6 @@ function formatMinutesToAmPm(totalMins) {
     let mins = m % 60;
     let period = h >= 12 ? "下午" : "上午";
 
-    // 轉為 12 小時制
     let displayH = h % 12;
     if (displayH === 0) displayH = 12;
 
@@ -1616,8 +1599,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
         tst: { title: "總睡眠時間", unit: "單位：小時", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
-        start: { title: "入睡規律性", unit: " ", field: "record_start", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },        
-        end: { title: "醒來規律性", unit: " ", field: "record_end", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },         
+        schedule: { title: "作息規律", unit: " ", field: "schedule", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },        
         wake: { title: "睡眠清醒時間", unit: "單位：分鐘", field: "wake_minutes", color: "#596b75", abnormalLabel: "高於個人平均" },        
         rmssd: { title: "rMSSD", unit: "單位：ms", field: "rMSSD", color: "#596b75", abnormalLabel: "低於個人平均範圍" },
         hrmin: { title: "睡眠最低脈搏", unit: "單位：bpm", field: "HR_min", color: "#596b75", abnormalLabel: "高於個人平均範圍" },
@@ -1625,7 +1607,6 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         rhr: { title: "靜息心率", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" }
     }[type];
 
-    // 1. 先動態決定「所有緩衝區資料」的日期標籤與體感數據
     const allLabels = rawData.map(d => {
         let displayDate = d.record_date;
         if (type === 'battery' || type === 'rhr') {
@@ -1647,49 +1628,67 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     });
 
-    // --- 【修正點 1：全部加上 all 前綴，避免與下方的切片變數衝突】 ---
+    // 抓取基礎數據
     const allDailyValues = rawData.map(d => {
+        if (type === 'schedule') return parseTimeToMinutes(d.raw_json['record_start'], 'start');
+        
         const rawVal = d.raw_json[config.field];
-        if (type === 'start' || type === 'end') {
-            return parseTimeToMinutes(rawVal, type);
-        }
+        if (type === 'start' || type === 'end') return parseTimeToMinutes(rawVal, type);
         return Number(rawVal) || 0;
     });
-    const allMovingAvgs = [];
-    const allLowerBounds = []; 
-    const allUpperBounds = [];
 
-    // 計算平均值邏輯（基於包含緩衝的完整陣列）
+    // 針對 schedule 準備醒來時間的陣列
+    let allDailyValuesEnd = [];
+    if (type === 'schedule') {
+        allDailyValuesEnd = rawData.map(d => parseTimeToMinutes(d.raw_json['record_end'], 'end'));
+    }
+
+    const allMovingAvgs = []; const allLowerBounds = []; const allUpperBounds = []; const allPointColors = [];
+    const allMovingAvgsEnd = []; const allLowerBoundsEnd = []; const allUpperBoundsEnd = []; const allPointColorsEnd = [];
+
+    // 計算平均值與範圍邏輯
     allDailyValues.forEach((val, i) => {
-        const start = Math.max(0, i - 6);
-        const chunk = allDailyValues.slice(start, i + 1);
+        const startIdx = Math.max(0, i - 6);
+        const chunk = allDailyValues.slice(startIdx, i + 1);
         const avg = chunk.reduce((a, b) => a + b, 0) / chunk.length;
+
         if (type === 'rmssd') {
             allMovingAvgs.push(avg); allLowerBounds.push(avg * 0.9); allUpperBounds.push(avg * 1.1);
         } else if (type === 'hrmin' || type === 'rhr') {
             allMovingAvgs.push(avg); allLowerBounds.push(avg - 5); allUpperBounds.push(avg + 5);
-        } else if (type === 'start' || type === 'end') {
+        } else if (type === 'schedule' || type === 'start' || type === 'end') {
             allMovingAvgs.push(avg); allLowerBounds.push(avg - 30); allUpperBounds.push(avg + 30);
         } else {
             allMovingAvgs.push((type === 'hbi' || type === 'wake' || type === 'tst') ? parseFloat(avg.toFixed(1)) : Math.round(avg));
         }
+
+        let color = config.color;
+        if (type === 'battery' && val < avg) color = '#ff8c73';
+        if (type === 'rhr' && val > allUpperBounds[i]) color = '#ff8c73';
+        if (type === 'n3' && (val < avg || val < 10)) color = '#ff8c73';
+        if (type === 'rmssd' && val < allLowerBounds[i]) color = '#ff8c73';
+        if (type === 'hrmin' && val > allUpperBounds[i]) color = '#ff8c73';
+        if ((type === 'schedule' || type === 'start' || type === 'end') && (val > allUpperBounds[i] || val < allLowerBounds[i])) color = '#ff8c73';
+        if (type === 'hbi' && val > avg) color = '#ff8c73';
+        if (type === 'tst' && (val < avg || val < 420)) color = '#ff8c73';
+        allPointColors.push(color);
+
+        // 如果是 schedule，額外計算「醒來」的範圍及異常顏色
+        if (type === 'schedule') {
+            const valEnd = allDailyValuesEnd[i];
+            const chunkEnd = allDailyValuesEnd.slice(startIdx, i + 1);
+            const avgEnd = chunkEnd.reduce((a, b) => a + b, 0) / chunkEnd.length;
+
+            allMovingAvgsEnd.push(avgEnd);
+            allLowerBoundsEnd.push(avgEnd - 30);
+            allUpperBoundsEnd.push(avgEnd + 30);
+
+            let colorEnd = config.color;
+            if (valEnd > (avgEnd + 30) || valEnd < (avgEnd - 30)) colorEnd = '#ff8c73';
+            allPointColorsEnd.push(colorEnd);
+        }
     });
 
-    const allPointColors = allDailyValues.map((v, i) => {
-        const ma = allMovingAvgs[i];
-        if (type === 'battery' && v < ma) return '#ff8c73';
-        if (type === 'rhr' && v > allUpperBounds[i]) return '#ff8c73';
-        if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
-        if (type === 'rmssd' && v < allLowerBounds[i]) return '#ff8c73';
-        if (type === 'hrmin' && v > allUpperBounds[i]) return '#ff8c73';
-        if ((type === 'start' || type === 'end') && (v > allUpperBounds[i] || v < allLowerBounds[i])) return '#ff8c73';
-        if (type === 'hbi' && v > ma) return '#ff8c73';
-        if (type === 'rhr' && v > ma) return '#ff8c73';
-        if (type === 'tst' && (v < ma || v < 420)) return '#ff8c73';
-        return config.color;
-    });
-
-    // --- 【核心步驟：算完滾動平均後，切出最後要顯示的 days 天數】 ---
     const labels = allLabels.slice(-days);
     const dailyValues = allDailyValues.slice(-days);
     const movingAvgs = allMovingAvgs.slice(-days);
@@ -1698,7 +1697,15 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const pointColors = allPointColors.slice(-days);
     const subjectiveValues = allSubjectiveValues.slice(-days);
 
-    // 建立結構
+    let dailyValuesEnd = [], movingAvgsEnd = [], lowerBoundsEnd = [], upperBoundsEnd = [], pointColorsEnd = [];
+    if (type === 'schedule') {
+        dailyValuesEnd = allDailyValuesEnd.slice(-days);
+        movingAvgsEnd = allMovingAvgsEnd.slice(-days);
+        lowerBoundsEnd = allLowerBoundsEnd.slice(-days);
+        upperBoundsEnd = allUpperBoundsEnd.slice(-days);
+        pointColorsEnd = allPointColorsEnd.slice(-days);
+    }
+
     container.innerHTML = `
         <div class="chart-info-header">
             <div class="chart-title-row">
@@ -1712,7 +1719,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
 
     const ctx = container.querySelector('canvas').getContext('2d');
     
-    // N3 背景色區塊插件
+    // 背景色區塊插件
     const n3BackgroundPlugin = {
         id: 'n3Background',
         beforeDraw: (chart) => {
@@ -1727,7 +1734,6 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     };
 
-    // tst 背景色區塊插件
     const tstBackgroundPlugin = {
         id: 'tstBackground',
         beforeDraw: (chart) => {
@@ -1742,57 +1748,78 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     };
 
-    const datasets = [
-        {
+    const datasets = [];
+
+    // --- 【作息規律：同時丟入入睡與醒來的曲線及範圍】 ---
+    if (type === 'schedule') {
+        datasets.push(
+            {
+                label: '當日入睡',             
+                type: 'line',
+                data: dailyValues,
+                borderColor: '#999999', borderWidth: 1.5,
+                pointBackgroundColor: pointColors,
+                pointRadius: 4, pointBorderWidth: 0, zIndex: 10
+            },
+            {
+                label: '當日醒來',             
+                type: 'line',
+                data: dailyValuesEnd,
+                borderColor: '#999999', borderWidth: 1.5,
+                pointBackgroundColor: pointColorsEnd,
+                pointRadius: 4, pointBorderWidth: 0, zIndex: 10
+            },
+            {
+                label: '入睡7日平均範圍',
+                type: 'bar',
+                data: dailyValues.map((_, i) => [lowerBounds[i], upperBounds[i]]),
+                backgroundColor: '#c1cdd3', barPercentage: 0.5,
+                stack: 'scheduleStack' // 防止兩組 bar 並排錯位，讓它們維持在同一垂直線上
+            },
+            {
+                label: '醒來7日平均範圍',
+                type: 'bar',
+                data: dailyValuesEnd.map((_, i) => [lowerBoundsEnd[i], upperBoundsEnd[i]]),
+                backgroundColor: '#c1cdd3', barPercentage: 0.5,
+                stack: 'scheduleStack'
+            }
+        );
+    } else {
+        // --- 【其他一般圖表處理邏輯】 ---
+        datasets.push({
             label: '當日數值',             
             type: 'line',
             data: dailyValues,
-            borderColor: '#999999',
-            borderWidth: 1.5,
+            borderColor: '#999999', borderWidth: 1.5,
             pointBackgroundColor: pointColors,
-            pointRadius: 4,
-            pointBorderWidth: 0, 
-            zIndex: 10
+            pointRadius: 4, pointBorderWidth: 0, zIndex: 10
+        });
+
+        if (type === 'battery') {
+            datasets.push({
+                label: '體感數值', type: 'line', data: subjectiveValues,
+                borderColor: '#a79d8c', borderWidth: 2, borderDash: [5, 3], 
+                pointBackgroundColor: '#a79d8c', pointRadius: 3, spanGaps: true, zIndex: 5
+            });
         }
-    ];
 
-    // 如果是恢復指數，新增一條「個人感受」曲線
-    if (type === 'battery') {
-        datasets.push({
-            label: '體感數值',
-            type: 'line',
-            data: subjectiveValues,
-            borderColor: '#a79d8c', 
-            borderWidth: 2,
-            borderDash: [5, 3], 
-            pointBackgroundColor: '#a79d8c',
-            pointRadius: 3,
-            spanGaps: true, 
-            zIndex: 5
-        });
+        const isRangeType = (type === 'rmssd' || type === 'hrmin' || type === 'rhr' || type === 'start' || type === 'end');
+        if (isRangeType) {
+            datasets.push({
+                label: '7日平均範圍', type: 'bar',
+                data: dailyValues.map((_, i) => [lowerBounds[i], upperBounds[i]]),
+                backgroundColor: '#c1cdd3', barPercentage: 0.5
+            });
+        } else {
+            datasets.push({
+                label: '7日平均', type: 'bar',
+                data: movingAvgs,
+                backgroundColor: '#c1cdd3', barPercentage: 0.5
+            });
+        }
     }
 
-    // --- 【修正點 2：這裡的範圍區間必須用 dailyValues 去 map，長度才跟 lowerBounds 對得起來】 ---
-    const isRangeType = (type === 'rmssd' || type === 'hrmin' || type === 'rhr' || type === 'start' || type === 'end');
-    if (isRangeType) {
-        datasets.push({
-            label: '7日平均範圍',
-            type: 'bar',
-            data: dailyValues.map((_, i) => [lowerBounds[i], upperBounds[i]]),
-            backgroundColor: '#c1cdd3',
-            barPercentage: 0.5
-        });
-    } else {
-        datasets.push({
-            label: '7日平均',
-            type: 'bar',
-            data: movingAvgs,
-            backgroundColor: '#c1cdd3',
-            barPercentage: 0.5
-        });
-    }
-
-new Chart(ctx, {
+    new Chart(ctx, {
         plugins: [n3BackgroundPlugin, tstBackgroundPlugin],
         data: { labels, datasets },
         options: {
@@ -1801,25 +1828,22 @@ new Chart(ctx, {
             layout: { padding: { right: 10 } }, 
             plugins: { 
                 legend: { display: false },
-                // 👇 替換這個 tooltip 區塊
                 tooltip: {
-                    mode: 'index',      // 讓同一天的資料合併在一個提示框顯示
-                    intersect: false,   // 滑鼠不用精準對準圓點也能觸發
+                    mode: 'index',      
+                    intersect: false,   
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
                             
-                            // 👇 關鍵修改：如果是範圍長條圖 (資料是 [下限, 上限] 的陣列)
+                            // 範圍長條圖的工具提示
                             if (context.dataset.type === 'bar' && Array.isArray(context.raw)) {
                                 let low = context.raw[0];
                                 let high = context.raw[1];
 
-                                // 👇 針對 rMSSD 顯示到小數點第一位，其他維持整數
                                 if (type === 'rmssd') {
                                     low = low.toFixed(1);
                                     high = high.toFixed(1);
-                                } else if (type === 'start' || type === 'end') {
-                                    // 👇 修改 5：範圍工具提示轉換為時間格式
+                                } else if (type === 'schedule' || type === 'start' || type === 'end') {
                                     return `${label}: ${formatMinutesToAmPm(low)} ~ ${formatMinutesToAmPm(high)}`;
                                 } else {
                                     low = Math.round(low);
@@ -1828,7 +1852,7 @@ new Chart(ctx, {
                                 return `${label}: ${low} ~ ${high}`;
                             }
 
-                            // 👇 處理一般的單一數值 (當日數值、一般平均)
+                            // 單一數值的工具提示
                             let val = context.parsed.y;
                             
                             if (type === 'tst') {
@@ -1837,8 +1861,7 @@ new Chart(ctx, {
                                 return `${label}: ${h > 0 ? h + '小時' : ''}${m}分鐘`;
                             }
                             
-                            if (type === 'start' || type === 'end') {
-                                // 👇 修改 6：單點工具提示轉換為時間格式
+                            if (type === 'schedule' || type === 'start' || type === 'end') {
                                 return `${label}: ${formatMinutesToAmPm(val)}`;
                             }
                             
@@ -1849,14 +1872,11 @@ new Chart(ctx, {
             },
             scales: {
                y: { 
-                    // 維持原本的寬度 45
                     afterFit: (scale) => { scale.width = 45; }, 
+                    beginAtZero: !(type === 'schedule' || type === 'start' || type === 'end'),
                     
-                    beginAtZero: !(type === 'start' || type === 'end'),
-                    
-                    // 透過 afterDataLimits 攔截 Chart.js 算好的資料範圍，並向外擴充正負 1 小時 (60 分鐘)
                     afterDataLimits: (scale) => {
-                        if (type === 'start' || type === 'end') {
+                        if (type === 'schedule' || type === 'start' || type === 'end') {
                             scale.min = scale.min - 60;
                             scale.max = scale.max + 60;
                         }
@@ -1866,25 +1886,18 @@ new Chart(ctx, {
                     ticks: { 
                         font: { size: 11 }, 
                         color: '#888',
-                        
-                        stepSize: (type === 'tst' || type === 'start' || type === 'end') ? 60 : undefined, 
+                        stepSize: (type === 'tst' || type === 'schedule' || type === 'start' || type === 'end') ? 60 : undefined, 
                         
                         callback: function(value) {
-                            if (type === 'start' || type === 'end') {
+                            if (type === 'schedule' || type === 'start' || type === 'end') {
                                 let timeStr = formatMinutesToAmPm(value);
-                                
-                                // 取出前兩個字 (上午/下午)，以及後面的時間 (10:00)
                                 let ampm = timeStr.substring(0, 2);
                                 let time = timeStr.substring(2).trim();
-                                
-                                // 回傳陣列 [ "上午", "10:00" ]，Chart.js 就會自動折成兩行
-                                return [ampm, time];
+                                return [ampm, time]; // 折成兩行
                             }
-                            
                             if (type === 'tst') {
                                 return (value / 60) + '小時';
                             }
-                            
                             return value;
                         }
                     }
@@ -1899,14 +1912,12 @@ new Chart(ctx, {
 }
 
 function renderLegend(type, abnormalLabel) {
-    const isRange = (type === 'rmssd' || type === 'hrmin' || type === 'rhr');
+    const isRange = (type === 'rmssd' || type === 'hrmin' || type === 'rhr' || type === 'schedule');
     let html = `
         <div class="legend-row"><div class="dot-sample" style="background:#596b75"></div> 當日數值</div>
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
 
-
-// 恢復指數特有圖例
     if (type === 'battery') {
         html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
