@@ -1614,7 +1614,7 @@ function formatMinutesToAmPm(totalMins) {
 function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
-        tst: { title: "總睡眠時間", unit: "單位：小時", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
+        tst: { title: "總睡眠時間", unit: "", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         n3: { title: "深睡期 (N3)", unit: "單位：%", field: "N3_pct", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
         start: { title: "入睡規律性", unit: " ", field: "record_start", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },        
         end: { title: "醒來規律性", unit: " ", field: "record_end", color: "#596b75", abnormalLabel: "早/晚於個人平均範圍" },         
