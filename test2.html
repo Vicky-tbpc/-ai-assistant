@@ -2206,8 +2206,7 @@ function appendSummaryCard(displayDate, data) {
 
             <!-- 標籤與提示 -->
             <div class="tag-prominent-row"><div class="daily-tag-pill">${raw.Daily_Tag || '日常紀錄'}</div></div>
-            <div class="analysis-capsule capsule-best"><span class="capsule-icon">👍</span><span>${data.bestText}</span></div>
-            <div class="analysis-capsule capsule-worst" style="margin-bottom:15px;"><span class="capsule-icon">💡</span><span>${data.worstText}</span></div>
+
 
             <!-- 1 & 2 & 3. 恢復指數區塊 -->
             <div class="summary-block recovery-index-box">
@@ -2323,7 +2322,8 @@ function appendSummaryCard(displayDate, data) {
                         Math.round(rhrStats.current), Math.round(rhrStats.avg), 'rhr', '❤️ 靜息心率 (RHR)')}
                 </div>
             </div>
-
+            <div class="analysis-capsule capsule-best"><span class="capsule-icon">👍</span><span>${data.bestText}</span></div>
+            <div class="analysis-capsule capsule-worst" style="margin-bottom:15px;"><span class="capsule-icon">💡</span><span>${data.worstText}</span></div>
             <!-- 10. PDF 報告 -->
             <button class="primary-btn" style="margin-top:10px;" onclick="openSleepReport('${dateStr}')">📄 開啟睡眠報告</button>
 
