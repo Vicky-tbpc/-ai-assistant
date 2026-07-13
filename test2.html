@@ -581,49 +581,6 @@
         </div>
     </div>
 
-<div id="sleep-record-overlay" class="modal-overlay hidden">
-    <div class="modal-card" style="display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 350px; padding: 25px 20px;">
-        <h3 style="color: var(--tbp-blue); margin-top: 0; margin-bottom: 5px;">記錄昨晚的睡眠 🌙</h3>
-        <p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 20px;">
-            開始對話前，請先記錄你昨晚的入睡與醒來時間，以便提供更符合你需求的健康分析。
-        </p>
-        
-        <div style="width: 100%; text-align: left; margin-bottom: 20px;">
-            <label style="display: block; font-size: 15px; font-weight: bold; color: var(--text-dark); margin-bottom: 12px;">入睡時間</label>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-size: 15px; color: #555;">日期</span>
-                <input type="date" id="sleep-start-date" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 15px; color: #555;">時間</span>
-                <input type="time" id="sleep-start-time" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
-            </div>
-        </div>
-        
-        <div style="width: 100%; height: 1px; background: #eee; margin-bottom: 20px;"></div>
-
-        <div style="width: 100%; text-align: left; margin-bottom: 25px;">
-            <label style="display: block; font-size: 15px; font-weight: bold; color: var(--text-dark); margin-bottom: 12px;">醒來時間</label>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-size: 15px; color: #555;">日期</span>
-                <input type="date" id="sleep-end-date" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 15px; color: #555;">時間</span>
-                <input type="time" id="sleep-end-time" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
-            </div>
-        </div>
-        
-        <div style="width: 100%; margin-top: 5px;">
-            <button type="button" class="primary-btn" style="width: 100%; padding: 12px; margin: 0;" onclick="saveSleepRecord()">儲存</button>
-        </div>
-    </div>
-</div>
-
 <div id="line-binding-overlay" class="modal-overlay hidden">
     <div class="modal-card">
         <h3 style="color: #00b900;">連結 LINE 帳號</h3>
@@ -838,7 +795,7 @@ async function login() {
     const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
     
     if (data) {
-        // --- 處理記住密碼邏輯 ---
+        // --- 新增：處理記住密碼邏輯 ---
         if (isRemember) {
             localStorage.setItem('saved_serial', serial);
             localStorage.setItem('saved_pw', pw);
@@ -853,9 +810,14 @@ async function login() {
         currentSerial = serial;
         document.getElementById('login-overlay').classList.add('hidden');
         
-        // --- 修改點在這裡：把後續流程交棒給睡眠紀錄檢查 ---
-        await checkSleepRecordFlow(data);
-        
+        if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
+        else initApp(data.nickname, data.ai_name);
+
+        if (liff.isInClient() && !data.line_user_id) {
+            setTimeout(() => {
+                document.getElementById('line-binding-overlay').classList.remove('hidden');
+            }, 1000);
+        }
     } else {
         alert("驗證失敗 😅");
     }
@@ -875,119 +837,6 @@ document.addEventListener('keydown', (event) => {
         }
     }
 });
-
-// 檢查今日是否已填寫睡眠紀錄 (僅限完整資料的使用者)
-async function checkSleepRecordFlow(userData) {
-    // 判斷：是否暱稱、AI名字、LINE ID 都已經存在
-    const isCompleteUser = userData.nickname && userData.ai_name && userData.line_user_id;
-
-    // 如果資料還沒填齊，直接跳過睡眠紀錄，去跑原本的新手設定流程
-    if (!isCompleteUser) {
-        proceedAfterSleepRecord(userData);
-        return;
-    }
-
-    // 如果是老手 (資料完整)，才開始檢查今天有沒有填過睡眠時間
-    const todayStr = getLocalDateString();
-    
-    try {
-        const { data: sleepData } = await _supabase
-            .from('user_sleep_records')
-            .select('record_date')
-            .eq('serial_number', currentSerial)
-            .eq('record_date', todayStr)
-            .maybeSingle();
-
-        if (!sleepData) {
-            // 如果沒填過，自動計算並預填時間 (昨晚 23:00 ~ 今早 07:00)
-            const now = new Date();
-            const yesterday = new Date(now);
-            yesterday.setDate(yesterday.getDate() - 1);
-            yesterday.setHours(23, 0, 0, 0); 
-            
-            const todayMorning = new Date(now);
-            todayMorning.setHours(7, 0, 0, 0); 
-
-            // 分別格式化日期(YYYY-MM-DD)與時間(HH:mm)
-            const formatDate = (d) => {
-                const tzOffset = d.getTimezoneOffset() * 60000;
-                return (new Date(d - tzOffset)).toISOString().slice(0, 10);
-            };
-            const formatTime = (d) => {
-                const tzOffset = d.getTimezoneOffset() * 60000;
-                return (new Date(d - tzOffset)).toISOString().slice(11, 16);
-            };
-
-            // 寫入畫面上的輸入框
-            document.getElementById('sleep-start-date').value = formatDate(yesterday);
-            document.getElementById('sleep-start-time').value = formatTime(yesterday);
-            document.getElementById('sleep-end-date').value = formatDate(todayMorning);
-            document.getElementById('sleep-end-time').value = formatTime(todayMorning);
-            
-            // 顯示對話框
-            document.getElementById('sleep-record-overlay').classList.remove('hidden');
-            
-            // 暫存 userData，等填完再繼續後續流程
-            window.pendingUserData = userData; 
-        } else {
-            // 已經填過，直接跑後面的流程
-            proceedAfterSleepRecord(userData);
-        }
-    } catch (err) {
-        console.error("檢查睡眠紀錄失敗:", err);
-        proceedAfterSleepRecord(userData); // 發生錯誤防呆，還是讓使用者進去
-    }
-}
-
-// 寫入 Supabase
-async function saveSleepRecord() {
-    const startDate = document.getElementById('sleep-start-date').value;
-    const startTime = document.getElementById('sleep-start-time').value;
-    const endDate = document.getElementById('sleep-end-date').value;
-    const endTime = document.getElementById('sleep-end-time').value;
-    
-    if (!startDate || !startTime || !endDate || !endTime) {
-        alert("請確認入睡與醒來時間都有填寫喔！");
-        return;
-    }
-
-    // 將分開的日期與時間，重新組合成資料庫要的 "YYYY-MM-DD HH:mm" 格式
-    const startFormatted = `${startDate} ${startTime}`;
-    const endFormatted = `${endDate} ${endTime}`;
-    const todayStr = getLocalDateString();
-
-    const { error } = await _supabase.from('user_sleep_records').insert([{
-        serial_number: currentSerial,
-        record_date: todayStr,
-        sleep_time: startFormatted,
-        wake_time: endFormatted
-    }]);
-
-    if (error) {
-        console.error("寫入睡眠時間失敗:", error);
-        alert("儲存失敗，請稍後再試。");
-        return;
-    }
-
-    // 關閉視窗，繼續原有流程
-    document.getElementById('sleep-record-overlay').classList.add('hidden');
-    proceedAfterSleepRecord(window.pendingUserData);
-}
-
-// 繼續執行取名與 AI 綁定流程
-function proceedAfterSleepRecord(data) {
-    if (!data.nickname) {
-        document.getElementById('nickname-overlay').classList.remove('hidden');
-    } else {
-        initApp(data.nickname, data.ai_name);
-
-        if (liff.isInClient() && !data.line_user_id) {
-            setTimeout(() => {
-                document.getElementById('line-binding-overlay').classList.remove('hidden');
-            }, 1000);
-        }
-    }
-}
 
 // 執行綁定動作
 async function bindLineAccount() {
