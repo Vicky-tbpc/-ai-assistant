@@ -207,6 +207,7 @@ export default async function handler(req, res) {
         "恢復": "恢復指數 Recovery Index",
         "發炎風險": "動態發炎預警 發炎風險 靜息心率 RHR",
         "發炎預警": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "發炎指數": "動態發炎預警 發炎風險 靜息心率 RHR",
         "發炎": "動態發炎預警 發炎風險 靜息心率 RHR",
         
         // --- 睡眠低血氧時間比例 ---
