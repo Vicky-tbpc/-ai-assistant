@@ -2145,9 +2145,15 @@ function toggleMiniCharts(btn, targetId) {
 }
 
 // --- 重寫健康摘要卡片渲染 ---
-function appendSummaryCard(data) {
+function appendSummaryCard(displayDate, data) {
+    // 💡 相容性處理：如果只傳入一個參數(如 showSummaryFlow)，將其視為 data
+    if (typeof data === 'undefined') {
+        data = displayDate;
+        displayDate = data.date;
+    }
+
     const raw = data.raw_json;
-    const dateStr = data.date;
+    const dateStr = displayDate; // 替換為實際應顯示的日期
     const history7 = data.history7;
 
     // --- 計算各項數值與 7 日平均 ---
