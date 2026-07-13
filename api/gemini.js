@@ -201,7 +201,15 @@ export default async function handler(req, res) {
       let finalQuery = intent.knowledge_query;
       
       const aliasDictionary = {
-       
+        // --- 獨有商業模型 (多檔案) ---
+        // 塞入涵蓋該主題的廣泛核心關鍵字，讓向量庫自己去找最適合的段落
+        "恢復指數": "恢復指數 Recovery Index 關鍵指標 原理 摘要",
+        "恢復": "恢復指數 Recovery Index",
+        "發炎風險": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "發炎預警": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "發炎指數": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "發炎": "動態發炎預警 發炎風險 靜息心率 RHR",
+        
         // --- 睡眠低血氧時間比例 ---
         "T90": "T90 睡眠期間 血氧濃度小於 90% 的時間百分比 SpO2",
         "T89": "T89 睡眠期間 血氧濃度小於 89% 的時間百分比 SpO2",
