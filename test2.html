@@ -2253,7 +2253,7 @@ function appendSummaryCard(displayDate, data) {
                 
                 <!-- 3 & 4. 中間新增橫條顯示百分比，顏色同步 -->
                 <div style="width: 100%; height: 10px; background: #eee; border-radius: 4px; margin: 12px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${data.percentage}%; height: 100%; background: ${batColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                    <div style="width: ${raw.Personal_Battery_weighted_round || 0}%; height: 100%; background: ${batColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
 
                 <div class="recovery-meta">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)</div>
