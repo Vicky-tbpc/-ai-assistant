@@ -2317,13 +2317,15 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">脈搏穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val">${Math.round(pulseStats.current)}</div>
+                        <div class="stability-val" style="color: ${data.battery >= 95 ? '#596b75' : data.battery >= 80 ? '#8699a3' : data.battery >= 60 ? '#a79d8c' : '#ff8c73'};">
+                            ${Math.round(pulseStats.current)}
+                        </div>
                         <div class="stability-diff">較7日平均${pulseStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(pulseStats.diffPct)}%</div>
                     </div>
                 </div>
 
                 <!-- 新增：讀取 Battery_HR_min_A 的百分比橫條 -->
-                <div style="width: 100%; height: 10px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
                     <div style="width: ${raw.Battery_HR_min_A || 0}%; height: 100%; background: ${data.battery >= 95 ? '#596b75' : data.battery >= 80 ? '#8699a3' : data.battery >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
 
