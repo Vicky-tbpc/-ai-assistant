@@ -562,6 +562,25 @@
     color: #999;
     margin-top: 5px;
 }
+/* --- 統一詳細圖表按鈕樣式 --- */
+.detail-chart-btn {
+    display: block;
+    width: 25%; /* 寬度縮小到 1/4 */
+    min-width: 80px; /* 確保在小螢幕不會過度擠壓 */
+    margin: 10px auto 0 auto; /* 置中 */
+    background-color: #edeae4;
+    color: #5a5a5a;
+    border: none;
+    padding: 8px; /* 高度統一使用迷你圖表的 8px 設定 */
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.detail-chart-btn:hover {
+    background-color: #e2ddd4;
+}
 </style>
 </head>
 <body>
@@ -2193,31 +2212,64 @@ function appendSummaryCard(displayDate, data) {
     
     const rhrStats = calculate7DayStats(history7, 'RHR_raw');
 
+    // 1. 健康摘要標題列右側燈號邏輯
+    const lightStatusText = raw?.light_status;
+    let lightStatusHtml = '';
+    if (lightStatusText) {
+        const lightColorMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
+        const dotColor = lightColorMap[lightStatusText] || 'transparent';
+        lightStatusHtml = `<span style="color: inherit; display: flex; align-items: center; gap: 4px; font-size: 0.95rem;">
+            <span style="color: ${dotColor}; font-size: 1.1rem;">●</span> ${lightStatusText}
+        </span>`;
+    }
+
+    // 5. 日常標籤邏輯
+    const dailyTag = raw?.Daily_Tag;
+    let tagHtml = '';
+    if (dailyTag) {
+        const tagColor = (dailyTag.includes('混亂') || dailyTag.includes('極端') || dailyTag.includes('疲乏') || dailyTag.includes('最差') || dailyTag.includes('發炎')) ? '#ff8c73': '#8699a3';
+        tagHtml = `<div class="daily-tag-pill" style="background-color: ${tagColor}; margin: 0; font-size: 13px; padding: 4px 12px;">${dailyTag}</div>`;
+    }
+
+    // 4. 動態恢復指數與橫條顏色設定
+    const batColor = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+
     // 產生唯一 ID
     const uid = Date.now();
 
     let html = `
     <div class="msg-row ai-row">
         <div class="summary-card" style="cursor: default; padding: 15px;">
+            <!-- 1. 標題與燈號 -->
             <div class="summary-header">
                 <span>📅 ${dateStr} 健康摘要</span>
-                <span class="status-dot status-${data.light}"></span>
+                ${lightStatusHtml}
             </div>
 
-            <!-- 標籤與提示 -->
-            <div class="tag-prominent-row"><div class="daily-tag-pill">${raw.Daily_Tag || '日常紀錄'}</div></div>
+            <!-- 2 & 5. 恢復指數標題與標籤擺在同一列 -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px;">
+                <div style="font-weight:bold; color:#555; font-size: 1.1rem;">恢復指數</div>
+                <div>${tagHtml}</div>
+            </div>
 
+            <!-- 2. 取消恢復指數外的方框 (移除 summary-block class) -->
+            <div class="recovery-index-box">
+                <!-- 4. 數值顏色連動 -->
+                <div class="recovery-big-val" style="color: ${batColor};">${data.battery}</div>
+                
+                <!-- 3 & 4. 中間新增橫條顯示百分比，顏色同步 -->
+                <div style="width: 100%; height: 6px; background: #eee; border-radius: 4px; margin: 12px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${data.percentage}%; height: 100%; background: ${batColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                </div>
 
-            <!-- 1 & 2 & 3. 恢復指數區塊 -->
-            <div class="summary-block recovery-index-box">
-                <div style="font-weight:bold; color:#555; margin-bottom:5px;">恢復指數</div>
-                <div class="recovery-big-val">${data.battery}</div>
                 <div class="recovery-meta">超過 ${data.percentage}% 的使用者<br>(樣本數 ${data.sampleSize} 人次)</div>
-                <button class="btn-outline-primary" onclick="startTrendFlow('battery', '📈 恢復指數')">詳細圖表</button>
+                
+                <!-- 6. 詳細圖表按鈕統一大小與顏色 -->
+                <button class="detail-chart-btn" onclick="startTrendFlow('battery', '📈 恢復指數')">詳細圖表</button>
             </div>
 
             <!-- 5. 睡眠穩定度區塊 -->
-            <div class="summary-block">
+            <div class="summary-block" style="margin-top: 20px;">
                 <div class="stability-header">
                     <div class="stability-title-box">
                         <img src="images/sleep_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
