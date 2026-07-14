@@ -428,23 +428,6 @@
     color: #666;
     margin-bottom: 15px;
 }
-.btn-outline-primary {
-    display: block;
-    width: 100%;
-    text-align: center;
-    border: 1px solid var(--tbp-blue);
-    color: var(--tbp-blue);
-    background: transparent;
-    padding: 10px;
-    border-radius: 20px;
-    font-size: 0.95rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.2s;
-}
-.btn-outline-primary:hover {
-    background: var(--tbp-light-blue);
-}
 
 /* 穩定度區塊 */
 .stability-header {
@@ -482,7 +465,7 @@
 
 /* 展開/收合按鈕 */
 .toggle-chart-btn {
-    width: 100%;
+    width: 30%;
     background: #f5f5f5;
     border: none;
     color: #666;
@@ -2262,7 +2245,7 @@ function appendSummaryCard(displayDate, data) {
                     <div style="width: ${data.percentage}%; height: 100%; background: ${batColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
 
-                <div class="recovery-meta">超過 ${data.percentage}% 的使用者<br>(樣本數 ${data.sampleSize} 人次)</div>
+                <div class="recovery-meta">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)</div>
                 
                 <!-- 6. 詳細圖表按鈕統一大小與顏色 -->
                 <button class="detail-chart-btn" onclick="startTrendFlow('battery', '📈 恢復指數')">詳細圖表</button>
@@ -2409,7 +2392,7 @@ function generateMiniChartHTML(canvasId, title, currentStr, avgStr, trendType, t
                 <div class="stability-val" style="font-size: 1.2rem; text-align:left;">${currentStr}</div>
             </div>
             <div class="mini-chart-data">
-                <div style="font-size: 0.8rem; color:#888;">7日平均</div>
+                <div style="font-size: 0.85rem; color:#888;">7日平均</div>
                 <div style="font-weight: bold; color:#555;">${avgStr}</div>
             </div>
         </div>
