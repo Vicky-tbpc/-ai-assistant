@@ -465,13 +465,15 @@
 
 /* 展開/收合按鈕 */
 .toggle-chart-btn {
-    width: 100%;
+    width: fit-content; /* 讓寬度隨著文字內容自動縮放 */
+    margin: 15px auto 0 auto; /* 加入 auto 讓按鈕在容器內置中 */
+    
+    /* 下面維持你原本的設定 */
     background: #f5f5f5;
     border: none;
     color: #666;
-    padding: 8px;
+    padding: 8px 16px; /* 建議左右內距加一點，按鈕看起來更平衡 */
     border-radius: 8px;
-    margin-top: 15px;
     cursor: pointer;
     font-size: 0.9rem;
     display: flex;
@@ -493,7 +495,14 @@
 .mini-chart-header {
     display: flex;
     justify-content: space-between;
+    align-items: flex-end; /* 新增這行：讓內容底部對齊 */
     margin-bottom: 8px;
+}
+
+/* 新增一個類別，專門給 7日平均數值 使用 */
+.mini-chart-avg-val {
+    color: #8699a3; /* 你指定的顏色 */
+    font-weight: bold;
 }
 .mini-chart-title {
     font-size: 0.95rem;
@@ -2143,6 +2152,9 @@ function toggleMiniCharts(btn, targetId) {
     } else {
         target.style.display = 'block';
         btn.innerHTML = '🔼 收合詳細趨勢';
+        
+        // 新增這行：手動觸發視窗縮放事件，喚醒 Chart.js 重新繪圖
+        window.dispatchEvent(new Event('resize'));
     }
 }
 
@@ -2199,12 +2211,14 @@ function appendSummaryCard(displayDate, data) {
     const lightStatusText = raw?.light_status;
     let lightStatusHtml = '';
     if (lightStatusText) {
-        const lightColorMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
-        const dotColor = lightColorMap[lightStatusText] || 'transparent';
-        lightStatusHtml = `<span style="color: inherit; display: flex; align-items: center; gap: 4px; font-size: 1.1rem;">
-            <span style="color: ${dotColor}; font-size: 1.1rem;">●</span> ${lightStatusText}
-        </span>`;
-    }
+    const lightColorMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
+    const dotColor = lightColorMap[lightStatusText] || 'transparent';
+    
+    // 改用 span 套用 .status-dot 類別
+    lightStatusHtml = `<span style="color: inherit; display: flex; align-items: center; gap: 6px; font-size: 1.1rem;">
+        <span class="status-dot" style="background-color: ${dotColor}; margin: 0;"></span> ${lightStatusText}
+    </span>`;
+}
 
     // 5. 日常標籤邏輯
     const dailyTag = raw?.Daily_Tag;
@@ -2306,9 +2320,12 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">脈搏穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val">${Math.round(pulseStats.current)}</div>
+                        <div class="stability-val" style="color: ${batColor};">${Math.round(pulseStats.current)}</div>
                         <div class="stability-diff">較7日平均${pulseStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(pulseStats.diffPct)}%</div>
                     </div>
+                </div>
+                <div class="progress-bg" style="width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden;">
+                     <div class="progress-fill" style="width: ${pulseScore}%; background: ${barColor}; height: 100%; border-radius: 4px;"></div>
                 </div>
                 <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'pulse-charts-${uid}')">🔽 展開詳細趨勢</button>
                 <div id="pulse-charts-${uid}" class="mini-charts-wrapper">
