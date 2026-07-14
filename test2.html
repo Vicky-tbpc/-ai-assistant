@@ -2298,9 +2298,15 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">心率變異(HRV)穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val">${Math.round(hrvStats.current)}</div>
+                        <div class="stability-val" style="color: ${data.battery >= 95 ? '#596b75' : data.battery >= 80 ? '#8699a3' : data.battery >= 60 ? '#a79d8c' : '#ff8c73'};">
+                            ${Math.round(hrvStats.current)}
+                        </div>
                         <div class="stability-diff">較7日平均${hrvStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(hrvStats.diffPct)}%</div>
                     </div>
+                </div>
+                <!-- 新增：讀取 Battery_HR_min_A 的百分比橫條 -->
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${raw.Battery_rMSSD_A || 0}%; height: 100%; background: ${data.battery >= 95 ? '#596b75' : data.battery >= 80 ? '#8699a3' : data.battery >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
                 <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">🔽 展開詳細趨勢</button>
                 <div id="hrv-charts-${uid}" class="mini-charts-wrapper">
@@ -2344,9 +2350,15 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">血氧穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val">${Math.round(o2Stats.current)}</div>
+                        <div class="stability-val" style="color: ${data.battery >= 95 ? '#596b75' : data.battery >= 80 ? '#8699a3' : data.battery >= 60 ? '#a79d8c' : '#ff8c73'};">
+                            ${Math.round(o2Stats.current)}
+                        </div>
                         <div class="stability-diff">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
                     </div>
+                </div>
+                <!-- 新增：讀取 Battery_HR_min_A 的百分比橫條 -->
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${raw.Battery_HBI_A || 0}%; height: 100%; background: ${data.battery >= 95 ? '#596b75' : data.battery >= 80 ? '#8699a3' : data.battery >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
                 <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">🔽 展開詳細趨勢</button>
                 <div id="o2-charts-${uid}" class="mini-charts-wrapper">
