@@ -218,6 +218,8 @@ export default async function handler(req, res) {
         // --- 原始設定 (單一精準指標) ---
         "低氧負擔": "低氧負擔指數 HBI",
         "HBI": "低氧負擔指數 HBI",
+        "RR": "呼吸頻率 RR Respiratory Rate",
+        "呼吸頻率": "呼吸頻率 RR Respiratory Rate",
         "RHR": "靜息心率 RHR",
         "靜息心率": "靜息心率 RHR",
         "ODI": "ODI 3% ODI 4%",
@@ -233,6 +235,7 @@ export default async function handler(req, res) {
         "SDNN": "SDNN 相鄰正常心跳間距的標準差",
         "CBP": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "心血管壓力": "CBP 心血管壓力 血管系統的動態壓力狀態",
+        "說明書": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "Soosyn": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "APP": "APP 安裝教學",
         "ST-50": "ST-50 硬體裝置說明書",
