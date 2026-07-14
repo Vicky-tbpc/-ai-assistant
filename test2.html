@@ -2228,7 +2228,7 @@ function appendSummaryCard(displayDate, data) {
     let tagHtml = '';
     if (dailyTag) {
         const tagColor = (dailyTag.includes('混亂') || dailyTag.includes('極端') || dailyTag.includes('疲乏') || dailyTag.includes('最差') || dailyTag.includes('發炎')) ? '#ff8c73': '#8699a3';
-        tagHtml = `<div class="daily-tag-pill" style="background-color: ${tagColor}; margin: 0; font-size: 13px; padding: 4px 12px;">${dailyTag}</div>`;
+        tagHtml = `<div class="daily-tag-pill" style="background-color: ${tagColor}; margin: 0; font-size: 15px; padding: 4px 12px;">${dailyTag}</div>`;
     }
 
     // 4. 動態恢復指數與橫條顏色設定
@@ -2258,7 +2258,7 @@ function appendSummaryCard(displayDate, data) {
                 <div class="recovery-big-val" style="color: ${batColor};">${data.battery}</div>
                 
                 <!-- 3 & 4. 中間新增橫條顯示百分比，顏色同步 -->
-                <div style="width: 100%; height: 12px; background: #eee; border-radius: 4px; margin: 12px 0; overflow: hidden; display: flex;">
+                <div style="width: 100%; height: 10px; background: #eee; border-radius: 4px; margin: 12px 0; overflow: hidden; display: flex;">
                     <div style="width: ${data.percentage}%; height: 100%; background: ${batColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
 
