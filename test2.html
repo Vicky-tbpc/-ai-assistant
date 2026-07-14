@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089</title>
+    <title>Soosyn 健康夥伴 n089-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2199,12 +2199,14 @@ function appendSummaryCard(displayDate, data) {
     const lightStatusText = raw?.light_status;
     let lightStatusHtml = '';
     if (lightStatusText) {
-        const lightColorMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
-        const dotColor = lightColorMap[lightStatusText] || 'transparent';
-        lightStatusHtml = `<span style="color: inherit; display: flex; align-items: center; gap: 4px; font-size: 1.1rem;">
-            <span style="color: ${dotColor}; font-size: 1.1rem;">●</span> ${lightStatusText}
-        </span>`;
-    }
+    const lightColorMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
+    const dotColor = lightColorMap[lightStatusText] || 'transparent';
+    
+    // 改用 span 套用 .status-dot 類別
+    lightStatusHtml = `<span style="color: inherit; display: flex; align-items: center; gap: 6px; font-size: 1.1rem;">
+        <span class="status-dot" style="background-color: ${dotColor}; margin: 0;"></span> ${lightStatusText}
+    </span>`;
+}
 
     // 5. 日常標籤邏輯
     const dailyTag = raw?.Daily_Tag;
