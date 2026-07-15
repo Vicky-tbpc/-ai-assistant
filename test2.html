@@ -2271,11 +2271,23 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">睡眠穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val">${sleepStabCurrent}</div>
-                        <div class="stability-diff">較7日平均${sleepStabDiff >= 0 ? '高' : '低'} ${Math.abs(sleepStabDiff)}%</div>
+                        <!-- 這裡套用與 HRV 一致的 Math.round() 四捨五入顏色判斷 -->
+                        <div class="stability-val" style="color: ${Math.round(sleepStabCurrent) >= 95 ? '#596b75' : Math.round(sleepStabCurrent) >= 80 ? '#8699a3' : Math.round(sleepStabCurrent) >= 60 ? '#a79d8c' : '#ff8c73'};">
+                            ${Math.round(sleepStabCurrent)}
+                        </div>
                     </div>
                 </div>
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'sleep-charts-${uid}')">🔽 展開詳細趨勢</button>
+                
+                <!-- 新增：睡眠穩定度的百分比橫條 (與 HRV 寬度、顏色判斷邏輯一致) -->
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${Math.round(sleepStabCurrent)}%; height: 100%; background: ${Math.round(sleepStabCurrent) >= 95 ? '#596b75' : Math.round(sleepStabCurrent) >= 80 ? '#8699a3' : Math.round(sleepStabCurrent) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                </div>
+                
+                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
+                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${sleepStabDiff >= 0 ? '高' : '低'} ${Math.abs(sleepStabDiff)}%</div>
+                
+                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
+                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'sleep-charts-${uid}')">▼ 展開詳細趨勢</button>
                 <div id="sleep-charts-${uid}" class="mini-charts-wrapper">
                     ${generateMiniChartHTML(`tst-${uid}`, '總睡眠時間', 
                         `${Math.floor(tstStats.current/60)}小時${Math.round(tstStats.current%60)}分鐘`, 
@@ -2330,19 +2342,23 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">脈搏穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val" style="color: ${pulseStats.current >= 95 ? '#596b75' : pulseStats.current >= 80 ? '#8699a3' : pulseStats.current >= 60 ? '#a79d8c' : '#ff8c73'};">
+                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
+                        <div class="stability-val" style="color: ${Math.round(pulseStats.current) >= 95 ? '#596b75' : Math.round(pulseStats.current) >= 80 ? '#8699a3' : Math.round(pulseStats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
                             ${Math.round(pulseStats.current)}
                         </div>
-                        <div class="stability-diff">較7日平均${pulseStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(pulseStats.diffPct)}%</div>
                     </div>
                 </div>
-
-                <!-- 新增：讀取 Battery_HR_min_A 的百分比橫條 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${raw.Battery_HR_min_A || 0}%; height: 100%; background: ${pulseStats.current >= 95 ? '#596b75' : pulseStats.current >= 80 ? '#8699a3' : pulseStats.current >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                
+                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${Math.round(pulseStats.current)}%; height: 100%; background: ${Math.round(pulseStats.current) >= 95 ? '#596b75' : Math.round(pulseStats.current) >= 80 ? '#8699a3' : Math.round(pulseStats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
-
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'pulse-charts-${uid}')">🔽 展開詳細趨勢</button>
+                
+                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
+                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${pulseStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(pulseStats.diffPct)}%</div>
+                
+                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
+                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'pulse-charts-${uid}')">▼ 展開詳細趨勢</button>
                 <div id="pulse-charts-${uid}" class="mini-charts-wrapper">
                     ${generateMiniChartHTML(`hrmin-${uid}`, '睡眠最低脈搏', 
                         Math.round(hrminStats.current), Math.round(hrminStats.avg), 'hrmin', '💓 睡眠最低脈搏')}
@@ -2357,17 +2373,23 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">血氧穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <div class="stability-val" style="color: ${o2Stats.current >= 95 ? '#596b75' : o2Stats.current >= 80 ? '#8699a3' : o2Stats.current >= 60 ? '#a79d8c' : '#ff8c73'};">
+                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
+                        <div class="stability-val" style="color: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
                             ${Math.round(o2Stats.current)}
                         </div>
-                        <div class="stability-diff">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
                     </div>
                 </div>
-                <!-- 新增：讀取 Battery_HBI_A 的百分比橫條 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${raw.Battery_HBI_A || 0}%; height: 100%; background: ${o2Stats.current >= 95 ? '#596b75' : o2Stats.current >= 80 ? '#8699a3' : o2Stats.current >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                
+                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${Math.round(o2Stats.current)}%; height: 100%; background: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">🔽 展開詳細趨勢</button>
+                
+                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
+                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
+                
+                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
+                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">▼ 展開詳細趨勢</button>
                 <div id="o2-charts-${uid}" class="mini-charts-wrapper">
                     ${generateMiniChartHTML(`hbi-${uid}`, 'HBI 低氧負擔指數', 
                         hbiStats.current.toFixed(1), hbiStats.avg.toFixed(1), 'hbi', '🫁 HBI 低氧負擔指數')}
