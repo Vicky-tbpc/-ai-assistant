@@ -468,7 +468,8 @@
     width: fit-content; /* 讓寬度隨著文字內容自動縮放 */
     margin: 15px auto 0 auto; /* 加入 auto 讓按鈕在容器內置中 */
     border: none;
-    color: #666;
+    background: transparent; /* 新增：取消預設灰底，改為透明背景 */
+    color: #a79d8c;
     padding: 8px 16px; /* 建議左右內距加一點，按鈕看起來更平衡 */
     border-radius: 8px;
     cursor: pointer;
@@ -2145,10 +2146,10 @@ function toggleMiniCharts(btn, targetId) {
     const target = document.getElementById(targetId);
     if (target.style.display === 'block') {
         target.style.display = 'none';
-        btn.innerHTML = '🔽 展開詳細趨勢';
+        btn.innerHTML = '▼ 展開詳細趨勢'; // 修改：改用實心向下箭頭
     } else {
         target.style.display = 'block';
-        btn.innerHTML = '🔼 收合詳細趨勢';
+        btn.innerHTML = '▲ 收合詳細趨勢'; // 修改：改用實心向上箭頭
         
         // 新增這行：手動觸發視窗縮放事件，喚醒 Chart.js 重新繪圖
         window.dispatchEvent(new Event('resize'));
@@ -2313,7 +2314,8 @@ function appendSummaryCard(displayDate, data) {
                 <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
                 <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${hrvStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(hrvStats.diffPct)}%</div>
                 
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">🔽 展開詳細趨勢</button>
+                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
+                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">▼ 展開詳細趨勢</button>
                 <div id="hrv-charts-${uid}" class="mini-charts-wrapper">
                     ${generateMiniChartHTML(`rmssd-${uid}`, 'rMSSD', 
                         rmssdStats.current.toFixed(1), rmssdStats.avg.toFixed(1), 'rmssd', '🌿 rMSSD')}
