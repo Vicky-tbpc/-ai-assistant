@@ -2306,7 +2306,7 @@ function appendSummaryCard(displayDate, data) {
                 </div>
                 <!-- 新增：讀取 Battery_rMSSD_A 的百分比橫條 -->
                 <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${raw.Battery_rMSSD_A || 0}%; height: 100%; background: ${hrvStats.current >= 95 ? '#596b75' : hrvStats.current >= 80 ? '#8699a3' : hrvStats.current >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                    <div style="width: ${Math.round(hrvStats.current)}%; height: 100%; background: ${hrvStats.current >= 95 ? '#596b75' : hrvStats.current >= 80 ? '#8699a3' : hrvStats.current >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
                 </div>
                 <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">🔽 展開詳細趨勢</button>
                 <div id="hrv-charts-${uid}" class="mini-charts-wrapper">
