@@ -2298,18 +2298,21 @@ function appendSummaryCard(displayDate, data) {
                         <span class="stability-title">心率變異(HRV)穩定度</span>
                     </div>
                     <div class="stability-value-box">
-                        <!-- 這裡的顏色判斷加入了 Math.round() -->
+                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
                         <div class="stability-val" style="color: ${Math.round(hrvStats.current) >= 95 ? '#596b75' : Math.round(hrvStats.current) >= 80 ? '#8699a3' : Math.round(hrvStats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
                             ${Math.round(hrvStats.current)}
                         </div>
-                <!-- 新增：讀取 Battery_rMSSD_A 的百分比橫條 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 10px 0; overflow: hidden; display: flex;">
-                    <!-- 這裡的 background 顏色判斷也加入了 Math.round() -->
-                    <div style="width: ${Math.round(hrvStats.current)}%; height: 100%; background: ${Math.round(hrvStats.current) >= 95 ? '#596b75' : Math.round(hrvStats.current) >= 80 ? '#8699a3' : Math.round(hrvStats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
-                </div>
-                        <div class="stability-diff">較7日平均${hrvStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(hrvStats.diffPct)}%</div>
                     </div>
                 </div>
+                
+                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
+                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
+                    <div style="width: ${Math.round(hrvStats.current)}%; height: 100%; background: ${Math.round(hrvStats.current) >= 95 ? '#596b75' : Math.round(hrvStats.current) >= 80 ? '#8699a3' : Math.round(hrvStats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                </div>
+                
+                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
+                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${hrvStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(hrvStats.diffPct)}%</div>
+                
                 <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">🔽 展開詳細趨勢</button>
                 <div id="hrv-charts-${uid}" class="mini-charts-wrapper">
                     ${generateMiniChartHTML(`rmssd-${uid}`, 'rMSSD', 
