@@ -2050,15 +2050,15 @@ function appendSummaryCard(dateTitle, data) {
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
-                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 12px; padding: 4px 10px;">${dailyTag}</span>` : ''}
+                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
                 </div>
                 <div style="text-align: center; margin: 15px 0;">
-                    <span style="font-size: 2.8rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
+                    <span style="font-size: 3.2rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
                 </div>
                 <div class="progress-bg" style="height: 10px; background: #eee; border-radius: 5px; margin-bottom: 8px;">
                     <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
                 </div>
-                <div style="font-size: 12px; color: #888; text-align: left;">
+                <div style="font-size: 12px; color: #888; text-align: center;">
                     超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)
                 </div>
                 <div style="text-align: center; margin-top: 15px;">
