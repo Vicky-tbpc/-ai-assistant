@@ -2172,13 +2172,32 @@ function calculate7DayStats(history7, field, isTime = false) {
 // --- 輔助函式：展開收合控制 ---
 function toggleMiniCharts(btn, chartId) {
     const wrapper = document.getElementById(chartId);
+    // 取得 uid (假設 chartId 格式是 o2-charts-123)
+    const uid = chartId.split('-')[2]; 
+    
     if (wrapper.style.display === 'none') {
         wrapper.style.display = 'block';
         btn.innerText = '▲ 收合7日趨勢';
+
+        // 1. 檢查元素是否存在
+        const canvasId = `hbi-chart-${uid}`;
+        const canvas = document.getElementById(canvasId);
         
-        // 觸發 HBI 趨勢繪圖 (假設你已經把資料準備在全域變數或透過 dataset 傳遞)
-        const canvasId = `hbi-chart-${chartId.split('-')[2]}`; // 取得正確的 uid
-        renderHbiTrend(canvasId, history7); 
+        if (!canvas) {
+            console.error("找不到畫布元件: " + canvasId);
+            return;
+        }
+
+        // 2. 取出對應資料
+        const data = window.hbiDataStore[uid];
+        if (!data) {
+            console.error("找不到對應的 HBI 資料，UID: " + uid);
+            return;
+        }
+
+        // 3. 繪圖
+        renderHbiTrend(canvasId, data);
+        
     } else {
         wrapper.style.display = 'none';
         btn.innerText = '▼ 查看7日趨勢';
