@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089-2</title>
+    <title>Soosyn 健康夥伴 n089</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -511,15 +511,16 @@
     text-align: right;
 }
 .mini-chart-canvas-box {
-    position: relative;
-    width: 100%; 
-    height: 120px; /* 這裡一定要給高度 */
-    display: block; /* 確保它是 block */
+    height: 120px; /* 120px 滿清楚的，但如果覺得一次展開多個圖表畫面太長，可以下修到 80px ~ 100px 試試看 */
+    width: 100%;
+    position: relative; /* Chart.js 正常縮放的靈魂，你有加對！ */
+    margin-bottom: 10px;
 }
 
+/* 建議新增這一段，確保畫布完全填滿容器，且不會有奇怪的底部留白 */
 .mini-chart-canvas-box canvas {
-    display: block; /* 這是關鍵 */
-    width: 100% !important; /* 讓它強制吃滿父容器 */
+    display: block;
+    width: 100% !important;
     height: 100% !important;
 }
 
@@ -576,11 +577,6 @@
 }
 .detail-chart-btn:hover {
     background-color: #e2ddd4;
-}
-/* 測試用：直接強迫畫布顯示出邊框 */
-canvas {
-    border: 3px solid red !important;
-    background-color: #f0f0f0 !important;
 }
 </style>
 </head>
@@ -2137,8 +2133,7 @@ function calculate7DayStats(history7, field, isTime = false) {
             count++;
         }
         // 為了讓圖表顯示，倒序存入 (確保最舊的在前面)
-        const dateVal = d.raw_json.record_end || d.record_end; 
-historyVals.unshift({ date: dateVal, val: isNaN(val) ? null : val });
+        historyVals.unshift({ date: d.record_date, val: isNaN(val) ? null : val });
     });
 
     const avg = count > 0 ? sum / count : 0;
@@ -2160,18 +2155,13 @@ function toggleMiniCharts(btn, targetId) {
         target.style.display = 'none';
         btn.innerHTML = '▼ 查看7日趨勢';
     } else {
-        // 1. 先顯示 DOM
         target.style.display = 'block';
         btn.innerHTML = '▲ 收合7日趨勢'; 
         
-        // 2. 延遲 200ms，確保瀏覽器已經把這個 div 的寬高算出來
+        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
         setTimeout(() => {
-            // 在這裡才呼叫你的繪圖函式，或者觸發重繪
-            Object.values(window.miniChartInstances || {}).forEach(chart => {
-                chart.resize(); // 強制重算大小
-                chart.update(); // 強制重繪
-            });
-        }, 200); 
+            window.dispatchEvent(new Event('resize'));
+        }, 50);
     }
 }
 // --- 重寫健康摘要卡片渲染 ---
@@ -2443,6 +2433,44 @@ function appendSummaryCard(displayDate, data) {
         </div>
     </div>`;
 
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
+
+    // 掛載迷你圖表 (使用 setTimeout 確保 DOM 渲染完畢)
+    setTimeout(() => {
+        mountMiniChart(`tst-${uid}`, tstStats);
+        mountMiniChart(`n3-${uid}`, n3Stats);
+        mountMiniChart(`start-${uid}`, startStats, true);
+        mountMiniChart(`end-${uid}`, endStats, true);
+        mountMiniChart(`wake-${uid}`, wakeStats);
+        mountMiniChart(`rmssd-${uid}`, rmssdStats);
+        mountMiniChart(`hrmin-${uid}`, hrminStats);
+        mountMiniChart(`hbi-${uid}`, hbiStats);
+        mountMiniChart(`rhr-${uid}`, rhrStats);
+    }, 100);
+}
+
+// --- 輔助函式：產生迷你圖表 HTML 結構 ---
+function generateMiniChartHTML(canvasId, title, currentStr, avgStr, trendType, trendName) {
+    return `
+    <div class="mini-chart-item">
+        <div class="mini-chart-header">
+            <div>
+                <div class="mini-chart-title">${title}</div>
+                <div class="stability-val" style="font-size: 1.2rem; text-align:left;">${currentStr}</div>
+            </div>
+            <div class="mini-chart-data">
+                <div style="font-size: 0.85rem; color:#888;">7日平均</div>
+                <div style="font-weight: bold; color:#555;">${avgStr}</div>
+            </div>
+        </div>
+        <div class="mini-chart-canvas-box">
+            <canvas id="${canvasId}"></canvas>
+        </div>
+        <button class="detail-chart-btn" style="padding: 6px; font-size: 0.85rem;" 
+                onclick="startTrendFlow('${trendType}', '${trendName}')">詳細圖表</button>
+    </div>`;
+}
 
 // --- 輔助函式：產生 RHR 橫軸 HTML ---
 function generateRHRBarHTML(current, avg) {
@@ -2473,8 +2501,79 @@ function generateRHRBarHTML(current, avg) {
     </div>`;
 }
 
+// --- 輔助函式：掛載 Chart.js 迷你圖表 ---
+function mountMiniChart(canvasId, statsData, isTime = false) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const labels = statsData.historyVals.map(d => d.date.slice(5).replace('-', '/')); // MM/DD
+    const dataPoints = statsData.historyVals.map(d => d.val);
+    const avgLine = dataPoints.map(() => statsData.avg);
 
-function appendStatusOptions() {
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '當日數值',
+                    data: dataPoints,
+                    borderColor: '#999999',
+                    backgroundColor: '#596b75',
+                    borderWidth: 1.5,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#596b75',
+                    zIndex: 10
+                },
+                {
+                    label: '7日平均線',
+                    data: avgLine,
+                    borderColor: '#c1cdd3',
+                    borderWidth: 2,
+                    borderDash: [5, 5], // 虛線
+                    pointRadius: 0,
+                    zIndex: 5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false } // 迷你圖表關閉 tooltip 保持乾淨
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 10 },
+                        color: '#999',
+                        // 僅顯示第一筆與第七筆 (最後一筆) 日期
+                        callback: function(value, index, values) {
+                            if (index === 0 || index === values.length - 1) {
+                                return this.getLabelForValue(value);
+                            }
+                            return '';
+                        }
+                    }
+                },
+                y: {
+                    display: false, // 隱藏 Y 軸，讓畫面極簡
+                    // 若為時間，給予適當的縮放緩衝
+                    afterDataLimits: (scale) => {
+                        const buffer = isTime ? 60 : (scale.max - scale.min) * 0.2;
+                        scale.min -= buffer;
+                        scale.max += buffer;
+                    }
+                }
+            }
+        }
+    });
+}
+
+    function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
