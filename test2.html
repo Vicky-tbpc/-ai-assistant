@@ -517,13 +517,6 @@
     margin-bottom: 10px;
 }
 
-/* 建議新增這一段，確保畫布完全填滿容器，且不會有奇怪的底部留白 */
-.mini-chart-canvas-box canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
-}
-
 /* RHR 橫軸樣式 */
 .rhr-axis-container {
     margin-top: 15px;
@@ -2133,7 +2126,8 @@ function calculate7DayStats(history7, field, isTime = false) {
             count++;
         }
         // 為了讓圖表顯示，倒序存入 (確保最舊的在前面)
-        historyVals.unshift({ date: d.record_date, val: isNaN(val) ? null : val });
+        const dateVal = d.raw_json.record_end || d.record_end; 
+historyVals.unshift({ date: dateVal, val: isNaN(val) ? null : val });
     });
 
     const avg = count > 0 ? sum / count : 0;
