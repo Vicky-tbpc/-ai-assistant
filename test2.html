@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089</title>
+    <title>Soosyn 健康夥伴 n089-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2464,7 +2464,8 @@ function generateMiniChartHTML(canvasId, title, currentStr, avgStr, trendType, t
                 <div style="font-weight: bold; color:#555;">${avgStr}</div>
             </div>
         </div>
-        <div class="mini-chart-canvas-box">
+        <!-- 💡 關鍵修改在這裡：加上 position: relative 與固定的 height -->
+        <div class="mini-chart-canvas-box" style="position: relative; height: 120px; width: 100%;">
             <canvas id="${canvasId}"></canvas>
         </div>
         <button class="detail-chart-btn" style="padding: 6px; font-size: 0.85rem;" 
