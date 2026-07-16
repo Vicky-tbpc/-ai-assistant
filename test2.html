@@ -511,10 +511,16 @@
     text-align: right;
 }
 .mini-chart-canvas-box {
-    height: 120px; /* 120px 滿清楚的，但如果覺得一次展開多個圖表畫面太長，可以下修到 80px ~ 100px 試試看 */
-    width: 100%;
-    position: relative; /* Chart.js 正常縮放的靈魂，你有加對！ */
-    margin-bottom: 10px;
+    position: relative;
+    width: 100%; 
+    height: 120px; /* 這裡一定要給高度 */
+    display: block; /* 確保它是 block */
+}
+
+.mini-chart-canvas-box canvas {
+    display: block; /* 這是關鍵 */
+    width: 100% !important; /* 讓它強制吃滿父容器 */
+    height: 100% !important;
 }
 
 /* RHR 橫軸樣式 */
@@ -570,6 +576,11 @@
 }
 .detail-chart-btn:hover {
     background-color: #e2ddd4;
+}
+/* 測試用：直接強迫畫布顯示出邊框 */
+canvas {
+    border: 3px solid red !important;
+    background-color: #f0f0f0 !important;
 }
 </style>
 </head>
@@ -2149,15 +2160,18 @@ function toggleMiniCharts(btn, targetId) {
         target.style.display = 'none';
         btn.innerHTML = '▼ 查看7日趨勢';
     } else {
+        // 1. 先顯示 DOM
         target.style.display = 'block';
         btn.innerHTML = '▲ 收合7日趨勢'; 
         
+        // 2. 延遲 200ms，確保瀏覽器已經把這個 div 的寬高算出來
         setTimeout(() => {
-            // ✅ 改成直接呼叫每個圖表自己的 resize()，強制它重新計算 120px 的高度
+            // 在這裡才呼叫你的繪圖函式，或者觸發重繪
             Object.values(window.miniChartInstances || {}).forEach(chart => {
-                chart.resize();
+                chart.resize(); // 強制重算大小
+                chart.update(); // 強制重繪
             });
-        }, 50);
+        }, 200); 
     }
 }
 // --- 重寫健康摘要卡片渲染 ---
