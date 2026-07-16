@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+*<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -2148,23 +2148,6 @@ function calculate7DayStats(history7, field, isTime = false) {
     return { current, avg, diffPct, historyVals };
 }
 
-// --- 輔助函式：展開收合控制 ---
-function toggleMiniCharts(btn, targetId) {
-    const target = document.getElementById(targetId);
-    if (target.style.display === 'block') {
-        target.style.display = 'none';
-        btn.innerHTML = '▼ 查看7日趨勢';
-    } else {
-        target.style.display = 'block';
-        btn.innerHTML = '▲ 收合7日趨勢'; 
-        
-        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-        }, 50);
-    }
-}
-
 // --- 重寫健康摘要卡片渲染 ---
 function appendSummaryCard(displayDate, data) {
     // 💡 相容性處理：如果只傳入一個參數(如 showSummaryFlow)，將其視為 data
@@ -2619,11 +2602,6 @@ async function handleAbnormalitySelection(choice) {
     }
 }
 
-
-
-
-
-
 async function handleStatusSelection(text, score) {
     document.getElementById('status-options-container')?.remove();
     appendUserMessage(text);
@@ -2808,7 +2786,22 @@ async function handleAbnormalityInput(msg) {
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
-
+// --- 輔助函式：展開收合控制 ---
+function toggleMiniCharts(btn, targetId) {
+    const target = document.getElementById(targetId);
+    if (target.style.display === 'block') {
+        target.style.display = 'none';
+        btn.innerHTML = '▼ 查看7日趨勢';
+    } else {
+        target.style.display = 'block';
+        btn.innerHTML = '▲ 收合7日趨勢'; 
+        
+        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+        }, 50);
+    }
+}
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { 
