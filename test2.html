@@ -2498,89 +2498,81 @@ function generateRHRBarHTML(current, avg) {
     </div>`;
 }
 
-// 請確保這行宣告放在 JavaScript 檔案的頂端，或是 mountMiniChart 函式之外
 window.miniChartInstances = window.miniChartInstances || {};
 
-// --- 輔助函式：掛載 Chart.js 迷你圖表 ---
 function mountMiniChart(canvasId, statsData, isTime = false) {
     const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
+    if (!canvas) {
+        console.error("找不到畫布 ID:", canvasId);
+        return;
+    }
 
-    // --- 【整合關鍵】檢查並銷毀舊圖表 ---
+    // 1. 強制設定 canvas 的 HTML 屬性 (這是很多時候解決白屏的關鍵)
+    canvas.setAttribute('width', '300'); // 這裡設定基礎寬度
+    canvas.setAttribute('height', '120'); // 這裡設定基礎高度
+
+    // 2. 銷毀舊圖表
     if (window.miniChartInstances[canvasId]) {
         window.miniChartInstances[canvasId].destroy();
     }
-    
-    const ctx = canvas.getContext('2d');
-    const labels = statsData.historyVals.map(d => d.date.slice(5).replace('-', '/')); // MM/DD
+
+    // 3. 確保資料處理
+    const labels = statsData.historyVals.map(d => d.date.slice(5).replace('-', '/'));
     const dataPoints = statsData.historyVals.map(d => d.val);
     const avgLine = dataPoints.map(() => statsData.avg);
 
-    // --- 【整合關鍵】將新圖表存入實體管理物件 ---
-    window.miniChartInstances[canvasId] = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '當日數值',
-                    data: dataPoints,
-                    borderColor: '#999999',
-                    backgroundColor: '#596b75',
-                    borderWidth: 1.5,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#596b75',
-                    zIndex: 10
-                },
-                {
-                    label: '7日平均線',
-                    data: avgLine,
-                    borderColor: '#c1cdd3',
-                    borderWidth: 2,
-                    borderDash: [5, 5], // 虛線
-                    pointRadius: 0,
-                    zIndex: 5
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: { enabled: false }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: {
-                        font: { size: 10 },
-                        color: '#999',
-                        callback: function(value, index, values) {
-                            if (index === 0 || index === values.length - 1) {
-                                return this.getLabelForValue(value);
-                            }
-                            return '';
-                        }
+    // 4. 延遲建立圖表，確保 DOM 渲染完成 (使用 requestAnimationFrame 確保畫面更新)
+    requestAnimationFrame(() => {
+        const ctx = canvas.getContext('2d');
+        
+        window.miniChartInstances[canvasId] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '當日數值',
+                        data: dataPoints,
+                        borderColor: '#999999',
+                        backgroundColor: '#596b75',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#596b75'
+                    },
+                    {
+                        label: '7日平均線',
+                        data: avgLine,
+                        borderColor: '#c1cdd3',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0
                     }
-                },
-                y: {
-                    display: false,
-                    afterDataLimits: (scale) => {
-                        let buffer = isTime ? 60 : (scale.max - scale.min) * 0.2;
-                        // 數值防呆
-                        if (buffer === 0) {
-                            buffer = scale.max * 0.1 || 1; 
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // 關鍵：讓它忽略預設比例，直接填滿容器
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                scales: {
+                    x: { display: true, ticks: { font: { size: 10 }, color: '#999' } },
+                    y: { 
+                        display: false,
+                        afterDataLimits: (scale) => {
+                            let buffer = (scale.max - scale.min) * 0.2;
+                            if (buffer === 0) buffer = scale.max * 0.1 || 1;
+                            scale.min -= buffer;
+                            scale.max += buffer;
                         }
-                        scale.min -= buffer;
-                        scale.max += buffer;
                     }
                 }
             }
-        }
+        });
+        
+        // 5. 強制圖表更新一次
+        window.miniChartInstances[canvasId].update();
+        console.log("圖表嘗試渲染完成:", canvasId);
     });
-}
-    function appendStatusOptions() {
+}    function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
