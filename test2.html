@@ -578,6 +578,27 @@
 .detail-chart-btn:hover {
     background-color: #e2ddd4;
 }
+/* HBI 趨勢區塊樣式 */
+.hbi-trend-wrapper {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed #ddd;
+    display: none; /* 預設收合 */
+}
+.hbi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.hbi-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 0.9rem;
+}
+.hbi-val { font-weight: bold; color: #555; }
+.hbi-avg { color: #8699a3; font-weight: bold; }
+.chart-box { height: 150px; width: 100%; }
 </style>
 </head>
 <body>
@@ -2149,19 +2170,18 @@ function calculate7DayStats(history7, field, isTime = false) {
 }
 
 // --- 輔助函式：展開收合控制 ---
-function toggleMiniCharts(btn, targetId) {
-    const target = document.getElementById(targetId);
-    if (target.style.display === 'block') {
-        target.style.display = 'none';
-        btn.innerHTML = '▼ 查看7日趨勢';
-    } else {
-        target.style.display = 'block';
-        btn.innerHTML = '▲ 收合7日趨勢'; 
+function toggleMiniCharts(btn, chartId) {
+    const wrapper = document.getElementById(chartId);
+    if (wrapper.style.display === 'none') {
+        wrapper.style.display = 'block';
+        btn.innerText = '▲ 收合7日趨勢';
         
-        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-        }, 50);
+        // 觸發 HBI 趨勢繪圖 (假設你已經把資料準備在全域變數或透過 dataset 傳遞)
+        const canvasId = `hbi-chart-${chartId.split('-')[2]}`; // 取得正確的 uid
+        renderHbiTrend(canvasId, history7); 
+    } else {
+        wrapper.style.display = 'none';
+        btn.innerText = '▼ 查看7日趨勢';
     }
 }
 // --- 重寫健康摘要卡片渲染 ---
@@ -2374,35 +2394,42 @@ function appendSummaryCard(displayDate, data) {
             </div>
 
             <!-- 8. 血氧穩定度區塊 -->
-            <div class="summary-block">
-                <div class="stability-header">
-                    <div class="stability-title-box">
-                        <img src="images/o2_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
-                        <span class="stability-title">血氧穩定度</span>
-                    </div>
-                    <div class="stability-value-box">
-                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
-                        <div class="stability-val" style="color: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
-                            ${Math.round(o2Stats.current)}
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${Math.round(o2Stats.current)}%; height: 100%; background: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
-                </div>
-                
-                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
-                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
-                
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="o2-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`hbi-${uid}`, 'HBI 低氧負擔指數', 
-                        hbiStats.current.toFixed(1), hbiStats.avg.toFixed(1), 'hbi', '🫁 HBI 低氧負擔指數')}
-                </div>
+<div class="summary-block">
+    <div class="stability-header">
+        <div class="stability-title-box">
+            <img src="images/o2_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
+            <span class="stability-title">血氧穩定度</span>
+        </div>
+        <div class="stability-value-box">
+            <div class="stability-val" style="color: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
+                ${Math.round(o2Stats.current)}
             </div>
+        </div>
+    </div>
+    
+    <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
+        <div style="width: ${Math.round(o2Stats.current)}%; height: 100%; background: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+    </div>
+    
+    <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
+    
+    <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">▼ 查看7日趨勢</button>
+    
+    <!-- 整合區塊開始 -->
+    <div id="o2-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
+        ${generateMiniChartHTML(`hbi-${uid}`, 'HBI 低氧負擔指數', hbiStats.current.toFixed(1), hbiStats.avg.toFixed(1), 'hbi', '🫁 HBI 低氧負擔指數')}
+        
+        <!-- 新增的 HBI 詳細趨勢區塊 -->
+        <div class="hbi-trend-wrapper" id="hbi-trend-wrapper-${uid}" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ddd;">
+            <div class="hbi-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-weight:bold; font-size: 0.9rem;">HBI 7日趨勢變化</span>
+            </div>
+            <div class="chart-box" style="height: 150px; width: 100%;">
+                <canvas id="hbi-chart-${uid}"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
 
             <!-- 9. 靜息心率 (RHR) 區塊 -->
             <div class="summary-block">
@@ -3256,6 +3283,7 @@ async function selectCalendarDate(dateStr) {
     
     await processSummarySearch(preDateStr, dateStr);
 }
+
 </script>
 </body>
 </html>
