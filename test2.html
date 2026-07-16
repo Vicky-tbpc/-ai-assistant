@@ -2100,13 +2100,13 @@ function appendSummaryCard(dateTitle, data) {
 
             <!-- 原有分析與報告 (需求 15) -->
             <div class="analysis-capsule capsule-best">
-                <span class="capsule-icon">✨</span><span style="flex: 1;">${data.bestText}</span>
+                <span class="capsule-icon">😊</span><span style="flex: 1;">${data.bestText}</span>
             </div>
             <div class="analysis-capsule capsule-worst">
-                <span class="capsule-icon">⚠️</span><span style="flex: 1;">${data.worstText}</span>
+                <span class="capsule-icon">😟</span><span style="flex: 1;">${data.worstText}</span>
             </div>
             <div style="margin-top: 15px;">
-                <button class="primary-btn" style="background: white; color: var(--tbp-blue); border: 1px solid var(--tbp-blue);" onclick="openSleepReport('${dateTitle}')">
+                <button class="primary-btn" style="background: white; color: var(--tbp-blue); border: 1px solid var(--tbp-blue);" onclick="openSleepReport('${data.date}')">
                     📄 開啟當日睡眠報告
                 </button>
             </div>
