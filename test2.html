@@ -2154,24 +2154,25 @@ historyVals.unshift({ date: dateVal, val: isNaN(val) ? null : val });
 }
 
 // --- 輔助函式：展開收合控制 ---
-function toggleMiniCharts(btn, targetId) {
+function toggleMiniCharts(btn, targetId, chartConfigs) {
     const target = document.getElementById(targetId);
-    if (target.style.display === 'block') {
+    
+    // 如果是第一次展開 (且內部尚未掛載圖表)，則進行渲染
+    if (target.style.display === 'none' || target.style.display === '') {
+        target.style.display = 'block';
+        btn.innerHTML = '▲ 收合7日趨勢';
+
+        // 檢查是否已經渲染過，避免重複渲染
+        if (!target.dataset.initialized) {
+            chartConfigs.forEach(config => {
+                mountMiniChart(config.id, config.data);
+            });
+            target.dataset.initialized = 'true'; // 標記已初始化
+        }
+    } else {
         target.style.display = 'none';
         btn.innerHTML = '▼ 查看7日趨勢';
-    } else {
-        // 1. 先顯示 DOM
-        target.style.display = 'block';
-        btn.innerHTML = '▲ 收合7日趨勢'; 
-        
-        // 2. 延遲 200ms，確保瀏覽器已經把這個 div 的寬高算出來
-        setTimeout(() => {
-            // 在這裡才呼叫你的繪圖函式，或者觸發重繪
-            Object.values(window.miniChartInstances || {}).forEach(chart => {
-                chart.resize(); // 強制重算大小
-                chart.update(); // 強制重繪
-            });
-        }, 200); 
+        // (選擇性) 若要節省記憶體，這裡可以做銷毀邏輯，但不一定要刪除
     }
 }
 // --- 重寫健康摘要卡片渲染 ---
@@ -2250,6 +2251,19 @@ function appendSummaryCard(displayDate, data) {
     // 產生唯一 ID
     const uid = Date.now();
 
+// 在 appendSummaryCard 內生成按鈕時
+// 先把你要渲染的清單準備好
+const chartsToRender = [
+    { id: `tst-${uid}`, data: tstStats },
+    { id: `n3-${uid}`, data: n3Stats },
+    /
+];
+
+// 將這個 config 轉成字串放到 data- 屬性中，或者透過變數傳遞
+// 簡單做法：直接在 appendSummaryCard 內定義一個 closure 函式或者 global map
+window.chartDataMap = window.chartDataMap || {};
+window.chartDataMap[`target-${uid}`] = chartsToRender;
+
     let html = `
     <div class="msg-row ai-row">
         <div class="summary-card" style="cursor: default; padding: 15px;">
@@ -2305,7 +2319,7 @@ function appendSummaryCard(displayDate, data) {
                 <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${sleepStabDiff >= 0 ? '高' : '低'} ${Math.abs(sleepStabDiff)}%</div>
                 
                 <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'sleep-charts-${uid}')">▼ 查看7日趨勢</button>
+                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'sleep-charts-${uid}', window.chartDataMap['target-${uid}'])">▼ 查看7日趨勢</button>
                 <div id="sleep-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
                     ${generateMiniChartHTML(`tst-${uid}`, '總睡眠時間', 
                         `${Math.floor(tstStats.current/60)}小時${Math.round(tstStats.current%60)}分鐘`, 
