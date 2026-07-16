@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089</title>
+    <title>Soosyn 健康夥伴 n089-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -461,67 +461,6 @@
 .stability-diff {
     font-size: 0.8rem;
     color: #888;
-}
-
-/* 展開/收合按鈕 */
-.toggle-chart-btn {
-    width: fit-content; /* 讓寬度隨著文字內容自動縮放 */
-    margin: 15px auto 0 auto; /* 加入 auto 讓按鈕在容器內置中 */
-    border: none;
-    background: transparent; /* 新增：取消預設灰底，改為透明背景 */
-    color: #a79d8c;
-    padding: 8px 16px; /* 建議左右內距加一點，按鈕看起來更平衡 */
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 5px;
-}
-
-/* 迷你圖表容器 */
-.mini-charts-wrapper {
-    display: none;
-    margin-top: 20px;
-    border-top: 1px dashed #ddd;
-    padding-top: 15px;
-}
-.mini-chart-item {
-    margin-bottom: 25px;
-}
-.mini-chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end; /* 新增這行：讓內容底部對齊 */
-    margin-bottom: 8px;
-}
-
-/* 新增一個類別，專門給 7日平均數值 使用 */
-.mini-chart-avg-val {
-    color: #8699a3; /* 你指定的顏色 */
-    font-weight: bold;
-}
-.mini-chart-title {
-    font-size: 0.95rem;
-    color: #555;
-    font-weight: bold;
-}
-.mini-chart-data {
-    text-align: right;
-}
-.mini-chart-canvas-box {
-    height: 120px; /* 120px 滿清楚的，但如果覺得一次展開多個圖表畫面太長，可以下修到 80px ~ 100px 試試看 */
-    width: 100%;
-    position: relative; /* Chart.js 正常縮放的靈魂，你有加對！ */
-    margin-bottom: 10px;
-}
-
-/* 建議新增這一段，確保畫布完全填滿容器，且不會有奇怪的底部留白 */
-.mini-chart-canvas-box canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
 }
 
 /* RHR 橫軸樣式 */
@@ -2148,22 +2087,7 @@ function calculate7DayStats(history7, field, isTime = false) {
     return { current, avg, diffPct, historyVals };
 }
 
-// --- 輔助函式：展開收合控制 ---
-function toggleMiniCharts(btn, targetId) {
-    const target = document.getElementById(targetId);
-    if (target.style.display === 'block') {
-        target.style.display = 'none';
-        btn.innerHTML = '▼ 查看7日趨勢';
-    } else {
-        target.style.display = 'block';
-        btn.innerHTML = '▲ 收合7日趨勢'; 
-        
-        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-        }, 50);
-    }
-}
+
 // --- 重寫健康摘要卡片渲染 ---
 function appendSummaryCard(displayDate, data) {
     // 💡 相容性處理：如果只傳入一個參數(如 showSummaryFlow)，將其視為 data
@@ -2294,22 +2218,7 @@ function appendSummaryCard(displayDate, data) {
                 <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
                 <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${sleepStabDiff >= 0 ? '高' : '低'} ${Math.abs(sleepStabDiff)}%</div>
                 
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'sleep-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="sleep-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`tst-${uid}`, '總睡眠時間', 
-                        `${Math.floor(tstStats.current/60)}小時${Math.round(tstStats.current%60)}分鐘`, 
-                        `${Math.floor(tstStats.avg/60)}小時${Math.round(tstStats.avg%60)}分鐘`, 'tst', '🛌 總睡眠時間')}
-                    ${generateMiniChartHTML(`n3-${uid}`, '深睡期 (N3)', 
-                        `${Math.round(n3Stats.current)}%`, `${Math.round(n3Stats.avg)}%`, 'n3', '💤 深睡期 (N3)')}
-                    ${generateMiniChartHTML(`start-${uid}`, '入睡規律性', 
-                        formatMinutesToAmPm(startStats.current), formatMinutesToAmPm(startStats.avg), 'start', '🌙 入睡規律性')}
-                    ${generateMiniChartHTML(`end-${uid}`, '醒來規律性', 
-                        formatMinutesToAmPm(endStats.current), formatMinutesToAmPm(endStats.avg), 'end', '☀️ 醒來規律性')}
-                    ${generateMiniChartHTML(`wake-${uid}`, '睡眠清醒時間', 
-                        `${Math.round(wakeStats.current)}分鐘`, `${Math.round(wakeStats.avg)}分鐘`, 'wake', '⏱️ 睡眠清醒時間')}
-                </div>
-            </div>
+                            </div>
             
             <!-- 6. 心率變異 (HRV) 穩定度區塊 -->
             <div class="summary-block">
@@ -2334,13 +2243,7 @@ function appendSummaryCard(displayDate, data) {
                 <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
                 <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${hrvStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(hrvStats.diffPct)}%</div>
                 
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="hrv-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`rmssd-${uid}`, 'rMSSD', 
-                        rmssdStats.current.toFixed(1), rmssdStats.avg.toFixed(1), 'rmssd', '🌿 rMSSD')}
-                </div>
-            </div>
+                           </div>
 
             <!-- 7. 脈搏穩定度區塊 -->
             <div class="summary-block">
@@ -2365,13 +2268,7 @@ function appendSummaryCard(displayDate, data) {
                 <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
                 <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${pulseStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(pulseStats.diffPct)}%</div>
                 
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'pulse-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="pulse-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`hrmin-${uid}`, '睡眠最低脈搏', 
-                        Math.round(hrminStats.current), Math.round(hrminStats.avg), 'hrmin', '💓 睡眠最低脈搏')}
-                </div>
-            </div>
+                           </div>
 
             <!-- 8. 血氧穩定度區塊 -->
             <div class="summary-block">
@@ -2395,14 +2292,7 @@ function appendSummaryCard(displayDate, data) {
                 
                 <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
                 <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
-                
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="o2-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`hbi-${uid}`, 'HBI 低氧負擔指數', 
-                        hbiStats.current.toFixed(1), hbiStats.avg.toFixed(1), 'hbi', '🫁 HBI 低氧負擔指數')}
-                </div>
-            </div>
+                           </div>
 
             <!-- 9. 靜息心率 (RHR) 區塊 -->
             <div class="summary-block">
@@ -2418,12 +2308,6 @@ function appendSummaryCard(displayDate, data) {
                 
                 <!-- 橫軸呈現範圍 -->
                 ${generateRHRBarHTML(Math.round(rhrStats.current), Math.round(rhrStats.avg))}
-
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'rhr-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="rhr-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`rhr-${uid}`, '靜息心率 (RHR) 7日趨勢', 
-                        Math.round(rhrStats.current), Math.round(rhrStats.avg), 'rhr', '❤️ 靜息心率 (RHR)')}
-                </div>
             </div>
             <div class="analysis-capsule capsule-best"><span class="capsule-icon">👍</span><span>${data.bestText}</span></div>
             <div class="analysis-capsule capsule-worst" style="margin-bottom:15px;"><span class="capsule-icon">💡</span><span>${data.worstText}</span></div>
@@ -2436,41 +2320,6 @@ function appendSummaryCard(displayDate, data) {
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 
-    // 掛載迷你圖表 (使用 setTimeout 確保 DOM 渲染完畢)
-    setTimeout(() => {
-        mountMiniChart(`tst-${uid}`, tstStats);
-        mountMiniChart(`n3-${uid}`, n3Stats);
-        mountMiniChart(`start-${uid}`, startStats, true);
-        mountMiniChart(`end-${uid}`, endStats, true);
-        mountMiniChart(`wake-${uid}`, wakeStats);
-        mountMiniChart(`rmssd-${uid}`, rmssdStats);
-        mountMiniChart(`hrmin-${uid}`, hrminStats);
-        mountMiniChart(`hbi-${uid}`, hbiStats);
-        mountMiniChart(`rhr-${uid}`, rhrStats);
-    }, 100);
-}
-
-// --- 輔助函式：產生迷你圖表 HTML 結構 ---
-function generateMiniChartHTML(canvasId, title, currentStr, avgStr, trendType, trendName) {
-    return `
-    <div class="mini-chart-item">
-        <div class="mini-chart-header">
-            <div>
-                <div class="mini-chart-title">${title}</div>
-                <div class="stability-val" style="font-size: 1.2rem; text-align:left;">${currentStr}</div>
-            </div>
-            <div class="mini-chart-data">
-                <div style="font-size: 0.85rem; color:#888;">7日平均</div>
-                <div style="font-weight: bold; color:#555;">${avgStr}</div>
-            </div>
-        </div>
-        <div class="mini-chart-canvas-box">
-            <canvas id="${canvasId}"></canvas>
-        </div>
-        <button class="detail-chart-btn" style="padding: 6px; font-size: 0.85rem;" 
-                onclick="startTrendFlow('${trendType}', '${trendName}')">詳細圖表</button>
-    </div>`;
-}
 
 // --- 輔助函式：產生 RHR 橫軸 HTML ---
 function generateRHRBarHTML(current, avg) {
@@ -2501,77 +2350,6 @@ function generateRHRBarHTML(current, avg) {
     </div>`;
 }
 
-// --- 輔助函式：掛載 Chart.js 迷你圖表 ---
-function mountMiniChart(canvasId, statsData, isTime = false) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const labels = statsData.historyVals.map(d => d.date.slice(5).replace('-', '/')); // MM/DD
-    const dataPoints = statsData.historyVals.map(d => d.val);
-    const avgLine = dataPoints.map(() => statsData.avg);
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '當日數值',
-                    data: dataPoints,
-                    borderColor: '#999999',
-                    backgroundColor: '#596b75',
-                    borderWidth: 1.5,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#596b75',
-                    zIndex: 10
-                },
-                {
-                    label: '7日平均線',
-                    data: avgLine,
-                    borderColor: '#c1cdd3',
-                    borderWidth: 2,
-                    borderDash: [5, 5], // 虛線
-                    pointRadius: 0,
-                    zIndex: 5
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: { enabled: false } // 迷你圖表關閉 tooltip 保持乾淨
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: {
-                        font: { size: 10 },
-                        color: '#999',
-                        // 僅顯示第一筆與第七筆 (最後一筆) 日期
-                        callback: function(value, index, values) {
-                            if (index === 0 || index === values.length - 1) {
-                                return this.getLabelForValue(value);
-                            }
-                            return '';
-                        }
-                    }
-                },
-                y: {
-                    display: false, // 隱藏 Y 軸，讓畫面極簡
-                    // 若為時間，給予適當的縮放緩衝
-                    afterDataLimits: (scale) => {
-                        const buffer = isTime ? 60 : (scale.max - scale.min) * 0.2;
-                        scale.min -= buffer;
-                        scale.max += buffer;
-                    }
-                }
-            }
-        }
-    });
-}
 
     function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
