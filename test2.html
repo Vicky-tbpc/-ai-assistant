@@ -2152,9 +2152,11 @@ function toggleMiniCharts(btn, targetId) {
         target.style.display = 'block';
         btn.innerHTML = '▲ 收合7日趨勢'; 
         
-        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
         setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
+            // ✅ 改成直接呼叫每個圖表自己的 resize()，強制它重新計算 120px 的高度
+            Object.values(window.miniChartInstances || {}).forEach(chart => {
+                chart.resize();
+            });
         }, 50);
     }
 }
@@ -2496,17 +2498,26 @@ function generateRHRBarHTML(current, avg) {
     </div>`;
 }
 
+// 請確保這行宣告放在 JavaScript 檔案的頂端，或是 mountMiniChart 函式之外
+window.miniChartInstances = window.miniChartInstances || {};
+
 // --- 輔助函式：掛載 Chart.js 迷你圖表 ---
 function mountMiniChart(canvasId, statsData, isTime = false) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
+
+    // --- 【整合關鍵】檢查並銷毀舊圖表 ---
+    if (window.miniChartInstances[canvasId]) {
+        window.miniChartInstances[canvasId].destroy();
+    }
     
     const ctx = canvas.getContext('2d');
     const labels = statsData.historyVals.map(d => d.date.slice(5).replace('-', '/')); // MM/DD
     const dataPoints = statsData.historyVals.map(d => d.val);
     const avgLine = dataPoints.map(() => statsData.avg);
 
-    new Chart(ctx, {
+    // --- 【整合關鍵】將新圖表存入實體管理物件 ---
+    window.miniChartInstances[canvasId] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -2537,7 +2548,7 @@ function mountMiniChart(canvasId, statsData, isTime = false) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: { enabled: false } // 迷你圖表關閉 tooltip 保持乾淨
+                tooltip: { enabled: false }
             },
             scales: {
                 x: {
@@ -2545,7 +2556,6 @@ function mountMiniChart(canvasId, statsData, isTime = false) {
                     ticks: {
                         font: { size: 10 },
                         color: '#999',
-                        // 僅顯示第一筆與第七筆 (最後一筆) 日期
                         callback: function(value, index, values) {
                             if (index === 0 || index === values.length - 1) {
                                 return this.getLabelForValue(value);
@@ -2555,10 +2565,13 @@ function mountMiniChart(canvasId, statsData, isTime = false) {
                     }
                 },
                 y: {
-                    display: false, // 隱藏 Y 軸，讓畫面極簡
-                    // 若為時間，給予適當的縮放緩衝
+                    display: false,
                     afterDataLimits: (scale) => {
-                        const buffer = isTime ? 60 : (scale.max - scale.min) * 0.2;
+                        let buffer = isTime ? 60 : (scale.max - scale.min) * 0.2;
+                        // 數值防呆
+                        if (buffer === 0) {
+                            buffer = scale.max * 0.1 || 1; 
+                        }
                         scale.min -= buffer;
                         scale.max += buffer;
                     }
@@ -2567,7 +2580,6 @@ function mountMiniChart(canvasId, statsData, isTime = false) {
         }
     });
 }
-
     function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
