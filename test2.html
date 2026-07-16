@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n089</title>
+    <title>Soosyn 健康夥伴 n090</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -401,183 +401,6 @@
     height: 100%;
     object-fit: cover; /* 如果圖片原本不是正方形，cover 可以確保它不變形並填滿 */
 }
-/* --- 健康摘要小卡改版專用樣式 --- */
-.summary-block {
-    background: #fdfdfd;
-    border: 1px solid #f0f0f0;
-    border-radius: 12px;
-    padding: 20px 15px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-}
-
-/* 恢復指數特化 */
-.recovery-index-box {
-    text-align: center;
-    padding: 10px 0;
-}
-.recovery-big-val {
-    font-size: 5rem;
-    font-weight: 900;
-    color: var(--tbp-blue);
-    line-height: 1;
-    margin-bottom: 8px;
-}
-.recovery-meta {
-    font-size: 0.9rem;
-    color: #666;
-    margin-bottom: 15px;
-}
-
-/* 穩定度區塊 */
-.stability-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.stability-title-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.stability-icon {
-    width: 24px;
-    height: 24px;
-}
-.stability-title {
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: #333;
-}
-.stability-value-box {
-    text-align: right;
-}
-.stability-val {
-    font-size: 1.6rem;
-    font-weight: bold;
-    color: #333;
-    line-height: 1.2;
-}
-.stability-diff {
-    font-size: 0.8rem;
-    color: #888;
-}
-
-/* 展開/收合按鈕 */
-.toggle-chart-btn {
-    width: fit-content; /* 讓寬度隨著文字內容自動縮放 */
-    margin: 15px auto 0 auto; /* 加入 auto 讓按鈕在容器內置中 */
-    border: none;
-    background: transparent; /* 新增：取消預設灰底，改為透明背景 */
-    color: #a79d8c;
-    padding: 8px 16px; /* 建議左右內距加一點，按鈕看起來更平衡 */
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 5px;
-}
-
-/* 迷你圖表容器 */
-.mini-charts-wrapper {
-    display: none;
-    margin-top: 20px;
-    border-top: 1px dashed #ddd;
-    padding-top: 15px;
-}
-.mini-chart-item {
-    margin-bottom: 25px;
-}
-.mini-chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end; /* 新增這行：讓內容底部對齊 */
-    margin-bottom: 8px;
-}
-
-/* 新增一個類別，專門給 7日平均數值 使用 */
-.mini-chart-avg-val {
-    color: #8699a3; /* 你指定的顏色 */
-    font-weight: bold;
-}
-.mini-chart-title {
-    font-size: 0.95rem;
-    color: #555;
-    font-weight: bold;
-}
-.mini-chart-data {
-    text-align: right;
-}
-.mini-chart-canvas-box {
-    height: 120px; /* 120px 滿清楚的，但如果覺得一次展開多個圖表畫面太長，可以下修到 80px ~ 100px 試試看 */
-    width: 100%;
-    position: relative; /* Chart.js 正常縮放的靈魂，你有加對！ */
-    margin-bottom: 10px;
-}
-
-/* 建議新增這一段，確保畫布完全填滿容器，且不會有奇怪的底部留白 */
-.mini-chart-canvas-box canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* RHR 橫軸樣式 */
-.rhr-axis-container {
-    margin-top: 15px;
-    padding: 0 10px;
-}
-.rhr-axis-track {
-    position: relative;
-    height: 8px;
-    background: #eee;
-    border-radius: 4px;
-    width: 100%;
-}
-.rhr-axis-range {
-    position: absolute;
-    height: 100%;
-    background: #c1cdd3;
-    border-radius: 4px;
-}
-.rhr-axis-marker {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    background: var(--accent-red);
-    border-radius: 50%;
-    top: -3px;
-    transform: translateX(-50%);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-.rhr-axis-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.75rem;
-    color: #999;
-    margin-top: 5px;
-}
-/* --- 統一詳細圖表按鈕樣式 --- */
-.detail-chart-btn {
-    display: block;
-    width: 25%; /* 寬度縮小到 1/4 */
-    min-width: 80px; /* 確保在小螢幕不會過度擠壓 */
-    margin: 10px auto 0 auto; /* 置中 */
-    background-color: #edeae4;
-    color: #5a5a5a;
-    border: none;
-    padding: 8px; /* 高度統一使用迷你圖表的 8px 設定 */
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-.detail-chart-btn:hover {
-    background-color: #e2ddd4;
-}
 </style>
 </head>
 <body>
@@ -596,6 +419,49 @@
             <button class="primary-btn" onclick="login()">登入</button>
         </div>
     </div>
+
+<div id="sleep-record-overlay" class="modal-overlay hidden">
+    <div class="modal-card" style="display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 350px; padding: 25px 20px;">
+        <h3 style="color: var(--tbp-blue); margin-top: 0; margin-bottom: 5px;">記錄昨晚的睡眠 🌙</h3>
+        <p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 20px;">
+            開始對話前，請先記錄你昨晚的入睡與醒來時間，以便提供更符合你需求的健康分析。
+        </p>
+        
+        <div style="width: 100%; text-align: left; margin-bottom: 20px;">
+            <label style="display: block; font-size: 15px; font-weight: bold; color: var(--text-dark); margin-bottom: 12px;">入睡時間</label>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 15px; color: #555;">日期</span>
+                <input type="date" id="sleep-start-date" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 15px; color: #555;">時間</span>
+                <input type="time" id="sleep-start-time" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
+            </div>
+        </div>
+        
+        <div style="width: 100%; height: 1px; background: #eee; margin-bottom: 20px;"></div>
+
+        <div style="width: 100%; text-align: left; margin-bottom: 25px;">
+            <label style="display: block; font-size: 15px; font-weight: bold; color: var(--text-dark); margin-bottom: 12px;">醒來時間</label>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 15px; color: #555;">日期</span>
+                <input type="date" id="sleep-end-date" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 15px; color: #555;">時間</span>
+                <input type="time" id="sleep-end-time" style="border: 1px solid #ddd; background: #fff; padding: 8px 12px; border-radius: 8px; font-size: 15px; color: var(--text-dark); text-align: center; width: 140px; box-sizing: border-box; margin: 0; -webkit-appearance: none; font-family: inherit;">
+            </div>
+        </div>
+        
+        <div style="width: 100%; margin-top: 5px;">
+            <button type="button" class="primary-btn" style="width: 100%; padding: 12px; margin: 0;" onclick="saveSleepRecord()">儲存</button>
+        </div>
+    </div>
+</div>
 
 <div id="line-binding-overlay" class="modal-overlay hidden">
     <div class="modal-card">
@@ -811,7 +677,7 @@ async function login() {
     const { data } = await _supabase.from('user_credentials').select('*').eq('serial_number', serial).eq('password', pw).single();
     
     if (data) {
-        // --- 新增：處理記住密碼邏輯 ---
+        // --- 處理記住密碼邏輯 ---
         if (isRemember) {
             localStorage.setItem('saved_serial', serial);
             localStorage.setItem('saved_pw', pw);
@@ -826,14 +692,9 @@ async function login() {
         currentSerial = serial;
         document.getElementById('login-overlay').classList.add('hidden');
         
-        if (!data.nickname) document.getElementById('nickname-overlay').classList.remove('hidden');
-        else initApp(data.nickname, data.ai_name);
-
-        if (liff.isInClient() && !data.line_user_id) {
-            setTimeout(() => {
-                document.getElementById('line-binding-overlay').classList.remove('hidden');
-            }, 1000);
-        }
+        // --- 修改點在這裡：把後續流程交棒給睡眠紀錄檢查 ---
+        await checkSleepRecordFlow(data);
+        
     } else {
         alert("驗證失敗 😅");
     }
@@ -853,6 +714,119 @@ document.addEventListener('keydown', (event) => {
         }
     }
 });
+
+// 檢查今日是否已填寫睡眠紀錄 (僅限完整資料的使用者)
+async function checkSleepRecordFlow(userData) {
+    // 判斷：是否暱稱、AI名字、LINE ID 都已經存在
+    const isCompleteUser = userData.nickname && userData.ai_name && userData.line_user_id;
+
+    // 如果資料還沒填齊，直接跳過睡眠紀錄，去跑原本的新手設定流程
+    if (!isCompleteUser) {
+        proceedAfterSleepRecord(userData);
+        return;
+    }
+
+    // 如果是老手 (資料完整)，才開始檢查今天有沒有填過睡眠時間
+    const todayStr = getLocalDateString();
+    
+    try {
+        const { data: sleepData } = await _supabase
+            .from('user_sleep_records')
+            .select('record_date')
+            .eq('serial_number', currentSerial)
+            .eq('record_date', todayStr)
+            .maybeSingle();
+
+        if (!sleepData) {
+            // 如果沒填過，自動計算並預填時間 (昨晚 23:00 ~ 今早 07:00)
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(23, 0, 0, 0); 
+            
+            const todayMorning = new Date(now);
+            todayMorning.setHours(7, 0, 0, 0); 
+
+            // 分別格式化日期(YYYY-MM-DD)與時間(HH:mm)
+            const formatDate = (d) => {
+                const tzOffset = d.getTimezoneOffset() * 60000;
+                return (new Date(d - tzOffset)).toISOString().slice(0, 10);
+            };
+            const formatTime = (d) => {
+                const tzOffset = d.getTimezoneOffset() * 60000;
+                return (new Date(d - tzOffset)).toISOString().slice(11, 16);
+            };
+
+            // 寫入畫面上的輸入框
+            document.getElementById('sleep-start-date').value = formatDate(yesterday);
+            document.getElementById('sleep-start-time').value = formatTime(yesterday);
+            document.getElementById('sleep-end-date').value = formatDate(todayMorning);
+            document.getElementById('sleep-end-time').value = formatTime(todayMorning);
+            
+            // 顯示對話框
+            document.getElementById('sleep-record-overlay').classList.remove('hidden');
+            
+            // 暫存 userData，等填完再繼續後續流程
+            window.pendingUserData = userData; 
+        } else {
+            // 已經填過，直接跑後面的流程
+            proceedAfterSleepRecord(userData);
+        }
+    } catch (err) {
+        console.error("檢查睡眠紀錄失敗:", err);
+        proceedAfterSleepRecord(userData); // 發生錯誤防呆，還是讓使用者進去
+    }
+}
+
+// 寫入 Supabase
+async function saveSleepRecord() {
+    const startDate = document.getElementById('sleep-start-date').value;
+    const startTime = document.getElementById('sleep-start-time').value;
+    const endDate = document.getElementById('sleep-end-date').value;
+    const endTime = document.getElementById('sleep-end-time').value;
+    
+    if (!startDate || !startTime || !endDate || !endTime) {
+        alert("請確認入睡與醒來時間都有填寫喔！");
+        return;
+    }
+
+    // 將分開的日期與時間，重新組合成資料庫要的 "YYYY-MM-DD HH:mm" 格式
+    const startFormatted = `${startDate} ${startTime}`;
+    const endFormatted = `${endDate} ${endTime}`;
+    const todayStr = getLocalDateString();
+
+    const { error } = await _supabase.from('user_sleep_records').insert([{
+        serial_number: currentSerial,
+        record_date: todayStr,
+        sleep_time: startFormatted,
+        wake_time: endFormatted
+    }]);
+
+    if (error) {
+        console.error("寫入睡眠時間失敗:", error);
+        alert("儲存失敗，請稍後再試。");
+        return;
+    }
+
+    // 關閉視窗，繼續原有流程
+    document.getElementById('sleep-record-overlay').classList.add('hidden');
+    proceedAfterSleepRecord(window.pendingUserData);
+}
+
+// 繼續執行取名與 AI 綁定流程
+function proceedAfterSleepRecord(data) {
+    if (!data.nickname) {
+        document.getElementById('nickname-overlay').classList.remove('hidden');
+    } else {
+        initApp(data.nickname, data.ai_name);
+
+        if (liff.isInClient() && !data.line_user_id) {
+            setTimeout(() => {
+                document.getElementById('line-binding-overlay').classList.remove('hidden');
+            }, 1000);
+        }
+    }
+}
 
 // 執行綁定動作
 async function bindLineAccount() {
@@ -1329,13 +1303,11 @@ async function fetchSummaryData(targetDate) {
     // 【新增】：切出最近 7 筆歷史資料供圖表使用
     const history7 = healths.slice(0, 7);
 
-    // --- 2. 抓取全體資料 (計算排名用)：取消日期限制，抓取全庫所有資料作為樣本 ---
+    // --- 2. 抓取全體資料 (計算排名用)：讀取所有歷史資料 (不分日期) ---
     let allUsersData = [];
     try {
-        // 不帶 start/end 參數，讓後端回傳所有可用的數據
-        const rankParams = new URLSearchParams({}).toString();
-
-        const rankRes = await fetch(`/api/health?${rankParams}`);
+        // 移除日期參數，獲取所有的資料作為全域樣本
+        const rankRes = await fetch(`/api/health`);
         if (rankRes.ok) {
             allUsersData = await rankRes.json();
         }
@@ -1348,27 +1320,23 @@ async function fetchSummaryData(targetDate) {
     let sampleSize = 0;
 
     if (allUsersData && allUsersData.length > 0) {
-        let validBatteryCount = 0;
-        let lowerBatteryCount = 0;
-
-        allUsersData.forEach(d => {
+        // 過濾出所有具備有效恢復指數 (Personal_Battery_weighted_round) 的資料，
+        // 不做帳號去重，確保算入所有的「數據筆數」
+        const validRecords = allUsersData.filter(d => {
             const batteryVal = d.raw_json && d.raw_json.Personal_Battery_weighted_round;
             const parsedVal = parseFloat(batteryVal);
-            
-            // 只要有真實數據，就納入總樣本數
-            if (!isNaN(parsedVal)) {
-                validBatteryCount++;
-                if (parsedVal < parseFloat(currentBattery)) {
-                    lowerBatteryCount++;
-                }
-            }
+            return !isNaN(parsedVal);
         });
 
-        // 樣本數為全庫有效數據總筆數
-        sampleSize = validBatteryCount;
+        // 計算真正的有效「樣本數 (筆數)」
+        sampleSize = validRecords.length;
 
+        // 計算當日數值超過了全域多少筆數據
         if (sampleSize > 0) {
-            percentage = Math.round((lowerBatteryCount / sampleSize) * 100);
+            const lowerUsers = validRecords.filter(d => 
+                parseFloat(d.raw_json.Personal_Battery_weighted_round) < parseFloat(currentBattery)
+            ).length;
+            percentage = Math.round((lowerUsers / sampleSize) * 100);
         }
     }
 
@@ -2112,465 +2080,193 @@ function showDateActions(type, metricConfig = null) {
     scrollToBottom();
 }
 
-// --- 輔助函式：計算 7 日平均與變化率 ---
-function calculate7DayStats(history7, field, isTime = false) {
-    if (!history7 || history7.length === 0) return { current: 0, avg: 0, diffPct: 0, historyVals: [] };
-    
-    let sum = 0;
-    let count = 0;
-    const historyVals = [];
-
-    history7.forEach(d => {
-        let val;
-        if (isTime) {
-            val = parseTimeToMinutes(d.raw_json[field], field === 'record_start' ? 'start' : 'end');
-        } else {
-            val = parseFloat(d.raw_json[field]);
-        }
-        
-        if (!isNaN(val)) {
-            sum += val;
-            count++;
-        }
-        // 為了讓圖表顯示，倒序存入 (確保最舊的在前面)
-        historyVals.unshift({ date: d.record_date, val: isNaN(val) ? null : val });
-    });
-
-    const avg = count > 0 ? sum / count : 0;
-    const current = historyVals.length > 0 ? historyVals[historyVals.length - 1].val : 0;
-    
-    // 計算差異百分比
-    let diffPct = 0;
-    if (avg > 0) {
-        diffPct = Math.round(((current - avg) / avg) * 100);
-    }
-
-    return { current, avg, diffPct, historyVals };
-}
-
-// --- 輔助函式：展開收合控制 ---
-function toggleMiniCharts(btn, targetId) {
-    const target = document.getElementById(targetId);
-    if (target.style.display === 'block') {
-        target.style.display = 'none';
-        btn.innerHTML = '▼ 查看7日趨勢';
-    } else {
-        target.style.display = 'block';
-        btn.innerHTML = '▲ 收合7日趨勢'; 
-        
-        // 修改這裡：加入 setTimeout，讓 DOM 真正顯示出來後再觸發 resize
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-        }, 50);
-    }
-}
-// --- 重寫健康摘要卡片渲染 ---
-function appendSummaryCard(displayDate, data) {
-    // 💡 相容性處理：如果只傳入一個參數(如 showSummaryFlow)，將其視為 data
-    if (typeof data === 'undefined') {
-        data = displayDate;
-        displayDate = data.date;
-    }
-
+function appendSummaryCard(dateTitle, data) {
     const raw = data.raw_json;
-    const dateStr = displayDate; // 替換為實際應顯示的日期
-    const history7 = data.history7;
+    // 取得 7 日歷史資料 (包含今日)，若無則用當天陣列
+    const history7 = data.history7 || [data];
+    
+    // 4 捨 5 入與顏色判斷共用邏輯 (需求 16)
+    const getColor = (val) => {
+        if (val >= 95) return "#596b75";
+        if (val >= 80) return "#8699a3";
+        if (val >= 60) return "#a79d8c";
+        return "#ff8c73";
+    };
 
-    // --- 計算各項數值與 7 日平均 ---
-    // 睡眠穩定度計算
-    const A = (raw.Battery_TST_min_A || 0) * 0.36;
-    const B = (raw.Battery_N3_pct_A || 0) * 0.36;
-    const C = (raw.Battery_OnsetDev_min_A || 0) * 0.09;
-    const D = (raw.Battery_wake_minutes_A || 0) * 0.18;
-    const sleepStabCurrent = Math.round(A + B + C + D);
+    // 標題燈號邏輯 (需求 2)
+    const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
+    const statusLight = data.light || '--';
+    const lightDotColor = lightMap[statusLight] || '#888';
 
-    // 模擬算出歷史睡眠穩定度以求 7 日平均
-    let sleepStabSum = 0, sleepStabCount = 0;
-    history7.forEach(d => {
-        const r = d.raw_json;
-        const s = Math.round((r.Battery_TST_min_A||0)*0.36 + (r.Battery_N3_pct_A||0)*0.36 + (r.Battery_OnsetDev_min_A||0)*0.09 + (r.Battery_wake_minutes_A||0)*0.18);
-        sleepStabSum += s;
-        sleepStabCount++;
+    // Daily Tag 邏輯
+    const dailyTag = raw && raw.Daily_Tag;
+    const tagColor = dailyTag && (dailyTag.includes('混亂') || dailyTag.includes('極端') || dailyTag.includes('疲乏') || dailyTag.includes('最差') || dailyTag.includes('發炎')) ? '#ff8c73' : '#8699a3';
+
+    // 恢復指數數值
+    const batteryVal = Math.round(data.battery);
+    const batteryColor = getColor(batteryVal);
+
+    // 睡眠穩定度計算公式 (需求 10.a)
+    const calcSleepStability = (r) => {
+        if (!r) return 0;
+        return Math.round(
+            (r.Battery_TST_min_A || 0) * 0.36 +
+            (r.Battery_N3_pct_A || 0) * 0.36 +
+            (r.Battery_OnsetDev_min_A || 0) * 0.09 +
+            (r.Battery_wake_minutes_A || 0) * 0.18
+        );
+    };
+
+    // 當日各項數值
+    const sleepVal = calcSleepStability(raw);
+    const hrvVal = Math.round(raw.Battery_rMSSD_A || 0);
+    const pulseVal = Math.round(raw.Battery_HR_min_A || 0);
+    const o2Val = Math.round(raw.Battery_HBI_A || 0);
+    const rhrVal = Math.round(raw.RHR_raw || 0); // 確保轉整數
+
+    // 計算 7 日平均
+    let sumSleep = 0, sumHrv = 0, sumPulse = 0, sumO2 = 0, sumRhr = 0;
+    let countSleep = 0, countHrv = 0, countPulse = 0, countO2 = 0, countRhr = 0;
+
+    history7.forEach(h => {
+        const r = h.raw_json;
+        if (!r) return;
+
+        const s = calcSleepStability(r);
+        if (s > 0) { sumSleep += s; countSleep++; }
+        
+        if (r.Battery_rMSSD_A != null) { sumHrv += r.Battery_rMSSD_A; countHrv++; }
+        if (r.Battery_HR_min_A != null) { sumPulse += r.Battery_HR_min_A; countPulse++; }
+        if (r.Battery_HBI_A != null) { sumO2 += r.Battery_HBI_A; countO2++; }
+        if (r.RHR_raw != null) { sumRhr += r.RHR_raw; countRhr++; }
     });
-    const sleepStabAvg = sleepStabCount > 0 ? sleepStabSum / sleepStabCount : sleepStabCurrent;
-    const sleepStabDiff = sleepStabAvg > 0 ? Math.round(((sleepStabCurrent - sleepStabAvg) / sleepStabAvg) * 100) : 0;
 
-    // 其他指標計算
-    const tstStats = calculate7DayStats(history7, 'TST_min');
-    const n3Stats = calculate7DayStats(history7, 'N3_pct');
-    const startStats = calculate7DayStats(history7, 'record_start', true);
-    const endStats = calculate7DayStats(history7, 'record_end', true);
-    const wakeStats = calculate7DayStats(history7, 'wake_minutes');
-    
-    const hrvStats = calculate7DayStats(history7, 'Battery_rMSSD_A');
-    const rmssdStats = calculate7DayStats(history7, 'rMSSD');
-    
-    const pulseStats = calculate7DayStats(history7, 'Battery_HR_min_A');
-    const hrminStats = calculate7DayStats(history7, 'HR_min');
-    
-    const o2Stats = calculate7DayStats(history7, 'Battery_HBI_A');
-    const hbiStats = calculate7DayStats(history7, 'HBI');
-    
-    const rhrStats = calculate7DayStats(history7, 'RHR_raw');
+    const avgSleep = countSleep ? sumSleep / countSleep : sleepVal;
+    const avgHrv = countHrv ? sumHrv / countHrv : hrvVal;
+    const avgPulse = countPulse ? sumPulse / countPulse : pulseVal;
+    const avgO2 = countO2 ? sumO2 / countO2 : o2Val;
+    const avgRhrRound = Math.round(countRhr ? sumRhr / countRhr : rhrVal);
 
-    // 1. 健康摘要標題列右側燈號邏輯
-    const lightStatusText = raw?.light_status;
-    let lightStatusHtml = '';
-    if (lightStatusText) {
-    const lightColorMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
-    const dotColor = lightColorMap[lightStatusText] || 'transparent';
-    
-    // 改用 span 套用 .status-dot 類別
-    lightStatusHtml = `<span style="color: inherit; display: flex; align-items: center; gap: 6px; font-size: 1.1rem;">
-        <span class="status-dot" style="background-color: ${dotColor}; margin: 0;"></span> ${lightStatusText}
-    </span>`;
-}
+    // 較 7 日平均百分比文字轉換
+    const getDiffText = (current, avg) => {
+        if (avg === 0) return "與7日平均持平";
+        const diff = Math.round(((current - avg) / avg) * 100);
+        if (diff > 0) return `較7日平均高 ${diff}%`;
+        if (diff < 0) return `較7日平均低 ${Math.abs(diff)}%`;
+        return "與7日平均持平";
+    };
 
-    // 5. 日常標籤邏輯
-    const dailyTag = raw?.Daily_Tag;
-    let tagHtml = '';
-    if (dailyTag) {
-        const tagColor = (dailyTag.includes('混亂') || dailyTag.includes('極端') || dailyTag.includes('疲乏') || dailyTag.includes('最差') || dailyTag.includes('發炎')) ? '#ff8c73': '#8699a3';
-        tagHtml = `<div class="daily-tag-pill" style="background-color: ${tagColor}; margin: 0; font-size: 15px; padding: 4px 12px;">${dailyTag}</div>`;
-    }
+    // 靜息心率 (RHR) 區間判斷邏輯 (需求 14)
+    const rhrMin = avgRhrRound - 5;
+    const rhrMax = avgRhrRound + 5;
+    const isRhrNormal = (rhrVal >= rhrMin && rhrVal <= rhrMax);
+    const rhrDotColor = isRhrNormal ? "#ffffff" : "#ff8c73";
+    const rhrDotBorder = isRhrNormal ? "2px solid #8699a3" : "2px solid #ff8c73";
+    // 動態計算圓點在橫軸的百分比位置 (將區間映射在 avgRhr - 15 到 avgRhr + 15 的範圍)
+    let posPct = ((rhrVal - (avgRhrRound - 15)) / 30) * 100;
+    posPct = Math.max(0, Math.min(100, posPct)); // 限制不出界
 
-    // 4. 動態恢復指數與橫條顏色設定
-    const batColor = data.battery >= 95 ? "#596b75" : data.battery >= 80 ? "#8699a3" : data.battery >= 60 ? "#a79d8c" : "#ff8c73";
+    // 繪製穩定度通用區塊
+    const renderBlock = (title, iconName, val, diffText, color, bgColor) => `
+        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">
+                    <span style="font-weight: bold; color: #333;">${title}</span>
+                </div>
+                <span style="font-size: 1.2rem; font-weight: bold; color: ${color};">${val}</span>
+            </div>
+            <div class="progress-bg" style="height: 6px; background: #eee; border-radius: 3px; margin-bottom: 8px;">
+                <div class="progress-fill" style="width: ${val}%; height: 100%; background: ${color}; border-radius: 3px;"></div>
+            </div>
+            <div style="font-size: 12px; color: #888; text-align: right;">
+                ${diffText}
+            </div>
+        </div>
+    `;
 
-    // 產生唯一 ID
-    const uid = Date.now();
-
-    let html = `
+    const cardHtml = `
     <div class="msg-row ai-row">
-        <div class="summary-card" style="cursor: default; padding: 15px;">
-            <!-- 1. 標題與燈號 -->
-            <div class="summary-header">
-                <span>📅 ${dateStr} 健康摘要</span>
-                ${lightStatusHtml}
+        <div class="summary-card">
+            
+            <!-- 標題與燈號 (需求 1 & 2) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
+                <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
+                <span style="font-size: 1.1rem; color: #888; display: flex; align-items: center; gap: 6px;">
+                    <span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
+                </span>
             </div>
 
-            <!-- 2 & 5. 恢復指數標題與標籤擺在同一列 -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px;">
-                <div style="font-weight:bold; color:#555; font-size: 1.1rem;">恢復指數</div>
-                <div>${tagHtml}</div>
-            </div>
-
-            <!-- 2. 取消恢復指數外的方框 (移除 summary-block class) -->
-            <div class="recovery-index-box">
-                <!-- 4. 數值顏色連動 -->
-                <div class="recovery-big-val" style="color: ${batColor};">${data.battery}</div>
-                
-                <!-- 3 & 4. 中間新增橫條顯示百分比，顏色同步 -->
-                <div style="width: 100%; height: 10px; background: #eee; border-radius: 4px; margin: 12px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${raw.Personal_Battery_weighted_round || 0}%; height: 100%; background: ${batColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
+            <!-- 恢復指數區塊 (需求 3~8) -->
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
+                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 12px; padding: 4px 10px;">${dailyTag}</span>` : ''}
                 </div>
-
-                <div class="recovery-meta">超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)</div>
-                
-                <!-- 6. 詳細圖表按鈕統一大小與顏色 -->
-                <button class="detail-chart-btn" onclick="startTrendFlow('battery', '📈 恢復指數')">詳細圖表</button>
+                <div style="text-align: center; margin: 15px 0;">
+                    <span style="font-size: 2.8rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
+                </div>
+                <div class="progress-bg" style="height: 10px; background: #eee; border-radius: 5px; margin-bottom: 8px;">
+                    <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
+                </div>
+                <div style="font-size: 12px; color: #888; text-align: left;">
+                    超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)
+                </div>
+                <div style="text-align: center; margin-top: 15px;">
+                    <button onclick="startTrendFlow('battery', '📈 恢復指數')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
+                </div>
             </div>
 
-            <!-- 5. 睡眠穩定度區塊 -->
-            <div class="summary-block" style="margin-top: 20px;">
-                <div class="stability-header">
-                    <div class="stability-title-box">
-                        <img src="images/sleep_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
-                        <span class="stability-title">睡眠穩定度</span>
+            <!-- 四項穩定度區塊 (需求 10~13, 17) -->
+            ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6")}
+            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6")}
+            ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6")}
+            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
+
+            <!-- 靜息心率 RHR 區塊 (需求 14, 17) -->
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img src="images/rhr_icon.svg" style="width: 20px; height: 20px;" alt="靜息心率">
+                        <span style="font-weight: bold; color: #333;">靜息心率 (RHR)</span>
                     </div>
-                    <div class="stability-value-box">
-                        <!-- 這裡套用與 HRV 一致的 Math.round() 四捨五入顏色判斷 -->
-                        <div class="stability-val" style="color: ${Math.round(sleepStabCurrent) >= 95 ? '#596b75' : Math.round(sleepStabCurrent) >= 80 ? '#8699a3' : Math.round(sleepStabCurrent) >= 60 ? '#a79d8c' : '#ff8c73'};">
-                            ${Math.round(sleepStabCurrent)}
-                        </div>
-                    </div>
+                    <span style="font-size: 1.2rem; font-weight: bold; color: #596b75;">${rhrVal}</span>
                 </div>
-                
-                <!-- 新增：睡眠穩定度的百分比橫條 (與 HRV 寬度、顏色判斷邏輯一致) -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${Math.round(sleepStabCurrent)}%; height: 100%; background: ${Math.round(sleepStabCurrent) >= 95 ? '#596b75' : Math.round(sleepStabCurrent) >= 80 ? '#8699a3' : Math.round(sleepStabCurrent) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                <!-- 視覺化橫軸 -->
+                <div style="position: relative; height: 24px; display: flex; align-items: center;">
+                    <!-- 灰色底線 -->
+                    <div style="position: absolute; width: 100%; height: 4px; background: #eee; border-radius: 2px;"></div>
+                    <!-- 7日平均安全範圍 (置中標示 1/3 寬) -->
+                    <div style="position: absolute; left: 33.33%; width: 33.33%; height: 4px; background: #c1cdd3; border-radius: 2px;"></div>
+                    <!-- 數值定位圓點 -->
+                    <div style="position: absolute; left: calc(${posPct}% - 7px); width: 14px; height: 14px; background: ${rhrDotColor}; border: ${rhrDotBorder}; border-radius: 50%; box-sizing: border-box; z-index: 2;"></div>
                 </div>
-                
-                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
-                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${sleepStabDiff >= 0 ? '高' : '低'} ${Math.abs(sleepStabDiff)}%</div>
-                
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'sleep-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="sleep-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`tst-${uid}`, '總睡眠時間', 
-                        `${Math.floor(tstStats.current/60)}小時${Math.round(tstStats.current%60)}分鐘`, 
-                        `${Math.floor(tstStats.avg/60)}小時${Math.round(tstStats.avg%60)}分鐘`, 'tst', '🛌 總睡眠時間')}
-                    ${generateMiniChartHTML(`n3-${uid}`, '深睡期 (N3)', 
-                        `${Math.round(n3Stats.current)}%`, `${Math.round(n3Stats.avg)}%`, 'n3', '💤 深睡期 (N3)')}
-                    ${generateMiniChartHTML(`start-${uid}`, '入睡規律性', 
-                        formatMinutesToAmPm(startStats.current), formatMinutesToAmPm(startStats.avg), 'start', '🌙 入睡規律性')}
-                    ${generateMiniChartHTML(`end-${uid}`, '醒來規律性', 
-                        formatMinutesToAmPm(endStats.current), formatMinutesToAmPm(endStats.avg), 'end', '☀️ 醒來規律性')}
-                    ${generateMiniChartHTML(`wake-${uid}`, '睡眠清醒時間', 
-                        `${Math.round(wakeStats.current)}分鐘`, `${Math.round(wakeStats.avg)}分鐘`, 'wake', '⏱️ 睡眠清醒時間')}
+                <!-- 橫軸標籤說明 -->
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 5px;">
+                    <span>偏低</span>
+                    <span>7日平均範圍 (${rhrMin}-${rhrMax})</span>
+                    <span>偏高</span>
                 </div>
+            </div>
+
+            <!-- 原有分析與報告 (需求 15) -->
+            <div class="analysis-capsule capsule-best">
+                <span class="capsule-icon">✨</span><span style="flex: 1;">${data.bestText}</span>
+            </div>
+            <div class="analysis-capsule capsule-worst">
+                <span class="capsule-icon">⚠️</span><span style="flex: 1;">${data.worstText}</span>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="primary-btn" style="background: white; color: var(--tbp-blue); border: 1px solid var(--tbp-blue);" onclick="openSleepReport('${dateTitle}')">
+                    📄 開啟當日睡眠報告
+                </button>
             </div>
             
-            <!-- 6. 心率變異 (HRV) 穩定度區塊 -->
-            <div class="summary-block">
-                <div class="stability-header">
-                    <div class="stability-title-box">
-                        <img src="images/hrv_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
-                        <span class="stability-title">心率變異(HRV)穩定度</span>
-                    </div>
-                    <div class="stability-value-box">
-                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
-                        <div class="stability-val" style="color: ${Math.round(hrvStats.current) >= 95 ? '#596b75' : Math.round(hrvStats.current) >= 80 ? '#8699a3' : Math.round(hrvStats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
-                            ${Math.round(hrvStats.current)}
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${Math.round(hrvStats.current)}%; height: 100%; background: ${Math.round(hrvStats.current) >= 95 ? '#596b75' : Math.round(hrvStats.current) >= 80 ? '#8699a3' : Math.round(hrvStats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
-                </div>
-                
-                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
-                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${hrvStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(hrvStats.diffPct)}%</div>
-                
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'hrv-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="hrv-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`rmssd-${uid}`, 'rMSSD', 
-                        rmssdStats.current.toFixed(1), rmssdStats.avg.toFixed(1), 'rmssd', '🌿 rMSSD')}
-                </div>
-            </div>
-
-            <!-- 7. 脈搏穩定度區塊 -->
-            <div class="summary-block">
-                <div class="stability-header">
-                    <div class="stability-title-box">
-                        <img src="images/pulse_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
-                        <span class="stability-title">脈搏穩定度</span>
-                    </div>
-                    <div class="stability-value-box">
-                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
-                        <div class="stability-val" style="color: ${Math.round(pulseStats.current) >= 95 ? '#596b75' : Math.round(pulseStats.current) >= 80 ? '#8699a3' : Math.round(pulseStats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
-                            ${Math.round(pulseStats.current)}
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${Math.round(pulseStats.current)}%; height: 100%; background: ${Math.round(pulseStats.current) >= 95 ? '#596b75' : Math.round(pulseStats.current) >= 80 ? '#8699a3' : Math.round(pulseStats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
-                </div>
-                
-                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
-                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${pulseStats.diffPct >= 0 ? '高' : '低'} ${Math.abs(pulseStats.diffPct)}%</div>
-                
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'pulse-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="pulse-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`hrmin-${uid}`, '睡眠最低脈搏', 
-                        Math.round(hrminStats.current), Math.round(hrminStats.avg), 'hrmin', '💓 睡眠最低脈搏')}
-                </div>
-            </div>
-
-            <!-- 8. 血氧穩定度區塊 -->
-            <div class="summary-block">
-                <div class="stability-header">
-                    <div class="stability-title-box">
-                        <img src="images/o2_stability.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
-                        <span class="stability-title">血氧穩定度</span>
-                    </div>
-                    <div class="stability-value-box">
-                        <!-- 這裡保留當前數值，並套用 Math.round() 的顏色判斷 -->
-                        <div class="stability-val" style="color: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'};">
-                            ${Math.round(o2Stats.current)}
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 百分比橫條維持在原位，確保 100% 寬度不變 -->
-                <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 15px 0 8px 0; overflow: hidden; display: flex;">
-                    <div style="width: ${Math.round(o2Stats.current)}%; height: 100%; background: ${Math.round(o2Stats.current) >= 95 ? '#596b75' : Math.round(o2Stats.current) >= 80 ? '#8699a3' : Math.round(o2Stats.current) >= 60 ? '#a79d8c' : '#ff8c73'}; border-radius: 4px; transition: width 0.5s ease;"></div>
-                </div>
-                
-                <!-- 原本的 7日平均文字移到橫條下方 (加上 text-align: right 確保靠右對齊) -->
-                <div class="stability-diff" style="text-align: right; margin-bottom: 10px;">較7日平均${o2Stats.diffPct >= 0 ? '高' : '低'} ${Math.abs(o2Stats.diffPct)}%</div>
-                
-                <!-- 修改：按鈕的預設文字改為實心 ▼ 箭頭 -->
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'o2-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="o2-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`hbi-${uid}`, 'HBI 低氧負擔指數', 
-                        hbiStats.current.toFixed(1), hbiStats.avg.toFixed(1), 'hbi', '🫁 HBI 低氧負擔指數')}
-                </div>
-            </div>
-
-            <!-- 9. 靜息心率 (RHR) 區塊 -->
-            <div class="summary-block">
-                <div class="stability-header">
-                    <div class="stability-title-box">
-                        <img src="images/rhr_icon.svg" class="stability-icon" onerror="this.src='images/calendar.svg'">
-                        <span class="stability-title">靜息心率 (RHR)</span>
-                    </div>
-                    <div class="stability-value-box">
-                        <div class="stability-val">${Math.round(rhrStats.current)}</div>
-                    </div>
-                </div>
-                
-                <!-- 橫軸呈現範圍 -->
-                ${generateRHRBarHTML(Math.round(rhrStats.current), Math.round(rhrStats.avg))}
-
-                <button class="toggle-chart-btn" onclick="toggleMiniCharts(this, 'rhr-charts-${uid}')">▼ 查看7日趨勢</button>
-                <div id="rhr-charts-${uid}" class="mini-charts-wrapper" style="display: none;">
-                    ${generateMiniChartHTML(`rhr-${uid}`, '靜息心率 (RHR) 7日趨勢', 
-                        Math.round(rhrStats.current), Math.round(rhrStats.avg), 'rhr', '❤️ 靜息心率 (RHR)')}
-                </div>
-            </div>
-            <div class="analysis-capsule capsule-best"><span class="capsule-icon">👍</span><span>${data.bestText}</span></div>
-            <div class="analysis-capsule capsule-worst" style="margin-bottom:15px;"><span class="capsule-icon">💡</span><span>${data.worstText}</span></div>
-            <!-- 10. PDF 報告 -->
-            <button class="primary-btn" style="margin-top:10px;" onclick="openSleepReport('${dateStr}')">📄 開啟睡眠報告</button>
-
         </div>
     </div>`;
-
-    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    
+    document.getElementById('chat-history').innerHTML += cardHtml;
     scrollToBottom();
-
-    // 掛載迷你圖表 (使用 setTimeout 確保 DOM 渲染完畢)
-    setTimeout(() => {
-        mountMiniChart(`tst-${uid}`, tstStats);
-        mountMiniChart(`n3-${uid}`, n3Stats);
-        mountMiniChart(`start-${uid}`, startStats, true);
-        mountMiniChart(`end-${uid}`, endStats, true);
-        mountMiniChart(`wake-${uid}`, wakeStats);
-        mountMiniChart(`rmssd-${uid}`, rmssdStats);
-        mountMiniChart(`hrmin-${uid}`, hrminStats);
-        mountMiniChart(`hbi-${uid}`, hbiStats);
-        mountMiniChart(`rhr-${uid}`, rhrStats);
-    }, 100);
-}
-
-// --- 輔助函式：產生迷你圖表 HTML 結構 ---
-function generateMiniChartHTML(canvasId, title, currentStr, avgStr, trendType, trendName) {
-    return `
-    <div class="mini-chart-item">
-        <div class="mini-chart-header">
-            <div>
-                <div class="mini-chart-title">${title}</div>
-                <div class="stability-val" style="font-size: 1.2rem; text-align:left;">${currentStr}</div>
-            </div>
-            <div class="mini-chart-data">
-                <div style="font-size: 0.85rem; color:#888;">7日平均</div>
-                <div style="font-weight: bold; color:#555;">${avgStr}</div>
-            </div>
-        </div>
-        <div class="mini-chart-canvas-box">
-            <canvas id="${canvasId}"></canvas>
-        </div>
-        <button class="detail-chart-btn" style="padding: 6px; font-size: 0.85rem;" 
-                onclick="startTrendFlow('${trendType}', '${trendName}')">詳細圖表</button>
-    </div>`;
-}
-
-// --- 輔助函式：產生 RHR 橫軸 HTML ---
-function generateRHRBarHTML(current, avg) {
-    // 預設縮放範圍：平均值正負 15
-    const minScale = avg - 15;
-    const maxScale = avg + 15;
-    const rangeSize = maxScale - minScale;
-    
-    // 計算安全邊界 (avg-5 到 avg+5) 的百分比位置
-    const rangeLeftPct = Math.max(0, ((avg - 5 - minScale) / rangeSize) * 100);
-    const rangeWidthPct = ((10) / rangeSize) * 100;
-    
-    // 計算當前數值標記的百分比位置
-    let markerPct = ((current - minScale) / rangeSize) * 100;
-    markerPct = Math.max(0, Math.min(100, markerPct)); // 限制在 0-100% 內
-
-    return `
-    <div class="rhr-axis-container">
-        <div class="rhr-axis-track">
-            <div class="rhr-axis-range" style="left: ${rangeLeftPct}%; width: ${rangeWidthPct}%;"></div>
-            <div class="rhr-axis-marker" style="left: ${markerPct}%;"></div>
-        </div>
-        <div class="rhr-axis-labels">
-            <span>偏低</span>
-            <span>7日平均範圍</span>
-            <span>偏高</span>
-        </div>
-    </div>`;
-}
-
-// --- 輔助函式：掛載 Chart.js 迷你圖表 ---
-function mountMiniChart(canvasId, statsData, isTime = false) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const labels = statsData.historyVals.map(d => d.date.slice(5).replace('-', '/')); // MM/DD
-    const dataPoints = statsData.historyVals.map(d => d.val);
-    const avgLine = dataPoints.map(() => statsData.avg);
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '當日數值',
-                    data: dataPoints,
-                    borderColor: '#999999',
-                    backgroundColor: '#596b75',
-                    borderWidth: 1.5,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#596b75',
-                    zIndex: 10
-                },
-                {
-                    label: '7日平均線',
-                    data: avgLine,
-                    borderColor: '#c1cdd3',
-                    borderWidth: 2,
-                    borderDash: [5, 5], // 虛線
-                    pointRadius: 0,
-                    zIndex: 5
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: { enabled: false } // 迷你圖表關閉 tooltip 保持乾淨
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: {
-                        font: { size: 10 },
-                        color: '#999',
-                        // 僅顯示第一筆與第七筆 (最後一筆) 日期
-                        callback: function(value, index, values) {
-                            if (index === 0 || index === values.length - 1) {
-                                return this.getLabelForValue(value);
-                            }
-                            return '';
-                        }
-                    }
-                },
-                y: {
-                    display: false, // 隱藏 Y 軸，讓畫面極簡
-                    // 若為時間，給予適當的縮放緩衝
-                    afterDataLimits: (scale) => {
-                        const buffer = isTime ? 60 : (scale.max - scale.min) * 0.2;
-                        scale.min -= buffer;
-                        scale.max += buffer;
-                    }
-                }
-            }
-        }
-    });
 }
 
     function appendStatusOptions() {
@@ -2617,6 +2313,11 @@ async function handleAbnormalitySelection(choice) {
         await handleAbnormalityInput(choice);
     }
 }
+
+
+
+
+
 
 async function handleStatusSelection(text, score) {
     document.getElementById('status-options-container')?.remove();
@@ -2802,7 +2503,20 @@ async function handleAbnormalityInput(msg) {
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
-
+function toggleMiniChartsRows(btn) {
+    const wrapper = btn.nextElementSibling;
+    const icon = btn.querySelector('.toggle-icon');
+    const txt = btn.querySelector('.toggle-text');
+    if (wrapper.classList.contains('hidden')) {
+        wrapper.classList.remove('hidden');
+        icon.innerText = '▲';
+        txt.innerText = '收合近期指標趨勢';
+    } else {
+        wrapper.classList.add('hidden');
+        icon.innerText = '▼';
+        txt.innerText = '查看近期指標趨勢';
+    }
+}
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { 
