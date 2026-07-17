@@ -2081,23 +2081,26 @@ function appendSummaryCard(dateTitle, data) {
     }
 
     // 繪製穩定度通用區塊
-    const renderBlock = (title, iconName, val, diffText, color, bgColor) => `
-        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">
-                    <span style="font-weight: bold; color: #333;">${title}</span>
-                </div>
-                <span style="font-size: 1.2rem; font-weight: bold; color: ${color};">${val}</span>
+    const renderBlock = (title, iconName, val, diffText, color, bgColor, extraContent = '') => `
+    <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">
+                <span style="font-weight: bold; color: #333;">${title}</span>
             </div>
-            <div class="progress-bg" style="height: 6px; background: #eee; border-radius: 3px; margin-bottom: 8px;">
-                <div class="progress-fill" style="width: ${val}%; height: 100%; background: ${color}; border-radius: 3px;"></div>
-            </div>
-            <div style="font-size: 13px; color: #888; text-align: right;">
-                ${diffText}
-            </div>
+            <span style="font-size: 1.2rem; font-weight: bold; color: ${color};">${val}</span>
         </div>
-    `;
+        <div class="progress-bg" style="height: 6px; background: #eee; border-radius: 3px; margin-bottom: 8px;">
+            <div class="progress-fill" style="width: ${val}%; height: 100%; background: ${color}; border-radius: 3px;"></div>
+        </div>
+        <div style="font-size: 13px; color: #888; text-align: right; margin-bottom: 5px;">
+            ${diffText}
+        </div>
+        
+        <!-- 擴充內容顯示區 -->
+        ${extraContent}
+    </div>
+`;
 
     const cardHtml = `
     <div class="msg-row ai-row">
@@ -2133,40 +2136,32 @@ function appendSummaryCard(dateTitle, data) {
 
             <!-- 四項穩定度區塊 (需求 10~13, 17) -->
             ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6")}
-            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6")}
-            
-            <!-- ▼ 把 HRV 7日趨勢 UI 放在這裡，緊接在 HRV 區塊下面 ▼ -->
-            <div style="margin-top: -8px; margin-bottom: 12px; text-align: center;">
-                <!-- 展開 / 收合按鈕 -->
-                <div style="color: #a79d8c; cursor: pointer; font-size: 13px; font-weight: bold; padding: 8px 0;" onclick="toggleHrvTrend(this)">▼ 查看7日趨勢</div>
-                
-                <!-- 點開後顯示的面板 -->
-                <div style="display: none; background: white; border-radius: 12px; padding: 15px; margin-top: 5px; border: 1px solid #eee; text-align: left;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                        <div>
-                            <div style="color: #5a5a5a; font-size: 13px; font-weight: bold;">rMSSD</div>
-                            <div style="color: #5a5a5a; font-size: 1.5rem; font-weight: bold;">${todayRmssd}</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="color: #5a5a5a; font-size: 13px; font-weight: bold;">7日平均</div>
-                            <div style="color: #ff8c73; font-size: 1.5rem; font-weight: bold;">${avgRmssd}</div>
-                        </div>
-                    </div>
-                    
-                    <!-- 簡易趨勢圖 (SVG) -->
-                    <div style="width: 100%; height: 100px;">
-                        <svg viewBox="0 0 300 100" style="width: 100%; height: 100%; overflow: visible;">
-                            ${svgHtml}
-                        </svg>
-                    </div>
-                    
-                    <!-- 詳細圖表按鈕 -->
-                    <div style="text-align: center; margin-top: 15px;">
-                        <button onclick="startTrendFlow('rmssd', '🌿 rMSSD')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold; width: 100%;">詳細圖表</button>
-                    </div>
+            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", `
+    <!-- HRV 7日趨勢 UI (這段會自動被包進去) -->
+    <div style="margin-top: 10px; border-top: 1px solid #e0dcd5; padding-top: 10px; text-align: center;">
+        <div style="color: #a79d8c; cursor: pointer; font-size: 13px; font-weight: bold; padding: 5px 0;" onclick="toggleHrvTrend(this)">▼ 查看7日趨勢</div>
+        <div style="display: none; background: white; border-radius: 12px; padding: 15px; margin-top: 10px; border: 1px solid #eee; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <div style="color: #5a5a5a; font-size: 13px; font-weight: bold;">rMSSD</div>
+                    <div style="color: #5a5a5a; font-size: 1.5rem; font-weight: bold;">${todayRmssd}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="color: #5a5a5a; font-size: 13px; font-weight: bold;">7日平均</div>
+                    <div style="color: #ff8c73; font-size: 1.5rem; font-weight: bold;">${avgRmssd}</div>
                 </div>
             </div>
-            <!-- ▲ HRV 7日趨勢 UI 結束 ▲ -->
+            <div style="width: 100%; height: 100px;">
+                <svg viewBox="0 0 300 100" style="width: 100%; height: 100%; overflow: visible;">
+                    ${svgHtml}
+                </svg>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button onclick="startTrendFlow('rmssd', '🌿 rMSSD')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold; width: 100%;">詳細圖表</button>
+            </div>
+        </div>
+    </div>
+`)}
 
             ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6")}
             ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
