@@ -1954,10 +1954,11 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
     if (validData.length === 0) return '';
 
     const currentVal = validData[validData.length - 1];
+    // 處理資料天數不足 7 天的平均值計算，依實際筆數除以 length
     const sum = validData.reduce((a, b) => a + b, 0);
     const avg = sum / validData.length;
     
-    // 依照指定位數四捨五入 (rMSSD:小數點1位, 最低脈搏:個位數)
+    // 依照指定位數四捨五入
     const formatVal = (v) => toFixedNum === 0 ? Math.round(v).toString() : v.toFixed(toFixedNum);
     
     const avgStr = formatVal(avg);
@@ -1988,7 +1989,7 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
         }
     });
 
-    // 抓取 record_end 並轉換為 MM/DD 格式
+    // 抓取 record_end 並轉換為 MM/DD 格式顯示日期
     const formatAxisDate = (d) => {
         if (!d) return '';
         const parts = d.split(/[-/]/); 
@@ -2011,11 +2012,11 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
     // 產生唯一 ID 避免多個圖表衝突
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
     
-    // 詳細圖表按鈕 (樣式配合你的版面設計)
+    // 詳細圖表按鈕 (樣式與恢復指數區塊按鈕完全一致)
     const btnHtml = `
         <div style="text-align: center; margin-top: 15px;">
-            <button class="action-btn" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 6px 20px; font-size: 13px; cursor: pointer; font-weight: bold;" 
-                    onclick="event.stopPropagation(); startTrendFlow('${chartTypeStr}', '${chartTitleStr}')">詳細圖表</button>
+            <button onclick="event.stopPropagation(); startTrendFlow('${chartTypeStr}', '${chartTitleStr}')" 
+                    style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
         </div>
     `;
 
@@ -2041,13 +2042,13 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
     `;
 }
 
-// --- 更新：保留你的原樣式與最佳/最差區塊的 appendSummaryCard ---
+// --- 更新：包含 O2 與 RHR 展開區塊的 appendSummaryCard ---
 function appendSummaryCard(dateTitle, data) {
     const raw = data.raw_json;
     // 取得 7 日歷史資料 (包含今日)，若無則用當天陣列
     const history7 = data.history7 || [data];
     
-    // 4 捨 5 入與顏色判斷共用邏輯 (需求 16)
+    // 4 捨 5 入與顏色判斷共用邏輯
     const getColor = (val) => {
         if (val >= 95) return "#596b75";
         if (val >= 80) return "#8699a3";
@@ -2055,7 +2056,7 @@ function appendSummaryCard(dateTitle, data) {
         return "#ff8c73";
     };
 
-    // 標題燈號邏輯 (需求 2)
+    // 標題燈號邏輯
     const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
     const statusLight = data.light || '--';
     const lightDotColor = lightMap[statusLight] || '#888';
@@ -2068,7 +2069,7 @@ function appendSummaryCard(dateTitle, data) {
     const batteryVal = Math.round(data.battery);
     const batteryColor = getColor(batteryVal);
 
-    // 睡眠穩定度計算公式 (需求 10.a)
+    // 睡眠穩定度計算公式
     const calcSleepStability = (r) => {
         if (!r) return 0;
         return Math.round(
@@ -2086,7 +2087,7 @@ function appendSummaryCard(dateTitle, data) {
     const o2Val = Math.round(raw.Battery_HBI_A || 0);
     const rhrVal = Math.round(raw.RHR_raw || 0); // 確保轉整數
 
-    // 計算 7 日平均
+    // 計算 7 日平均 (缺漏資料時以實際筆數處理)
     let sumSleep = 0, sumHrv = 0, sumPulse = 0, sumO2 = 0, sumRhr = 0;
     let countSleep = 0, countHrv = 0, countPulse = 0, countO2 = 0, countRhr = 0;
 
@@ -2118,17 +2119,16 @@ function appendSummaryCard(dateTitle, data) {
         return "與7日平均持平";
     };
 
-    // 靜息心率 (RHR) 區間判斷邏輯 (需求 14)
+    // 靜息心率 (RHR) 區間判斷邏輯
     const rhrMin = avgRhrRound - 5;
     const rhrMax = avgRhrRound + 5;
     const isRhrNormal = (rhrVal >= rhrMin && rhrVal <= rhrMax);
     const rhrDotColor = isRhrNormal ? "#ffffff" : "#ff8c73";
     const rhrDotBorder = isRhrNormal ? "2px solid #8699a3" : "2px solid #ff8c73";
-    // 動態計算圓點在橫軸的百分比位置 (將區間映射在 avgRhr - 15 到 avgRhr + 15 的範圍)
     let posPct = ((rhrVal - (avgRhrRound - 15)) / 30) * 100;
     posPct = Math.max(0, Math.min(100, posPct)); // 限制不出界
 
-    // 繪製穩定度通用區塊 (增加 extraHtml 參數以放入迷你圖表)
+    // 繪製穩定度通用區塊 (支援 extraHtml 參數放入迷你圖表)
     const renderBlock = (title, iconName, val, diffText, color, bgColor, extraHtml = '') => `
         <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -2148,15 +2148,17 @@ function appendSummaryCard(dateTitle, data) {
         </div>
     `;
 
-    // 呼叫輔助函數，產生專屬的展開迷你圖表區塊 HTML
+    // 產生四大區塊專屬的展開迷你圖表區塊 HTML
     const hrvExtraHtml = generateMiniChartHTML('hrv', 'rMSSD', 'rMSSD', history7, 1, 'rmssd', '🌿 rMSSD');
     const pulseExtraHtml = generateMiniChartHTML('pulse', '睡眠最低脈搏', 'HR_min', history7, 0, 'hrmin', '💓 睡眠最低脈搏');
+    const o2ExtraHtml = generateMiniChartHTML('o2', 'HBI低氧負擔指數', 'rHBI', history7, 1, 'hbi', '🩸 HBI低氧負擔指數');
+    const rhrExtraHtml = generateMiniChartHTML('rhr', '靜息心率', 'RHR_raw', history7, 0, 'rhr', '🫀 靜息心率 (RHR)');
 
     const cardHtml = `
     <div class="msg-row ai-row">
         <div class="summary-card">
             
-            <!-- 標題與燈號 (需求 1 & 2) -->
+            <!-- 標題與燈號 -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
                 <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
                 <span style="font-size: 1.1rem; color: #888; display: flex; align-items: center; gap: 6px;">
@@ -2164,7 +2166,7 @@ function appendSummaryCard(dateTitle, data) {
                 </span>
             </div>
 
-            <!-- 恢復指數區塊 (需求 3~8) -->
+            <!-- 恢復指數區塊 -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
@@ -2184,13 +2186,13 @@ function appendSummaryCard(dateTitle, data) {
                 </div>
             </div>
 
-            <!-- 四項穩定度區塊 (需求 10~13, 17) -->
+            <!-- 四項穩定度區塊 (新增血氧展開區塊) -->
             ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6")}
             ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
             ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6", pulseExtraHtml)}
-            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
+            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml)}
 
-            <!-- 靜息心率 RHR 區塊 (需求 14, 17) -->
+            <!-- 靜息心率 RHR 區塊 (新增展開區塊) -->
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -2203,7 +2205,7 @@ function appendSummaryCard(dateTitle, data) {
                 <div style="position: relative; height: 24px; display: flex; align-items: center;">
                     <!-- 灰色底線 -->
                     <div style="position: absolute; width: 100%; height: 6px; background: #e1e1e1; border-radius: 2px;"></div>
-                    <!-- 7日平均安全範圍 (置中標示 1/3 寬) -->
+                    <!-- 7日平均安全範圍 -->
                     <div style="position: absolute; left: 33.33%; width: 33.33%; height: 4px; background: #a0afb7; border-radius: 2px;"></div>
                     <!-- 數值定位圓點 -->
                     <div style="position: absolute; left: calc(${posPct}% - 7px); width: 14px; height: 14px; background: ${rhrDotColor}; border: ${rhrDotBorder}; border-radius: 50%; box-sizing: border-box; z-index: 2;"></div>
@@ -2214,9 +2216,11 @@ function appendSummaryCard(dateTitle, data) {
                     <span>7日平均範圍 (${rhrMin}-${rhrMax})</span>
                     <span>偏高</span>
                 </div>
+                <!-- 靜息心率的迷你圖表 -->
+                ${rhrExtraHtml}
             </div>
 
-            <!-- 原有分析與報告 (需求 15) -->
+            <!-- 原有分析與報告 -->
             <div class="analysis-capsule capsule-best">
                 <span class="capsule-icon">😊</span><span style="flex: 1;">${data.bestText}</span>
             </div>
