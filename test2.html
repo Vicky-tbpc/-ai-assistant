@@ -1988,9 +1988,19 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
         }
     });
 
-    // X軸第一筆與第七筆的日期顯示
-    const firstDate = hist[0].record_date.slice(5).replace('-', '/');
-    const lastDate = hist[hist.length - 1].record_date.slice(5).replace('-', '/');
+    // 抓取 record_end 並轉換為 MM/DD 格式
+    const formatAxisDate = (d) => {
+        if (!d) return '';
+        const parts = d.split(/[-/]/); 
+        if (parts.length >= 3) return `${parts[1]}/${parts[2]}`;
+        return d;
+    };
+    
+    const firstDateStr = hist[0].record_end || hist[0].record_date || '';
+    const lastDateStr = hist[hist.length - 1].record_end || hist[hist.length - 1].record_date || '';
+    
+    const firstDate = formatAxisDate(firstDateStr);
+    const lastDate = formatAxisDate(lastDateStr);
     
     svgHtml += `<text x="20" y="${height}" font-size="11" fill="#999" text-anchor="middle">${firstDate}</text>`;
     if (hist.length > 1) {
@@ -2001,10 +2011,10 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
     // 產生唯一 ID 避免多個圖表衝突
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
     
-    // 詳細圖表按鈕 (樣式與恢復指數區塊的按鈕完全一致)
+    // 詳細圖表按鈕 (樣式配合你的版面設計)
     const btnHtml = `
         <div style="text-align: center; margin-top: 15px;">
-            <button class="action-btn" style="border-radius: 20px; padding: 6px 20px; font-weight: bold;" 
+            <button class="action-btn" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 6px 20px; font-size: 13px; cursor: pointer; font-weight: bold;" 
                     onclick="event.stopPropagation(); startTrendFlow('${chartTypeStr}', '${chartTitleStr}')">詳細圖表</button>
         </div>
     `;
@@ -2031,13 +2041,13 @@ function generateMiniChartHTML(idPrefix, title, field, history, toFixedNum, char
     `;
 }
 
-// --- 更新：取代原本不完整的 appendSummaryCard ---
+// --- 更新：保留你的原樣式與最佳/最差區塊的 appendSummaryCard ---
 function appendSummaryCard(dateTitle, data) {
     const raw = data.raw_json;
     // 取得 7 日歷史資料 (包含今日)，若無則用當天陣列
     const history7 = data.history7 || [data];
     
-    // 4 捨 5 入與顏色判斷共用邏輯
+    // 4 捨 5 入與顏色判斷共用邏輯 (需求 16)
     const getColor = (val) => {
         if (val >= 95) return "#596b75";
         if (val >= 80) return "#8699a3";
@@ -2045,7 +2055,7 @@ function appendSummaryCard(dateTitle, data) {
         return "#ff8c73";
     };
 
-    // 標題燈號邏輯
+    // 標題燈號邏輯 (需求 2)
     const lightMap = { '紅燈': '#dc0000', '黃紅燈': '#f06400', '黃燈': '#ffb400', '綠燈': '#018837' };
     const statusLight = data.light || '--';
     const lightDotColor = lightMap[statusLight] || '#888';
@@ -2058,7 +2068,7 @@ function appendSummaryCard(dateTitle, data) {
     const batteryVal = Math.round(data.battery);
     const batteryColor = getColor(batteryVal);
 
-    // 睡眠穩定度計算公式
+    // 睡眠穩定度計算公式 (需求 10.a)
     const calcSleepStability = (r) => {
         if (!r) return 0;
         return Math.round(
@@ -2074,7 +2084,7 @@ function appendSummaryCard(dateTitle, data) {
     const hrvVal = Math.round(raw.Battery_rMSSD_A || 0);
     const pulseVal = Math.round(raw.Battery_HR_min_A || 0);
     const o2Val = Math.round(raw.Battery_HBI_A || 0);
-    const rhrVal = Math.round(raw.RHR_raw || 0);
+    const rhrVal = Math.round(raw.RHR_raw || 0); // 確保轉整數
 
     // 計算 7 日平均
     let sumSleep = 0, sumHrv = 0, sumPulse = 0, sumO2 = 0, sumRhr = 0;
@@ -2108,98 +2118,119 @@ function appendSummaryCard(dateTitle, data) {
         return "與7日平均持平";
     };
 
-    // 靜息心率 (RHR) 區間判斷邏輯
+    // 靜息心率 (RHR) 區間判斷邏輯 (需求 14)
     const rhrMin = avgRhrRound - 5;
     const rhrMax = avgRhrRound + 5;
     const isRhrNormal = (rhrVal >= rhrMin && rhrVal <= rhrMax);
     const rhrDotColor = isRhrNormal ? "#ffffff" : "#ff8c73";
     const rhrDotBorder = isRhrNormal ? "2px solid #8699a3" : "2px solid #ff8c73";
+    // 動態計算圓點在橫軸的百分比位置 (將區間映射在 avgRhr - 15 到 avgRhr + 15 的範圍)
     let posPct = ((rhrVal - (avgRhrRound - 15)) / 30) * 100;
-    posPct = Math.max(0, Math.min(100, posPct)); 
+    posPct = Math.max(0, Math.min(100, posPct)); // 限制不出界
 
-    // 繪製穩定度通用區塊
-    const renderBlock = (title, iconName, val, diffText, color, bgColor, extraHtml = '') => {
-        const iconHtml = iconName ? `<img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">` : '';
-        return `
-            <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        ${iconHtml}
-                        <span style="font-weight: bold; color: #333;">${title}</span>
-                    </div>
-                    <span style="font-size: 1.2rem; font-weight: bold; color: ${color};">${val}</span>
+    // 繪製穩定度通用區塊 (增加 extraHtml 參數以放入迷你圖表)
+    const renderBlock = (title, iconName, val, diffText, color, bgColor, extraHtml = '') => `
+        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">
+                    <span style="font-weight: bold; color: #333;">${title}</span>
                 </div>
-                <div class="progress-bg" style="height: 6px; background: #eee; border-radius: 3px; margin-bottom: 8px;">
-                    <div class="progress-fill" style="width: ${val}%; height: 100%; background: ${color}; border-radius: 3px;"></div>
-                </div>
-                <div style="font-size: 13px; color: #777; margin-bottom: ${extraHtml ? '10px' : '0'};">${diffText}</div>
-                ${extraHtml}
+                <span style="font-size: 1.2rem; font-weight: bold; color: ${color};">${val}</span>
             </div>
-        `;
-    };
+            <div class="progress-bg" style="height: 6px; background: #eee; border-radius: 3px; margin-bottom: 8px;">
+                <div class="progress-fill" style="width: ${val}%; height: 100%; background: ${color}; border-radius: 3px;"></div>
+            </div>
+            <div style="font-size: 13px; color: #888; text-align: right;">
+                ${diffText}
+            </div>
+            ${extraHtml}
+        </div>
+    `;
 
     // 呼叫輔助函數，產生專屬的展開迷你圖表區塊 HTML
     const hrvExtraHtml = generateMiniChartHTML('hrv', 'rMSSD', 'rMSSD', history7, 1, 'rmssd', '🌿 rMSSD');
     const pulseExtraHtml = generateMiniChartHTML('pulse', '睡眠最低脈搏', 'HR_min', history7, 0, 'hrmin', '💓 睡眠最低脈搏');
 
-    // 組合所有的區塊
-    const blocksHtml = `
-        ${renderBlock('睡眠連續穩定度', '', sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), '#f0f8f9')}
-        ${renderBlock('心率變異 (HRV) 度', '', hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), '#fff9f0', hrvExtraHtml)}
-        ${renderBlock('脈搏穩定度', '', pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), '#fbf6f6', pulseExtraHtml)}
-        ${renderBlock('血氧穩定度', '', o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), '#f4f4f8')}
-        
-        <!-- RHR 區塊 (保持特殊格式) -->
-        <div style="background-color: #f5f5f5; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: bold; color: #333;">靜息心率 (RHR)</span>
-                </div>
-                <span style="font-size: 1.2rem; font-weight: bold; color: ${isRhrNormal ? '#5a5a5a' : '#ff8c73'};">${rhrVal} bpm</span>
-            </div>
-            <div style="position: relative; height: 24px; background: #e0e0e0; border-radius: 12px; margin-bottom: 8px;">
-                <div style="position: absolute; left: 33.33%; width: 33.33%; height: 100%; background: #c1cdd3; border-radius: 12px;"></div>
-                <div style="position: absolute; left: ${posPct}%; top: 50%; transform: translate(-50%, -50%); 
-                            width: 14px; height: 14px; background: ${rhrDotColor}; border: ${rhrDotBorder}; 
-                            border-radius: 50%; z-index: 10;"></div>
-            </div>
-            <div style="font-size: 13px; color: #777;">
-                7日平均: ${avgRhrRound} bpm <br>
-                (正常範圍: ${rhrMin} ~ ${rhrMax} bpm)
-            </div>
-        </div>
-    `;
-
-    // 卡片整體結構
     const cardHtml = `
-        <div class="msg-row ai-row">
-            <div class="summary-card">
-                <div class="summary-header">
-                    <span>
-                        <span class="status-dot" style="background-color: ${lightDotColor};"></span>
-                        📅 ${dateTitle.replace(/-/g, '/')}
-                    </span>
-                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor};">${dailyTag}</span>` : ''}
-                </div>
-                
-                <div class="battery-container" style="text-align: center; margin-bottom: 20px;">
-                    <div style="font-size: 14px; color: #888;">恢復指數</div>
-                    <div class="battery-val" style="color: ${batteryColor}; font-size: 3rem; margin: 10px 0;">${batteryVal}</div>
-                    ${data.sampleSize > 0 ? `<div class="rank-text">超越全網 ${data.percentage}% 用戶</div>` : ''}
-                    <button class="action-btn" style="margin-top: 15px; border-radius: 20px; padding: 6px 20px; font-weight: bold;" 
-                            onclick="startTrendFlow('battery', '📈 恢復指數')">詳細圖表</button>
-                </div>
+    <div class="msg-row ai-row">
+        <div class="summary-card">
+            
+            <!-- 標題與燈號 (需求 1 & 2) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
+                <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
+                <span style="font-size: 1.1rem; color: #888; display: flex; align-items: center; gap: 6px;">
+                    <span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
+                </span>
+            </div>
 
-                <div style="border-top: 1px solid #eee; padding-top: 15px;">
-                    ${blocksHtml}
+            <!-- 恢復指數區塊 (需求 3~8) -->
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
+                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
                 </div>
-
-                <div style="margin-top: 15px; display: flex; gap: 10px; flex-direction: column;">
-                    <button class="action-btn" style="width: 100%; border-color: #8699a3; color: #8699a3; padding: 10px;" 
-                            onclick="openSleepReport('${dateTitle}')">📄 查看完整睡眠報告</button>
+                <div style="text-align: center; margin: 8px 0 8px 0; line-height: 1;">
+                    <span style="font-size: 6rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
+                </div>
+                <div class="progress-bg" style="height: 10px; background: #eee; border-radius: 5px; margin-bottom: 8px;">
+                    <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
+                </div>
+                <div style="font-size: 12px; color: #888; text-align: center;">
+                    超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)
+                </div>
+                <div style="text-align: center; margin-top: 15px;">
+                    <button onclick="startTrendFlow('battery', '📈 恢復指數')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
                 </div>
             </div>
-        </div>`;
+
+            <!-- 四項穩定度區塊 (需求 10~13, 17) -->
+            ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6")}
+            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
+            ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6", pulseExtraHtml)}
+            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
+
+            <!-- 靜息心率 RHR 區塊 (需求 14, 17) -->
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img src="images/rhr_icon.svg" style="width: 20px; height: 20px;" alt="靜息心率">
+                        <span style="font-weight: bold; color: #333;">靜息心率 (RHR)</span>
+                    </div>
+                    <span style="font-size: 1.2rem; font-weight: bold; color: #596b75;">${rhrVal}</span>
+                </div>
+                <!-- 視覺化橫軸 -->
+                <div style="position: relative; height: 24px; display: flex; align-items: center;">
+                    <!-- 灰色底線 -->
+                    <div style="position: absolute; width: 100%; height: 6px; background: #e1e1e1; border-radius: 2px;"></div>
+                    <!-- 7日平均安全範圍 (置中標示 1/3 寬) -->
+                    <div style="position: absolute; left: 33.33%; width: 33.33%; height: 4px; background: #a0afb7; border-radius: 2px;"></div>
+                    <!-- 數值定位圓點 -->
+                    <div style="position: absolute; left: calc(${posPct}% - 7px); width: 14px; height: 14px; background: ${rhrDotColor}; border: ${rhrDotBorder}; border-radius: 50%; box-sizing: border-box; z-index: 2;"></div>
+                </div>
+                <!-- 橫軸標籤說明 -->
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-top: 5px;">
+                    <span>偏低</span>
+                    <span>7日平均範圍 (${rhrMin}-${rhrMax})</span>
+                    <span>偏高</span>
+                </div>
+            </div>
+
+            <!-- 原有分析與報告 (需求 15) -->
+            <div class="analysis-capsule capsule-best">
+                <span class="capsule-icon">😊</span><span style="flex: 1;">${data.bestText}</span>
+            </div>
+            <div class="analysis-capsule capsule-worst">
+                <span class="capsule-icon">😟</span><span style="flex: 1;">${data.worstText}</span>
+            </div>
+            <div style="margin: 20px 0 5px 0;">
+                <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">
+                    📄 開啟睡眠報告
+                </button>
+            </div>
+            
+        </div>
+    </div>`;
     
     document.getElementById('chat-history').innerHTML += cardHtml;
     scrollToBottom();
