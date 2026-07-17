@@ -493,7 +493,9 @@
 </div>
 
 <script>
-
+// 請放在檔案最上方
+let currentCalDate = new Date();
+let availableSummaryDates = new Map();
 
 // 頁面載入完成後檢查是否有儲存的帳密
 document.addEventListener('DOMContentLoaded', () => {
