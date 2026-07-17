@@ -2866,8 +2866,8 @@ async function fetchAvailableSummaryDates() {
             
             allData.forEach(d => {
                 if (d.raw_json && d.raw_json.Personal_Battery_weighted_round != null) {
-                    // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
-                    const dateObj = new Date(d.record_date.replace(/-/g, '/'));
+                    // 這裡改用 record_end 來確保正確計算日期
+                    const dateObj = new Date(d.record_end.replace(/-/g, '/'));
                     dateObj.setDate(dateObj.getDate() + 1);
                     const displayDate = dateObj.toLocaleDateString('en-CA');
                     
