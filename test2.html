@@ -2057,15 +2057,15 @@ function appendSummaryCard(dateTitle, data) {
 
         // 1. 畫當日往前 7 筆資料的平均橫線 (#ff8c73)
         if (avgRmssd !== '--') {
-        const lineOffset = 15; // 設定往左右延伸的寬度，你可以根據喜好調整數值
-        svgHtml += `<line x1="${padX - lineOffset}" y1="${avgY}" x2="${(w - padX) + lineOffset}" y2="${avgY}" stroke="#ff8c73" stroke-width="2" stroke-dasharray="4" />`;
+        const lineOffset = 20; // 設定往左右延伸的寬度，你可以根據喜好調整數值
+        svgHtml += `<line x1="${padX - lineOffset}" y1="${avgY}" x2="${(w - padX) + lineOffset}" y2="${avgY}" stroke="#ff8c73" stroke-width="2.5" stroke-dasharray="4" />`;
         }
 
         // 2. 畫資料圓點 (#8699a3)
         rmssdData.forEach((d, i) => {
             const x = getX(i);
             const y = getY(d.val);
-            svgHtml += `<circle cx="${x}" cy="${y}" r="9" fill="#8699a3" />`;
+            svgHtml += `<circle cx="${x}" cy="${y}" r="6" fill="#8699a3" />`;
         });
 
         // 3. 只顯示第 1 筆與最後 1 筆資料的日期標籤
