@@ -493,9 +493,7 @@
 </div>
 
 <script>
-// 請放在檔案最上方
-let currentCalDate = new Date();
-let availableSummaryDates = new Map();
+
 
 // 頁面載入完成後檢查是否有儲存的帳密
 document.addEventListener('DOMContentLoaded', () => {
@@ -2036,39 +2034,48 @@ function appendSummaryCard(dateTitle, data) {
         </div>
     `;
 
-    // --- 新增：準備 HRV 7日趨勢專用的資料與客製化區塊 ---
+    // --- 新增：處理 HRV rMSSD 7 日趨勢與自訂區塊資料 ---
+    const uniqueId = Date.now();
+    const hrvHistory = [...history7].reverse(); // 確保時間從舊到新排列（左到右）
+    
     let rmssdValues = [];
     let rmssdDates = [];
-    let sumRmssd = 0;
-
-    // 將 history7 倒轉，讓圖表從左(舊)到右(新)排列
-    let sortedHistory = [...history7].reverse();
-    sortedHistory.forEach(h => {
-        if (h.raw_json && h.raw_json.rMSSD !== undefined) {
-            rmssdValues.push(h.raw_json.rMSSD);
+    let rmssdSum = 0;
+    
+    hrvHistory.forEach(h => {
+        const raw = h.raw_json;
+        if (raw && raw.rMSSD !== undefined && raw.rMSSD !== null) {
+            const val = Number(raw.rMSSD);
+            rmssdValues.push(val);
+            rmssdSum += val;
             
-            // 抓取日期：優先從 record_end 提取
-            let dStr = h.raw_json.record_end || '';
-            let dMatch = dStr.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
-            if (dMatch) {
-                rmssdDates.push(`${dMatch[2].padStart(2, '0')}/${dMatch[3].padStart(2, '0')}`);
-            } else {
-                rmssdDates.push(h.record_date ? h.record_date.slice(5).replace('-', '/') : '');
+            // 嚴格依照邏輯從 record_end 抓取日期
+            let dateStr = "";
+            if (raw.record_end) {
+                const match = raw.record_end.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                if (match) {
+                    dateStr = `${match[2]}/${match[3]}`; // 轉換成 MM/DD 顯示
+                }
             }
-            sumRmssd += h.raw_json.rMSSD;
+            if (!dateStr) {
+                const dMatch = h.record_date.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                dateStr = dMatch ? `${dMatch[2]}/${dMatch[3]}` : "";
+            }
+            rmssdDates.push(dateStr);
         }
     });
 
-    let countRmssd = rmssdValues.length;
-    // 使用實際擁有的筆數進行計算
-    let avgRmssdForTrend = countRmssd > 0 ? (sumRmssd / countRmssd).toFixed(1) : "0.0";
-    let todayRmssdForTrend = countRmssd > 0 ? rmssdValues[rmssdValues.length - 1].toFixed(1) : "0.0";
-    let firstDate = countRmssd > 0 ? rmssdDates[0] : '';
-    let lastDate = countRmssd > 0 ? rmssdDates[countRmssd - 1] : '';
-    const miniChartId = 'rmssd-chart-' + Date.now();
+    // 平均邏輯：除以「實際可用的資料筆數」
+    const actualPointsCount = rmssdValues.length;
+    const avgRmssdRaw = actualPointsCount > 0 ? (rmssdSum / actualPointsCount) : 0;
+    const avgRmssd = (Math.round(avgRmssdRaw * 10) / 10).toFixed(1); // 4捨5入到小數點第1位
+    const currentRmssd = actualPointsCount > 0 ? rmssdValues[actualPointsCount - 1] : 0;
+    
+    const firstDateStr = rmssdDates.length > 0 ? rmssdDates[0] : '';
+    const lastDateStr = rmssdDates.length > 1 ? rmssdDates[rmssdDates.length - 1] : '';
 
-    // HRV 專屬客製化區塊 HTML
-    const hrvCustomBlock = `
+    // HRV 專屬區塊 HTML (包含隱藏的趨勢圖與按鈕)
+    const hrvBlockHtml = `
         <div style="background-color: #faf9f6; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -2080,50 +2087,43 @@ function appendSummaryCard(dateTitle, data) {
             <div class="progress-bg" style="height: 6px; background: #eee; border-radius: 3px; margin-bottom: 8px;">
                 <div class="progress-fill" style="width: ${hrvVal}%; height: 100%; background: ${getColor(hrvVal)}; border-radius: 3px;"></div>
             </div>
-            <div style="font-size: 13px; color: #888; text-align: right; margin-bottom: 10px;">
+            <div style="font-size: 13px; color: #888; text-align: right; margin-bottom: 12px;">
                 ${getDiffText(hrvVal, avgHrv)}
             </div>
             
-            <!-- 新增：展開/收合 7日趨勢按鈕 -->
+            <!-- 展開按鈕 -->
             <div style="text-align: center; border-top: 1px dashed #ddd; padding-top: 10px;">
-                <div onclick="const cont = this.parentElement.nextElementSibling; const isHidden = cont.style.display === 'none'; cont.style.display = isHidden ? 'block' : 'none'; this.innerText = isHidden ? '▲ 收合7日趨勢' : '▼ 查看7日趨勢';" style="color: #a79d8c; font-size: 14px; cursor: pointer; display: inline-block; font-weight: 500;">
-                    ▼ 查看7日趨勢
-                </div>
+                <button onclick="toggleHrvTrend(this, 'hrv-trend-container-${uniqueId}')" style="background: none; border: none; color: #a79d8c; font-size: 13px; cursor: pointer; font-weight: bold;">▼ 查看7日趨勢</button>
             </div>
-
-            <!-- 新增：簡易趨勢圖表面板 (預設隱藏) -->
-            <div style="display: none; background-color: white; border-radius: 8px; padding: 15px; margin-top: 10px; border: 1px solid #eee;">
-                <!-- 頂部標題與數值 -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            
+            <!-- 隱藏的趨勢圖表區 -->
+            <div id="hrv-trend-container-${uniqueId}" style="display: none; background: #ffffff; border-radius: 8px; padding: 15px; margin-top: 10px; border: 1px solid #eee;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                     <div>
-                        <div style="color: #5a5a5a; font-size: 12px; font-weight: bold;">rMSSD</div>
-                        <div style="color: #5a5a5a; font-size: 20px; font-weight: bold;">${todayRmssdForTrend}</div>
+                        <div style="font-size: 13px; color: #5a5a5a; font-weight: bold; margin-bottom: 2px;">rMSSD</div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: #5a5a5a;">${currentRmssd}</div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="color: #5a5a5a; font-size: 12px; font-weight: bold;">7日平均</div>
-                        <div style="color: #ff8c73; font-size: 18px; font-weight: bold;">${avgRmssdForTrend}</div>
+                        <div style="font-size: 13px; color: #5a5a5a; margin-bottom: 2px;">7日平均</div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: #ff8c73;">${avgRmssd}</div>
                     </div>
                 </div>
-
-                <!-- 圖表繪製區 -->
-                <div style="position: relative; height: 120px; width: 100%;">
-                    <canvas id="${miniChartId}"></canvas>
+                
+                <div style="height: 90px; width: 100%; position: relative; margin: 10px 0;">
+                    <canvas id="hrv-mini-chart-${uniqueId}"></canvas>
                 </div>
-
-                <!-- 底部只顯示頭尾日期 -->
-                <div style="display: flex; justify-content: space-between; color: #888; font-size: 11px; margin-top: 5px;">
-                    <span>${firstDate}</span>
-                    <span>${lastDate}</span>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888;">
+                    <span>${firstDateStr}</span>
+                    <span>${lastDateStr}</span>
                 </div>
-
-                <!-- 詳細圖表按鈕 -->
+                
                 <div style="text-align: center; margin-top: 15px;">
                     <button onclick="startTrendFlow('rmssd', '🌿 rMSSD')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
                 </div>
             </div>
         </div>
     `;
-    // --- 準備結束 ---
 
     const cardHtml = `
     <div class="msg-row ai-row">
@@ -2159,7 +2159,7 @@ function appendSummaryCard(dateTitle, data) {
 
             <!-- 四項穩定度區塊 (需求 10~13, 17) -->
             ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6")}
-            ${hrvCustomBlock}
+            ${hrvBlockHtml}
             ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6")}
             ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
 
@@ -2209,60 +2209,10 @@ function appendSummaryCard(dateTitle, data) {
     scrollToBottom();
 }
 
-document.getElementById('chat-history').innerHTML += cardHtml; 
-    scrollToBottom();
-
-    // --- 新增：初始化 rMSSD 簡易趨勢圖 ---
-    setTimeout(() => {
-        const ctx = document.getElementById(miniChartId);
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: rmssdDates,
-                    datasets: [
-                        {
-                            label: 'rMSSD',
-                            data: rmssdValues,
-                            borderColor: '#8699a3',
-                            borderWidth: 1.5,
-                            pointBackgroundColor: '#8699a3',
-                            pointRadius: 4,
-                            pointBorderWidth: 0,
-                            fill: false,
-                            tension: 0.3 // 加上一點平滑曲線
-                        },
-                        {
-                            label: '7日平均線',
-                            data: Array(countRmssd).fill(avgRmssdForTrend),
-                            type: 'line',
-                            borderColor: '#ff8c73',
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            borderDash: [4, 4] // 平均線使用虛線稍微區隔，不想虛線可拿掉這行
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false }, 
-                        tooltip: { enabled: false } 
-                    },
-                    scales: {
-                        x: { display: false }, // 隱藏原生 X 軸，改用我們剛剛手寫的頭尾日期
-                        y: { 
-                            display: false, 
-                            min: Math.min(...rmssdValues, avgRmssdForTrend) * 0.8, 
-                            max: Math.max(...rmssdValues, avgRmssdForTrend) * 1.2 
-                        }
-                    },
-                    layout: { padding: { top: 10, bottom: 5 } }
-                }
-            });
-        }
-    }, 50);
+// 當小卡渲染到畫面上後，觸發繪製 HRV 迷你圖表
+    if (rmssdValues.length > 0) {
+        renderHrvMiniChart(`hrv-mini-chart-${uniqueId}`, rmssdValues, avgRmssdRaw);
+    }
 
     function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
@@ -2270,6 +2220,70 @@ document.getElementById('chat-history').innerHTML += cardHtml;
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
         document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
     }
+
+// --- 輔助功能：切換 HRV 區塊顯示狀態 ---
+window.toggleHrvTrend = function(btn, containerId) {
+    const container = document.getElementById(containerId);
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        btn.innerText = '▲ 收合7日趨勢';
+    } else {
+        container.style.display = 'none';
+        btn.innerText = '▼ 查看7日趨勢';
+    }
+};
+
+// --- 輔助功能：繪製 HRV 迷你圖表 ---
+window.renderHrvMiniChart = function(canvasId, data, avg) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const labels = data.map(() => ''); // 不顯示預設 X 軸標籤
+    const avgData = data.map(() => avg); // 製造一條平行的平均線數據
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '當日數值',
+                    data: data,
+                    borderColor: '#8699a3',
+                    backgroundColor: '#8699a3',
+                    pointBackgroundColor: '#8699a3',
+                    pointRadius: 4,
+                    borderWidth: 1.5,
+                    tension: 0.1 // 讓折線有一點點滑順感
+                },
+                {
+                    label: '平均線',
+                    data: avgData,
+                    borderColor: '#ff8c73',
+                    borderWidth: 1.5,
+                    pointRadius: 0, 
+                    borderDash: [] // 依照要求為實體橫線
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: {
+                x: { display: false },
+                y: { 
+                    display: false, 
+                    // 自動擴展上下邊界，避免圖形切齊頂部
+                    min: Math.min(...data, avg) * 0.85, 
+                    max: Math.max(...data, avg) * 1.15 
+                }
+            },
+            layout: { padding: 5 }
+        }
+    });
+};
 
 function appendAbnormalityOptions() {
     // 定義選項：包含顯示用的 text 與判斷用的 value
@@ -2308,11 +2322,6 @@ async function handleAbnormalitySelection(choice) {
         await handleAbnormalityInput(choice);
     }
 }
-
-
-
-
-
 
 async function handleStatusSelection(text, score) {
     document.getElementById('status-options-container')?.remove();
@@ -2866,8 +2875,8 @@ async function fetchAvailableSummaryDates() {
             
             allData.forEach(d => {
                 if (d.raw_json && d.raw_json.Personal_Battery_weighted_round != null) {
-                    // 這裡改用 record_end 來確保正確計算日期
-                    const dateObj = new Date(d.record_end.replace(/-/g, '/'));
+                    // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
+                    const dateObj = new Date(d.record_date.replace(/-/g, '/'));
                     dateObj.setDate(dateObj.getDate() + 1);
                     const displayDate = dateObj.toLocaleDateString('en-CA');
                     
