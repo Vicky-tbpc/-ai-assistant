@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n090</title>
+    <title>Soosyn 健康夥伴 n091</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2015,6 +2015,71 @@ function appendSummaryCard(dateTitle, data) {
     let posPct = ((rhrVal - (avgRhrRound - 15)) / 30) * 100;
     posPct = Math.max(0, Math.min(100, posPct)); // 限制不出界
 
+    // --- 準備 HRV rMSSD 7日趨勢資料與 SVG 圖表 ---
+    let rmssdData = [];
+    // 複製 history7 並反轉，確保圖表從左到右是「舊到新」
+    let history7Reversed = [...history7].reverse(); 
+    
+    history7Reversed.forEach(h => {
+        if (h.raw_json && h.raw_json.rMSSD != null) {
+            rmssdData.push({
+                date: h.record_date.slice(5).replace('-', '/'), // 轉為 MM/DD 格式
+                val: h.raw_json.rMSSD
+            });
+        }
+    });
+
+    // 計算當日數值與 7 日平均
+    let todayRmssd = (raw && raw.rMSSD != null) ? raw.rMSSD.toFixed(1) : '--';
+    let sumRmssd = rmssdData.reduce((sum, d) => sum + d.val, 0);
+    let avgRmssd = rmssdData.length > 0 ? (sumRmssd / rmssdData.length).toFixed(1) : '--';
+
+    // 產生 SVG 簡易趨勢圖表
+    let svgHtml = '';
+    if (rmssdData.length > 0) {
+        const w = 300, h = 100;
+        const padX = 20, padY = 20;
+        const usableW = w - padX * 2, usableH = h - padY * 2;
+        
+        // 抓出極值來動態計算 Y 軸比例
+        const validVals = rmssdData.map(d => d.val);
+        if (avgRmssd !== '--') validVals.push(parseFloat(avgRmssd));
+        
+        const maxVal = Math.max(...validVals) + 5;
+        const minVal = Math.max(0, Math.min(...validVals) - 5);
+        const range = (maxVal - minVal) || 1; // 避免除以 0
+
+        const getY = (val) => h - padY - ((val - minVal) / range) * usableH;
+        // 如果只有一筆資料就放正中間
+        const getX = (idx) => rmssdData.length === 1 ? w / 2 : padX + (idx / (rmssdData.length - 1)) * usableW;
+
+        const avgY = avgRmssd !== '--' ? getY(parseFloat(avgRmssd)) : 0;
+
+        // 1. 畫當日往前 7 筆資料的平均橫線 (#ff8c73)
+        if (avgRmssd !== '--') {
+            svgHtml += `<line x1="${padX}" y1="${avgY}" x2="${w - padX}" y2="${avgY}" stroke="#ff8c73" stroke-width="1.5" />`;
+        }
+
+        // 2. 畫資料圓點 (#8699a3)
+        rmssdData.forEach((d, i) => {
+            const x = getX(i);
+            const y = getY(d.val);
+            svgHtml += `<circle cx="${x}" cy="${y}" r="4.5" fill="#8699a3" />`;
+        });
+
+        // 3. 只顯示第 1 筆與最後 1 筆資料的日期標籤
+        if (rmssdData.length > 0) {
+            const firstDate = rmssdData[0].date;
+            const lastDate = rmssdData[rmssdData.length - 1].date;
+            // 第一筆日期
+            svgHtml += `<text x="${padX}" y="${h - 2}" fill="#a79d8c" font-size="11" font-weight="bold" text-anchor="middle">${firstDate}</text>`;
+            // 若有多筆資料，顯示最後一筆日期
+            if (rmssdData.length > 1) {
+                svgHtml += `<text x="${w - padX}" y="${h - 2}" fill="#a79d8c" font-size="11" font-weight="bold" text-anchor="middle">${lastDate}</text>`;
+            }
+        }
+    }
+
     // 繪製穩定度通用區塊
     const renderBlock = (title, iconName, val, diffText, color, bgColor) => `
         <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
@@ -2069,6 +2134,40 @@ function appendSummaryCard(dateTitle, data) {
             <!-- 四項穩定度區塊 (需求 10~13, 17) -->
             ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6")}
             ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6")}
+            
+            <!-- ▼ 把 HRV 7日趨勢 UI 放在這裡，緊接在 HRV 區塊下面 ▼ -->
+            <div style="margin-top: -8px; margin-bottom: 12px; text-align: center;">
+                <!-- 展開 / 收合按鈕 -->
+                <div style="color: #a79d8c; cursor: pointer; font-size: 13px; font-weight: bold; padding: 8px 0;" onclick="toggleHrvTrend(this)">▼ 查看7日趨勢</div>
+                
+                <!-- 點開後顯示的面板 -->
+                <div style="display: none; background: white; border-radius: 12px; padding: 15px; margin-top: 5px; border: 1px solid #eee; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <div>
+                            <div style="color: #5a5a5a; font-size: 13px; font-weight: bold;">rMSSD</div>
+                            <div style="color: #5a5a5a; font-size: 1.5rem; font-weight: bold;">${todayRmssd}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: #5a5a5a; font-size: 13px; font-weight: bold;">7日平均</div>
+                            <div style="color: #ff8c73; font-size: 1.5rem; font-weight: bold;">${avgRmssd}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 簡易趨勢圖 (SVG) -->
+                    <div style="width: 100%; height: 100px;">
+                        <svg viewBox="0 0 300 100" style="width: 100%; height: 100%; overflow: visible;">
+                            ${svgHtml}
+                        </svg>
+                    </div>
+                    
+                    <!-- 詳細圖表按鈕 -->
+                    <div style="text-align: center; margin-top: 15px;">
+                        <button onclick="startTrendFlow('rmssd', '🌿 rMSSD')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold; width: 100%;">詳細圖表</button>
+                    </div>
+                </div>
+            </div>
+            <!-- ▲ HRV 7日趨勢 UI 結束 ▲ -->
+
             ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6")}
             ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
 
@@ -2805,6 +2904,18 @@ async function selectCalendarDate(dateStr) {
     const preDateStr = dateObj.toLocaleDateString('en-CA');
     
     await processSummarySearch(preDateStr, dateStr);
+}
+
+// --- 切換 HRV 7日趨勢面板 ---
+function toggleHrvTrend(btn) {
+    const container = btn.nextElementSibling;
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        btn.innerHTML = '▲ 收合7日趨勢';
+    } else {
+        container.style.display = 'none';
+        btn.innerHTML = '▼ 查看7日趨勢';
+    }
 }
 </script>
 </body>
