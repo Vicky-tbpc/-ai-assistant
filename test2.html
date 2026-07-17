@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n091-2</title>
+    <title>Soosyn 健康夥伴 n091</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1929,50 +1929,6 @@ function showDateActions(type, metricConfig = null) {
     scrollToBottom();
 }
 
-// 通用繪圖函式
-function createTrendSvg(dataList) {
-    if (!dataList || dataList.length === 0) return '';
-
-    const w = 300, h = 100;
-    const padX = 20, padY = 20;
-    const usableW = w - padX * 2, usableH = h - padY * 2;
-    
-    // 計算平均值
-    const sum = dataList.reduce((acc, d) => acc + d.val, 0);
-    const avg = sum / dataList.length;
-    
-    // 計算極值 (為了讓圖表更好看，上下各預留 5)
-    const vals = dataList.map(d => d.val);
-    const maxVal = Math.max(...vals, avg) + 5;
-    const minVal = Math.max(0, Math.min(...vals, avg) - 5);
-    const range = (maxVal - minVal) || 1;
-
-    const getY = (val) => h - padY - ((val - minVal) / range) * usableH;
-    const getX = (idx) => dataList.length === 1 ? w / 2 : padX + (idx / (dataList.length - 1)) * usableW;
-
-    let svgHtml = '';
-    const avgY = getY(avg);
-
-    // 1. 畫平均虛線
-    const lineOffset = 20;
-    svgHtml += `<line x1="${padX - lineOffset}" y1="${avgY}" x2="${(w - padX) + lineOffset}" y2="${avgY}" stroke="#ff8c73" stroke-width="2.5" stroke-dasharray="4" />`;
-
-    // 2. 畫資料點
-    dataList.forEach((d, i) => {
-        svgHtml += `<circle cx="${getX(i)}" cy="${getY(d.val)}" r="6.5" fill="#8699a3" />`;
-    });
-
-    // 3. 畫日期標籤
-    const firstDate = dataList[0].date;
-    const lastDate = dataList[dataList.length - 1].date;
-    svgHtml += `<text x="${padX}" y="${h - 2}" fill="#a79d8c" font-size="11" font-weight="bold" text-anchor="middle">${firstDate}</text>`;
-    if (dataList.length > 1) {
-        svgHtml += `<text x="${w - padX}" y="${h - 2}" fill="#a79d8c" font-size="11" font-weight="bold" text-anchor="middle">${lastDate}</text>`;
-    }
-
-    return `<svg width="${w}" height="${h}">${svgHtml}</svg>`;
-}
-
 function appendSummaryCard(dateTitle, data) {
     const raw = data.raw_json;
     // 取得 7 日歷史資料 (包含今日)，若無則用當天陣列
@@ -2059,25 +2015,71 @@ function appendSummaryCard(dateTitle, data) {
     let posPct = ((rhrVal - (avgRhrRound - 15)) / 30) * 100;
     posPct = Math.max(0, Math.min(100, posPct)); // 限制不出界
 
-// 準備數據 (利用 map 處理)
-let history7Reversed = [...history7].reverse();
+    // --- 準備 HRV rMSSD 7日趨勢資料與 SVG 圖表 ---
+    let rmssdData = [];
+    // 複製 history7 並反轉，確保圖表從左到右是「舊到新」
+    let history7Reversed = [...history7].reverse(); 
+    
+    history7Reversed.forEach(h => {
+        if (h.raw_json && h.raw_json.rMSSD != null) {
+            rmssdData.push({
+                date: h.record_date.slice(5).replace('-', '/'), // 轉為 MM/DD 格式
+                val: h.raw_json.rMSSD
+            });
+        }
+    });
 
-const rmssdData = history7Reversed
-    .filter(h => h.raw_json?.rMSSD != null)
-    .map(h => ({ date: h.record_date.slice(5).replace('-', '/'), val: h.raw_json.rMSSD }));
+    // 計算當日數值與 7 日平均
+    let todayRmssd = (raw && raw.rMSSD != null) ? raw.rMSSD.toFixed(1) : '--';
+    let sumRmssd = rmssdData.reduce((sum, d) => sum + d.val, 0);
+    let avgRmssd = rmssdData.length > 0 ? (sumRmssd / rmssdData.length).toFixed(1) : '--';
 
-const hbiData = history7Reversed
-    .filter(h => h.raw_json?.HBI != null)
-    .map(h => ({ date: h.record_date.slice(5).replace('-', '/'), val: h.raw_json.HBI }));
+    // 產生 SVG 簡易趨勢圖表
+    let svgHtml = '';
+    if (rmssdData.length > 0) {
+        const w = 300, h = 100;
+        const padX = 20, padY = 20;
+        const usableW = w - padX * 2, usableH = h - padY * 2;
+        
+        // 抓出極值來動態計算 Y 軸比例
+        const validVals = rmssdData.map(d => d.val);
+        if (avgRmssd !== '--') validVals.push(parseFloat(avgRmssd));
+        
+        const maxVal = Math.max(...validVals) + 5;
+        const minVal = Math.max(0, Math.min(...validVals) - 5);
+        const range = (maxVal - minVal) || 1; // 避免除以 0
 
-const hrData = history7Reversed
-    .filter(h => h.raw_json?.HR_min != null)
-    .map(h => ({ date: h.record_date.slice(5).replace('-', '/'), val: h.raw_json.HR_min }));
+        const getY = (val) => h - padY - ((val - minVal) / range) * usableH;
+        // 如果只有一筆資料就放正中間
+        const getX = (idx) => rmssdData.length === 1 ? w / 2 : padX + (idx / (rmssdData.length - 1)) * usableW;
 
-// 產生三組 SVG 字串
-const svgRms = createTrendSvg(rmssdData);
-const svgHbi = createTrendSvg(hbiData);
-const svgHr  = createTrendSvg(hrData);
+        const avgY = avgRmssd !== '--' ? getY(parseFloat(avgRmssd)) : 0;
+
+        // 1. 畫當日往前 7 筆資料的平均橫線 (#ff8c73)
+        if (avgRmssd !== '--') {
+        const lineOffset = 20; // 設定往左右延伸的寬度，你可以根據喜好調整數值
+        svgHtml += `<line x1="${padX - lineOffset}" y1="${avgY}" x2="${(w - padX) + lineOffset}" y2="${avgY}" stroke="#ff8c73" stroke-width="2.5" stroke-dasharray="4" />`;
+        }
+
+        // 2. 畫資料圓點 (#8699a3)
+        rmssdData.forEach((d, i) => {
+            const x = getX(i);
+            const y = getY(d.val);
+            svgHtml += `<circle cx="${x}" cy="${y}" r="6.5" fill="#8699a3" />`;
+        });
+
+        // 3. 只顯示第 1 筆與最後 1 筆資料的日期標籤
+        if (rmssdData.length > 0) {
+            const firstDate = rmssdData[0].date;
+            const lastDate = rmssdData[rmssdData.length - 1].date;
+            // 第一筆日期
+            svgHtml += `<text x="${padX}" y="${h - 2}" fill="#a79d8c" font-size="11" font-weight="bold" text-anchor="middle">${firstDate}</text>`;
+            // 若有多筆資料，顯示最後一筆日期
+            if (rmssdData.length > 1) {
+                svgHtml += `<text x="${w - padX}" y="${h - 2}" fill="#a79d8c" font-size="11" font-weight="bold" text-anchor="middle">${lastDate}</text>`;
+            }
+        }
+    }
 
     // 繪製穩定度通用區塊
     const renderBlock = (title, iconName, val, diffText, color, bgColor, extraContent = '') => `
@@ -2152,7 +2154,7 @@ const svgHr  = createTrendSvg(hrData);
             </div>
             <div style="width: 100%; height: 100px;">
                 <svg viewBox="0 0 300 100" style="width: 100%; height: 100%; overflow: visible;">
-                    ${svgRms}
+                    ${svgHtml}
                 </svg>
             </div>
             <div style="text-align: center; margin-top: 15px;">
@@ -2161,6 +2163,7 @@ const svgHr  = createTrendSvg(hrData);
         </div>
     </div>
 `)}
+
             ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6")}
             ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6")}
 
