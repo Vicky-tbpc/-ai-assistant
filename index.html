@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n090</title>
+    <title>Soosyn 健康夥伴 n091-5</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -584,7 +584,6 @@ function getLocalDateString() {
     return `${year}-${month}-${day}`;
 }
 
-
     const SUPABASE_URL = "https://gcvwebgfbrsrezxvjafe.supabase.co";
     const SUPABASE_KEY = "sb_publishable_H_-X-v5cU7I3IHjml2CGUQ_FUK6teZs";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -624,7 +623,6 @@ function getRandomEndQuestion() {
         "我會與你一起建立好習慣！✨ 一步一步邁向更健康的生活！現在想從哪個部分開始了解呢？",
         "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
-    const ENCYCLOPEDIA_KEYWORDS = ["什麼是睡眠平衡", "睡眠平衡度?", "睡眠平衡?", "睡眠平衡度？", "睡眠平衡？"];
 
 async function login() {
     const serial = document.getElementById('serial').value;
@@ -867,25 +865,6 @@ const healthConfigs = []; // 這樣就不會報錯，只是不會比對到任何
     const matchedConfig = healthConfigs.find(c => c.regex.test(msg));
     const isDefinitionQuery = msg.includes("什麼是") || msg.includes("？") || msg.includes("?");
 
- // --- 睡眠平衡度 ---
-    if ((msg.includes("睡眠平衡")) && !isDefinitionQuery) {
-        if (hasAnyDate) processBalanceSearch(targetDateStr);
-        else { await appendAiMessage("📊 想查看哪一天的睡眠平衡度呢？"); showDateActions('balance'); }
-        return;
-    }   
-
-
-// --- 需求 1 & 2：指標查詢邏輯 ---
-    if (matchedConfig) {
-        if (hasAnyDate || isDefinitionQuery) {
-            await processHealthKeyword(matchedConfig, targetDateStr, isDefinitionQuery);
-        } else {
-            await appendAiMessage(`🔍 想查看哪一天的 ${matchedConfig.fallbackTitle} 呢？`);
-            showDateActions('metric', matchedConfig);
-        }
-        return;
-    }
-
 // --- 需求：健康摘要邏輯修改 (修正版) ---
 if (msg.includes("健康摘要")) {
     // 1. 取得使用者提到的日期（例如：2026-04-02）
@@ -919,17 +898,6 @@ if (msg.includes("健康摘要")) {
     return; 
 }
 
-    // 百科關鍵字
-    const wikiKeyword = ENCYCLOPEDIA_KEYWORDS.find(k => msg.includes(k));
-    if (wikiKeyword) {
-        const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', wikiKeyword).limit(1).single();
-        if (data) { 
-            await appendAiMessage(data.detailed_content); 
-            await new Promise(r => setTimeout(r, 600)); 
-            await appendAiMessage(getRandomEndQuestion()); 
-            return;
-        }
-    }
 
 // --- 關鍵修改點：在最後的 else 區塊插入 Gemini 轉接邏輯 ---
 if (isWaitingForAbnormality) { 
@@ -1151,73 +1119,118 @@ async function fetchSummaryData(targetDate) {
 
     // 【新增】：切出最近 7 筆歷史資料供圖表使用
     const history7 = healths.slice(0, 7);
-
-    // --- 2. 抓取全體資料 (計算排名用)：讀取所有歷史資料 (不分日期) ---
-    let allUsersData = [];
-    try {
-        // 移除日期參數，獲取所有的資料作為全域樣本
-        const rankRes = await fetch(`/api/health`);
-        if (rankRes.ok) {
-            allUsersData = await rankRes.json();
-        }
-    } catch (err) {
-        console.error("計算排名時讀取失敗:", err);
-    }
-
-    // 計算排名百分比
-    let percentage = 0;
-    let sampleSize = 0;
-
-    if (allUsersData && allUsersData.length > 0) {
-        // 過濾出所有具備有效恢復指數 (Personal_Battery_weighted_round) 的資料，
-        // 不做帳號去重，確保算入所有的「數據筆數」
-        const validRecords = allUsersData.filter(d => {
-            const batteryVal = d.raw_json && d.raw_json.Personal_Battery_weighted_round;
-            const parsedVal = parseFloat(batteryVal);
-            return !isNaN(parsedVal);
-        });
-
-        // 計算真正的有效「樣本數 (筆數)」
-        sampleSize = validRecords.length;
-
-        // 計算當日數值超過了全域多少筆數據
-        if (sampleSize > 0) {
-            const lowerUsers = validRecords.filter(d => 
-                parseFloat(d.raw_json.Personal_Battery_weighted_round) < parseFloat(currentBattery)
-            ).length;
-            percentage = Math.round((lowerUsers / sampleSize) * 100);
-        }
-    }
-
-    // --- 3. 指標增減比較邏輯 (與前一次數據比較) ---
-    let bestKey = COMPARISON_FIELDS[0], worstKey = COMPARISON_FIELDS[0];
-    if (healths[1]) {
-        let maxInc = -Infinity, maxDec = Infinity;
-        const prevRaw = healths[1].raw_json;
-        
-        COMPARISON_FIELDS.forEach(k => {
-            const diff = (raw[k] || 0) - (prevRaw[k] || 0);
-            if (diff > maxInc) { maxInc = diff; bestKey = k; }
-            if (diff < maxDec) { maxDec = diff; worstKey = k; }
-        });
-    }
-
-    // --- 4. 從資料庫獲取對應建議語 ---
-    const randomIdx = Math.floor(Math.random() * 3) + 1;
-    const logicKeys = [
-        `${FIELD_CONFIG[bestKey]}最佳`, 
-        `${FIELD_CONFIG[worstKey]}最差`, 
-        `${FIELD_CONFIG[worstKey]}最差${randomIdx}`
-    ];
     
-    let phrases = [];
-    try {
-        const { data } = await _supabase.from('phrase_library')
-            .select('logic_key, detailed_content')
-            .in('logic_key', logicKeys);
-        phrases = data || [];
-    } catch (err) {
-        console.error("Supabase 讀取失敗:", err);
+    // --- 3. 新版指標增減比較邏輯 ---
+    let finalCapsules = [];
+    let flowSuggestionText = null;
+
+    if (healths[1]) {
+        const prevRaw = healths[1].raw_json;
+
+        // 定義計算四項指標分數的函式
+        const getIndicators = (r) => {
+            if (!r) return { sleep: 0, hrv: 0, pulse: 0, o2: 0 };
+            return {
+                sleep: Math.round(
+                    (r.Battery_TST_min_A || 0) * 0.36 +
+                    (r.Battery_N3_pct_A || 0) * 0.36 +
+                    (r.Battery_OnsetDev_min_A || 0) * 0.09 +
+                    (r.Battery_wake_minutes_A || 0) * 0.18
+                ),
+                hrv: Math.round(r.Battery_rMSSD_A || 0),
+                pulse: Math.round(r.Battery_HR_min_A || 0),
+                o2: Math.round(r.Battery_HBI_A || 0)
+            };
+        };
+
+        const curInd = getIndicators(raw);
+        const prevInd = getIndicators(prevRaw);
+
+        // 指標對應的 Logic Key 字首
+        const metrics = [
+            { key: 'sleep', prefix: 'S' },
+            { key: 'hrv', prefix: 'H' },
+            { key: 'pulse', prefix: 'P' },
+            { key: 'o2', prefix: 'O' }
+        ];
+
+        // 計算差異與狀態
+        let statuses = metrics.map(m => {
+            const diff = curInd[m.key] - prevInd[m.key];
+            let status = 'stable';
+            
+            // 差異 < 3 持平，>= 3 進步，<= -3 退步
+            if (diff >= 3) status = 'progress';
+            else if (diff <= -3) status = 'regress';
+            
+            return { ...m, diff, status };
+        });
+
+        // 分類進步與退步的指標
+        const progresses = statuses.filter(s => s.status === 'progress');
+        const regresses = statuses.filter(s => s.status === 'regress');
+
+        // 找出進步最多與退步最多的指標
+        let bestProgress = progresses.length > 0 ? progresses.reduce((max, s) => s.diff > max.diff ? s : max) : null;
+        let worstRegress = regresses.length > 0 ? regresses.reduce((min, s) => s.diff < min.diff ? s : min) : null;
+
+        // 判斷情境與需要抓取的 logic_key
+        let logicKeysToFetch = [];
+        let scenario = '';
+
+        if (progresses.length === 0 && regresses.length === 0) {
+            // 情境四：全部持平
+            scenario = 'all_stable';
+            logicKeysToFetch.push('全平');
+        } else if (progresses.length > 0 && regresses.length > 0) {
+            // 情境三：有進步、有退步
+            scenario = 'mixed';
+            logicKeysToFetch.push(`${bestProgress.prefix}進`);
+            logicKeysToFetch.push(`${worstRegress.prefix}退`);
+        } else if (progresses.length > 0 && regresses.length === 0) {
+            // 情境二、五：有進步，無退步
+            scenario = 'progress_only';
+            logicKeysToFetch.push(`${bestProgress.prefix}進`);
+        } else if (regresses.length > 0 && progresses.length === 0) {
+            // 情境一、六：有退步，無進步
+            scenario = 'regress_only';
+            logicKeysToFetch.push(`${worstRegress.prefix}退`);
+        }
+
+        // --- 4. 從資料庫獲取對應建議語 ---
+        // 保留隨機建議邏輯給 flowSuggestion 使用 (可依你的實際需求調整)
+        const randomIdx = Math.floor(Math.random() * 3) + 1;
+        const fallbackFlowKey = worstRegress ? `${worstRegress.prefix}退${randomIdx}` : `全平${randomIdx}`;
+        logicKeysToFetch.push(fallbackFlowKey);
+
+        let phrases = [];
+        try {
+            const { data } = await _supabase.from('phrase_library')
+                .select('logic_key, detailed_content')
+                .in('logic_key', logicKeysToFetch);
+            phrases = data || [];
+        } catch (err) {
+            console.error("Supabase 讀取失敗:", err);
+        }
+
+        const getPhrase = (key) => phrases.find(p => p.logic_key === key)?.detailed_content;
+
+        // 依照情境組合要顯示的 UI 膠囊陣列
+        if (scenario === 'all_stable') {
+            finalCapsules.push({ type: 'best', icon: '🙂', text: getPhrase('全平') || '各項指標維持穩定，繼續保持！' });
+        } else if (scenario === 'mixed') {
+            finalCapsules.push({ type: 'best', icon: '😊', text: getPhrase(`${bestProgress.prefix}進`) || '部分指標有進步！' });
+            finalCapsules.push({ type: 'worst', icon: '😟', text: getPhrase(`${worstRegress.prefix}退`) || '部分指標有些退步，請多留意。' });
+        } else if (scenario === 'progress_only') {
+            finalCapsules.push({ type: 'best', icon: '😊', text: getPhrase(`${bestProgress.prefix}進`) || '指標表現進步！' });
+        } else if (scenario === 'regress_only') {
+            finalCapsules.push({ type: 'worst', icon: '😟', text: getPhrase(`${worstRegress.prefix}退`) || '指標表現退步，請多留意。' });
+        }
+
+        flowSuggestionText = getPhrase(fallbackFlowKey);
+    } else {
+        // 若無前一筆紀錄 (無法比較) 的預設顯示
+        finalCapsules.push({ type: 'best', icon: '🙂', text: '累積更多數據後將為你提供進退步分析。' });
     }
 
     const statusLight = raw?.light_status || '--';
@@ -1226,14 +1239,11 @@ async function fetchSummaryData(targetDate) {
     return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
-        percentage: percentage, 
-        sampleSize: sampleSize, // 👈 這裡新增：把計算好的樣本數一起回傳
         light: statusLight, 
-        bestText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[bestKey]}最佳`)?.detailed_content || "表現不錯！",
-        worstText: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差`)?.detailed_content || "這部分可留意。",
+        capsules: finalCapsules, // 傳遞陣列給 UI
         raw_json: raw, 
-        flowSuggestion: phrases.find(p => p.logic_key === `${FIELD_CONFIG[worstKey]}最差${randomIdx}`)?.detailed_content,
-        history7: history7 // 【新增】：包進回傳物件中
+        flowSuggestion: flowSuggestionText,
+        history7: history7 
     };
 }
 
@@ -1746,118 +1756,6 @@ function renderLegend(type, abnormalLabel) {
     html += `<div class="legend-row"><div class="dot-sample" style="background:#ff8c73"></div> ${abnormalLabel}</div>`;
     return html;
 }
-
-
-// --- 核心邏輯：雷達圖平衡度 (修正版：最大化圓圈尺寸) ---
-   function appendBalanceCard(data) {
-        const raw = data.raw_json;
-        const indicators = [
-            { label: '修復時間', val: raw.Battery_TST_min_A || 0 },
-            { label: '核心修復', val: raw.Battery_N3_pct_A || 0 },
-            { label: '放鬆指數', val: raw.Battery_rMSSD_A || 0 },
-            { label: '脈搏穩定度', val: raw.Battery_HR_min_A || 0 },
-            { label: '血氧穩定度', val: raw.Battery_HBI_A || 0 },
-            { label: '睡眠連續性', val: raw.Battery_wake_minutes_A || 0 },
-            { label: '睡眠規律性', val: raw.Battery_OnsetDev_min_A || 0 }
-        ];
-
-        const lowCount = indicators.filter(i => i.val < 60).length;
-        const resultText = lowCount > 3 ? "低平衡度" : indicators.every(i => i.val >= 60) ? "高平衡度" : "中平衡度";
-        
-        const centerX = 230;
-        const centerY = 230;
-        const radiusMin = 55; 
-        const radiusMid = 115; 
-        const radiusMax = 180;
-
-        const points = indicators.map((ind, i) => {
-            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
-            let r;
-            if (ind.val < 60) {
-                r = radiusMin + (ind.val / 60) * (radiusMid - radiusMin);
-            } else {
-                r = radiusMid + ((Math.min(ind.val, 100) - 60) / 40) * (radiusMax - radiusMid);
-            }
-
-            const color = ind.val >= 95 ? "#596b75" : ind.val >= 80 ? "#8699a3" : ind.val >= 60 ? "#a79d8c" : "#ff8c73";
-            const labelDist = radiusMax + 55; // 再往外推一點點
-            
-            return { 
-                x: centerX + r * Math.cos(angle), 
-                y: centerY + r * Math.sin(angle), 
-                color, 
-                labelX: centerX + labelDist * Math.cos(angle), 
-                labelY: centerY + (labelDist - 5) * Math.sin(angle) 
-            };
-        });
-
-        const cardHtml = `
-            <div class="msg-row ai-row">
-                <div class="balance-card" onclick="zoomChart(this)">
-                    <div class="summary-header"><span>📅 ${data.record_date.replace(/-/g, '/')} 睡眠平衡度</span></div>
-                    <svg viewBox="-70 -55 600 550" class="radar-svg" style="width: 100%; height: auto; display: block;">
-                        <circle cx="${centerX}" cy="${centerY}" r="${radiusMax}" fill="#f2f2f2" />
-                        <circle cx="${centerX}" cy="${centerY}" r="${radiusMid}" fill="#e6e6e6" />
-                        <circle cx="${centerX}" cy="${centerY}" r="${radiusMin}" fill="white" />
-                        
-                        ${indicators.map((_, i) => {
-                            const angle = (Math.PI * 2 * i / 7) - (Math.PI / 2);
-                            return `<line x1="${centerX + radiusMin * Math.cos(angle)}" y1="${centerY + radiusMin * Math.sin(angle)}" 
-                                          x2="${centerX + radiusMax * Math.cos(angle)}" y2="${centerY + radiusMax * Math.sin(angle)}" 
-                                          stroke="white" stroke-width="1.5" />`;
-                        }).join('')}
-                        
-                        ${points.map((p, i) => `
-                            <circle cx="${p.x}" cy="${p.y}" r="7" fill="${p.color}" stroke="white" stroke-width="1.5" />
-                            <text x="${p.labelX}" y="${p.labelY}" class="radar-label" 
-                                  text-anchor="middle" dominant-baseline="middle" 
-                                  style="font-size: 17px; font-weight: 600; fill: #555;">${indicators[i].label}</text>
-                        `).join('')}
-                        
-                        <text x="${centerX}" y="${centerY + 5}" class="radar-result-text" text-anchor="middle" style="font-size: 22px; font-weight: bold; fill: #444;">${resultText}</text>
-                    </svg>
-
-                    <div class="balance-description">
-                        綜合修復時間、核心修復、放鬆指數、脈搏穩定度、血氧穩定度、睡眠連續性、睡眠規律性，七大項指標評估睡眠平衡狀態。
-                    </div>
-                </div>
-            </div>`;
-        document.getElementById('chat-history').innerHTML += cardHtml; 
-        scrollToBottom();
-    }
-// 其他輔助函數
-async function processBalanceSearch(d) {
-    document.querySelector('.date-actions')?.remove();
-    await appendAiMessage(`正在查詢 ${d} 睡眠平衡度...`);
-    try {
-        // 1. 修改參數：加上 end，將搜尋範圍鎖定在目標日期當天
-        const params = new URLSearchParams({ serial: currentSerial, start: d, end: d }).toString();
-        
-        // 2. 向地端要求資料
-        const response = await fetch(`/api/health?${params}`);
-        if (!response.ok) throw new Error("地端連線失敗");
-        
-        const filteredData = await response.json();
-        
-        // 3. 修改抓取邏輯：確保 record_date 與目標日期完全一致
-        const dayData = Array.isArray(filteredData) ? filteredData.find(r => r.record_date === d) : null;
-        
-        if (dayData) {
-            // 4. 呼叫卡片生成函式
-            appendBalanceCard(dayData);
-            await new Promise(r => setTimeout(r, 600));
-            await appendAiMessage(getRandomEndQuestion());
-        } else {
-            // 5. 沒有資料時的處理邏輯
-            await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
-            await new Promise(r => setTimeout(r, 800));
-            await appendAiMessage(getRandomEndQuestion());
-        }
-    } catch (err) {
-        console.error("讀取失敗:", err);
-        await appendAiMessage("連不到地端 Python 伺服器，請確認 CMD 視窗有沒有開喔！ 🔌");
-    }
-}
     
 // 修改為接收兩個參數：d (抓資料用), displayDate (顯示用)
 async function processSummarySearch(d, displayDate) {
@@ -1894,37 +1792,21 @@ async function processSummarySearch(d, displayDate) {
     }
 }
 
+function showDateActions() {
+    const today = getLocalDateString();
 
-function showDateActions(type, metricConfig = null) {
-    const today = getLocalDateString(); 
     const d = new Date();
     d.setDate(d.getDate() - 1);
     const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    let html = '';
-    
-    if (type === 'metric' && metricConfig) {
-        // 指標類型 (N3, rMSSD 等)
-        const configJson = JSON.stringify(metricConfig).replace(/"/g, '&quot;');
-        html = `
-            <div class="msg-row ai-row date-actions">
-                <div class="quick-actions">
-                    <button class="action-btn" onclick="processHealthKeyword(${configJson}, '${today}', false)">今天</button>
-                    <button class="action-btn" onclick="processHealthKeyword(${configJson}, '${yesterday}', false)">昨天</button>
-                </div>
-            </div>`;
-    } else {
-        // 摘要或平衡度類型
-        const callback = type === 'balance' ? 'processBalanceSearch' : 'processSummarySearch';
-        html = `
-            <div class="msg-row ai-row date-actions">
-                <div class="quick-actions">
-                    <button class="action-btn" onclick="${callback}('${today}')">今天</button>
-                    <button class="action-btn" onclick="${callback}('${yesterday}')">昨天</button>
-                </div>
-            </div>`;
-    }
-    
+    const html = `
+        <div class="msg-row ai-row date-actions">
+            <div class="quick-actions">
+                <button class="action-btn" onclick="processSummarySearch('${today}')">今天</button>
+                <button class="action-btn" onclick="processSummarySearch('${yesterday}')">昨天</button>
+            </div>
+        </div>`;
+
     document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
 }
@@ -2079,7 +1961,7 @@ const formatTimeStr = (v) => {
     let m = rm % 60;
     let ampm = h < 12 ? '上午' : '下午';
     let h12 = h % 12 || 12;
-    return `<span style="font-size: 13px; font-weight: normal; margin-right: 2px;">${ampm}</span>${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    return `<span style="font-size: 13px; font-weight: normal; margin-right: 2px;">${ampm}</span>${h12}:${String(m).padStart(2, '0')}`;
 };
 
 // --- 主畫面卡片產生 ---
@@ -2103,6 +1985,53 @@ function appendSummaryCard(dateTitle, data) {
 
     const batteryVal = Math.round(data.battery);
     const batteryColor = getColor(batteryVal);
+    
+    const allBatteryPct = (raw && raw["ALL_Battery_percentage"] != null) ? raw["ALL_Battery_percentage"] : null;
+    const attendanceCount = (raw && raw["number of attendance"] != null) ? raw["number of attendance"] : null;
+
+    // 判斷是否要顯示百分比文字
+    let pctHtml = '';
+    if (allBatteryPct !== null && attendanceCount !== null) {
+        pctHtml = `
+        <div style="font-size: 14px; color: #888; text-align: center; margin-bottom: 8px;">
+            超過 ${allBatteryPct}% 的使用者 (樣本數 ${attendanceCount} 人次)
+        </div>`;
+    }
+
+    // --- 新增：處理個人恢復區間邏輯 ---
+    let batteryStateHtml = '';
+    const personalBatteryState = raw && raw.Personal_Battery_state !== undefined ? raw.Personal_Battery_state : null;
+    
+    if (personalBatteryState !== null) {
+        let leftColor = '#e1e1e1', midColor = '#e1e1e1', rightColor = '#e1e1e1';
+        let stateText = '';
+
+        if (personalBatteryState === 0) {
+            leftColor = '#ff8c73';
+            stateText = '個人恢復不足區間';
+        } else if (personalBatteryState === 1) {
+            midColor = '#a79d8c';
+            stateText = '個人穩定恢復區間';
+        } else if (personalBatteryState === 2) {
+            rightColor = '#8699a3';
+            stateText = '個人最佳恢復區間';
+        }
+
+        if (stateText !== '') {
+            batteryStateHtml = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 10px;">
+                <div style="display: flex; gap: 16px; margin-bottom: 4px;">
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${leftColor};"></div>
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${midColor};"></div>
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${rightColor};"></div>
+                </div>
+                <div style="font-size: 14px; color: #5a5a5a; font-weight: bold;">
+                    ${stateText}
+                </div>
+            </div>`;
+        }
+    }
+    // ------------------------------------
 
     const calcSleepStability = (r) => {
         if (!r) return 0;
@@ -2223,55 +2152,11 @@ function appendSummaryCard(dateTitle, data) {
             `;
         }
     }
-    const cardHtml = `
-    <div class="msg-row ai-row">
-        <div class="summary-card">
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
-                <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
-                <span style="font-size: 1.1rem; color: #888; display: flex; align-items: center; gap: 6px;">
-                    <span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
-                </span>
-            </div>
 
-            <div style="margin-bottom: 25px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <!-- 將標題與 info 按鈕包在一起 -->
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
-                        <img src="images/info_icon.svg" alt="說明" style="width: 18px; height: 18px; cursor: pointer;" 
-                             onclick="const info = document.getElementById('battery-info-${data.date}'); info.style.display = info.style.display === 'none' ? 'block' : 'none'; event.stopPropagation();">
-                    </div>
-                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
-                </div>
-                
-                <!-- 新增：隱藏的說明區塊 -->
-                <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
-                    <span style="font-weight: bold; color: #333;">恢復指數</span>就像身體健康的「晴雨表」，依據睡眠品質評估睡眠期間的身體修復程度，反映身體恢復能力。<br><br>
-                    <span style="font-weight: bold; color: #333;">發炎風險</span>就像身體健康的「天氣警報」，依據生理指標變化評估身體可能處於發炎或其他生理壓力狀態的風險，並以綠、黃、紅燈呈現。<br><br>
-                    當晴雨表長期顯示不佳時，代表身體修復能力下降；若同時出現黃色或紅色警報，表示身體可能正承受較高的生理壓力，建議及早調整作息、增加休息並持續觀察身體狀況。
-                </div>
-
-                <div style="text-align: center; margin: 8px 0 8px 0; line-height: 1;">
-                    <span style="font-size: 6rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
-                </div>
-                <div class="progress-bg" style="height: 10px; background: #e1e1e1; border-radius: 5px; margin-bottom: 8px;">
-                    <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
-                </div>
-                <div style="font-size: 14px; color: #888; text-align: center;">
-                    超過 ${data.percentage}% 的使用者 (樣本數 ${data.sampleSize} 人次)
-                </div>
-                <div style="text-align: center; margin-top: 15px;">
-                    <button onclick="startTrendFlow('battery', '📈 恢復指數')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
-                </div>
-            </div>
-            ${alertHtml}
-            <!-- 四項穩定度區塊 (新增睡眠區塊展開功能) -->
-            ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6", sleepExtraHtml)}
-            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
-            ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6", pulseExtraHtml)}
-            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml)}
-
+    // --- 靜息心率 (RHR) 區塊判斷 ---
+    let rhrSectionHtml = '';
+    if (raw && raw.RHR_raw != null) {
+        rhrSectionHtml = `
             <!-- 靜息心率 RHR 區塊 -->
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -2304,13 +2189,80 @@ function appendSummaryCard(dateTitle, data) {
                 </div>
                 ${rhrExtraHtml}
             </div>
-            <!-- 原有分析與報告 -->
-            <div class="analysis-capsule capsule-best">
-                <span class="capsule-icon">😊</span><span style="flex: 1;">${data.bestText}</span>
+        `;
+    }
+
+    // --- 動態生成分析膠囊 (Capsules) ---
+    let capsulesHtml = '';
+    if (data.capsules && data.capsules.length > 0) {
+        data.capsules.forEach(cap => {
+            // 依據 type 決定要用哪種樣式 (capsule-best 或 capsule-worst)
+            const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
+            capsulesHtml += `
+            <div class="analysis-capsule ${capsuleClass}">
+                <span class="capsule-icon">${cap.icon}</span><span style="flex: 1;">${cap.text}</span>
+            </div>`;
+        });
+    }
+
+    // --- 給這張新卡片一個獨立的 ID ---
+    const cardId = `summary-card-${Date.now()}`;
+
+    const cardHtml = `
+    <div class="msg-row ai-row" id="${cardId}">
+        <div class="summary-card">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
+                <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
+                <span style="font-size: 1.1rem; color: #888; display: flex; align-items: center; gap: 6px;">
+                    <span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
+                </span>
             </div>
-            <div class="analysis-capsule capsule-worst">
-                <span class="capsule-icon">😟</span><span style="flex: 1;">${data.worstText}</span>
+
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <!-- 將標題與 info 按鈕包在一起 -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
+                        <img src="images/info_icon.svg" alt="說明" style="width: 18px; height: 18px; cursor: pointer;" 
+                             onclick="const info = document.getElementById('battery-info-${data.date}'); info.style.display = info.style.display === 'none' ? 'block' : 'none'; event.stopPropagation();">
+                    </div>
+                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
+                </div>
+                
+                <!-- 新增：隱藏的說明區塊 -->
+                <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
+                    <span style="font-weight: bold; color: #333;">恢復指數</span>就像身體健康的「晴雨表」，依據睡眠品質評估睡眠期間的身體修復程度，反映身體恢復能力。<br><br>
+                    <span style="font-weight: bold; color: #333;">發炎風險</span>就像身體健康的「天氣警報」，依據生理指標變化評估身體可能處於發炎或其他生理壓力狀態的風險，並以綠、黃、紅燈呈現。<br><br>
+                    當晴雨表長期顯示不佳時，代表身體修復能力下降；若同時出現黃色或紅色警報，表示身體可能正承受較高的生理壓力，建議及早調整作息、增加休息並持續觀察身體狀況。
+                </div>
+
+                <div style="text-align: center; margin: 8px 0 8px 0; line-height: 1;">
+                    <span style="font-size: 6rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
+                </div>
+
+                <!-- 這是我們新加入的恢復區間區塊 -->
+                ${batteryStateHtml}
+
+                <div class="progress-bg" style="height: 10px; background: #e1e1e1; border-radius: 5px; margin-bottom: 8px;">
+                    <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
+                </div>
+                ${pctHtml}
+                <div style="text-align: center; margin-top: 15px;">
+                    <button onclick="startTrendFlow('battery', '📈 恢復指數')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
+                </div>
             </div>
+            ${alertHtml}
+            <!-- 四項穩定度區塊 (新增睡眠區塊展開功能) -->
+            ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6", sleepExtraHtml)}
+            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
+            ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6", pulseExtraHtml)}
+            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml)}
+
+            <!-- 替換為動態條件判斷的靜息心率 RHR 區塊 -->
+            ${rhrSectionHtml}
+            <!-- 新版的動態分析與報告 -->
+            ${capsulesHtml}
             <div style="margin: 20px 0 5px 0;">
                 <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">
                     📄 開啟睡眠報告
@@ -2321,7 +2273,14 @@ function appendSummaryCard(dateTitle, data) {
     </div>`;
     
     document.getElementById('chat-history').innerHTML += cardHtml;
-    scrollToBottom();
+    
+    // 用 setTimeout 給瀏覽器一點時間渲染畫面，捲動定位會更精準
+    setTimeout(() => {
+        const newCard = document.getElementById(cardId);
+        if (newCard) {
+            newCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 100);
 }
 
     function appendStatusOptions() {
