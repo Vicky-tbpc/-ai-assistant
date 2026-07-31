@@ -1,4 +1,4 @@
-// api/gemini.js 27
+// api/gemini.js 28
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -139,16 +139,14 @@ export default async function handler(req, res) {
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
-2. 【數據查詢】：如果問到健康狀況、各項數值變化，need_data 設為 true，並指定 start 與 end 日期。若提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
-3. 【知識庫查詢】(全面涵蓋)：只要問題涉及「健康指標的定義與正常範圍」(如：低氧負擔、HBI、N3、血氧)，或是「硬體裝置操作與APP教學」(如：APP下載、ST-50配戴、藍牙連線、說明書)，或是「報告判讀教學」(如：睡眠報告怎麼看)，請務必將 need_knowledge 設為 true。
-   🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫，或是遇到「綠燈」、「黃燈」、「紅燈」、「發炎風險」、「恢復指數」等系統狀態詞彙時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！嚴禁當作一般常識或機構簡稱。
-   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。
-   - 若問健康指標（如「低氧負擔是什麼」），轉為「低氧負擔指數 HBI」。
-   - 若問燈號狀態（如「為何黃燈」），轉為「黃燈」。
-   - 若問操作與教學（如「手環怎麼連線」），轉為「ST-50 藍牙連線 說明書」。
-   - 若問報告（如「睡眠報告有問題」），轉為「睡眠報告判讀 AHI」。
-   絕對不可把「是什麼」、「為何」、「怎麼用」、「意思」等疑問詞放進 query，確保向量資料庫能 100% 命中。
-4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養、醫療疑問」（例如：怎麼吃比較好、感冒怎麼辦等），請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
+2. 【個人數據查詢】(強制觸發)：只要問題涉及「個人的健康狀況」、「具體數值變化」，或是詢問「個人的指標狀態或原因」（例如：「為什麼今天是紅燈/黃燈」、「我的恢復指數為何下降」），請務必將 need_data 設為 true！
+   - 日期設定：若明確提到「今天」，start 與 end 皆設為 ${local_date}。若未指明具體日期但提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
+3. 【知識庫查詢】(全面涵蓋)：只要問題涉及「健康指標的定義與正常範圍」(如：低氧負擔、HBI、N3、血氧)，或是「硬體裝置操作與APP教學」，或是「報告判讀教學」，請務必將 need_knowledge 設為 true。
+   🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫，或是遇到「綠燈」、「黃燈」、「紅燈」、「發炎風險」、「恢復指數」等系統狀態詞彙時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！
+   ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
+4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
+
+💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼今天看起來是紅燈？」，你必須同時將 need_data 設為 true (為了抓取今天數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
 【日期對照表】
 1. 今天：${local_date}
