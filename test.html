@@ -2215,13 +2215,13 @@ function appendSummaryCard(dateTitle, data) {
         let bar1 = '#e1e1e1', bar2 = '#e1e1e1', bar3 = '#e1e1e1', bar4 = '#e1e1e1';
 
         if (riskVal === 0) {
-            riskText = '正常';
+            riskText = '良好';
             bar1 = '#596b75';
         } else if (riskVal === 1) {
-            riskText = '低';
+            riskText = '一般';
             bar2 = '#8699a3';
         } else if (riskVal === 2) {
-            riskText = '中';
+            riskText = '偏高';
             bar3 = '#a79d8c';
         } else if (riskVal === 3) {
             riskText = '高';
@@ -2284,9 +2284,9 @@ function appendSummaryCard(dateTitle, data) {
         
         // 縱軸文字
         riskSvg += `<text x="30" y="20" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">高</text>`;
-        riskSvg += `<text x="30" y="40" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">中</text>`;
-        riskSvg += `<text x="30" y="60" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">低</text>`;
-        riskSvg += `<text x="30" y="80" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">正常</text>`;
+        riskSvg += `<text x="30" y="40" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">偏高</text>`;
+        riskSvg += `<text x="30" y="60" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">一般</text>`;
+        riskSvg += `<text x="30" y="80" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">良好</text>`;
 
         // 數值資料繪圖
         riskChartData.forEach((val, i) => {
@@ -2316,8 +2316,8 @@ function appendSummaryCard(dateTitle, data) {
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="心血管風險">
-                        <span style="font-weight: bold; color: #333;">心血管風險</span>
+                        <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="睡眠心血管負荷">
+                        <span style="font-weight: bold; color: #333;">睡眠心血管負荷</span>
                     </div>
                     <span style="font-size: 1.8rem; font-weight: bold; color: #596b75;">
                         ${riskText}
@@ -2332,10 +2332,10 @@ function appendSummaryCard(dateTitle, data) {
                 </div>
 
                 <div style="display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-top: 5px; text-align: center;">
-                    <div style="flex: 1;">正常</div>
-                    <div style="flex: 1;">低風險</div>
-                    <div style="flex: 1;">中風險</div>
-                    <div style="flex: 1;">高風險</div>
+                    <div style="flex: 1;">良好</div>
+                    <div style="flex: 1;">一般</div>
+                    <div style="flex: 1;">偏高</div>
+                    <div style="flex: 1;">高</div>
                 </div>
 
                 <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
@@ -2347,9 +2347,9 @@ function appendSummaryCard(dateTitle, data) {
                     <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
                     <div style="font-size: 15px; color: #5a5a5a; font-weight: bold;">7日趨勢</div>
                 <div style="font-size: 11px; color: #888; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
-                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#596b75;"></div>正常: ${c0}</div>
-                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#8699a3;"></div>低: ${c1}</div>
-                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#a79d8c;"></div>中: ${c2}</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#596b75;"></div>良好: ${c0}</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#8699a3;"></div>一般: ${c1}</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#a79d8c;"></div>偏高: ${c2}</div>
                 <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#ff8c73;"></div>高: ${c3}</div>
                     </div>
                     </div>
