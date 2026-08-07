@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n091-5</title>
+    <title>Soosyn 健康夥伴 n093</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1824,7 +1824,7 @@ function toggleMiniChart(btn, containerId) {
 }
 
 // --- 新增：產生單一迷你趨勢圖表卡片 (純白底色卡片) ---
-function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, parser, formatter, unit = '', hideCurrent = false) {
+function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, parser, formatter, unit = '', hideCurrent = false, addOneDay = false) {
     // 歷史資料新到舊，繪圖要舊到新，先反轉
     const hist = [...history].reverse(); 
     const data = hist.map(h => {
@@ -1874,8 +1874,23 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
     // 日期 X 軸 (抓取 record_end)
     const formatAxisDate = (d) => {
         if (!d) return '';
-        const parts = d.split(/[-/]/); 
-        if (parts.length >= 3) return `${parts[1]}/${parts[2].substring(0,2)}`;
+        const datePart = d.split(' ')[0];
+        const parts = datePart.split(/[-/]/); 
+        if (parts.length >= 3) {
+            if (addOneDay) {
+                let year = parseInt(parts[0], 10);
+                let month = parseInt(parts[1], 10) - 1; 
+                let day = parseInt(parts[2].substring(0,2), 10);
+                let dateObj = new Date(year, month, day);
+                if (!isNaN(dateObj)) {
+                    dateObj.setDate(dateObj.getDate() + 1);
+                    let mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    let dd = String(dateObj.getDate()).padStart(2, '0');
+                    return `${mm}/${dd}`;
+                }
+            }
+            return `${parts[1]}/${parts[2].substring(0,2)}`;
+        }
         return d;
     };
     
@@ -2118,7 +2133,7 @@ function appendSummaryCard(dateTitle, data) {
     const hrvExtraHtml = buildToggleWrapper(buildChartCard('rMSSD', 'rMSSD', history7, 'rmssd', '🌿 rMSSD', parseNum, format1Dec, 'ms'), 'hrv');
     const pulseExtraHtml = buildToggleWrapper(buildChartCard('睡眠最低脈搏', 'HR_min', history7, 'hrmin', '💓 睡眠最低脈搏', parseNum, formatRound, 'bpm'), 'pulse');
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
-    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true), 'rhr');
+    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr');
     // --- 新增：健康提醒區塊判斷邏輯 ---
     let alertHtml = '';
     // 條件：恢復指數 < 60 或 發炎風險為黃燈/紅燈 時才觸發
@@ -2192,6 +2207,160 @@ function appendSummaryCard(dateTitle, data) {
         `;
     }
 
+    // --- 新增：心血管風險 區塊 ---
+    let riskSectionHtml = '';
+    if (raw && raw.CVD != null) {
+        const riskVal = raw.CVD;
+        let riskText = '';
+        let bar1 = '#e1e1e1', bar2 = '#e1e1e1', bar3 = '#e1e1e1', bar4 = '#e1e1e1';
+
+        if (riskVal === 0) {
+            riskText = '正常';
+            bar1 = '#596b75';
+        } else if (riskVal === 1) {
+            riskText = '低';
+            bar2 = '#8699a3';
+        } else if (riskVal === 2) {
+            riskText = '中';
+            bar3 = '#a79d8c';
+        } else if (riskVal === 3) {
+            riskText = '高';
+            bar4 = '#ff8c73';
+        }
+
+        // 計算7日數量
+        let c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+        history7.forEach(h => {
+            const v = (h.raw_json && h.raw_json.CVD !== undefined) ? h.raw_json.CVD : null;
+            if (v === 0) c0++;
+            else if (v === 1) c1++;
+            else if (v === 2) c2++;
+            else if (v === 3) c3++;
+        });
+
+        // 轉換日期 + 1 天工具
+        const formatRiskAxisDatePlus1 = (d) => {
+            if (!d) return '';
+            const parts = d.split(' ')[0].split(/[-/]/); 
+            if (parts.length >= 3) {
+                let year = parseInt(parts[0], 10);
+                let month = parseInt(parts[1], 10) - 1; 
+                let day = parseInt(parts[2].substring(0,2), 10);
+                let dateObj = new Date(year, month, day);
+                if(isNaN(dateObj)) return d;
+                dateObj.setDate(dateObj.getDate() + 1);
+                let mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                let dd = String(dateObj.getDate()).padStart(2, '0');
+                return `${mm}/${dd}`;
+            }
+            return d;
+        };
+
+        const histRev = [...history7].reverse();
+        const riskChartData = histRev.map(h => (h.raw_json && h.raw_json.CVD !== undefined) ? h.raw_json.CVD : null);
+
+        const getRiskY = (v) => {
+            if (v === 3) return 20;
+            if (v === 2) return 40;
+            if (v === 1) return 60;
+            if (v === 0) return 80;
+            return 80;
+        };
+        const getRiskLineColor = (v) => {
+            if (v === 3) return '#ff8c73';
+            if (v === 2) return '#a79d8c';
+            if (v === 1) return '#8699a3';
+            if (v === 0) return '#596b75';
+            return '#000';
+        };
+
+        const drawWidth = 300;
+        const startX = 60;
+        const endX = drawWidth - 20;
+        const xStep = riskChartData.length > 1 ? (endX - startX) / (riskChartData.length - 1) : 0;
+
+        // 繪製心血管風險 SVG 趨勢圖 (使用橫線顯示點位)
+        let riskSvg = `<svg viewBox="0 0 ${drawWidth} 110" style="width: 100%; height: 110px; overflow: visible; margin-top: 10px; background-color: white; border-radius: 8px;">`;
+        
+        // 縱軸文字
+        riskSvg += `<text x="30" y="20" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">高</text>`;
+        riskSvg += `<text x="30" y="40" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">中</text>`;
+        riskSvg += `<text x="30" y="60" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">低</text>`;
+        riskSvg += `<text x="30" y="80" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">正常</text>`;
+
+        // 數值資料繪圖
+        riskChartData.forEach((val, i) => {
+            if (val !== null) {
+                let cx = startX + i * xStep;
+                if (riskChartData.length === 1) cx = startX + (endX - startX) / 2;
+                let cy = getRiskY(val);
+                let ccolor = getRiskLineColor(val);
+                // 畫出水平橫線代表數值點位
+                riskSvg += `<line x1="${cx - 8}" y1="${cy}" x2="${cx + 8}" y2="${cy}" stroke="${ccolor}" stroke-width="4" stroke-linecap="round" />`;
+            }
+        });
+
+        // 橫軸文字 (+1天)
+        const firstRiskDate = formatRiskAxisDatePlus1(histRev[0].record_end || histRev[0].record_date || '');
+        const lastRiskDate = formatRiskAxisDatePlus1(histRev[histRev.length - 1].record_end || histRev[histRev.length - 1].record_date || '');
+
+        riskSvg += `<text x="${startX}" y="105" font-size="12" fill="#999" text-anchor="middle">${firstRiskDate}</text>`;
+        if (riskChartData.length > 1) {
+            riskSvg += `<text x="${endX}" y="105" font-size="12" fill="#999" text-anchor="middle">${lastRiskDate}</text>`;
+        }
+        riskSvg += `</svg>`;
+
+        const toggleId = `risk-chart-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+
+        riskSectionHtml = `
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="心血管風險">
+                        <span style="font-weight: bold; color: #333;">心血管風險</span>
+                    </div>
+                    <span style="font-size: 1.8rem; font-weight: bold; color: #596b75;">
+                        ${riskText}
+                    </span>
+                </div>
+
+                <div style="display: flex; gap: 4px; height: 6px; width: 100%;">
+                    <div style="flex: 1; background-color: ${bar1}; border-radius: 3px;"></div>
+                    <div style="flex: 1; background-color: ${bar2}; border-radius: 3px;"></div>
+                    <div style="flex: 1; background-color: ${bar3}; border-radius: 3px;"></div>
+                    <div style="flex: 1; background-color: ${bar4}; border-radius: 3px;"></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-top: 5px; text-align: center;">
+                    <div style="flex: 1;">正常</div>
+                    <div style="flex: 1;">低風險</div>
+                    <div style="flex: 1;">中風險</div>
+                    <div style="flex: 1;">高風險</div>
+                </div>
+
+                <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
+                    <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
+                         onclick="const c = document.getElementById('${toggleId}'); if(c.classList.contains('hidden')){c.classList.remove('hidden'); this.innerText='▲ 收合7日趨勢';}else{c.classList.add('hidden'); this.innerText='▼ 查看7日趨勢';}">▼ 查看7日趨勢</div>
+                    
+                    <div id="${toggleId}" class="hidden" style="margin-top: 5px;">
+                    <div style="background: white; border-radius: 12px; padding: 15px; margin-top: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+                    <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+                    <div style="font-size: 15px; color: #5a5a5a; font-weight: bold;">7日趨勢</div>
+                <div style="font-size: 11px; color: #888; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#596b75;"></div>正常: ${c0}</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#8699a3;"></div>低: ${c1}</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#a79d8c;"></div>中: ${c2}</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#ff8c73;"></div>高: ${c3}</div>
+                    </div>
+                    </div>
+                    ${riskSvg}
+                    </div>
+                  </div>
+                </div>
+            </div>
+        `;
+    }
+
     // --- 動態生成分析膠囊 (Capsules) ---
     let capsulesHtml = '';
     if (data.capsules && data.capsules.length > 0) {
@@ -2212,10 +2381,10 @@ function appendSummaryCard(dateTitle, data) {
     <div class="msg-row ai-row" id="${cardId}">
         <div class="summary-card">
             
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
                 <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
-                <span style="font-size: 1.1rem; color: #888; display: flex; align-items: center; gap: 6px;">
-                    <span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
+                <span style="font-size: 1rem; color: #888; display: flex; align-items: center; gap: 6px; align-self: flex-end;">
+                    發炎風險：<span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
                 </span>
             </div>
 
@@ -2261,6 +2430,8 @@ function appendSummaryCard(dateTitle, data) {
 
             <!-- 替換為動態條件判斷的靜息心率 RHR 區塊 -->
             ${rhrSectionHtml}
+            <!-- 將心血管風險區塊直接安插在 RHR 下方 -->
+            ${riskSectionHtml}
             <!-- 新版的動態分析與報告 -->
             ${capsulesHtml}
             <div style="margin: 20px 0 5px 0;">
@@ -2311,8 +2482,6 @@ function appendAbnormalityOptions() {
     scrollToBottom();
 }
 
-
-
 // 處理按鈕選後的行為
 async function handleAbnormalitySelection(choice) {
     document.getElementById('abnormality-options-container')?.remove();
@@ -2327,11 +2496,6 @@ async function handleAbnormalitySelection(choice) {
         await handleAbnormalityInput(choice);
     }
 }
-
-
-
-
-
 
 async function handleStatusSelection(text, score) {
     document.getElementById('status-options-container')?.remove();
@@ -2386,6 +2550,17 @@ async function handleAbnormalityInput(msg) {
     const yesterdayData = allData.find(d => d.record_date === preDateStr);
     const hasYesterdayBatteryTST = yesterdayData?.raw_json?.Battery_TST_min_A !== undefined && yesterdayData?.raw_json?.Battery_TST_min_A !== null;
 
+    // 👇 新增：檢查當天-1 的 "TRT_min" 是否有資料
+    const hasYesterdayTRT = yesterdayData?.raw_json?.TRT_min !== undefined && yesterdayData?.raw_json?.TRT_min !== null;
+
+    // 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
+    const reportButtonHtml = hasYesterdayTRT ? `
+        <div style="text-align: right;">
+            <button onclick="openSleepReport('${preDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                📄 開啟睡眠報告
+            </button>
+        </div>` : '';
+
 
     // ==========================================
     // 情境 A：當天 -1 的 Battery_TST_min_A 有資料
@@ -2414,7 +2589,20 @@ async function handleAbnormalityInput(msg) {
     
     // 1. 如果資料庫完全沒資料，或是只剩 1 筆(沒有前一天的歷史可以比較)
     if (allData.length <= 1) {
-        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
+        
+        const fallbackHtml = `
+            <div class="ai-message-wrapper">
+                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
+                    <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
+                        🛌 睡眠紀錄
+                    </div>
+                    ${reportButtonHtml}
+                </div>
+            </div>`;
+        
+        document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
+        scrollToBottom();
         return;
     }
 
@@ -2474,7 +2662,20 @@ async function handleAbnormalityInput(msg) {
 
     // 4. 如果因為缺少數值算不出任何比較結果，直接顯示 fallback
     if (!worstMetric) {
-        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
+        
+        const fallbackHtml = `
+            <div class="ai-message-wrapper">
+                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
+                    <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
+                        🛌 睡眠紀錄
+                    </div>
+                    ${reportButtonHtml}
+                </div>
+            </div>`;
+        
+        document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
+        scrollToBottom();
         return;
     }
 
@@ -2501,10 +2702,10 @@ async function handleAbnormalityInput(msg) {
 
         if (phraseData && phraseData.detailed_content) {
             // --- 修改這裡：先說一句話，然後推派小卡 ---
-            await appendAiMessage(`收到了！😊 幫你分析了一下最近的數據：`);
+            await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
             
-            // 呼叫簡易小卡 function
-            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content);
+            // 👇 呼叫簡易小卡 function (傳入第四個參數 hasYesterdayTRT 決定小卡內按鈕是否顯示)
+            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, preDateStr, hasYesterdayTRT);
             
             // 小卡出現後，再給一個引導
             await new Promise(r => setTimeout(r, 1000));
@@ -2517,7 +2718,6 @@ async function handleAbnormalityInput(msg) {
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
-
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { 
@@ -2803,7 +3003,7 @@ async function callGreetingAPI(name, aiName, aiData) {
     }
 }
 
-function appendSimpleSummaryCard(metricName, detailedContent) {
+function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false) {
     const config = {
         'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#a79d8c' },
         'N3_pct': { icon: '💤', label: '深睡期 (N3)', color: '#a79d8c' },
@@ -2814,6 +3014,14 @@ function appendSimpleSummaryCard(metricName, detailedContent) {
 
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#a79d8c' };
 
+    // 根據 showSleepReport 決定是否顯示睡眠報告按鈕區塊
+    const reportButtonHtml = showSleepReport ? `
+        <div style="text-align: right; border-top: 1px dashed #e0e0e0; padding-top: 10px;">
+            <button onclick="openSleepReport('${recordDate}')" style="background-color: ${style.color}; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                📄 開啟睡眠報告
+            </button>
+        </div>` : '';
+
     const html = `
         <div class="ai-message-wrapper">
             <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid ${style.color}; background-color: #ffffff;">
@@ -2821,21 +3029,26 @@ function appendSimpleSummaryCard(metricName, detailedContent) {
                     <span style="font-weight: bold; font-size: 1.1em;">近期睡眠分析</span>
                     <span style="font-size: 0.9em; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
                 </div>
-                <div style="display: flex; align-items: center;">
+                <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
                     <div style="font-size: 24px; margin-right: 12px;">${style.icon}</div>
                     <div style="font-size: 0.95em; line-height: 1.4; color: #333;">
                         ${detailedContent}
                     </div>
                 </div>
+                
+                ${reportButtonHtml}
             </div>
         </div>`;
     
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 }
+
 // --- 日曆功能 ---
 let currentCalDate = new Date();
 let availableSummaryDates = new Map();
+// 新增：用來存放拉回來的所有健康數據，方便計算歷史平均
+let userHealthDataList = []; 
 
 // 打開日曆並獲取有資料的日期
 async function openCalendarModal() {
@@ -2848,7 +3061,7 @@ async function openCalendarModal() {
     currentCalDate = new Date();
     document.getElementById('calendar-overlay').classList.remove('hidden');
     
-    // 渲染骨架，並顯示載入中... (可視需求)
+    // 渲染骨架，並顯示載入中... 
     renderCalendar(); 
     
     await fetchAvailableSummaryDates();
@@ -2867,21 +3080,38 @@ async function fetchAvailableSummaryDates() {
         const params = new URLSearchParams({ serial: currentSerial }).toString();
         const response = await fetch(`/api/health?${params}`);
         if (response.ok) {
-            const allData = await response.json();
+            const rawData = await response.json();
+            // 確保留下來的資料是新到舊排序，這樣我們取 allData[0] 才會是選中的當天
+            userHealthDataList = rawData.sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+            
             availableSummaryDates.clear(); // 清空舊資料
             
-            allData.forEach(d => {
-                if (d.raw_json && d.raw_json.Personal_Battery_weighted_round != null) {
-                    // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
-                    const dateObj = new Date(d.record_date.replace(/-/g, '/'));
-                    dateObj.setDate(dateObj.getDate() + 1);
-                    const displayDate = dateObj.toLocaleDateString('en-CA');
+            userHealthDataList.forEach(d => {
+                if (d.raw_json) {
+                    const battery = d.raw_json.Personal_Battery_weighted_round;
+                    const trt = d.raw_json.TRT_min;
                     
-                    // 取得 raw_json 裡面的燈號，如果沒有就給空字串
-                    const light = d.raw_json.light_status || '';
-                    
-                    // 將「日期」作為 key，「燈號」作為 value 存起來
-                    availableSummaryDates.set(displayDate, light);
+                    // 判斷是否有值
+                    const hasBattery = battery !== null && battery !== undefined;
+                    const hasTRT = trt !== null && trt !== undefined;
+
+                    // 條件1 & 2：只要其中一個有值就要顯示；如果兩個都是 null/undefined 就不做任何事
+                    if (hasBattery || hasTRT) {
+                        // 健康摘要的顯示日期 = 紀錄日期 (record_date) + 1 天
+                        const dateObj = new Date(d.record_date.replace(/-/g, '/'));
+                        dateObj.setDate(dateObj.getDate() + 1);
+                        const displayDate = dateObj.toLocaleDateString('en-CA');
+                        
+                        const light = d.raw_json.light_status || '';
+                        
+                        // 儲存狀態物件，讓渲染與點擊事件都能判斷
+                        availableSummaryDates.set(displayDate, {
+                            hasBattery: hasBattery,
+                            hasTRTOnly: !hasBattery && hasTRT, // 代表只有 TRT 有值
+                            light: light,
+                            trtMin: trt
+                        });
+                    }
                 }
             });
         }
@@ -2921,28 +3151,34 @@ function renderCalendar() {
     
     const todayStr = getLocalDateString();
 
-// 產生每一天
+    // 產生每一天
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
-        // 使用 .has() 判斷有沒有資料
-        const hasData = availableSummaryDates.has(dateStr);
+        // 取得該日期的資料狀態
+        const dateData = availableSummaryDates.get(dateStr);
+        const hasData = !!dateData;
         const isToday = dateStr === todayStr;
         
         let classNames = 'calendar-day';
+        let extraStyle = '';
         
         if (hasData) {
             classNames += ' has-data';
-            // 取出之前存好的燈號
-            const light = availableSummaryDates.get(dateStr);
             
-            // 根據燈號加上對應的 CSS class
-            if (light === '綠燈') classNames += ' status-green';
-            else if (light === '黃燈') classNames += ' status-yellow';
-            else if (light === '黃紅燈') classNames += ' status-orange';
-            else if (light === '紅燈') classNames += ' status-red';
-            else classNames += ' status-default'; 
-            
+            // 條件2：只有 TRT_min 有數值且 Battery 沒有數值時
+            if (dateData.hasTRTOnly) {
+                // 改為套用 status-default 樣式類別
+                classNames += ' status-default';
+            } 
+            // 條件1：Battery 有數值，依據 light_status 呈現
+            else {
+                if (dateData.light === '綠燈') classNames += ' status-green';
+                else if (dateData.light === '黃燈') classNames += ' status-yellow';
+                else if (dateData.light === '黃紅燈') classNames += ' status-orange';
+                else if (dateData.light === '紅燈') classNames += ' status-red';
+                else classNames += ' status-default'; 
+            }
         } else {
             classNames += ' disabled'; // 無資料反灰
         }
@@ -2950,7 +3186,7 @@ function renderCalendar() {
         if (isToday) classNames += ' today';
         
         if (hasData) {
-            html += `<div class="${classNames}" onclick="selectCalendarDate('${dateStr}')">${day}</div>`;
+            html += `<div class="${classNames}" ${extraStyle} onclick="selectCalendarDate('${dateStr}')">${day}</div>`;
         } else {
             html += `<div class="${classNames}">${day}</div>`;
         }
@@ -2962,14 +3198,160 @@ function renderCalendar() {
 // 點選日期後執行查詢
 async function selectCalendarDate(dateStr) {
     closeCalendarModal();
-    appendUserMessage(`查詢 ${dateStr} 健康摘要`);
+    const dateData = availableSummaryDates.get(dateStr);
     
-    // 因為 processSummarySearch 需要傳入前一天的日期去抓資料
+    // 將顯示日期轉回前一天的紀錄日期
     const dateObj = new Date(dateStr.replace(/-/g, '/'));
     dateObj.setDate(dateObj.getDate() - 1);
     const preDateStr = dateObj.toLocaleDateString('en-CA');
     
-    await processSummarySearch(preDateStr, dateStr);
+    // 條件3：如果是上述條件2 (只有 TRT_min)，點選後執行「找出惡化最多指標」並推派小卡的邏輯
+    if (dateData && dateData.hasTRTOnly) {
+        appendUserMessage(`查詢 ${dateStr} 睡眠分析`);
+        await processSleepAnalysisByDate(preDateStr);
+    } else {
+        // 原本 Battery 有數值時走這邊
+        appendUserMessage(`查詢 ${dateStr} 健康摘要`);
+        await processSummarySearch(preDateStr, dateStr);
+    }
+}
+
+// ==========================================
+// 新增一支獨立 function，直接套用你寫好的邏輯
+// ==========================================
+async function processSleepAnalysisByDate(targetPreDateStr) {
+    // 1. 從我們先前存好的資料，找出目標日期的 index
+    const targetIndex = userHealthDataList.findIndex(d => d.record_date === targetPreDateStr);
+    
+    if (targetIndex === -1) {
+        await appendAiMessage("找不到該日期的詳細數據喔！");
+        return;
+    }
+
+    // 取出從「該天(含)以前」的所有資料，這樣 allData[0] 就會是我們點擊的那一天
+    const allData = userHealthDataList.slice(targetIndex);
+
+    // ======= 以下完全套用你提供的判斷邏輯 =======
+    const latestData = allData[0]; // 擷取資料庫中最新的那一筆
+    const pastData = allData.slice(1); // 剩下的歷史數據
+    const fields = ['TST_min', 'N3_pct', 'rMSSD', 'HBI', 'HR_min'];
+    let baseline = {};
+
+    // 👇 新增：檢查這一筆資料的 TRT_min 是否有值
+    const currentRaw = latestData.raw_json || {};
+    const hasTRT = currentRaw.TRT_min !== undefined && currentRaw.TRT_min !== null;
+
+    // 👇 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
+    const reportButtonHtml = hasTRT ? `
+        <div style="text-align: right;">
+            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                📄 開啟睡眠報告
+            </button>
+        </div>` : '';
+
+    // 2. 決定比較基準：有3天歷史就算平均，沒有3天就只抓前一天
+    if (pastData.length >= 3) {
+        const recent3 = pastData.slice(0, 3);
+        fields.forEach(f => {
+            let sum = 0, count = 0;
+            recent3.forEach(d => {
+                if (d.raw_json && d.raw_json[f] !== undefined) {
+                    sum += Number(d.raw_json[f]);
+                    count++;
+                }
+            });
+            // 按照實際有數據的天數來除以取得平均值
+            baseline[f] = count > 0 ? sum / count : null;
+        });
+    } else if (pastData.length > 0) { 
+        // 加上判斷確保 pastData 裡面真的有資料才抓 prev1，避免剛好是第一天使用時報錯
+        const prev1 = pastData[0];
+        fields.forEach(f => {
+            baseline[f] = (prev1.raw_json && prev1.raw_json[f] !== undefined) ? Number(prev1.raw_json[f]) : null;
+        });
+    } else {
+        // 如果完全沒有歷史資料可以比
+        fields.forEach(f => baseline[f] = null);
+    }
+
+    // 3. 找出差異(惡化)最多的指標
+    let maxDeviation = -Infinity;
+    let worstMetric = null;
+
+    fields.forEach(f => {
+        const currentVal = currentRaw[f];
+        const baseVal = baseline[f];
+
+        if (currentVal !== undefined && baseVal !== null && baseVal !== 0) {
+            let deviation = 0;
+            // 將差異轉換為百分比幅度，以便不同單位的指標能公平比較
+            if (f === 'TST_min' || f === 'N3_pct' || f === 'rMSSD') {
+                // 越低越差：(基準值 - 當前值) / 基準值 => 正值越大代表下降越多
+                deviation = (baseVal - currentVal) / Math.abs(baseVal);
+            } else if (f === 'HBI' || f === 'HR_min') {
+                // 越高越差：(當前值 - 基準值) / 基準值 => 正值越大代表上升越多
+                deviation = (currentVal - baseVal) / Math.abs(baseVal);
+            }
+
+            if (deviation > maxDeviation) {
+                maxDeviation = deviation;
+                worstMetric = f;
+            }
+        }
+    });
+
+    // 4. 如果因為缺少數值算不出任何比較結果 (例如第一天使用，沒有歷史數據)
+    if (!worstMetric) {
+        // 給一句適合第一天使用的專屬對話
+        await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
+        
+        // 直接推派一張帶有 PDF 按鈕的簡化版卡片 (加入 reportButtonHtml 判斷)
+        const fallbackHtml = `
+            <div class="ai-message-wrapper">
+                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
+                    <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
+                        🛌 睡眠紀錄
+                    </div>
+                    ${reportButtonHtml}
+                </div>
+            </div>`;
+        
+        document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
+        scrollToBottom();
+        
+        return;
+    }
+
+    // 5. 轉換為 phrase_library 對應的 logic_key 前綴
+    const metricPrefixMap = {
+        'TST_min': 'Battery 總睡眠時間',
+        'N3_pct': 'Battery N3',
+        'rMSSD': 'Battery rMSSD',
+        'HBI': 'Battery HBI',
+        'HR_min': 'Battery 最低脈搏'
+    };
+
+    const prefix = metricPrefixMap[worstMetric];
+    const randomNum = Math.floor(Math.random() * 3) + 1; // 隨機 1、2、3
+    const logicKey = `${prefix}最差${randomNum}`;
+
+    try {
+        const { data: phraseData } = await _supabase
+            .from('phrase_library')
+            .select('detailed_content')
+            .eq('logic_key', logicKey)
+            .limit(1)
+            .maybeSingle();
+
+        if (phraseData && phraseData.detailed_content) {
+            // 先說一句話，然後推派小卡
+            await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
+            // 👇 修改這裡：把 hasTRT 當作第四個參數傳進去
+            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, targetPreDateStr, hasTRT);
+        }
+    } catch (e) {
+        console.error("Supabase 查詢錯誤：", e);
+    }
 }
 </script>
 </body>
