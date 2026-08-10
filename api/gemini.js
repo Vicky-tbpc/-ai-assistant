@@ -1,4 +1,4 @@
-// api/gemini.js 28
+// api/gemini.js 28-2
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -134,19 +134,19 @@ export default async function handler(req, res) {
     const lastWeekStartStr = getOffsetDate(-7);
 
     // 🌟 調整 1：精準定義 knowledge_query 的提取方式，強制抓出具體的名詞
-    const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
+const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請判斷使用者的問題：「${prompt}」的意圖。
 
 【判斷規則】
 1. 【圖表嚴格限制】：只有當使用者「明確提到視覺化圖表的關鍵字」時，才將 need_trend_chart 設為 true。並判斷 trend_type 為："all", "battery", "rhr", "n3", "rmssd", "hrmin", "hbi", 或 "unknown"。
-2. 【個人數據查詢】(強制觸發)：只要問題涉及「個人的健康狀況」、「具體數值變化」，或是詢問「個人的指標狀態或原因」（例如：「為什麼今天是紅燈/黃燈」、「我的恢復指數為何下降」），請務必將 need_data 設為 true！
-   - 日期設定：若明確提到「今天」，start 與 end 皆設為 ${local_date}。若未指明具體日期但提到具體指標名稱，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
+2. 【個人數據查詢】(強制觸發)：只要問題涉及「個人的健康狀況」、「具體數值變化」，或是詢問「個人的指標狀態或原因」（例如：「為什麼是紅燈/黃燈」、「我的恢復指數為何下降」），請務必將 need_data 設為 true！
+   - 日期設定：若明確提到「今天」，start 與 end 皆設為 ${local_date}。若未指明具體日期（如只問「為何紅燈」）但提到具體指標名稱或燈號狀態，強制設 start 為 ${lastWeekStartStr}，end 為 ${local_date}。
 3. 【知識庫查詢】(全面涵蓋)：只要問題涉及「健康指標的定義與正常範圍」(如：低氧負擔、HBI、N3、血氧)，或是「硬體裝置操作與APP教學」，或是「報告判讀教學」，請務必將 need_knowledge 設為 true。
    🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫，或是遇到「綠燈」、「黃燈」、「紅燈」、「發炎風險」、「恢復指數」等系統狀態詞彙時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！
    ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
 4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
 
-💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼今天看起來是紅燈？」，你必須同時將 need_data 設為 true (為了抓取今天數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
+💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
 【日期對照表】
 1. 今天：${local_date}
