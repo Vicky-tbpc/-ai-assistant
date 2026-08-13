@@ -433,6 +433,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
               blockText += `   - 靜息心率: ${rhrDisplay}\n`;
               blockText += `   - 恢復狀態: ${tagDisplay}\n`;
+              blockText += `   - 睡眠心血管負荷: ${cvdDisplay}\n`; // 新增輸出 CVD
             } else {
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：無數據\n`;
             }
