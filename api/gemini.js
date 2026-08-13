@@ -418,15 +418,22 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               const light = rawWake.light_status;
               const rhr = rawWake.RHR_raw;
               const tag = rawWake.Daily_Tag;
+              const cvd = rawWake.CVD; // 新增讀取 CVD
               const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
               const lightDisplay = (light === null || light === undefined || light === "無資料") ? "無資料" : light;
               const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
+              let cvdDisplay = "無資料";
+              if (cvd === 0) cvdDisplay = "良好";
+              else if (cvd === 1) cvdDisplay = "一般";
+              else if (cvd === 2) cvdDisplay = "偏高";
+              else if (cvd === 3) cvdDisplay = "高";              
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
               blockText += `   - 靜息心率: ${rhrDisplay}\n`;
               blockText += `   - 恢復狀態: ${tagDisplay}\n`;
+              blockText += `   - 睡眠心血管負荷: ${cvdDisplay}\n`; // 新增輸出 CVD
             } else {
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：無數據\n`;
             }
