@@ -1,4 +1,4 @@
-// api/gemini.js 29
+// api/gemini.js 30
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -145,6 +145,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫，或是遇到「綠燈」、「黃燈」、「紅燈」、「發炎風險」、「恢復指數」等系統狀態詞彙時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！
    ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
 4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
+5. 【開啟睡眠報告】(新增)：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
+   🛑 【報告進度攔截】：若使用者是詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告「計算進度或數量」的問題，嚴禁開啟報告！請務必將 need_pdf_report 設為 false！
 
 💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
@@ -154,7 +156,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 3. 上週/最近一週：${lastWeekStartStr} 到 ${yesterdayStr}
 
 請根據上述規則，輸出完全符合以下格式的 JSON：
-{"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string"}`;
+{"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string", "need_pdf_report": boolean, "pdf_date": "YYYY-MM-DD"}`;
 
     let intentRes = await fetch(geminiUrl, {
       method: "POST",
@@ -186,6 +188,17 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       } else {
         return res.status(200).json({ action: 'show_trend_options', text: "🔍 想查看哪一種趨勢圖表呢？" });
       }
+    }
+    // ==========================================
+    // 🌟 新增：攔截開啟 PDF 睡眠報告的意圖
+    // ==========================================
+    if (intent.need_pdf_report && intent.pdf_date) {
+      return res.status(200).json({ 
+        action: 'open_pdf', 
+        date: intent.pdf_date, 
+        // 👇 把原本的 "這就幫你開啟" 改成引導點擊按鈕的說法
+        text: `沒問題！${intent.pdf_date} 的睡眠報告準備好囉，點擊下方的按鈕就可以查看了！` 
+      });
     }
 
     // ==========================================
