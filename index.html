@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n093</title>
+    <title>Soosyn 健康夥伴 n094</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2734,7 +2734,10 @@ async function handleAbnormalityInput(msg) {
         // 2. 將 Markdown 連結 [名稱](網址) 轉換為 HTML 可點擊的超連結 <a>
         formattedText = formattedText.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" style="color: #0056b3; text-decoration: underline; font-weight: bold;">$1</a>');
         
-        // 3. 輸出到畫面上
+        // 3. 將 Markdown 粗體 **文字** 轉換為 HTML 粗體 <strong> (新增這一行)
+        formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        // 4. 輸出到畫面上
         typingElem.querySelector('.ai-bubble').innerHTML = formattedText;
     }
     scrollToBottom(); 
