@@ -196,7 +196,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       return res.status(200).json({ 
         action: 'open_pdf', 
         date: intent.pdf_date, 
-        text: `沒問題！這就幫你開啟 ${intent.pdf_date} 的睡眠報告📄👇` 
+        // 👇 把原本的 "這就幫你開啟" 改成引導點擊按鈕的說法
+        text: `沒問題！${intent.pdf_date} 的睡眠報告準備好囉，點擊下方的按鈕就可以查看了` 
       });
     }
 
