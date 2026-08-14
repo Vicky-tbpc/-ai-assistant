@@ -2878,15 +2878,9 @@ async function callGeminiAPI(prompt) {
 
         // 👇 判斷後端回傳的 action 來決定前端要做什麼動作
         if (data.action === 'open_pdf') {
-            // 收到開啟 PDF 指令，呼叫開啟報告的函式
+            // 改成：呼叫產生按鈕的函式，不直接開啟
             setTimeout(() => {
-                // 這裡假設你有一個 openSleepReport 函式來處理開啟 PDF
-                // data.date 會是後端傳來的 YYYY-MM-DD
-                if (typeof openSleepReport === 'function') {
-                    openSleepReport(data.date); 
-                } else {
-                    console.log(`準備開啟 ${data.date} 的報告，但還沒寫 openSleepReport 函式！`);
-                }
+                appendPdfButton(data.date); 
             }, 500);
         } else if (data.action === 'show_trend_options') {
             // 使用者沒說清楚，跳出選單
@@ -2906,6 +2900,34 @@ async function callGeminiAPI(prompt) {
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
         return "抱歉，我現在連不上線，請稍後再試。 😅";
+    }
+}
+
+// --- 新增：在對話框中產生開啟 PDF 的按鈕 ---
+function appendPdfButton(date) {
+    const historyElem = document.getElementById('chat-history');
+    if (!historyElem) return;
+
+    // 建立按鈕的 HTML 結構 (你可以依照你原本的 UI 風格修改 class 或 style)
+    const btnHtml = `
+        <div class="msg-row ai-row">
+            <div class="ai-bubble" style="background-color: transparent; border: none; padding: 0; box-shadow: none;">
+                <button onclick="openSleepReport('${date}')" 
+                        style="background-color: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.3s;"
+                        onmouseover="this.style.backgroundColor='#45a049'" 
+                        onmouseout="this.style.backgroundColor='#4CAF50'">
+                    📄 點我開啟 ${date} 的睡眠報告
+                </button>
+            </div>
+        </div>
+    `;
+
+    // 將按鈕加入對話紀錄中
+    historyElem.insertAdjacentHTML('beforeend', btnHtml);
+    
+    // 捲動到最底部
+    if (typeof scrollToBottom === 'function') {
+        scrollToBottom();
     }
 }
 
