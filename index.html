@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n094</title>
+    <title>Soosyn 健康夥伴 n095</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2876,8 +2876,19 @@ async function callGeminiAPI(prompt) {
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
-        // 👇 新增這段：如果後端判定要畫圖，就呼叫按鈕選單
-        if (data.action === 'show_trend_options') {
+        // 👇 判斷後端回傳的 action 來決定前端要做什麼動作
+        if (data.action === 'open_pdf') {
+            // 收到開啟 PDF 指令，呼叫開啟報告的函式
+            setTimeout(() => {
+                // 這裡假設你有一個 openSleepReport 函式來處理開啟 PDF
+                // data.date 會是後端傳來的 YYYY-MM-DD
+                if (typeof openSleepReport === 'function') {
+                    openSleepReport(data.date); 
+                } else {
+                    console.log(`準備開啟 ${data.date} 的報告，但還沒寫 openSleepReport 函式！`);
+                }
+            }, 500);
+        } else if (data.action === 'show_trend_options') {
             // 使用者沒說清楚，跳出選單
             setTimeout(() => {
                 appendTrendOptions();
