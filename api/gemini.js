@@ -1,4 +1,4 @@
-// api/gemini.js 28-2
+// api/gemini.js 29
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
