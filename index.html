@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n094</title>
+    <title>Soosyn 健康夥伴 n095</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2876,8 +2876,13 @@ async function callGeminiAPI(prompt) {
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
-        // 👇 新增這段：如果後端判定要畫圖，就呼叫按鈕選單
-        if (data.action === 'show_trend_options') {
+        // 👇 判斷後端回傳的 action 來決定前端要做什麼動作
+        if (data.action === 'open_pdf') {
+            // 改成：呼叫產生按鈕的函式，不直接開啟
+            setTimeout(() => {
+                appendPdfButton(data.date); 
+            }, 500);
+        } else if (data.action === 'show_trend_options') {
             // 使用者沒說清楚，跳出選單
             setTimeout(() => {
                 appendTrendOptions();
@@ -2895,6 +2900,34 @@ async function callGeminiAPI(prompt) {
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
         return "抱歉，我現在連不上線，請稍後再試。 😅";
+    }
+}
+
+// --- 新增：在對話框中產生開啟 PDF 的按鈕 ---
+function appendPdfButton(date) {
+    const historyElem = document.getElementById('chat-history');
+    if (!historyElem) return;
+
+    // 建立按鈕的 HTML 結構 (你可以依照你原本的 UI 風格修改 class 或 style)
+    const btnHtml = `
+        <div class="msg-row ai-row">
+            <div class="ai-bubble" style="background-color: transparent; border: none; padding: 0; box-shadow: none;">
+                <button onclick="openSleepReport('${date}')" 
+                        style="background-color: #8699a3; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.3s;"
+                        onmouseover="this.style.backgroundColor='#6c838f'" 
+                        onmouseout="this.style.backgroundColor='#8699a3'">
+                    📄 開啟 ${date} 的睡眠報告
+                </button>
+            </div>
+        </div>
+    `;
+
+    // 將按鈕加入對話紀錄中
+    historyElem.insertAdjacentHTML('beforeend', btnHtml);
+    
+    // 捲動到最底部
+    if (typeof scrollToBottom === 'function') {
+        scrollToBottom();
     }
 }
 
