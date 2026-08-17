@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096</title>
+    <title>Soosyn 健康夥伴 n095-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2312,77 +2312,6 @@ function appendSummaryCard(dateTitle, data) {
 
         const toggleId = `risk-chart-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
 
-        // --- 新增：本次綜合分析 區塊準備 ---
-        let compAnalysisHtml = '';
-        if (raw && raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null) {
-            
-            // 產生前三項橫線 UI 的函數
-            const getCompBarHtml = (title, val) => {
-                let colors = ['#e1e1e1', '#e1e1e1', '#e1e1e1', '#e1e1e1'];
-                if (val >= 75 && val <= 100) colors[0] = '#596b75';
-                else if (val >= 50 && val <= 74) colors[1] = '#8699a3';
-                else if (val >= 25 && val <= 49) colors[2] = '#a79d8c';
-                else if (val >= 0 && val <= 24) colors[3] = '#ff8c73';
-
-                return `
-                    <div style="margin-top: 12px;">
-                        <div style="font-size: 14px; font-weight: bold; color: #5a5a5a;">${title}</div>
-                        <div style="display: flex; gap: 4px; height: 6px; width: 100%; margin-top: 6px;">
-                            <div style="flex: 1; background-color: ${colors[0]}; border-radius: 3px;"></div>
-                            <div style="flex: 1; background-color: ${colors[1]}; border-radius: 3px;"></div>
-                            <div style="flex: 1; background-color: ${colors[2]}; border-radius: 3px;"></div>
-                            <div style="flex: 1; background-color: ${colors[3]}; border-radius: 3px;"></div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 4px; text-align: center;">
-                            <div style="flex: 1;">良好</div>
-                            <div style="flex: 1;">一般</div>
-                            <div style="flex: 1;">不佳</div>
-                            <div style="flex: 1;">差</div>
-                        </div>
-                    </div>
-                `;
-            };
-
-            const item1 = getCompBarHtml('脈搏間隔穩定度', raw.PPI_count);
-            const item2 = getCompBarHtml('低氧區穩定度', raw.HBI_count);
-            const item3 = getCompBarHtml('心血管壓力穩定度', raw.CBP_count);
-
-            // 項目4：建議文字 (比對 Supabase phrase_library)
-            let suggestText = "建議文字載入中..."; 
-            const cvdContent = raw.CVD_content;
-            
-            if (cvdContent != null) {
-                const targetTitle = `cvd_${cvdContent}`;
-                
-                // 這裡假設你有個叫做 phrase_library 的變數（陣列）存放了 supabase 的資料
-                // 若你的取法不同，可以替換下方的 if 判斷
-                if (typeof phrase_library !== 'undefined' && Array.isArray(phrase_library)) {
-                    const matched = phrase_library.find(p => p.title === targetTitle);
-                    if (matched && matched.action_suggest) {
-                        suggestText = matched.action_suggest;
-                    }
-                } else {
-                    suggestText = `(這裡會顯示 ${targetTitle} 的建議，請串接 phrase_library table 資料)`;
-                }
-            }
-
-            const item4 = `
-                <div style="margin-top: 15px; padding: 12px; background-color: white; border: 1px solid #e1e1e1; border-radius: 8px; font-size: 13px; color: #5a5a5a; line-height: 1.5;">
-                    <span style="font-weight: bold; color: #333;">💡 建議：</span><br>${suggestText}
-                </div>
-            `;
-
-            compAnalysisHtml = `
-                <div style="margin-top: 20px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 15px;">
-                    <div style="font-size: 15px; font-weight: bold; color: #333; text-align: center;">本次綜合分析</div>
-                    ${item1}
-                    ${item2}
-                    ${item3}
-                    
-                </div>
-            `;
-        }
-
         riskSectionHtml = `
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -2428,8 +2357,6 @@ function appendSummaryCard(dateTitle, data) {
                     </div>
                   </div>
                 </div>
-                <!-- 注入本次綜合分析區塊 -->
-                ${compAnalysisHtml}            
             </div>
         `;
     }
@@ -2951,10 +2878,41 @@ async function callGeminiAPI(prompt) {
 
         // 👇 判斷後端回傳的 action 來決定前端要做什麼動作
         if (data.action === 'open_pdf') {
-            // 改成：呼叫產生按鈕的函式，不直接開啟
-            setTimeout(() => {
-                appendPdfButton(data.date); 
-            }, 500);
+            // --- 👑 新增功能：先向地端 API 檢查該日期是否有資料 ---
+            try {
+                // 準備查詢參數，限制只查目標日期這天
+                const params = new URLSearchParams({
+                    serial: currentSerial,
+                    start: data.date,
+                    end: data.date
+                }).toString();
+                
+                const checkRes = await fetch(`/api/health?${params}`);
+                if (!checkRes.ok) throw new Error("地端連線失敗");
+                
+                const checkData = await checkRes.json();
+                
+                // 確認回傳資料中有沒有包含這天的紀錄
+                const hasReport = checkData.find(r => r.record_date === data.date);
+
+                if (hasReport) {
+                    // 有找到報告：延遲一下再產生開啟 PDF 的按鈕
+                    setTimeout(() => {
+                        appendPdfButton(data.date); 
+                    }, 500);
+                } else {
+                    // 沒找到報告：不產生按鈕，改用語音泡泡通知
+                    setTimeout(() => {
+                        appendAiMessage(`幫你確認過了，**${data.date.replace(/-/g, '/')}** 這天沒有睡眠報告喔 😅，可能是還沒記錄到或尚未同步！`);
+                    }, 500);
+                }
+            } catch (err) {
+                console.error("檢查報告發生錯誤:", err);
+                setTimeout(() => {
+                    appendAiMessage(`哎呀，連線檢查 **${data.date.replace(/-/g, '/')}** 的報告時發生了一點問題，請確認一下地端伺服器有沒有正常開啟喔！ 🔌`);
+                }, 500);
+            }
+            // --------------------------------------------------------
         } else if (data.action === 'show_trend_options') {
             // 使用者沒說清楚，跳出選單
             setTimeout(() => {
