@@ -2900,17 +2900,16 @@ async function callGeminiAPI(prompt) {
                     setTimeout(() => {
                         appendPdfButton(data.date); 
                     }, 500);
+                    // 讓程式繼續往下走，最後會回傳並印出原本的 data.text ("沒問題！...")
                 } else {
-                    // 沒找到報告：不產生按鈕，改用語音泡泡通知
-                    setTimeout(() => {
-                        appendAiMessage(`幫你確認過了，**${data.date.replace(/-/g, '/')}** 這天沒有睡眠報告喔 😅，可能是還沒記錄到或尚未同步！`);
-                    }, 500);
+                    // 沒找到報告：直接覆蓋掉 AI 原本的台詞，並提早 return！
+                    // 這樣就不會印出「沒問題！...」，也不會產生兩句對話了
+                    return `幫你確認過了，**${data.date.replace(/-/g, '/')}** 這天沒有睡眠報告喔 😅，可能是還沒記錄到或尚未同步！`;
                 }
             } catch (err) {
                 console.error("檢查報告發生錯誤:", err);
-                setTimeout(() => {
-                    appendAiMessage(`哎呀，連線檢查 **${data.date.replace(/-/g, '/')}** 的報告時發生了一點問題，請確認一下地端伺服器有沒有正常開啟喔！ 🔌`);
-                }, 500);
+                // 發生錯誤：一樣覆蓋台詞並提早 return
+                return `哎呀，連線檢查 **${data.date.replace(/-/g, '/')}** 的報告時發生了一點問題，請確認一下地端伺服器有沒有正常開啟喔！ 🔌`;
             }
             // --------------------------------------------------------
         } else if (data.action === 'show_trend_options') {
