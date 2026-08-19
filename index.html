@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n095-2</title>
+    <title>Soosyn 健康夥伴 n096-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2312,6 +2312,52 @@ function appendSummaryCard(dateTitle, data) {
 
         const toggleId = `risk-chart-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
 
+        // --- 新增：本次綜合分析 區塊準備 ---
+        let compAnalysisHtml = '';
+        if (raw && raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null) {
+            
+            // 產生前三項橫線 UI 的函數
+            const getCompBarHtml = (title, val) => {
+                let colors = ['#e1e1e1', '#e1e1e1', '#e1e1e1', '#e1e1e1'];
+                if (val >= 0 && val <= 24) colors[0] = '#596b75';
+                else if (val >= 25 && val <= 49) colors[1] = '#8699a3';
+                else if (val >= 50 && val <= 74) colors[2] = '#a79d8c';
+                else if (val >= 75 && val <= 100) colors[3] = '#ff8c73';
+
+                return `
+                    <div style="margin-top: 12px;">
+                        <div style="font-size: 14px; font-weight: bold; color: #5a5a5a;">${title}</div>
+                        <div style="display: flex; gap: 4px; height: 6px; width: 100%; margin-top: 12px;">
+                            <div style="flex: 1; background-color: ${colors[0]}; border-radius: 3px;"></div>
+                            <div style="flex: 1; background-color: ${colors[1]}; border-radius: 3px;"></div>
+                            <div style="flex: 1; background-color: ${colors[2]}; border-radius: 3px;"></div>
+                            <div style="flex: 1; background-color: ${colors[3]}; border-radius: 3px;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 4px; text-align: center;">
+                            <div style="flex: 1;">良好</div>
+                            <div style="flex: 1;">一般</div>
+                            <div style="flex: 1;">需留意</div>
+                            <div style="flex: 1;">不佳</div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            const item1 = getCompBarHtml('脈搏間隔穩定度', raw.PPI_count);
+            const item2 = getCompBarHtml('低氧區穩定度', raw.HBI_count);
+            const item3 = getCompBarHtml('心血管壓力穩定度', raw.CBP_count);
+
+            compAnalysisHtml = `
+                <div style="margin-top: 20px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 15px;">
+                    <div style="font-size: 15px; font-weight: bold; color: #333; text-align: center;">本次綜合分析</div>
+                    ${item1}
+                    ${item2}
+                    ${item3}
+                    
+                </div>
+            `;
+        }
+        
         riskSectionHtml = `
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -2357,6 +2403,8 @@ function appendSummaryCard(dateTitle, data) {
                     </div>
                   </div>
                 </div>
+                <!-- 注入本次綜合分析區塊 -->
+                ${compAnalysisHtml}            
             </div>
         `;
     }
