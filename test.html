@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n095-2</title>
+    <title>Soosyn 健康夥伴 n096-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2319,10 +2319,10 @@ function appendSummaryCard(dateTitle, data) {
             // 產生前三項橫線 UI 的函數
             const getCompBarHtml = (title, val) => {
                 let colors = ['#e1e1e1', '#e1e1e1', '#e1e1e1', '#e1e1e1'];
-                if (val >= 75 && val <= 100) colors[0] = '#596b75';
-                else if (val >= 50 && val <= 74) colors[1] = '#8699a3';
-                else if (val >= 25 && val <= 49) colors[2] = '#a79d8c';
-                else if (val >= 0 && val <= 24) colors[3] = '#ff8c73';
+                if (val >= 0 && val <= 24) colors[0] = '#596b75';
+                else if (val >= 25 && val <= 49) colors[1] = '#8699a3';
+                else if (val >= 50 && val <= 74) colors[2] = '#a79d8c';
+                else if (val >= 75 && val <= 100) colors[3] = '#ff8c73';
 
                 return `
                     <div style="margin-top: 12px;">
@@ -2346,31 +2346,6 @@ function appendSummaryCard(dateTitle, data) {
             const item1 = getCompBarHtml('脈搏間隔穩定度', raw.PPI_count);
             const item2 = getCompBarHtml('低氧區穩定度', raw.HBI_count);
             const item3 = getCompBarHtml('心血管壓力穩定度', raw.CBP_count);
-
-            // 項目4：建議文字 (比對 Supabase phrase_library)
-            let suggestText = "建議文字載入中..."; 
-            const cvdContent = raw.CVD_content;
-            
-            if (cvdContent != null) {
-                const targetTitle = `cvd_${cvdContent}`;
-                
-                // 這裡假設你有個叫做 phrase_library 的變數（陣列）存放了 supabase 的資料
-                // 若你的取法不同，可以替換下方的 if 判斷
-                if (typeof phrase_library !== 'undefined' && Array.isArray(phrase_library)) {
-                    const matched = phrase_library.find(p => p.title === targetTitle);
-                    if (matched && matched.action_suggest) {
-                        suggestText = matched.action_suggest;
-                    }
-                } else {
-                    suggestText = `(這裡會顯示 ${targetTitle} 的建議，請串接 phrase_library table 資料)`;
-                }
-            }
-
-            const item4 = `
-                <div style="margin-top: 15px; padding: 12px; background-color: white; border: 1px solid #e1e1e1; border-radius: 8px; font-size: 13px; color: #5a5a5a; line-height: 1.5;">
-                    <span style="font-weight: bold; color: #333;">💡 建議：</span><br>${suggestText}
-                </div>
-            `;
 
             compAnalysisHtml = `
                 <div style="margin-top: 20px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 15px;">
