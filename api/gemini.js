@@ -1,4 +1,4 @@
-// api/gemini.js 30
+// api/gemini.js 31
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -146,7 +146,9 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
 4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
 5. 【開啟睡眠報告】(新增)：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
-   🛑 【報告進度攔截】：若使用者是詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告「計算進度或數量」的問題，嚴禁開啟報告！請務必將 need_pdf_report 設為 false！
+   🛑 【意圖區隔與攔截】：
+   - 若使用者詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告【計算進度或數量】的問題，嚴禁開啟報告，請務必將 need_pdf_report 設為 false！
+   - 若使用者要求「昨晚的睡眠分析」、「幫我分析睡眠」，代表他需要你用文字【解讀數據】，而不是單純打開檔案！請務必將 need_pdf_report 設為 false，並確保 need_data 為 true！
 
 💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
