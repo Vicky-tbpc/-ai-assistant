@@ -1,4 +1,5 @@
 // api/health.js_新增自動切換5000
+console.log('目前讀取的網址清單:', process.env.LOCAL_TUNNEL_URLS);
 export default async function handler(req, res) {
   const API_KEY = process.env.LOCAL_API_KEY;
   // 改為讀取多個網址的環境變數，並用逗號分割成陣列 (相容舊的 LOCAL_TUNNEL_URL)
