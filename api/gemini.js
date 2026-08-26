@@ -1,4 +1,4 @@
-// api/gemini.js 31
+// api/gemini.js 32
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -233,8 +233,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "T88": "T88 睡眠期間 血氧濃度小於 88% 的時間百分比 SpO2",
         
         // --- 原始設定 (單一精準指標) ---
-        "低氧負擔": "低氧負擔指數 HBI",
-        "HBI": "低氧負擔指數 HBI",
+        "低氧負擔": "低氧負擔指數 HBI Hypoxia Burden Index",
+        "HBI": "低氧負擔指數 HBI Hypoxia Burden Index",
         "RR": "呼吸頻率 RR Respiratory Rate",
         "呼吸頻率": "呼吸頻率 RR Respiratory Rate",
         "RHR": "靜息心率 RHR",
@@ -250,6 +250,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "HF": "HF 高頻功率 (0.15-0.4 Hz)，通常反映副交感神經活性",
         "LF/HF": "LF/HF 低、高頻功率之比值，通常反映自律神經活性平衡",
         "SDNN": "SDNN 相鄰正常心跳間距的標準差",
+        "rMSSD": "rMSSD 相鄰正常心跳間距差異平方和的均方根",
         "CBP": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "心血管壓力": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "說明書": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
@@ -262,9 +263,11 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       // 💡 優化：把字典的 key 依照「字串長度」由長到短排序
       // 確保「睡眠最低脈搏」會比「脈搏」優先被比對到
       const sortedKeys = Object.keys(aliasDictionary).sort((a, b) => b.length - a.length);
+      const finalQueryLower = finalQuery.toLowerCase(); // 先將使用者的查詢轉為小寫
 
       for (const key of sortedKeys) {
-        if (finalQuery.includes(key)) {
+        // 將字典的 key 也轉為小寫進行比對，解決大小寫不一致的盲點
+        if (finalQueryLower.includes(key.toLowerCase())) {
           finalQuery = aliasDictionary[key];
           break;
         }
