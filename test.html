@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096-2</title>
+    <title>Soosyn 健康夥伴 n097</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1083,9 +1083,9 @@ if (!targetData) {
     }
 }
 
-// --- 核心邏輯：摘要比較與建議 (修正版) ---
+// --- 核心邏輯：日間建議與評估 (最新版) ---
 async function fetchSummaryData(targetDate) {
-    // --- 1. 抓取個人資料：抓取目標日期與前一筆紀錄 (用於進退步比較) ---
+    // --- 1. 抓取個人資料 ---
     let healths = [];
 
     try {
@@ -1108,130 +1108,114 @@ async function fetchSummaryData(targetDate) {
         return null;
     }
 
-    // 【關鍵修改】：檢查當天是否有數據，若無則回傳 null
+    // 檢查當天是否有數據，若無則回傳 null
     if (!healths?.length || healths[0].record_date !== targetDate) {
         return null;
     }
 
     const current = healths[0];
-    const raw = current.raw_json;
+    const raw = current.raw_json || {};
     const currentBattery = raw.Personal_Battery_weighted_round || 0;
-
-    // 【新增】：切出最近 7 筆歷史資料供圖表使用
     const history7 = healths.slice(0, 7);
     
-    // --- 3. 新版指標增減比較邏輯 ---
     let finalCapsules = [];
     let flowSuggestionText = null;
 
-    if (healths[1]) {
-        const prevRaw = healths[1].raw_json;
+    // --- 2. 計算日間建議等級 (exercise_level) ---
+    // 定義等級陣列 (由低到高)，方便後續用 index 進行升降級運算
+    const LEVELS = ['REST', 'VERY_LIGHT', 'LIGHT', 'MODERATE', 'MODERATE_HIGH', 'HIGH'];
+    let currentLvlIdx = 4; // 預設為 MODERATE_HIGH (index 4)
 
-        // 定義計算四項指標分數的函式
-        const getIndicators = (r) => {
-            if (!r) return { sleep: 0, hrv: 0, pulse: 0, o2: 0 };
-            return {
-                sleep: Math.round(
-                    (r.Battery_TST_min_A || 0) * 0.36 +
-                    (r.Battery_N3_pct_A || 0) * 0.36 +
-                    (r.Battery_OnsetDev_min_A || 0) * 0.09 +
-                    (r.Battery_wake_minutes_A || 0) * 0.18
-                ),
-                hrv: Math.round(r.Battery_rMSSD_A || 0),
-                pulse: Math.round(r.Battery_HR_min_A || 0),
-                o2: Math.round(r.Battery_HBI_A || 0)
-            };
-        };
-
-        const curInd = getIndicators(raw);
-        const prevInd = getIndicators(prevRaw);
-
-        // 指標對應的 Logic Key 字首
-        const metrics = [
-            { key: 'sleep', prefix: 'S' },
-            { key: 'hrv', prefix: 'H' },
-            { key: 'pulse', prefix: 'P' },
-            { key: 'o2', prefix: 'O' }
-        ];
-
-        // 計算差異與狀態
-        let statuses = metrics.map(m => {
-            const diff = curInd[m.key] - prevInd[m.key];
-            let status = 'stable';
-            
-            // 差異 < 3 持平，>= 3 進步，<= -3 退步
-            if (diff >= 3) status = 'progress';
-            else if (diff <= -3) status = 'regress';
-            
-            return { ...m, diff, status };
-        });
-
-        // 分類進步與退步的指標
-        const progresses = statuses.filter(s => s.status === 'progress');
-        const regresses = statuses.filter(s => s.status === 'regress');
-
-        // 找出進步最多與退步最多的指標
-        let bestProgress = progresses.length > 0 ? progresses.reduce((max, s) => s.diff > max.diff ? s : max) : null;
-        let worstRegress = regresses.length > 0 ? regresses.reduce((min, s) => s.diff < min.diff ? s : min) : null;
-
-        // 判斷情境與需要抓取的 logic_key
-        let logicKeysToFetch = [];
-        let scenario = '';
-
-        if (progresses.length === 0 && regresses.length === 0) {
-            // 情境四：全部持平
-            scenario = 'all_stable';
-            logicKeysToFetch.push('全平');
-        } else if (progresses.length > 0 && regresses.length > 0) {
-            // 情境三：有進步、有退步
-            scenario = 'mixed';
-            logicKeysToFetch.push(`${bestProgress.prefix}進`);
-            logicKeysToFetch.push(`${worstRegress.prefix}退`);
-        } else if (progresses.length > 0 && regresses.length === 0) {
-            // 情境二、五：有進步，無退步
-            scenario = 'progress_only';
-            logicKeysToFetch.push(`${bestProgress.prefix}進`);
-        } else if (regresses.length > 0 && progresses.length === 0) {
-            // 情境一、六：有退步，無進步
-            scenario = 'regress_only';
-            logicKeysToFetch.push(`${worstRegress.prefix}退`);
-        }
-
-        // --- 4. 從資料庫獲取對應建議語 ---
-        // 保留隨機建議邏輯給 flowSuggestion 使用 (可依你的實際需求調整)
-        const randomIdx = Math.floor(Math.random() * 3) + 1;
-        const fallbackFlowKey = worstRegress ? `${worstRegress.prefix}退${randomIdx}` : `全平${randomIdx}`;
-        logicKeysToFetch.push(fallbackFlowKey);
-
-        let phrases = [];
-        try {
-            const { data } = await _supabase.from('phrase_library')
-                .select('logic_key, detailed_content')
-                .in('logic_key', logicKeysToFetch);
-            phrases = data || [];
-        } catch (err) {
-            console.error("Supabase 讀取失敗:", err);
-        }
-
-        const getPhrase = (key) => phrases.find(p => p.logic_key === key)?.detailed_content;
-
-        // 依照情境組合要顯示的 UI 膠囊陣列
-        if (scenario === 'all_stable') {
-            finalCapsules.push({ type: 'best', icon: '🙂', text: getPhrase('全平') || '各項指標維持穩定，繼續保持！' });
-        } else if (scenario === 'mixed') {
-            finalCapsules.push({ type: 'best', icon: '😊', text: getPhrase(`${bestProgress.prefix}進`) || '部分指標有進步！' });
-            finalCapsules.push({ type: 'worst', icon: '😟', text: getPhrase(`${worstRegress.prefix}退`) || '部分指標有些退步，請多留意。' });
-        } else if (scenario === 'progress_only') {
-            finalCapsules.push({ type: 'best', icon: '😊', text: getPhrase(`${bestProgress.prefix}進`) || '指標表現進步！' });
-        } else if (scenario === 'regress_only') {
-            finalCapsules.push({ type: 'worst', icon: '😟', text: getPhrase(`${worstRegress.prefix}退`) || '指標表現退步，請多留意。' });
-        }
-
-        flowSuggestionText = getPhrase(fallbackFlowKey);
+    // A. 讀取 Daily_Tag 比對基礎等級
+    const tag = raw.Daily_Tag;
+    if (!tag) {
+        currentLvlIdx = 4; // null/undefined -> MODERATE_HIGH
     } else {
-        // 若無前一筆紀錄 (無法比較) 的預設顯示
-        finalCapsules.push({ type: 'best', icon: '🙂', text: '累積更多數據後將為你提供進退步分析。' });
+        const tagMap = {
+            '黃金修復': 5,      // HIGH
+            '標準修復': 4,      // MODERATE_HIGH
+            '精神負荷': 2,      // LIGHT
+            '高身心壓力': 2,     // LIGHT
+            '過度疲憊': 2,      // LIGHT
+            '修復不足': 2,      // LIGHT
+            '極度疲乏日': 0,     // REST
+            '睡眠結構混亂': 1,   // VERY_LIGHT
+            '極端負荷': 1,      // VERY_LIGHT
+            '最差睡眠結構': 1,   // VERY_LIGHT
+            '過度訓練/發炎': 0   // REST
+        };
+        currentLvlIdx = tagMap[tag] !== undefined ? tagMap[tag] : 4; 
     }
+
+    // B. 讀取 light_status 調整等級
+    const light = raw.light_status;
+    if (light === '黃燈') {
+        // MAX = MODERATE (index 3)
+        currentLvlIdx = Math.min(currentLvlIdx, 3);
+    } else if (light === '紅燈') {
+        // MAX = VERY_LIGHT (index 1)
+        currentLvlIdx = Math.min(currentLvlIdx, 1);
+    }
+
+    // C. 讀取 CVD 調整等級
+    const cvd = raw.CVD;
+    if (cvd !== undefined && cvd !== null) {
+        if (Number(cvd) === 2) {
+            // MAX = MODERATE (index 3)
+            currentLvlIdx = Math.min(currentLvlIdx, 3);
+        } else if (Number(cvd) === 3) {
+            // MAX = LIGHT (index 2)
+            currentLvlIdx = Math.min(currentLvlIdx, 2);
+        }
+    }
+
+    // D. 讀取 Personal_Battery_state 調整等級
+    const batteryState = raw.Personal_Battery_state;
+    if (batteryState !== undefined && batteryState !== null) {
+        if (Number(batteryState) === 0) {
+            // 降 1 級，最低為 REST (index 0)
+            currentLvlIdx = Math.max(0, currentLvlIdx - 1);
+        }
+    }
+
+    // 取得最終的 exercise_level 字串
+    const finalExerciseLevel = LEVELS[currentLvlIdx];
+
+    // --- 3. 查表：從 Supabase 獲取建議文字 ---
+    let dailyAction = '今天先好好休息，聽從身體的聲音。';
+    let exerciseRec = '建議進行輕度活動。';
+
+    try {
+        const { data, error } = await _supabase.from('exercise_level_rules')
+            .select('daily_action_recommendation, exercise_recommendation')
+            .eq('exercise_level', finalExerciseLevel)
+            .single();
+            
+        if (data && !error) {
+            dailyAction = data.daily_action_recommendation || dailyAction;
+            exerciseRec = data.exercise_recommendation || exerciseRec;
+        }
+    } catch (err) {
+        console.error("Supabase 讀取運動建議失敗:", err);
+    }
+
+    // --- 4. 組合最終的 Capsules ---
+    // 第一個膠囊：日常行動建議
+    finalCapsules.push({ 
+        type: 'best', // 沿用 best 樣式顯示日間建議
+        icon: '💡', 
+        text: dailyAction 
+    });
+
+    // 第二個膠囊：運動建議 + 警語
+    finalCapsules.push({ 
+        type: 'best', 
+        icon: '🏃‍♂️', 
+        text: `${exerciseRec}<br><span style="display:inline-block; margin-top:4px; font-size:0.85em; color:#e74c3c; font-weight:bold;">⚠️ 若運動時出現胸部不適或異常呼吸困難，應停止活動並尋求醫療協助。</span>` 
+    });
+
+    // 讓聊天機器人 (flow) 可以講出今天的日常建議
+    flowSuggestionText = dailyAction;
 
     const statusLight = raw?.light_status || '--';
 
@@ -1240,7 +1224,7 @@ async function fetchSummaryData(targetDate) {
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
         light: statusLight, 
-        capsules: finalCapsules, // 傳遞陣列給 UI
+        capsules: finalCapsules, 
         raw_json: raw, 
         flowSuggestion: flowSuggestionText,
         history7: history7 
