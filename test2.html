@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n097</title>
+    <title>Soosyn 健康夥伴 n097-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1199,23 +1199,127 @@ async function fetchSummaryData(targetDate) {
         console.error("Supabase 讀取運動建議失敗:", err);
     }
 
-    // --- 4. 組合最終的 Capsules ---
-    // 第一個膠囊：日常行動建議
-    finalCapsules.push({ 
-        type: 'best', // 沿用 best 樣式顯示日間建議
-        icon: '💡', 
-        text: dailyAction 
+    // --- 3.5 新增：計算四大穩定度與恢復指數建議 ---
+    const sleepStab = Math.round(
+        (raw.Battery_TST_min_A || 0) * 0.36 +
+        (raw.Battery_N3_pct_A || 0) * 0.36 +
+        (raw.Battery_OnsetDev_min_A || 0) * 0.09 +
+        (raw.Battery_wake_minutes_A || 0) * 0.18
+    );
+    const hrvStab = Math.round(raw.Battery_rMSSD_A || 0);
+    const pulseStab = Math.round(raw.Battery_HR_min_A || 0);
+    const o2Stab = Math.round(raw.Battery_HBI_A || 0);
+
+    const stabilities = [
+        { name: '睡眠穩定度', score: sleepStab, rawKeys: ['TST_min', 'N3_pct'] },
+        { name: '心率變異 (HRV) 穩定度', score: hrvStab, rawKeys: ['rMSSD'] },
+        { name: '脈搏穩定度', score: pulseStab, rawKeys: ['HR_min'] },
+        { name: '血氧穩定度', score: o2Stab, rawKeys: ['HBI'] }
+    ];
+
+    // 依分數由低到高排序，找出需要優先改善的弱項
+    stabilities.sort((a, b) => a.score - b.score);
+    const weakest = stabilities[0];
+    const minScore = weakest.score;
+    
+    // 判定弱項標準
+    const hasWeak = minScore < 90;
+    const hasSigWeak = minScore < 80;
+
+    let recType = '鼓勵＋維持';
+    let needsAction = false;
+
+    // 依恢復指數與弱項判定建議類型
+    if (currentBattery < 80) {
+        recType = '改善建議';
+        needsAction = true; // 分數低於 80 預設進行改善
+    } else if (currentBattery >= 80 && currentBattery <= 89) {
+        if (hasWeak) { recType = '優化建議'; needsAction = true; }
+        else { recType = '維持＋鼓勵'; needsAction = false; }
+    } else if (currentBattery >= 90 && currentBattery <= 94) {
+        if (hasSigWeak) { recType = '局部優化建議'; needsAction = true; }
+        else { recType = '維持＋鼓勵'; needsAction = false; }
+    } else if (currentBattery >= 95 && currentBattery <= 100) {
+        if (hasSigWeak) { recType = '輕度優化建議'; needsAction = true; }
+        else { recType = '鼓勵＋維持'; needsAction = false; }
+    }
+
+    let actionText = '你的各項穩定度表現都很棒，繼續保持這個好節奏喔！';
+
+    // 若需要提出改善行動，比對歷史紀錄找尋有效方案
+    if (needsAction) {
+        let bestRef = null;
+        // 從 healths 陣列往回找 (跳過索引 0 的今天)
+        for (let i = 1; i < healths.length; i++) {
+            const histRaw = healths[i].raw_json || {};
+            const histBattery = histRaw.Personal_Battery_weighted_round || 0;
+            // 尋找過去恢復指數曾高於今天的紀錄
+            if (histBattery > currentBattery) {
+                bestRef = { battery: histBattery, raw: histRaw };
+                break;
+            }
+        }
+
+        if (bestRef) {
+            const rKey = weakest.rawKeys[0];
+            const curVal = raw[rKey] || 0;
+            const histVal = bestRef.raw[rKey] || 0;
+
+            if (weakest.name === '睡眠穩定度') {
+                if (rKey === 'TST_min' && histVal > curVal) {
+                    const diff = Math.round(histVal - curVal);
+                    if (diff > 0) {
+                        actionText = `今晚可嘗試增加約 ${diff} 分鐘的睡眠時間。過去你的紀錄顯示，當睡眠時間增加時，恢復指數曾提升至 ${bestRef.battery} 分。`;
+                    }
+                } else {
+                    actionText = `今晚建議提早休息，確保充足的深睡比例，幫助身體恢復喔。`;
+                }
+            } else if (weakest.name === '心率變異 (HRV) 穩定度') {
+                if (histVal > curVal) {
+                    actionText = `試著安排一些放鬆活動，過去紀錄顯示當心率變異度 (rMSSD) 提升至 ${Math.round(histVal)} 時，恢復指數曾提升至 ${bestRef.battery} 分。`;
+                } else {
+                    actionText = `建議安排靜心或呼吸練習，幫助自律神經放鬆，提升心率變異度。`;
+                }
+            } else if (weakest.name === '脈搏穩定度') {
+                actionText = `睡前避免劇烈運動或咖啡因，讓心跳平穩。過去紀錄顯示，當睡眠心率較穩定時，你的恢復指數曾達到 ${bestRef.battery} 分。`;
+            } else if (weakest.name === '血氧穩定度') {
+                actionText = `睡覺時請注意室內通風。過去紀錄中，當血氧負擔降低時，你的恢復指數曾來到 ${bestRef.battery} 分。`;
+            }
+        } else {
+            // 沒有合適歷史紀錄時，給予通用且保守的建議
+            if (weakest.name === '睡眠穩定度') actionText = `今晚不妨多睡一點，給身體充足的修復時間。`;
+            else if (weakest.name === '心率變異 (HRV) 穩定度') actionText = `今天讓自己多放鬆一下，減少身心壓力。`;
+            else if (weakest.name === '脈搏穩定度') actionText = `睡前盡量放鬆，避免過度亢奮影響夜間心率。`;
+            else if (weakest.name === '血氧穩定度') actionText = `睡覺時記得保持室內空氣流通喔。`;
+        }
+    }
+
+    // 將恢復指數建議新增至膠囊列表
+    finalCapsules.push({
+        type: 'recovery',
+        text: `
+            <div style="margin-bottom: 8px;">
+                <strong>📌 恢復指數優先調整項目：${needsAction ? weakest.name : '無明顯弱項'}</strong><br>
+                ${actionText}
+            </div>
+        `
     });
 
-    // 第二個膠囊：運動建議 + 警語
+    // --- 4. 組合最終的 Capsules (原有的日常/運動建議) ---
     finalCapsules.push({ 
-        type: 'best', 
-        icon: '🏃‍♂️', 
-        text: `${exerciseRec}<br><span style="display:inline-block; margin-top:4px; font-size:0.8em; color:#ff8c73;">運動若出現胸部不適或呼吸困難，請停止活動。</span>` 
+        type: 'best',  
+        text: `
+            <div style="margin-bottom: 8px;">
+                <strong>💡 日常活動建議</strong><br>
+                ${dailyAction}
+            </div>
+            <div>
+                <strong>🏃‍♂️ 運動建議</strong><br>
+                ${exerciseRec}<br>
+                <span style="display:inline-block; margin-top:4px; font-size:0.8em; color:#ff8c73;">運動若出現胸部不適或呼吸困難，請停止活動。</span>
+            </div>
+        ` 
     });
-
-    // 讓聊天機器人 (flow) 可以講出今天的日常建議
-    flowSuggestionText = dailyAction;
 
     const statusLight = raw?.light_status || '--';
 
@@ -2141,7 +2245,7 @@ function appendSummaryCard(dateTitle, data) {
             alertHtml = `
                 <div style="background-color: #fffdf8; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb400; box-shadow: 0 1px 5px rgba(0,0,0,0.05);">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                        <span style="font-size: 1.2rem;">💡</span>
+                        <span style="font-size: 1.2rem;">🔔</span>
                         <span style="font-weight: bold; color: #d97706;">健康提醒</span>
                     </div>
                     <div style="font-size: 14px; color: #5a5a5a; line-height: 1.6;">
@@ -2401,7 +2505,7 @@ function appendSummaryCard(dateTitle, data) {
             const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
             capsulesHtml += `
             <div class="analysis-capsule ${capsuleClass}">
-                <span class="capsule-icon">${cap.icon}</span><span style="flex: 1;">${cap.text}</span>
+                <span style="flex: 1;">${cap.text}</span>
             </div>`;
         });
     }
