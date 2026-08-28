@@ -1215,6 +1215,9 @@ async function fetchSummaryData(targetDate) {
     });
 
 
+
+    const statusLight = raw?.light_status || '--';
+
     // --- 5. 最終回傳物件 ---
     return { 
         date: current.record_date.replace(/-/g, '/'), 
