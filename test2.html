@@ -1299,7 +1299,9 @@ async function fetchSummaryData(targetDate) {
         type: 'recovery',
         text: `
             <div style="margin-bottom: 8px;">
-                <strong>📌 恢復指數優先調整項目：${needsAction ? weakest.name : '無明顯弱項'}</strong><br>
+                <strong>📌 恢復指數優先調整項目：${needsAction ? weakest.name : '無明顯弱項'}</strong>
+            </div>
+            <div>
                 ${actionText}
             </div>
         `
