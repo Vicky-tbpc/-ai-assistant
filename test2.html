@@ -1276,7 +1276,7 @@ async function fetchSummaryData(targetDate) {
                 }
             } else if (weakest.name === '心率變異 (HRV) 穩定度') {
                 if (histVal > curVal) {
-                    actionText = `試著安排一些放鬆活動，過去紀錄顯示當心率變異度 (rMSSD) 提升至 ${Math.round(histVal)} 時，恢復指數曾提升至 ${bestRef.battery} 分。`;
+                    actionText = `試著安排一些放鬆活動，過去紀錄顯示當心率變異度 (rMSSD) 提升至 ${histVal} 時，恢復指數曾提升至 ${bestRef.battery} 分。`;
                 } else {
                     actionText = `建議安排靜心或呼吸練習，幫助自律神經放鬆，提升心率變異度。`;
                 }
