@@ -1202,15 +1202,14 @@ async function fetchSummaryData(targetDate) {
     // --- 4. 組合最終的 Capsules ---
     // 合併膠囊：日常行動建議 + 運動建議 + 警語
     finalCapsules.push({ 
-        type: 'best', 
-        icon: '💡', 
+        type: 'best',  
         text: `
             <div style="margin-bottom: 8px;">
-                <strong>【日常活動建議】</strong><br>
+                <strong>💡 日常活動建議</strong><br>
                 ${dailyAction}
             </div>
             <div>
-                <strong>【運動建議】</strong><br>
+                <strong>🏃‍♂️ 運動建議</strong><br>
                 ${exerciseRec}<br>
                 <span style="display:inline-block; margin-top:4px; font-size:0.8em; color:#ff8c73;">運動若出現胸部不適或呼吸困難，請停止活動。</span>
             </div>
