@@ -1214,10 +1214,6 @@ async function fetchSummaryData(targetDate) {
         text: `${exerciseRec}<br><span style="display:inline-block; margin-top:4px; font-size:0.8em; color:#ff8c73;">運動若出現胸部不適或呼吸困難，請停止活動。</span>` 
     });
 
-    // 讓聊天機器人 (flow) 可以講出今天的日常建議
-    flowSuggestionText = dailyAction;
-
-    const statusLight = raw?.light_status || '--';
 
     // --- 5. 最終回傳物件 ---
     return { 
