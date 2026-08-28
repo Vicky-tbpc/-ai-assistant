@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n097</title>
+    <title>Soosyn 健康夥伴 n097-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1199,8 +1199,127 @@ async function fetchSummaryData(targetDate) {
         console.error("Supabase 讀取運動建議失敗:", err);
     }
 
-    // --- 4. 組合最終的 Capsules ---
-    // 合併膠囊：日常行動建議 + 運動建議 + 警語
+    // --- 3.5 新增：計算四大穩定度與恢復指數建議 ---
+    const sleepStab = Math.round(
+        (raw.Battery_TST_min_A || 0) * 0.36 +
+        (raw.Battery_N3_pct_A || 0) * 0.36 +
+        (raw.Battery_OnsetDev_min_A || 0) * 0.09 +
+        (raw.Battery_wake_minutes_A || 0) * 0.18
+    );
+    const hrvStab = Math.round(raw.Battery_rMSSD_A || 0);
+    const pulseStab = Math.round(raw.Battery_HR_min_A || 0);
+    const o2Stab = Math.round(raw.Battery_HBI_A || 0);
+
+    const stabilities = [
+        { name: '睡眠穩定度', score: sleepStab, rawKeys: ['TST_min', 'N3_pct'] },
+        { name: '心率變異(HRV)穩定度', score: hrvStab, rawKeys: ['rMSSD'] },
+        { name: '脈搏穩定度', score: pulseStab, rawKeys: ['HR_min'] },
+        { name: '血氧穩定度', score: o2Stab, rawKeys: ['HBI'] }
+    ];
+
+    // 依分數由低到高排序，找出需要優先改善的弱項
+    stabilities.sort((a, b) => a.score - b.score);
+    const weakest = stabilities[0];
+    const minScore = weakest.score;
+    
+    // 判定弱項標準
+    const hasWeak = minScore < 90;
+    const hasSigWeak = minScore < 80;
+
+    let recType = '鼓勵＋維持';
+    let needsAction = false;
+
+    // 依恢復指數與弱項判定建議類型
+    if (currentBattery < 80) {
+        recType = '改善建議';
+        needsAction = true; // 分數低於 80 預設進行改善
+    } else if (currentBattery >= 80 && currentBattery <= 89) {
+        if (hasWeak) { recType = '優化建議'; needsAction = true; }
+        else { recType = '維持＋鼓勵'; needsAction = false; }
+    } else if (currentBattery >= 90 && currentBattery <= 94) {
+        if (hasSigWeak) { recType = '局部優化建議'; needsAction = true; }
+        else { recType = '維持＋鼓勵'; needsAction = false; }
+    } else if (currentBattery >= 95 && currentBattery <= 100) {
+        if (hasSigWeak) { recType = '輕度優化建議'; needsAction = true; }
+        else { recType = '鼓勵＋維持'; needsAction = false; }
+    }
+
+    let actionText = '你的各項穩定度表現都很棒，繼續保持這個好節奏喔！';
+
+    // 若需要提出改善行動，比對歷史紀錄找尋有效方案
+    if (needsAction) {
+        let bestRef = null;
+        // 從 healths 陣列往回找 (跳過索引 0 的今天)
+        for (let i = 1; i < healths.length; i++) {
+            const histRaw = healths[i].raw_json || {};
+            const histBattery = histRaw.Personal_Battery_weighted_round || 0;
+            // 尋找過去恢復指數曾高於今天的紀錄
+            if (histBattery > currentBattery) {
+                bestRef = { battery: histBattery, raw: histRaw };
+                break;
+            }
+        }
+
+        if (bestRef) {
+            const rKey = weakest.rawKeys[0];
+            const curVal = raw[rKey] || 0;
+            const histVal = bestRef.raw[rKey] || 0;
+
+            if (weakest.name === '睡眠穩定度') {
+                if (rKey === 'TST_min' && histVal > curVal) {
+                    const diff = Math.round(histVal - curVal);
+                    if (diff > 0) {
+                        actionText = `今晚可嘗試增加約 ${diff} 分鐘的睡眠時間。過去你的紀錄顯示，當睡眠時間增加時，恢復指數曾提升至 ${bestRef.battery} 分。`;
+                    }
+                } else {
+                    actionText = `今晚建議提早休息，確保充足的深睡比例，幫助身體恢復喔。`;
+                }
+            } else if (weakest.name === '心率變異(HRV)穩定度') {
+                if (histVal > curVal) {
+                    actionText = `試著安排一些放鬆活動，過去紀錄顯示當心率變異度(rMSSD)提升至 ${Math.round(histVal)} 時，恢復指數曾提升至 ${bestRef.battery} 分。`;
+                } else {
+                    actionText = `建議安排靜心或呼吸練習，幫助自律神經放鬆，提升心率變異度。`;
+                }
+            } else if (weakest.name === '脈搏穩定度') {
+                actionText = `睡前避免劇烈運動或咖啡因，讓心跳平穩。過去紀錄顯示，當睡眠心率較穩定時，你的恢復指數曾達到 ${bestRef.battery} 分。`;
+            } else if (weakest.name === '血氧穩定度') {
+                actionText = `睡覺時請注意室內通風。過去紀錄中，當血氧負擔降低時，你的恢復指數曾來到 ${bestRef.battery} 分。`;
+            }
+        } else {
+            // 沒有合適歷史紀錄時，給予通用且保守的建議
+            if (weakest.name === '睡眠穩定度') actionText = `今晚不妨多睡一點，給身體充足的修復時間。`;
+            else if (weakest.name === '心率變異(HRV)穩定度') actionText = `今天讓自己多放鬆一下，減少身心壓力。`;
+            else if (weakest.name === '脈搏穩定度') actionText = `睡前盡量放鬆，避免過度亢奮影響夜間心率。`;
+            else if (weakest.name === '血氧穩定度') actionText = `睡覺時記得保持室內空氣流通喔。`;
+        }
+    }
+
+    // 將恢復指數建議新增至膠囊列表
+    finalCapsules.push({
+        type: 'recovery',
+        text: `
+            <div style="margin-bottom: 8px;">
+                <strong>🔋 恢復指數與穩定度評估</strong><br>
+                今日恢復指數：${currentBattery} 分<br>
+                <span style="font-size:0.9em; color:#555; display:inline-block; margin-top:4px;">
+                ・睡眠穩定度：${sleepStab} <br>
+                ・心率變異穩定度：${hrvStab} <br>
+                ・脈搏穩定度：${pulseStab} <br>
+                ・血氧穩定度：${o2Stab}
+                </span>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <strong>📌 優先調整項目：${needsAction ? weakest.name : '無明顯弱項'}</strong><br>
+                建議類型：${recType}
+            </div>
+            <div>
+                <strong>💡 今日建議行動</strong><br>
+                ${actionText}
+            </div>
+        `
+    });
+
+    // --- 4. 組合最終的 Capsules (原有的日常/運動建議) ---
     finalCapsules.push({ 
         type: 'best',  
         text: `
