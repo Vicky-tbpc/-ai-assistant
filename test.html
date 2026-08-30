@@ -1447,7 +1447,7 @@ if (needsAction) {
 
         rMSSD: {
             label: 'rMSSD',
-            unit: '',
+            unit: 'ms',
             direction: 'higher'
         },
 
@@ -1459,7 +1459,7 @@ if (needsAction) {
 
         HBI: {
             label: '低氧負擔指數',
-            unit: '',
+            unit: '%min/h',
             direction: 'lower'
         }
     };
@@ -2037,7 +2037,7 @@ if (needsAction) {
     // 3-9. 選出最有支持度方案
     //
     // ① 成功案例數
-    // ② 成功率
+    // ② 成功率/有效率
     // ③ 平均 RI 提升
     // ========================================================
 
@@ -2211,9 +2211,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「睡眠時間增加」後恢復指數同步提升，成功率約 ${successRateText}%。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「睡眠時間增加」後恢復指數同步提升，有效率約 ${successRateText}%。` +
                 `建議可嘗試增加約 ${minutes} 分鐘的睡眠時間。` +
-                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2238,9 +2238,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「深睡比例增加」後恢復指數同步提升，成功率約 ${successRateText}%。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「深睡比例增加」後恢復指數同步提升，有效率約 ${successRateText}%。` +
                 `可以優先維持規律作息與穩定睡眠環境，讓深睡比例有機會改善約 ${improvement}%。` +
-                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2265,9 +2265,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「入睡時間偏差縮小」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `今晚可優先維持固定的就寢時間，讓入睡時間較平常穩定約 ${improvement} 分鐘。` +
-                `這類變化在你的歷史資料中平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「入睡時間偏差縮小」後恢復指數同步提升，有效率約 ${successRateText}%。` +
+                `可優先維持固定的就寢時間，讓入睡時間較平常穩定約 ${improvement} 分鐘。` +
+                `這類變化在你的歷史資料中平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2292,9 +2292,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「夜間清醒時間減少」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `今晚可優先維持安靜、穩定的睡眠環境，讓夜間清醒時間有機會減少約 ${minutes} 分鐘。` +
-                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「夜間清醒時間減少」後恢復指數同步提升，有效率約 ${successRateText}%。` +
+                `可優先維持安靜、穩定的睡眠環境，讓夜間清醒時間有機會減少約 ${minutes} 分鐘。` +
+                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2316,9 +2316,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「rMSSD 提升」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `今晚可優先安排放鬆活動，減少睡前過度刺激，讓 rMSSD 有機會改善約 ${improvement}。` +
-                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「rMSSD 提升」後恢復指數同步提升，有效率約 ${successRateText}%。` +
+                `可優先安排放鬆活動，減少睡前過度刺激，讓 rMSSD 有機會改善約 ${improvement}。` +
+                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2343,9 +2343,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「睡眠最低脈搏下降」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `今晚可優先避免睡前過度刺激，例如劇烈運動或過晚攝取咖啡因，讓睡眠期間的脈搏較為平穩。` +
-                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「睡眠最低脈搏下降」後恢復指數同步提升，有效率約 ${successRateText}%。` +
+                `可優先避免睡前過度刺激，例如劇烈運動或過晚攝取咖啡因，讓睡眠期間的脈搏較為平穩。` +
+                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2370,9 +2370,9 @@ if (needsAction) {
 
             actionText =
                 `${recommendationPrefix}` +
-                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「低氧負擔指數改善」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `今晚可優先維持有利於夜間呼吸穩定的睡眠習慣與環境，讓低氧負擔有機會改善約 ${improvement}。` +
-                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。` +
+                `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「低氧負擔指數改善」後恢復指數同步提升，有效率約 ${successRateText}%。` +
+                `可優先維持有利於夜間呼吸穩定的睡眠習慣與環境，讓低氧負擔有機會改善約 ${improvement}。` +
+                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)}。` +
                 `${recommendationSuffix}`;
         }
 
@@ -2401,7 +2401,7 @@ if (needsAction) {
                     '目前恢復指數較需要加強，';
 
                 genericSuffix =
-                    '今晚可以優先從這個方向開始調整。';
+                    '可以優先從這個方向開始調整。';
 
                 break;
 
@@ -2466,7 +2466,7 @@ if (needsAction) {
 
             actionText =
                 `${genericPrefix}` +
-                `目前心率變異（HRV）穩定度是主要需要加強的項目，今晚可優先安排放鬆活動，減少睡前身心壓力。` +
+                `目前心率變異（HRV）穩定度是主要需要加強的項目，可優先安排放鬆活動，減少睡前身心壓力。` +
                 `${genericSuffix}`;
 
         }
@@ -2500,8 +2500,9 @@ if (needsAction) {
 // ============================================================
 // 6. 將恢復指數建議新增至膠囊列表
 //
-// recType 現在也可以直接顯示在卡片中，讓前端知道
-// 這一次是「改善／優化／局部優化／輕度優化／維持」
+// 注意：
+// recType 為後端判斷用分類，不直接顯示給使用者。
+// 前端只顯示「恢復指數優先調整項目」。
 // ============================================================
 
 finalCapsules.push({
@@ -2511,15 +2512,8 @@ finalCapsules.push({
     text: `
         <div style="margin-bottom: 8px;">
             <strong>
-                📌 恢復指數建議：
-                ${recType}
-            </strong>
-        </div>
-
-        <div style="margin-bottom: 8px;">
-            <strong>
-                優先調整項目：
-                ${needsAction ? weakest.name : '無明顯弱項'}
+                📌 恢復指數優先調整項目：
+                ${needsAction ? weakest.name : '目前無特別需改善項目'}
             </strong>
         </div>
 
