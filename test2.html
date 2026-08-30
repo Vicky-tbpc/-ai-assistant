@@ -1234,7 +1234,9 @@ const stabilities = [
     }
 ];
 
-// 依分數由低到高排序，找出需要優先改善的弱項
+// ============================================================
+// 1. 找出四大穩定度中的最弱項目
+// ============================================================
 stabilities.sort((a, b) => a.score - b.score);
 
 const weakest = stabilities[0];
@@ -1247,11 +1249,16 @@ const hasSigWeak = minScore < 80;
 let recType = '鼓勵＋維持';
 let needsAction = false;
 
-// 依恢復指數與弱項判定建議類型
+// ============================================================
+// 2. 依恢復指數與弱項判定建議類型
+// ============================================================
 if (currentBattery < 80) {
+
     recType = '改善建議';
     needsAction = true;
+
 } else if (currentBattery >= 80 && currentBattery <= 89) {
+
     if (hasWeak) {
         recType = '優化建議';
         needsAction = true;
@@ -1259,7 +1266,9 @@ if (currentBattery < 80) {
         recType = '維持＋鼓勵';
         needsAction = false;
     }
+
 } else if (currentBattery >= 90 && currentBattery <= 94) {
+
     if (hasSigWeak) {
         recType = '局部優化建議';
         needsAction = true;
@@ -1267,7 +1276,9 @@ if (currentBattery < 80) {
         recType = '維持＋鼓勵';
         needsAction = false;
     }
+
 } else if (currentBattery >= 95 && currentBattery <= 100) {
+
     if (hasSigWeak) {
         recType = '輕度優化建議';
         needsAction = true;
@@ -1277,79 +1288,164 @@ if (currentBattery < 80) {
     }
 }
 
+// ============================================================
+// 3. 預設建議文字
+// ============================================================
 let actionText = '你的各項穩定度表現都很棒，繼續保持這個好節奏喔！';
 
-/* ============================================================
-   個人歷史有效方案分析
-   邏輯：
-   今天恢復指數
-        ↓
-   找最弱四大穩定度
-        ↓
-   找該穩定度的可改善原始指標
-        ↓
-   分析歷史「前一天 → 後一天」
-        ↓
-   找出「指標改善 → RI改善」案例
-        ↓
-   計算案例數 / 成功率 / 平均變化 / 平均RI變化
-        ↓
-   選出最有支持度方案
-        ↓
-   產生個人化建議
-   ============================================================ */
-
+// ============================================================
+// 4. 需要改善時，進行個人歷史有效方案分析
+// ============================================================
 if (needsAction) {
 
-    // ------------------------------------------------------------
-    // 1. 原始指標改善方向定義
-    //    higher = 數值越高代表改善
-    //    lower  = 數值越低代表改善
-    // ------------------------------------------------------------
+    // ========================================================
+    // 4-1. 原始指標規則
+    //
+    // direction:
+    // higher = 數值越高越好
+    // lower  = 數值越低越好
+    // ========================================================
     const metricRules = {
+
         TST_min: {
-            direction: 'higher',
             label: '睡眠時間',
-            unit: '分鐘'
+            unit: '分鐘',
+            direction: 'higher'
         },
+
         N3_pct: {
-            direction: 'higher',
             label: '深睡比例',
-            unit: '%'
+            unit: '%',
+            direction: 'higher'
         },
+
         OnsetDev_min: {
-            direction: 'lower',
             label: '入睡時間偏差',
-            unit: '分鐘'
+            unit: '分鐘',
+            direction: 'lower'
         },
+
         wake_minutes: {
-            direction: 'lower',
             label: '夜間清醒時間',
-            unit: '分鐘'
+            unit: '分鐘',
+            direction: 'lower'
         },
+
         rMSSD: {
-            direction: 'higher',
             label: 'rMSSD',
-            unit: ''
+            unit: '',
+            direction: 'higher'
         },
+
         HR_min: {
-            direction: 'lower',
             label: '睡眠最低脈搏',
-            unit: ' bpm'
+            unit: ' bpm',
+            direction: 'lower'
         },
+
         HBI: {
-            direction: 'lower',
             label: '低氧負擔指數',
-            unit: ''
+            unit: '',
+            direction: 'lower'
         }
     };
 
-    // ------------------------------------------------------------
-    // 2. 將原始健康資料標準化
-    // ------------------------------------------------------------
+    // ========================================================
+    // 4-2. 決定「真正要分析的原始指標」
+    //
+    // 如果最弱項目 = 睡眠穩定度：
+    //
+    //    使用：
+    //    (100 - 子指標分數) × 權重
+    //
+    // 找出目前對睡眠穩定度造成最大負向貢獻的項目。
+    //
+    // 例如：
+    // TST = 60，權重 36%
+    // N3  = 80，權重 36%
+    //
+    // TST 負向貢獻 = 40 × 0.36 = 14.4
+    // N3  負向貢獻 = 20 × 0.36 = 7.2
+    //
+    // → 優先分析 TST
+    // ========================================================
+
+    let targetMetricKeys = [];
+
+    if (weakest.name === '睡眠穩定度') {
+
+        const sleepComponents = [
+            {
+                key: 'TST_min',
+                score: Number(raw.Battery_TST_min_A || 0),
+                weight: 0.36
+            },
+            {
+                key: 'N3_pct',
+                score: Number(raw.Battery_N3_pct_A || 0),
+                weight: 0.36
+            },
+            {
+                key: 'OnsetDev_min',
+                score: Number(raw.Battery_OnsetDev_min_A || 0),
+                weight: 0.09
+            },
+            {
+                key: 'wake_minutes',
+                score: Number(raw.Battery_wake_minutes_A || 0),
+                weight: 0.18
+            }
+        ];
+
+        sleepComponents.forEach(item => {
+
+            // 限制 0~100，避免異常值造成過大的負向貢獻
+            const normalizedScore = Math.max(
+                0,
+                Math.min(100, item.score)
+            );
+
+            item.negativeContribution =
+                (100 - normalizedScore) * item.weight;
+        });
+
+        // 依負向貢獻由高到低排序
+        sleepComponents.sort(
+            (a, b) =>
+                b.negativeContribution -
+                a.negativeContribution
+        );
+
+        // 第一名就是今天最主要的睡眠改善來源
+        if (sleepComponents.length > 0) {
+            targetMetricKeys = [
+                sleepComponents[0].key
+            ];
+        }
+
+    } else {
+
+        // 其他三大穩定度目前都是單一原始指標
+        targetMetricKeys = [...weakest.rawKeys];
+    }
+
+    // ========================================================
+    // 4-3. 建立歷史紀錄
+    //
+    // 假設：
+    // healths[0] = 今天
+    // healths[1] = 昨天
+    // healths[2] = 前天
+    //
+    // 歷史案例只比較：
+    // 前一天 → 後一天
+    //
+    // 不直接拿「今天 vs 某一天」
+    // ========================================================
     const historyRecords = [];
 
     for (let i = 1; i < healths.length; i++) {
+
         const item = healths[i] || {};
         const histRaw = item.raw_json || {};
 
@@ -1357,7 +1453,9 @@ if (needsAction) {
             histRaw.Personal_Battery_weighted_round
         );
 
-        if (!Number.isFinite(histBattery)) continue;
+        if (!Number.isFinite(histBattery)) {
+            continue;
+        }
 
         historyRecords.push({
             index: i,
@@ -1366,185 +1464,274 @@ if (needsAction) {
         });
     }
 
-    // ------------------------------------------------------------
-    // 3. 由最新 → 最舊排序
-    //    healths 通常索引 0 是今天、索引 1 是昨天。
-    // ------------------------------------------------------------
-    historyRecords.sort((a, b) => a.index - b.index);
+    // 最新 → 最舊
+    historyRecords.sort(
+        (a, b) => a.index - b.index
+    );
 
-    // ------------------------------------------------------------
-    // 4. 取得目前最弱穩定度對應的可改善原始指標
-    // ------------------------------------------------------------
-    const candidateMetrics = weakest.rawKeys.filter(key => {
-        return metricRules[key];
-    });
-
-    // ------------------------------------------------------------
-    // 5. 中位數計算工具
-    // ------------------------------------------------------------
+    // ========================================================
+    // 4-4. 中位數
+    // ========================================================
     function getMedian(values) {
-        if (!values || values.length === 0) return null;
 
-        const sorted = [...values]
+        const validValues = values
             .filter(v => Number.isFinite(v))
             .sort((a, b) => a - b);
 
-        if (sorted.length === 0) return null;
-
-        const mid = Math.floor(sorted.length / 2);
-
-        if (sorted.length % 2 === 0) {
-            return (sorted[mid - 1] + sorted[mid]) / 2;
+        if (validValues.length === 0) {
+            return null;
         }
 
-        return sorted[mid];
+        const middle =
+            Math.floor(validValues.length / 2);
+
+        if (validValues.length % 2 === 0) {
+
+            return (
+                validValues[middle - 1] +
+                validValues[middle]
+            ) / 2;
+
+        }
+
+        return validValues[middle];
     }
 
-    // ------------------------------------------------------------
-    // 6. 計算平均值
-    // ------------------------------------------------------------
+    // ========================================================
+    // 4-5. 平均值
+    // ========================================================
     function getAverage(values) {
-        const valid = values.filter(v => Number.isFinite(v));
 
-        if (valid.length === 0) return null;
+        const validValues =
+            values.filter(v => Number.isFinite(v));
 
-        return valid.reduce((sum, v) => sum + v, 0) / valid.length;
+        if (validValues.length === 0) {
+            return null;
+        }
+
+        return (
+            validValues.reduce(
+                (sum, value) => sum + value,
+                0
+            ) / validValues.length
+        );
     }
 
-    // ------------------------------------------------------------
-    // 7. 分析某一原始指標：
+    // ========================================================
+    // 4-6. 分析單一原始指標的歷史連續案例
     //
-    //    前一天 → 後一天
+    // 找：
     //
-    //    指標有改善
-    //       +
-    //    RI 同步提升
+    // 指標改善
+    //      ↓
+    // RI 是否同步提升
     //
-    //    => 有效案例
+    // 例如 TST：
     //
-    //    同時計算：
-    //    - 改善案例數
-    //    - 成功案例數
-    //    - 改善成功率
-    //    - 平均指標變化
-    //    - 中位數指標變化
-    //    - 平均 RI 變化
-    // ------------------------------------------------------------
+    // Day A：TST 390 / RI 72
+    // Day B：TST 430 / RI 78
+    //
+    // TST +40
+    // RI   +6
+    //
+    // → 成功案例
+    // ========================================================
     function analyzeMetric(metricKey) {
 
-        const rule = metricRules[metricKey];
+        const rule =
+            metricRules[metricKey];
 
-        if (!rule) return null;
+        if (!rule) {
+            return null;
+        }
 
         const allImprovementCases = [];
         const successfulCases = [];
         const failedCases = [];
 
-        // 至少需要兩筆歷史紀錄才能形成「前一天 → 後一天」
-        for (let i = 0; i < historyRecords.length - 1; i++) {
+        // 至少需要兩筆歷史資料
+        for (
+            let i = 0;
+            i < historyRecords.length - 1;
+            i++
+        ) {
 
-            const older = historyRecords[i + 1];
-            const newer = historyRecords[i];
+            // 注意：
+            // historyRecords[0] = 昨天
+            // historyRecords[1] = 前天
+            //
+            // 因此：
+            // older = 前天
+            // newer = 昨天
+            const newer =
+                historyRecords[i];
 
-            const olderRaw = older.raw || {};
-            const newerRaw = newer.raw || {};
+            const older =
+                historyRecords[i + 1];
 
-            const olderValue = Number(olderRaw[metricKey]);
-            const newerValue = Number(newerRaw[metricKey]);
+            const newerRaw =
+                newer.raw || {};
 
-            const olderBattery = Number(older.battery);
-            const newerBattery = Number(newer.battery);
+            const olderRaw =
+                older.raw || {};
+
+            const newerValue =
+                Number(newerRaw[metricKey]);
+
+            const olderValue =
+                Number(olderRaw[metricKey]);
+
+            const newerBattery =
+                Number(newer.battery);
+
+            const olderBattery =
+                Number(older.battery);
 
             if (
-                !Number.isFinite(olderValue) ||
                 !Number.isFinite(newerValue) ||
-                !Number.isFinite(olderBattery) ||
-                !Number.isFinite(newerBattery)
+                !Number.isFinite(olderValue) ||
+                !Number.isFinite(newerBattery) ||
+                !Number.isFinite(olderBattery)
             ) {
                 continue;
             }
 
-            // --------------------------------------------
-            // 計算原始指標變化
-            // --------------------------------------------
-            const rawChange = newerValue - olderValue;
-
+            // =================================================
+            // 原始指標變化
+            // =================================================
             let metricImproved = false;
             let improvementAmount = 0;
 
             if (rule.direction === 'higher') {
-                metricImproved = newerValue > olderValue;
-                improvementAmount = newerValue - olderValue;
+
+                metricImproved =
+                    newerValue > olderValue;
+
+                improvementAmount =
+                    newerValue - olderValue;
+
             } else if (rule.direction === 'lower') {
-                metricImproved = newerValue < olderValue;
-                improvementAmount = olderValue - newerValue;
+
+                metricImproved =
+                    newerValue < olderValue;
+
+                improvementAmount =
+                    olderValue - newerValue;
             }
 
-            if (!metricImproved || improvementAmount <= 0) {
+            // 沒有改善，不納入案例
+            if (
+                !metricImproved ||
+                improvementAmount <= 0
+            ) {
                 continue;
             }
 
-            // --------------------------------------------
-            // RI 是否同步改善
-            // --------------------------------------------
-            const riChange = newerBattery - olderBattery;
+            // =================================================
+            // RI 變化
+            // =================================================
+            const riChange =
+                newerBattery - olderBattery;
 
             const caseData = {
                 metricKey,
+
                 fromIndex: older.index,
                 toIndex: newer.index,
+
                 olderValue,
                 newerValue,
-                rawChange,
+
                 improvementAmount,
+
                 olderBattery,
                 newerBattery,
+
                 riChange
             };
 
-            allImprovementCases.push(caseData);
+            allImprovementCases.push(
+                caseData
+            );
 
-            // RI 提升才視為成功案例
+            // RI 同步提升 = 成功案例
             if (riChange > 0) {
-                successfulCases.push(caseData);
+
+                successfulCases.push(
+                    caseData
+                );
+
             } else {
-                failedCases.push(caseData);
+
+                failedCases.push(
+                    caseData
+                );
             }
         }
 
-        const caseCount = allImprovementCases.length;
-        const successCount = successfulCases.length;
+        const caseCount =
+            allImprovementCases.length;
 
+        const successCount =
+            successfulCases.length;
+
+        const failedCount =
+            failedCases.length;
+
+        // =====================================================
+        // 成功率
+        //
+        // 成功率不是「全部歷史資料」
+        // 而是：
+        //
+        // 指標曾改善的案例中，
+        // 有多少次 RI 同步改善
+        // =====================================================
         const successRate =
             caseCount > 0
                 ? (successCount / caseCount) * 100
                 : 0;
 
-        const averageImprovement = getAverage(
-            successfulCases.map(c => c.improvementAmount)
-        );
+        // 平均原始指標改善幅度
+        const averageImprovement =
+            getAverage(
+                successfulCases.map(
+                    c => c.improvementAmount
+                )
+            );
 
-        const medianImprovement = getMedian(
-            successfulCases.map(c => c.improvementAmount)
-        );
+        // 建議實際使用中位數
+        const medianImprovement =
+            getMedian(
+                successfulCases.map(
+                    c => c.improvementAmount
+                )
+            );
 
-        const averageRIChange = getAverage(
-            successfulCases.map(c => c.riChange)
-        );
+        // 平均 RI 提升
+        const averageRIChange =
+            getAverage(
+                successfulCases.map(
+                    c => c.riChange
+                )
+            );
 
         return {
             metricKey,
+
             label: rule.label,
             unit: rule.unit,
             direction: rule.direction,
 
             caseCount,
             successCount,
-            failedCount: failedCases.length,
+            failedCount,
 
             successRate,
+
             averageImprovement,
             medianImprovement,
+
             averageRIChange,
 
             allImprovementCases,
@@ -1553,210 +1740,276 @@ if (needsAction) {
         };
     }
 
-    // ------------------------------------------------------------
-    // 8. 分析目前最弱穩定度的所有候選原始指標
-    // ------------------------------------------------------------
-    const metricAnalyses = candidateMetrics
-        .map(metricKey => analyzeMetric(metricKey))
-        .filter(Boolean);
+    // ========================================================
+    // 4-7. 分析目前真正需要改善的原始指標
+    // ========================================================
+    const metricAnalyses =
+        targetMetricKeys
+            .map(metricKey =>
+                analyzeMetric(metricKey)
+            )
+            .filter(Boolean);
 
-    // ------------------------------------------------------------
-    // 9. 最低證據門檻
+    // ========================================================
+    // 4-8. 歷史有效方案最低證據門檻
     //
-    //    至少需要 2 個成功案例，
-    //    才能稱為「個人歷史有效方案」
-    // ------------------------------------------------------------
+    // 至少 2 個成功案例
+    // ========================================================
     const MIN_SUCCESS_CASES = 2;
 
-    const supportedSolutions = metricAnalyses.filter(item => {
+    const supportedSolutions =
+        metricAnalyses.filter(item => {
 
-        return (
-            item.successCount >= MIN_SUCCESS_CASES &&
-            item.successRate > 0 &&
-            item.medianImprovement !== null &&
-            item.averageRIChange !== null
-        );
+            return (
+                item.successCount >= MIN_SUCCESS_CASES &&
+                item.successRate > 0 &&
+                item.medianImprovement !== null &&
+                item.averageRIChange !== null
+            );
+        });
 
-    });
-
-    // ------------------------------------------------------------
-    // 10. 選出「最有支持度」的方案
+    // ========================================================
+    // 4-9. 排序：找出最有支持度的改善方案
     //
-    //    優先順序：
-    //    ① 成功案例數
-    //    ② 成功率
-    //    ③ 平均 RI 提升
+    // 第一優先：
+    //    成功案例數
     //
-    //    這樣不會只因單一案例幅度很大，就勝過
-    //    有多次重複成功案例的方案。
-    // ------------------------------------------------------------
-    supportedSolutions.sort((a, b) => {
+    // 第二優先：
+    //    成功率
+    //
+    // 第三優先：
+    //    平均 RI 提升
+    //
+    // 這樣可以避免只有一次、但幅度很大的案例
+    // 壓過多次重複成功的個人歷史模式。
+    // ========================================================
+    supportedSolutions.sort(
+        (a, b) => {
 
-        if (b.successCount !== a.successCount) {
-            return b.successCount - a.successCount;
+            if (
+                b.successCount !==
+                a.successCount
+            ) {
+                return (
+                    b.successCount -
+                    a.successCount
+                );
+            }
+
+            if (
+                b.successRate !==
+                a.successRate
+            ) {
+                return (
+                    b.successRate -
+                    a.successRate
+                );
+            }
+
+            return (
+                (b.averageRIChange || 0) -
+                (a.averageRIChange || 0)
+            );
         }
+    );
 
-        if (b.successRate !== a.successRate) {
-            return b.successRate - a.successRate;
-        }
+    const bestSolution =
+        supportedSolutions.length > 0
+            ? supportedSolutions[0]
+            : null;
 
-        return (b.averageRIChange || 0) - (a.averageRIChange || 0);
-    });
-
-    const bestSolution = supportedSolutions.length > 0
-        ? supportedSolutions[0]
-        : null;
-
-    // ------------------------------------------------------------
-    // 11. 建立「個人歷史有效方案」
-    // ------------------------------------------------------------
+    // ========================================================
+    // 4-10. 有足夠歷史證據
+    //      → 生成個人化建議
+    // ========================================================
     if (bestSolution) {
 
-        const metricKey = bestSolution.metricKey;
-        const medianImprovement = bestSolution.medianImprovement;
-        const avgRIChange = bestSolution.averageRIChange;
+        const metricKey =
+            bestSolution.metricKey;
+
+        const medianImprovement =
+            bestSolution.medianImprovement;
+
+        const averageRIChange =
+            bestSolution.averageRIChange;
 
         const successRateText =
-            Math.round(bestSolution.successRate);
+            Math.round(
+                bestSolution.successRate
+            );
 
-        // --------------------------------------------------------
-        // 睡眠時間
-        // --------------------------------------------------------
+        // ====================================================
+        // TST：睡眠時間
+        // ====================================================
         if (metricKey === 'TST_min') {
 
-            const minutes = Math.max(
-                1,
-                Math.round(medianImprovement)
-            );
+            const minutes =
+                Math.max(
+                    1,
+                    Math.round(
+                        medianImprovement
+                    )
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「睡眠時間增加」後恢復指數同步提升，成功率約 ${successRateText}%。` +
                 `建議今晚可嘗試多安排約 ${minutes} 分鐘的睡眠時間。` +
-                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
+
         }
 
-        // --------------------------------------------------------
-        // 深睡比例
-        // --------------------------------------------------------
+        // ====================================================
+        // N3：深睡比例
+        // ====================================================
         else if (metricKey === 'N3_pct') {
 
-            const improvement = Math.max(
-                0.1,
-                Number(medianImprovement.toFixed(1))
-            );
+            const improvement =
+                Math.max(
+                    0.1,
+                    Number(
+                        medianImprovement.toFixed(1)
+                    )
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「深睡比例增加」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `可以把今晚的重點放在維持穩定睡眠與充足休息，讓深睡比例有機會增加約 ${improvement}% 。` +
-                `歷史上這類變化平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `今晚可優先維持規律作息與穩定睡眠環境，讓深睡比例有機會改善約 ${improvement}%。` +
+                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
+
         }
 
-        // --------------------------------------------------------
+        // ====================================================
         // 入睡時間偏差
-        // --------------------------------------------------------
+        // ====================================================
         else if (metricKey === 'OnsetDev_min') {
 
-            const improvement = Math.max(
-                1,
-                Math.round(medianImprovement)
-            );
+            const improvement =
+                Math.max(
+                    1,
+                    Math.round(
+                        medianImprovement
+                    )
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「入睡時間偏差縮小」後恢復指數同步提升，成功率約 ${successRateText}%。` +
                 `今晚可優先維持固定的就寢時間，讓入睡時間較平常穩定約 ${improvement} 分鐘。` +
-                `這類變化在你的歷史資料中平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `這類變化在你的歷史資料中平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
+
         }
 
-        // --------------------------------------------------------
+        // ====================================================
         // 夜間清醒時間
-        // --------------------------------------------------------
+        // ====================================================
         else if (metricKey === 'wake_minutes') {
 
-            const minutes = Math.max(
-                1,
-                Math.round(medianImprovement)
-            );
+            const minutes =
+                Math.max(
+                    1,
+                    Math.round(
+                        medianImprovement
+                    )
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「夜間清醒時間減少」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `今晚可優先維持安靜、穩定的睡眠環境，目標讓夜間清醒時間減少約 ${minutes} 分鐘。` +
-                `歷史上這類變化平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `今晚可優先維持安靜、穩定的睡眠環境，讓夜間清醒時間有機會減少約 ${minutes} 分鐘。` +
+                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
+
         }
 
-        // --------------------------------------------------------
-        // HRV / rMSSD
-        // --------------------------------------------------------
+        // ====================================================
+        // rMSSD
+        // ====================================================
         else if (metricKey === 'rMSSD') {
 
-            const improvement = Number(
-                medianImprovement.toFixed(1)
-            );
+            const improvement =
+                Number(
+                    medianImprovement.toFixed(1)
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「rMSSD 提升」後恢復指數同步提升，成功率約 ${successRateText}%。` +
                 `今晚可優先安排放鬆活動，減少睡前過度刺激，讓 rMSSD 有機會改善約 ${improvement}。` +
-                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
+
         }
 
-        // --------------------------------------------------------
+        // ====================================================
         // 睡眠最低脈搏
-        // --------------------------------------------------------
+        // ====================================================
         else if (metricKey === 'HR_min') {
 
-            const improvement = Math.max(
-                1,
-                Math.round(medianImprovement)
-            );
+            const improvement =
+                Math.max(
+                    1,
+                    Math.round(
+                        medianImprovement
+                    )
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「睡眠最低脈搏下降」後恢復指數同步提升，成功率約 ${successRateText}%。` +
                 `今晚可優先避免睡前過度刺激，例如劇烈運動或過晚攝取咖啡因，讓睡眠期間的脈搏較為平穩。` +
-                `歷史上這類變化平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `歷史上這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
+
         }
 
-        // --------------------------------------------------------
+        // ====================================================
         // HBI
         //
-        // 特別注意：
-        // 不再寫「HBI下降 = 側睡有效」
+        // 注意：
+        // 不再推論「HBI下降 = 側睡有效」
         //
-        // 只能描述：
-        // 「歷史上 HBI 改善時，RI 也較常改善」
-        // --------------------------------------------------------
+        // 只描述：
+        // 歷史上 HBI 改善時，
+        // RI 是否也同步改善。
+        // ====================================================
         else if (metricKey === 'HBI') {
 
-            const improvement = Number(
-                medianImprovement.toFixed(1)
-            );
+            const improvement =
+                Number(
+                    medianImprovement.toFixed(1)
+                );
 
             actionText =
                 `過去你的歷史紀錄中，有 ${bestSolution.successCount} 次出現「低氧負擔指數改善」後恢復指數同步提升，成功率約 ${successRateText}%。` +
-                `因此今晚可優先維持有利於夜間呼吸穩定的睡眠習慣與環境，讓低氧負擔有機會改善約 ${improvement}。` +
-                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${avgRIChange.toFixed(1)} 分。`;
+                `今晚可優先維持有利於夜間呼吸穩定的睡眠習慣與環境，讓低氧負擔有機會改善約 ${improvement}。` +
+                `你的歷史資料顯示，這類變化平均伴隨恢復指數提升約 ${averageRIChange.toFixed(1)} 分。`;
         }
 
     } else {
 
-        // --------------------------------------------------------
-        // 沒有足夠歷史證據
-        // 回到通用且保守建議
-        // --------------------------------------------------------
+        // ========================================================
+        // 4-11. 沒有足夠歷史證據
+        //      → 回到通用建議
+        // ========================================================
+
         if (weakest.name === '睡眠穩定度') {
 
             actionText =
                 `目前睡眠穩定度是主要需要加強的項目，建議優先維持規律作息、充足睡眠與穩定的睡眠環境，幫助身體恢復。`;
 
-        } else if (weakest.name === '心率變異 (HRV) 穩定度') {
+        } else if (
+            weakest.name ===
+            '心率變異 (HRV) 穩定度'
+        ) {
 
             actionText =
                 `目前心率變異（HRV）穩定度是主要需要加強的項目，今晚可優先安排放鬆活動，減少睡前身心壓力。`;
 
-        } else if (weakest.name === '脈搏穩定度') {
+        } else if (
+            weakest.name ===
+            '脈搏穩定度'
+        ) {
 
             actionText =
                 `目前脈搏穩定度是主要需要加強的項目，建議睡前保持放鬆，避免過晚劇烈運動或其他可能讓身體維持亢奮的活動。`;
 
-        } else if (weakest.name === '血氧穩定度') {
+        } else if (
+            weakest.name ===
+            '血氧穩定度'
+        ) {
 
             actionText =
                 `目前血氧穩定度是主要需要加強的項目，建議維持舒適且通風的睡眠環境，並留意睡眠期間呼吸是否穩定。`;
@@ -1764,12 +2017,17 @@ if (needsAction) {
     }
 }
 
-// 將恢復指數建議新增至膠囊列表
+// ============================================================
+// 5. 將恢復指數建議新增至膠囊列表
+// ============================================================
 finalCapsules.push({
     type: 'recovery',
     text: `
         <div style="margin-bottom: 8px;">
-            <strong>📌 恢復指數優先調整項目：${needsAction ? weakest.name : '無明顯弱項'}</strong>
+            <strong>
+                📌 恢復指數優先調整項目：
+                ${needsAction ? weakest.name : '無明顯弱項'}
+            </strong>
         </div>
         <div>
             ${actionText}
