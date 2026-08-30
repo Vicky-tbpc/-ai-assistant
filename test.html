@@ -2115,80 +2115,117 @@ if (needsAction) {
         let recommendationSuffix = '';
 
 
-        switch (recType) {
+       switch (recType) {
 
-            case '改善建議':
+    // ========================================================
+    // RI < 80
+    // 包含：
+    // 0–59 注意
+    // 60–79 標準
+    //
+    // 因為這兩個區間共用「改善建議」，
+    // 因此文字不要寫得太負面。
+    // ========================================================
+    case '改善建議':
 
-                recommendationPrefix =
-                    '目前恢復指數較需要加強，';
+        recommendationPrefix =
+            '目前恢復狀態還有進一步提升的空間，';
 
-                recommendationSuffix =
-                    '建議優先從這個方向開始調整。';
+        recommendationSuffix =
+            '建議優先從這個方向開始調整。';
 
-                break;
-
-
-            case '優化建議':
-
-                recommendationPrefix =
-                    '整體恢復表現尚可，';
-
-                recommendationSuffix =
-                    '可以優先做這項小幅調整。';
-
-                break;
+        break;
 
 
-            case '局部優化建議':
+    // ========================================================
+    // RI 80–89
+    // 分級：良好
+    // 有 <90 的弱項
+    // → 局部優化，但不應讓使用者覺得恢復不好
+    // ========================================================
+    case '優化建議':
 
-                recommendationPrefix =
-                    '整體恢復表現良好，';
+        recommendationPrefix =
+            '目前整體恢復表現良好，部分項目還有優化空間，';
 
-                recommendationSuffix =
-                    '建議針對這個局部項目進行調整即可。';
+        recommendationSuffix =
+            '可以優先做這項小幅調整。';
 
-                break;
-
-
-            case '輕度優化建議':
-
-                recommendationPrefix =
-                    '目前恢復表現非常好，';
-
-                recommendationSuffix =
-                    '若想進一步維持最佳狀態，可以做輕度調整。';
-
-                break;
+        break;
 
 
-            case '維持＋鼓勵':
+    // ========================================================
+    // RI 90–94
+    // 分級：良好
+    // 只有 <80 的明顯弱項
+    // → 更局部、更溫和
+    // ========================================================
+    case '局部優化建議':
 
-                recommendationPrefix =
-                    '目前整體恢復表現穩定，';
+        recommendationPrefix =
+            '目前整體恢復表現良好，只有部分項目需要留意，';
 
-                recommendationSuffix =
-                    '持續保持目前的生活與睡眠節奏即可。';
+        recommendationSuffix =
+            '建議針對這個項目做適度調整即可。';
 
-                break;
-
-
-            case '鼓勵＋維持':
-
-                recommendationPrefix =
-                    '目前恢復表現非常理想，';
-
-                recommendationSuffix =
-                    '繼續保持現在的好節奏即可。';
-
-                break;
+        break;
 
 
-            default:
+    // ========================================================
+    // RI 95–100
+    // 分級：優秀
+    // 有 <80 弱項
+    // → 不應使用「改善」或「需要加強」
+    // ========================================================
+    case '輕度優化建議':
 
-                recommendationPrefix = '';
+        recommendationPrefix =
+            '目前恢復表現非常好，若想進一步維持穩定，';
 
-                recommendationSuffix = '';
-        }
+        recommendationSuffix =
+            '可以針對這個項目做輕度調整。';
+
+        break;
+
+
+    // ========================================================
+    // RI 80–89 / 90–94
+    // 沒有需要進一步改善的項目
+    // → 後端分類保留，但不需要強調「維持」
+    // ========================================================
+    case '維持＋鼓勵':
+
+        recommendationPrefix =
+            '目前整體恢復表現良好，';
+
+        recommendationSuffix =
+            '持續保持目前的生活與睡眠節奏即可。';
+
+        break;
+
+
+    // ========================================================
+    // RI 95–100
+    // 無明顯需要調整項目
+    // → 優秀狀態
+    // ========================================================
+    case '鼓勵＋維持':
+
+        recommendationPrefix =
+            '目前恢復表現非常理想，';
+
+        recommendationSuffix =
+            '持續保持目前的生活與睡眠節奏即可。';
+
+        break;
+
+
+    default:
+
+        recommendationPrefix = '';
+
+        recommendationSuffix = '';
+}
 
 
         // ====================================================
