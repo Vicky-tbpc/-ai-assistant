@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096-2</title>
+    <title>Soosyn 健康夥伴 n096-3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2318,11 +2318,20 @@ function appendSummaryCard(dateTitle, data) {
             
             // 產生前三項橫線 UI 的函數
             const getCompBarHtml = (title, val) => {
+                // 1. 取得數值並先做四捨五入
+                const roundedVal = Math.round(val);
                 let colors = ['#e1e1e1', '#e1e1e1', '#e1e1e1', '#e1e1e1'];
-                if (val >= 0 && val <= 24) colors[0] = '#596b75';
-                else if (val >= 25 && val <= 49) colors[1] = '#8699a3';
-                else if (val >= 50 && val <= 74) colors[2] = '#a79d8c';
-                else if (val >= 75 && val <= 100) colors[3] = '#ff8c73';
+                
+                // 2~5. 依照四捨五入後的值判斷顏色區間
+                if (roundedVal >= 0 && roundedVal <= 24) {
+                    colors[0] = '#596b75';
+                } else if (roundedVal >= 25 && roundedVal <= 49) {
+                    colors[1] = '#8699a3';
+                } else if (roundedVal >= 50 && roundedVal <= 74) {
+                    colors[2] = '#a79d8c';
+                } else if (roundedVal >= 75 && roundedVal <= 100) {
+                    colors[3] = '#ff8c73';
+                }
 
                 return `
                     <div style="margin-top: 12px;">
