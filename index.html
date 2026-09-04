@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096-3</title>
+    <title>Soosyn 健康夥伴 n096-4</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1265,22 +1265,53 @@ async function showSummaryFlow(isFirstTime = false) {
 
 // --- 趨勢圖專用函數庫 ---
 
-function appendTrendOptions() {
+async function appendTrendOptions() {
+    // 加上 field 屬性，方便我們比對資料欄位
     const options = [
         { name: "📊 完整圖表", type: "all" },
-        { name: "📈 恢復指數", type: "battery" },
-        { name: "🛌 總睡眠時間", type: "tst" },
-        { name: "💤 深睡期 (N3)", type: "n3" },
-        { name: "🌙 入睡規律性", type: "start" },
-        { name: "☀️ 醒來規律性", type: "end" },
-        { name: "⏱️ 睡眠清醒時間", type: "wake" },        
-        { name: "🌿 rMSSD", type: "rmssd" },
-        { name: "💓 睡眠最低脈搏", type: "hrmin" },
-        { name: "🫁 HBI 低氧負擔指數", type: "hbi" },
-        { name: "❤️ 靜息心率 (RHR)", type: "rhr" }
+        { name: "📈 恢復指數", type: "battery", field: "Personal_Battery_weighted_round" },
+        { name: "🛌 總睡眠時間", type: "tst", field: "TST_min" },
+        { name: "💤 深睡期 (N3)", type: "n3", field: "N3_pct" },
+        { name: "🌙 入睡規律性", type: "start", field: "record_start" },
+        { name: "☀️ 醒來規律性", type: "end", field: "record_end" },
+        { name: "⏱️ 睡眠清醒時間", type: "wake", field: "wake_minutes" },        
+        { name: "🌿 rMSSD", type: "rmssd", field: "rMSSD" },
+        { name: "💓 睡眠最低脈搏", type: "hrmin", field: "HR_min" },
+        { name: "🫁 HBI 低氧負擔指數", type: "hbi", field: "HBI" },
+        { name: "❤️ 靜息心率 (RHR)", type: "rhr", field: "RHR_raw" }
     ];
+
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
-    options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
+
+    try {
+        // 先抓取一次使用者的全量數據
+        const queryParams = new URLSearchParams({ serial: currentSerial }).toString();
+        const response = await fetch(`/api/health?${queryParams}`);
+        
+        if (response.ok) {
+            const healthData = await response.json();
+            
+            // 過濾選項：只保留「完整圖表」或「該欄位至少有一筆有效數值」的按鈕
+            const validOptions = options.filter(opt => {
+                if (opt.type === 'all') return true;
+                
+                // 檢查是否至少有一天有資料
+                return healthData.some(d => {
+                    const val = d.raw_json?.[opt.field];
+                    return val !== null && val !== undefined && val !== '';
+                });
+            });
+
+            validOptions.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
+        } else {
+            // 如果連線失敗就 fallback 全顯示
+            options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
+        }
+    } catch (err) {
+        console.error("讀取按鈕過濾資料錯誤:", err);
+        options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
+    }
+
     document.getElementById('chat-history').innerHTML += html + '</div></div>';
     scrollToBottom();
 }
@@ -1401,11 +1432,14 @@ if (healthData.length === 0) {
         const chartBox = document.createElement('div');
         chartBox.className = 'chart-item';
         container.appendChild(chartBox);
-        // 將原始數據與 map 傳入，讓繪圖函式自己決定日期顯示
         drawSingleChart(chartBox, t, sortedData, subjectiveMap, days);
     }
+    
+    // 👇 迴圈結束後加這段：如果所有圖表都被除掉了，給個溫馨提示
+    if (container.children.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">此期間暫無圖表數據 😅</div>';
+    }
 }
-
 // --- 處理時間字串與分鐘數的轉換 ---
 function parseTimeToMinutes(dateStr, type) {
     if (!dateStr) return 0;
@@ -1481,22 +1515,36 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     });
 
-    // --- 【修正點 1：全部加上 all 前綴，避免與下方的切片變數衝突】 ---
+    // --- 【修正點 1：全部加上 all 前綴，並過濾掉沒有數據的空值保留為 null】 ---
     const allDailyValues = rawData.map(d => {
         const rawVal = d.raw_json[config.field];
+        // 遇到空值不再轉成 0，直接回傳 null
+        if (rawVal === null || rawVal === undefined || rawVal === '') {
+            return null;
+        }
         if (type === 'start' || type === 'end') {
             return parseTimeToMinutes(rawVal, type);
         }
-        return Number(rawVal) || 0;
+        return Number(rawVal);
     });
+
     const allMovingAvgs = [];
     const allLowerBounds = []; 
     const allUpperBounds = [];
 
-    // 計算平均值邏輯（基於包含緩衝的完整陣列）
+    // 計算平均值邏輯（只計算有數值的天數）
     allDailyValues.forEach((val, i) => {
         const start = Math.max(0, i - 6);
-        const chunk = allDailyValues.slice(start, i + 1);
+        // 過濾掉 null 的數據再來算平均
+        const chunk = allDailyValues.slice(start, i + 1).filter(v => v !== null);
+        
+        if (chunk.length === 0) {
+            allMovingAvgs.push(null);
+            allLowerBounds.push(null);
+            allUpperBounds.push(null);
+            return;
+        }
+
         const avg = chunk.reduce((a, b) => a + b, 0) / chunk.length;
         if (type === 'rmssd') {
             allMovingAvgs.push(avg); allLowerBounds.push(avg * 0.9); allUpperBounds.push(avg * 1.1);
@@ -1510,7 +1558,10 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     });
 
     const allPointColors = allDailyValues.map((v, i) => {
+        if (v === null) return config.color; // null 點不會畫，隨便給過
         const ma = allMovingAvgs[i];
+        if (ma === null) return config.color;
+
         if (type === 'battery' && v < ma) return '#ff8c73';
         if (type === 'rhr' && v > allUpperBounds[i]) return '#ff8c73';
         if (type === 'n3' && (v < ma || v < 10)) return '#ff8c73';
@@ -1526,6 +1577,14 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     // --- 【核心步驟：算完滾動平均後，切出最後要顯示的 days 天數】 ---
     const labels = allLabels.slice(-days);
     const dailyValues = allDailyValues.slice(-days);
+    
+    // 👇 新增檢查：這段期間的數值如果全部都是 null，直接把容器刪掉並結束繪圖
+    const hasAnyValidData = dailyValues.some(v => v !== null);
+    if (!hasAnyValidData) {
+        container.remove();
+        return; 
+    }
+
     const movingAvgs = allMovingAvgs.slice(-days);
     const lowerBounds = allLowerBounds.slice(-days);
     const upperBounds = allUpperBounds.slice(-days);
@@ -1612,7 +1671,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         datasets.push({
             label: '7日平均範圍',
             type: 'bar',
-            data: dailyValues.map((_, i) => [lowerBounds[i], upperBounds[i]]),
+            // 若下限是 null 就給 null，不要給 [null, null]
+            data: dailyValues.map((_, i) => lowerBounds[i] === null ? null : [lowerBounds[i], upperBounds[i]]),
             backgroundColor: '#c1cdd3',
             barPercentage: 0.5
         });
@@ -1620,7 +1680,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         datasets.push({
             label: '7日平均',
             type: 'bar',
-            data: movingAvgs,
+            data: movingAvgs, // 裡面已經是數值或 null 了，安全
             backgroundColor: '#c1cdd3',
             barPercentage: 0.5
         });
