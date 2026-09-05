@@ -1351,12 +1351,13 @@ async function renderTrendCard(type, days) {
     updateTrend(cardId, type, days, 0); // 傳入初始 offset 為 0
 }
 
-// 點選 7日、14日、30日 時，重設天數並回到最新的一頁 (offset = 0)
+// 點選 7日、14日、30日 時，保留目前的結束日期 (不重置 offset)
 function setTrendDays(cardId, type, days) {
     const card = document.getElementById(cardId);
-    card.dataset.days = days;
-    card.dataset.offset = 0; // 重置偏移量
-    updateTrend(cardId, type, days, 0);
+    card.dataset.days = days;    
+    // 讀取目前的 offset，如果沒有就預設為 0
+    const currentOffset = parseInt(card.dataset.offset || 0, 10);    
+    updateTrend(cardId, type, days, currentOffset);
 }
 
 // 點選 ◀ 或 ▶ 進行分頁切換
@@ -1394,7 +1395,7 @@ async function updateTrend(cardId, type, days, offset = 0) {
         filteredJsonData = await response.json();
         const totalDaysToFetch = days + 6; 
 
-        // 這裡把資料加上 offset 的邏輯，實現動態分頁切片
+        // 1. 切片取得資料
         healthData = filteredJsonData
             .sort((a, b) => new Date(b.record_date) - new Date(a.record_date))
             .slice(offset, offset + totalDaysToFetch) 
@@ -1402,6 +1403,18 @@ async function updateTrend(cardId, type, days, offset = 0) {
                 record_date: item.record_date,
                 raw_json: item.raw_json
             }));
+
+        // 【滿足第 2 點】：如果抓出來的資料筆數不夠 (代表到底了)，往前把缺的日期補齊為空資料
+        while (healthData.length < totalDaysToFetch) {
+            if (healthData.length === 0) break; // 完全沒資料防呆
+            const oldestItem = healthData[healthData.length - 1];
+            let d = new Date(oldestItem.record_date + 'T00:00:00');
+            d.setDate(d.getDate() - 1); // 往前推一天
+            healthData.push({
+                record_date: d.toLocaleDateString('en-CA'),
+                raw_json: {} // 塞空物件，這樣畫圖抓欄位就會是 undefined -> 轉成 null
+            });
+        }
 
     } catch (err) {
         console.error("讀取地端資料錯誤:", err);
@@ -1418,13 +1431,28 @@ async function updateTrend(cardId, type, days, offset = 0) {
 
     const sortedData = [...healthData].reverse();
 
-    // ================= 新增區塊：處理日期區間與按鈕狀態 =================
+    // ================= 處理上方導覽列的日期顯示 =================
     const displayData = sortedData.slice(-days); // 取出實際繪圖的那幾天
     if (displayData.length > 0) {
-        // 將 YYYY-MM-DD 轉成 YYYY/MM/DD 格式
-        const startDateStr = displayData[0].record_date.replace(/-/g, '/');
-        const endDateStr = displayData[displayData.length - 1].record_date.replace(/-/g, '/');
-        document.getElementById(`${cardId}-date-range`).innerText = `${startDateStr} - ${endDateStr}`;
+        let startD = new Date(displayData[0].record_date + 'T00:00:00');
+        let endD = new Date(displayData[displayData.length - 1].record_date + 'T00:00:00');
+
+        // 【滿足第 3 點 & 第 4 點的建議】：如果「單獨看」需要 +1 的圖表，上方文字才 +1
+        // 如果是 type === 'all'，這裡就不會進去，維持原始測量日期！
+        if (type === 'battery' || type === 'rhr' || type === 'end') {
+            startD.setDate(startD.getDate() + 1);
+            endD.setDate(endD.getDate() + 1);
+        }
+
+        // 格式化為 YYYY/MM/DD
+        const formatD = (d) => {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd}`;
+        };
+
+        document.getElementById(`${cardId}-date-range`).innerText = `${formatD(startD)}-${formatD(endD)}`;
     }
 
     // 控制 ◀ 與 ▶ 按鈕在到達極限時反灰不可點
@@ -1440,7 +1468,6 @@ async function updateTrend(cardId, type, days, offset = 0) {
         prevBtn.style.pointerEvents = "auto";
     }
     
-    // 如果 offset = 0 代表已經是最新的資料
     if (offset === 0) {
         nextBtn.style.opacity = "0.3";
         nextBtn.style.pointerEvents = "none";
