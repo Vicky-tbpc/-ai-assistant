@@ -2144,76 +2144,157 @@ async function renderTrendCard(type, days) {
     const cardId = `trend-${Date.now()}`;
     const html = `
         <div class="msg-row ai-row">
-            <div class="trend-card" id="${cardId}">
+            <!-- 加上 data-days 與 data-offset 讓 DOM 記住狀態 -->
+            <div class="trend-card" id="${cardId}" data-days="${days}" data-offset="0">
                 <div class="trend-header">
                     <span class="chart-title">📈 趨勢分析</span>
                     <div class="trend-nav">
-                        <button class="nav-btn ${days===7?'active':''}" onclick="updateTrend('${cardId}', '${type}', 7)">7日</button>
-                        <button class="nav-btn ${days===14?'active':''}" onclick="updateTrend('${cardId}', '${type}', 14)">14日</button>
-                        <button class="nav-btn ${days===30?'active':''}" onclick="updateTrend('${cardId}', '${type}', 30)">30日</button>
+                        <button class="nav-btn ${days===7?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 7)">7日</button>
+                        <button class="nav-btn ${days===14?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 14)">14日</button>
+                        <button class="nav-btn ${days===30?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 30)">30日</button>
                     </div>
+                </div>
+                <!-- 新增：日期分頁區塊 -->
+                <div class="trend-date-nav" style="display:flex; justify-content:center; align-items:center; gap:10px; margin: 10px 0; color: #596b75; font-size: 14px;">
+                    <button class="nav-arrow" onclick="changeTrendPage('${cardId}', '${type}', 'prev')" style="cursor:pointer; background:none; border:none; font-size:16px; padding:0 10px;">◀</button>
+                    <span id="${cardId}-date-range" style="font-weight:bold; min-width:180px; text-align:center;">讀取中...</span>
+                    <button class="nav-arrow" onclick="changeTrendPage('${cardId}', '${type}', 'next')" style="cursor:pointer; background:none; border:none; font-size:16px; padding:0 10px;">▶</button>
                 </div>
                 <div class="trend-content"></div>
             </div>
         </div>`;
     document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
-    updateTrend(cardId, type, days);
+    updateTrend(cardId, type, days, 0); // 傳入初始 offset 為 0
 }
 
+// 點選 7日、14日、30日 時，保留目前的結束日期 (不重置 offset)
+function setTrendDays(cardId, type, days) {
+    const card = document.getElementById(cardId);
+    card.dataset.days = days;    
+    // 讀取目前的 offset，如果沒有就預設為 0
+    const currentOffset = parseInt(card.dataset.offset || 0, 10);    
+    updateTrend(cardId, type, days, currentOffset);
+}
 
-async function updateTrend(cardId, type, days) {
+// 點選 ◀ 或 ▶ 進行分頁切換
+function changeTrendPage(cardId, type, direction) {
+    const card = document.getElementById(cardId);
+    const days = parseInt(card.dataset.days, 10);
+    let offset = parseInt(card.dataset.offset, 10);
+
+    if (direction === 'prev') {
+        offset += days; // 往回看更舊的資料
+    } else if (direction === 'next') {
+        offset -= days; // 往未來看較新的資料
+        if (offset < 0) offset = 0;
+    }
+
+    card.dataset.offset = offset;
+    updateTrend(cardId, type, days, offset);
+}
+async function updateTrend(cardId, type, days, offset = 0) {
     const card = document.getElementById(cardId);
     card.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.remove('active');
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 將原本的 Supabase 呼叫註解掉或替換掉
-let healthData = [];
-try {
-    // 1. 準備參數：只抓取目前這個使用者的資料
-    const queryParams = new URLSearchParams({
-        serial: currentSerial
-    }).toString();
-
-    // 2. 呼叫地端中轉 API (加上 serial 參數)
-    const response = await fetch(`/api/health?${queryParams}`);
+    let healthData = [];
+    let filteredJsonData = [];
     
-    if (!response.ok) throw new Error("地端連線失敗");
-    
-    // 現在拿到的資料已經是被地端過濾過的「該使用者全量資料」
-    const filteredJsonData = await response.json();
-    const totalDaysToFetch = days + 6; 
+    try {
+        const queryParams = new URLSearchParams({ serial: currentSerial }).toString();
+        const response = await fetch(`/api/health?${queryParams}`);
+        
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        filteredJsonData = await response.json();
+        const totalDaysToFetch = days + 6; 
 
-    // 3. 前端只負責「排序」與「取出最近幾天 (days)」
-    healthData = filteredJsonData
-        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
-        .slice(0, totalDaysToFetch) // 取得最近的筆數 (例如 7+6=13 筆，確保第一天也有足夠的前期資料算平均)
-        .map(item => ({
-            record_date: item.record_date,
-            raw_json: item.raw_json
-        }));
+        // 1. 切片取得資料
+        healthData = filteredJsonData
+            .sort((a, b) => new Date(b.record_date) - new Date(a.record_date))
+            .slice(offset, offset + totalDaysToFetch) 
+            .map(item => ({
+                record_date: item.record_date,
+                raw_json: item.raw_json
+            }));
 
-} catch (err) {
-    console.error("讀取地端資料錯誤:", err);
-    card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
-    return;
-}
+        // 【滿足第 2 點】：如果抓出來的資料筆數不夠 (代表到底了)，往前把缺的日期補齊為空資料
+        while (healthData.length < totalDaysToFetch) {
+            if (healthData.length === 0) break; // 完全沒資料防呆
+            const oldestItem = healthData[healthData.length - 1];
+            let d = new Date(oldestItem.record_date + 'T00:00:00');
+            d.setDate(d.getDate() - 1); // 往前推一天
+            healthData.push({
+                record_date: d.toLocaleDateString('en-CA'),
+                raw_json: {} // 塞空物件，這樣畫圖抓欄位就會是 undefined -> 轉成 null
+            });
+        }
 
-// 4. 檢查是否有資料 (保留你原本的判斷邏輯)
-if (healthData.length === 0) {
-    card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
-    return;
-}
+    } catch (err) {
+        console.error("讀取地端資料錯誤:", err);
+        card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
+        document.getElementById(`${cardId}-date-range`).innerText = "無數據";
+        return;
+    }
 
-
-// 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
+    if (healthData.length === 0) {
+        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+        document.getElementById(`${cardId}-date-range`).innerText = "無數據";
+        return;
+    }
 
     const sortedData = [...healthData].reverse();
+
+    // ================= 處理上方導覽列的日期顯示 =================
+    const displayData = sortedData.slice(-days); // 取出實際繪圖的那幾天
+    if (displayData.length > 0) {
+        let startD = new Date(displayData[0].record_date + 'T00:00:00');
+        let endD = new Date(displayData[displayData.length - 1].record_date + 'T00:00:00');
+
+        // 【滿足第 3 點 & 第 4 點的建議】：如果「單獨看」需要 +1 的圖表，上方文字才 +1
+        // 如果是 type === 'all'，這裡就不會進去，維持原始測量日期！
+        if (type === 'battery' || type === 'rhr' || type === 'end') {
+            startD.setDate(startD.getDate() + 1);
+            endD.setDate(endD.getDate() + 1);
+        }
+
+        // 格式化為 YYYY/MM/DD
+        const formatD = (d) => {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd}`;
+        };
+
+        document.getElementById(`${cardId}-date-range`).innerText = `${formatD(startD)}-${formatD(endD)}`;
+    }
+
+    // 控制 ◀ 與 ▶ 按鈕在到達極限時反灰不可點
+    const prevBtn = card.querySelector('.trend-date-nav button:first-child');
+    const nextBtn = card.querySelector('.trend-date-nav button:last-child');
     
+    // 如果再往前看，超過總資料量代表沒舊資料了
+    if (offset + days >= filteredJsonData.length) {
+        prevBtn.style.opacity = "0.3";
+        prevBtn.style.pointerEvents = "none";
+    } else {
+        prevBtn.style.opacity = "1";
+        prevBtn.style.pointerEvents = "auto";
+    }
+    
+    if (offset === 0) {
+        nextBtn.style.opacity = "0.3";
+        nextBtn.style.pointerEvents = "none";
+    } else {
+        nextBtn.style.opacity = "1";
+        nextBtn.style.pointerEvents = "auto";
+    }
+    // =================================================================
+
     // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
-    // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
     const originalDates = sortedData.map(d => d.record_date);
     const shiftedDates = originalDates.map(dStr => {
         let d = new Date(dStr + 'T00:00:00');
