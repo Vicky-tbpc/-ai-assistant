@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096-4</title>
+    <title>Soosyn 健康夥伴 n096-5</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1327,76 +1327,130 @@ async function renderTrendCard(type, days) {
     const cardId = `trend-${Date.now()}`;
     const html = `
         <div class="msg-row ai-row">
-            <div class="trend-card" id="${cardId}">
+            <!-- 加上 data-days 與 data-offset 讓 DOM 記住狀態 -->
+            <div class="trend-card" id="${cardId}" data-days="${days}" data-offset="0">
                 <div class="trend-header">
                     <span class="chart-title">📈 趨勢分析</span>
                     <div class="trend-nav">
-                        <button class="nav-btn ${days===7?'active':''}" onclick="updateTrend('${cardId}', '${type}', 7)">7日</button>
-                        <button class="nav-btn ${days===14?'active':''}" onclick="updateTrend('${cardId}', '${type}', 14)">14日</button>
-                        <button class="nav-btn ${days===30?'active':''}" onclick="updateTrend('${cardId}', '${type}', 30)">30日</button>
+                        <button class="nav-btn ${days===7?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 7)">7日</button>
+                        <button class="nav-btn ${days===14?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 14)">14日</button>
+                        <button class="nav-btn ${days===30?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 30)">30日</button>
                     </div>
+                </div>
+                <!-- 新增：日期分頁區塊 -->
+                <div class="trend-date-nav" style="display:flex; justify-content:center; align-items:center; gap:10px; margin: 10px 0; color: #596b75; font-size: 14px;">
+                    <button class="nav-arrow" onclick="changeTrendPage('${cardId}', '${type}', 'prev')" style="cursor:pointer; background:none; border:none; font-size:16px; padding:0 10px;">◀</button>
+                    <span id="${cardId}-date-range" style="font-weight:bold; min-width:180px; text-align:center;">讀取中...</span>
+                    <button class="nav-arrow" onclick="changeTrendPage('${cardId}', '${type}', 'next')" style="cursor:pointer; background:none; border:none; font-size:16px; padding:0 10px;">▶</button>
                 </div>
                 <div class="trend-content"></div>
             </div>
         </div>`;
     document.getElementById('chat-history').innerHTML += html;
     scrollToBottom();
-    updateTrend(cardId, type, days);
+    updateTrend(cardId, type, days, 0); // 傳入初始 offset 為 0
 }
 
+// 點選 7日、14日、30日 時，重設天數並回到最新的一頁 (offset = 0)
+function setTrendDays(cardId, type, days) {
+    const card = document.getElementById(cardId);
+    card.dataset.days = days;
+    card.dataset.offset = 0; // 重置偏移量
+    updateTrend(cardId, type, days, 0);
+}
 
-async function updateTrend(cardId, type, days) {
+// 點選 ◀ 或 ▶ 進行分頁切換
+function changeTrendPage(cardId, type, direction) {
+    const card = document.getElementById(cardId);
+    const days = parseInt(card.dataset.days, 10);
+    let offset = parseInt(card.dataset.offset, 10);
+
+    if (direction === 'prev') {
+        offset += days; // 往回看更舊的資料
+    } else if (direction === 'next') {
+        offset -= days; // 往未來看較新的資料
+        if (offset < 0) offset = 0;
+    }
+
+    card.dataset.offset = offset;
+    updateTrend(cardId, type, days, offset);
+}
+async function updateTrend(cardId, type, days, offset = 0) {
     const card = document.getElementById(cardId);
     card.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.remove('active');
         if(b.innerText.includes(days)) b.classList.add('active');
     });
 
-    // 1. 將原本的 Supabase 呼叫註解掉或替換掉
-let healthData = [];
-try {
-    // 1. 準備參數：只抓取目前這個使用者的資料
-    const queryParams = new URLSearchParams({
-        serial: currentSerial
-    }).toString();
-
-    // 2. 呼叫地端中轉 API (加上 serial 參數)
-    const response = await fetch(`/api/health?${queryParams}`);
+    let healthData = [];
+    let filteredJsonData = [];
     
-    if (!response.ok) throw new Error("地端連線失敗");
-    
-    // 現在拿到的資料已經是被地端過濾過的「該使用者全量資料」
-    const filteredJsonData = await response.json();
-    const totalDaysToFetch = days + 6; 
+    try {
+        const queryParams = new URLSearchParams({ serial: currentSerial }).toString();
+        const response = await fetch(`/api/health?${queryParams}`);
+        
+        if (!response.ok) throw new Error("地端連線失敗");
+        
+        filteredJsonData = await response.json();
+        const totalDaysToFetch = days + 6; 
 
-    // 3. 前端只負責「排序」與「取出最近幾天 (days)」
-    healthData = filteredJsonData
-        .sort((a, b) => new Date(b.record_date) - new Date(a.record_date)) // 日期降冪排序
-        .slice(0, totalDaysToFetch) // 取得最近的筆數 (例如 7+6=13 筆，確保第一天也有足夠的前期資料算平均)
-        .map(item => ({
-            record_date: item.record_date,
-            raw_json: item.raw_json
-        }));
+        // 這裡把資料加上 offset 的邏輯，實現動態分頁切片
+        healthData = filteredJsonData
+            .sort((a, b) => new Date(b.record_date) - new Date(a.record_date))
+            .slice(offset, offset + totalDaysToFetch) 
+            .map(item => ({
+                record_date: item.record_date,
+                raw_json: item.raw_json
+            }));
 
-} catch (err) {
-    console.error("讀取地端資料錯誤:", err);
-    card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
-    return;
-}
+    } catch (err) {
+        console.error("讀取地端資料錯誤:", err);
+        card.querySelector('.trend-content').innerHTML = "地端連線失敗 😅";
+        document.getElementById(`${cardId}-date-range`).innerText = "無數據";
+        return;
+    }
 
-// 4. 檢查是否有資料 (保留你原本的判斷邏輯)
-if (healthData.length === 0) {
-    card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
-    return;
-}
-
-
-// 接下來這段之後的程式碼（例如處理畫圖的部分）就可以繼續接下去跑，不用動
+    if (healthData.length === 0) {
+        card.querySelector('.trend-content').innerHTML = "暫無數據 😅";
+        document.getElementById(`${cardId}-date-range`).innerText = "無數據";
+        return;
+    }
 
     const sortedData = [...healthData].reverse();
+
+    // ================= 新增區塊：處理日期區間與按鈕狀態 =================
+    const displayData = sortedData.slice(-days); // 取出實際繪圖的那幾天
+    if (displayData.length > 0) {
+        // 將 YYYY-MM-DD 轉成 YYYY/MM/DD 格式
+        const startDateStr = displayData[0].record_date.replace(/-/g, '/');
+        const endDateStr = displayData[displayData.length - 1].record_date.replace(/-/g, '/');
+        document.getElementById(`${cardId}-date-range`).innerText = `${startDateStr} - ${endDateStr}`;
+    }
+
+    // 控制 ◀ 與 ▶ 按鈕在到達極限時反灰不可點
+    const prevBtn = card.querySelector('.trend-date-nav button:first-child');
+    const nextBtn = card.querySelector('.trend-date-nav button:last-child');
     
+    // 如果再往前看，超過總資料量代表沒舊資料了
+    if (offset + days >= filteredJsonData.length) {
+        prevBtn.style.opacity = "0.3";
+        prevBtn.style.pointerEvents = "none";
+    } else {
+        prevBtn.style.opacity = "1";
+        prevBtn.style.pointerEvents = "auto";
+    }
+    
+    // 如果 offset = 0 代表已經是最新的資料
+    if (offset === 0) {
+        nextBtn.style.opacity = "0.3";
+        nextBtn.style.pointerEvents = "none";
+    } else {
+        nextBtn.style.opacity = "1";
+        nextBtn.style.pointerEvents = "auto";
+    }
+    // =================================================================
+
     // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
-    // 我們需要抓取「生理日期」以及「生理日期+1天」的所有問卷，確保對應得到
     const originalDates = sortedData.map(d => d.record_date);
     const shiftedDates = originalDates.map(dStr => {
         let d = new Date(dStr + 'T00:00:00');
