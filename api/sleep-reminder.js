@@ -1,4 +1,4 @@
-// sleep-reminder_07 null不推播
+// sleep-reminder_08_自動偵測通道
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -27,41 +27,64 @@ export default async function handler(req, res) {
 
     if (userError) throw userError;
 
-// --- STEP 2: 直接向地端 Python 伺服器獲取「特定日期」資料 ---
-const API_KEY = process.env.LOCAL_API_KEY;
-const TUNNEL_URL = process.env.LOCAL_TUNNEL_URL;
+// --- STEP 2: 建立自動輪詢函數，直接向地端 Python 伺服器獲取資料 ---
+    const API_KEY = process.env.LOCAL_API_KEY;
+    // 優先讀取 LOCAL_TUNNEL_URLS，若無則降級使用舊的 LOCAL_TUNNEL_URL
+    const TUNNEL_URLS_STR = process.env.LOCAL_TUNNEL_URLS || process.env.LOCAL_TUNNEL_URL;
 
-let healthData = [];
-try {
-    if (!TUNNEL_URL || !API_KEY) {
-        throw new Error('Vercel 環境變數缺失，請確認 LOCAL_TUNNEL_URL 與 LOCAL_API_KEY 已設定。');
+    if (!TUNNEL_URLS_STR || !API_KEY) {
+        throw new Error('Vercel 環境變數缺失，請確認 LOCAL_TUNNEL_URLS 或 LOCAL_API_KEY 已設定。');
     }
 
-    // 直接建立地端的請求網址
-    const targetUrl = new URL(`${TUNNEL_URL}/api/get-latest-health`);
-    targetUrl.searchParams.append('start', dayBeforeYesterday);
-    targetUrl.searchParams.append('end', yesterday);
+    // 將網址字串拆成陣列
+    const tunnelList = TUNNEL_URLS_STR.split(',').map(url => url.trim());
 
-    console.log("正在直接連線至地端 Python API:", targetUrl.toString());
+    // 定義自動輪詢函數
+    async function fetchFromTunnels(pathAndQuery, options) {
+      let lastErrorText = "無法連線";
+      let lastStatus = 500;
 
-    const response = await fetch(targetUrl.toString(), {
-        headers: { 
-            'X-API-KEY': API_KEY,
-            'ngrok-skip-browser-warning': 'true' 
+      for (const baseUrl of tunnelList) {
+        try {
+          const url = `${baseUrl}${pathAndQuery}`;
+          console.log(`[自動推播] 嘗試連線至地端 Python API: ${url}`);
+          const response = await fetch(url, options);
+          
+          if (response.ok) {
+            return response; // 成功連線就直接回傳結果，中斷迴圈
+          } else {
+            lastStatus = response.status;
+            lastErrorText = await response.text();
+          }
+        } catch (error) {
+          console.log(`[自動推播連線失敗跳過] ${baseUrl}`);
         }
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`地端 API 回傳錯誤 (${response.status}): ${errorText}`);
+      }
+      throw new Error(`地端 API 回傳錯誤 (${lastStatus}): ${lastErrorText}`);
     }
-    
-    healthData = await response.json();
-    
-} catch (err) {
-    console.error("讀取地端資料失敗:", err);
-    return res.status(500).json({ error: "無法從地端 JSON 獲取健康數據", detail: err.message });
-}
+
+    let healthData = [];
+    try {
+      // 組合路徑與參數
+      const params = new URLSearchParams();
+      params.append('start', dayBeforeYesterday);
+      params.append('end', yesterday);
+      const pathAndQuery = `/api/get-latest-health?${params.toString()}`;
+
+      // 呼叫輪詢函數
+      const response = await fetchFromTunnels(pathAndQuery, {
+          headers: { 
+              'X-API-KEY': API_KEY,
+              'ngrok-skip-browser-warning': 'true' 
+          }
+      });
+      
+      healthData = await response.json();
+      
+    } catch (err) {
+      console.error("讀取地端資料失敗:", err);
+      return res.status(500).json({ error: "無法從地端 JSON 獲取健康數據", detail: err.message });
+    }
 
     const metrics = ['Battery_TST_min_A', 'Battery_N3_pct_A', 'Battery_rMSSD_A', 'Battery_HBI_A', 'Battery_HR_min_A'];
 
