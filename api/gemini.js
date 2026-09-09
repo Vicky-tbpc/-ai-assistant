@@ -1,4 +1,4 @@
-// api/gemini.js 32
+// api/gemini.js 33
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -13,7 +13,11 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY; 
-    const anythingLlmUrl = process.env.ANYTHING_LLM_URL;
+    
+    // 支援多組 URL（使用逗號分隔），若沒設定 ANYTHING_LLM_URLS 則回退到舊版單一 URL
+    const anythingLlmUrlsEnv = process.env.ANYTHING_LLM_URLS || process.env.ANYTHING_LLM_URL || "";
+    const anythingLlmUrls = anythingLlmUrlsEnv.split(',').map(u => u.trim()).filter(u => u);
+    
     const anythingLlmKey = process.env.ANYTHING_LLM_KEY;
     const anythingLlmSlug = process.env.ANYTHING_LLM_SLUG;
     
@@ -276,39 +280,57 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       console.log(`[檢查] 準備呼叫 AnythingLLM，正規化後關鍵字: ${finalQuery}`);
       const ragPrompt = `請從知識庫中找出與「${finalQuery}」最相關的資訊。如果是健康指標，請說明定義與標準範圍；如果是 APP、裝置操作或報告判讀，請直接提供知識庫中的教學說明、對應連結與回覆規則。`;
 
-      // 🌟 [升級 B]：加入 Retry 機制 (最多重試 2 次，解決擁塞時有時無的問題)
-      const MAX_RETRIES = 2;
-      let attempt = 0;
       let success = false;
+      let attemptGlobal = 0;
 
-      while (attempt <= MAX_RETRIES && !success) {
-        try {
-          if (attempt > 0) console.log(`🔄 [Retry] AnythingLLM 第 ${attempt} 次重試...`);
-          
-          const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ message: ragPrompt, mode: "query" })
-          });
-          
-          if (ragRes.ok) {
-            let ragData = await ragRes.json();
-            ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
-            success = true; // 成功就跳出迴圈
-          } else {
-            console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
-            if (attempt === MAX_RETRIES) throw new Error("超過最大重試次數");
+      // 🔄 多通道自動偵測與重試機制
+      for (const currentUrl of anythingLlmUrls) {
+        if (success) break;
+
+        const MAX_RETRIES = 1; // 每個通道嘗試次數縮減，避免整個 API 卡死
+        let attempt = 0;
+
+        while (attempt <= MAX_RETRIES && !success) {
+          try {
+            if (attempt > 0) console.log(`🔄 [Retry] AnythingLLM (${currentUrl}) 第 ${attempt} 次重試...`);
+            else console.log(`[檢查] 準備呼叫 AnythingLLM，當前測試通道: ${currentUrl}`);
+
+            // ⏱️ 加上 Timeout 斷路器 (10秒)，避免死通道造成 Vercel 逾時
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const ragRes = await fetch(`${currentUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ message: ragPrompt, mode: "query" }),
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (ragRes.ok) {
+              let ragData = await ragRes.json();
+              ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+              console.log(`📚【地端 AnythingLLM 知識庫回傳成功】來源通道: ${currentUrl}`);
+              success = true;
+            } else {
+              console.error(`💥【警告】AnythingLLM (${currentUrl}) 狀態異常: ${ragRes.status}`);
+              if (attempt === MAX_RETRIES) throw new Error("超過最大重試次數");
+            }
+          } catch (e) { 
+            if (attempt === MAX_RETRIES) {
+              console.error(`💥 通道 ${currentUrl} 呼叫完全失敗，準備嘗試下一個 (如果有):`, e.message); 
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           }
-        } catch (e) { 
-          if (attempt === MAX_RETRIES) {
-            console.error("💥 地端 RAG 呼叫完全失敗 (已達重試上限):", e); 
-          } else {
-            // 停頓 1.5 秒後再重試，給本地端伺服器一點喘息空間
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
+          attempt++;
+          attemptGlobal++;
         }
-        attempt++;
+      }
+      
+      if (!success) {
+        console.error("💥 所有 AnythingLLM 通道皆呼叫失敗。");
       }
     }
 
