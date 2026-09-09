@@ -1,4 +1,4 @@
-// api/gemini.js 30
+// api/gemini.js 33
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -13,7 +13,11 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY; 
-    const anythingLlmUrl = process.env.ANYTHING_LLM_URL;
+    
+    // 支援多組 URL（使用逗號分隔），若沒設定 ANYTHING_LLM_URLS 則回退到舊版單一 URL
+    const anythingLlmUrlsEnv = process.env.ANYTHING_LLM_URLS || process.env.ANYTHING_LLM_URL || "";
+    const anythingLlmUrls = anythingLlmUrlsEnv.split(',').map(u => u.trim()).filter(u => u);
+    
     const anythingLlmKey = process.env.ANYTHING_LLM_KEY;
     const anythingLlmSlug = process.env.ANYTHING_LLM_SLUG;
     
@@ -146,7 +150,9 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
 4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
 5. 【開啟睡眠報告】(新增)：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
-   🛑 【報告進度攔截】：若使用者是詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告「計算進度或數量」的問題，嚴禁開啟報告！請務必將 need_pdf_report 設為 false！
+   🛑 【意圖區隔與攔截】：
+   - 若使用者詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告【計算進度或數量】的問題，嚴禁開啟報告，請務必將 need_pdf_report 設為 false！
+   - 若使用者要求「昨晚的睡眠分析」、「幫我分析睡眠」，代表他需要你用文字【解讀數據】，而不是單純打開檔案！請務必將 need_pdf_report 設為 false，並確保 need_data 為 true！
 
 💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
@@ -197,7 +203,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         action: 'open_pdf', 
         date: intent.pdf_date, 
         // 👇 把原本的 "這就幫你開啟" 改成引導點擊按鈕的說法
-        text: `沒問題！${intent.pdf_date} 的睡眠報告準備好囉，點擊下方的按鈕就可以查看了` 
+        text: `沒問題！${intent.pdf_date} 的睡眠報告準備好囉，點擊下方的按鈕就可以查看了！` 
       });
     }
 
@@ -231,8 +237,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "T88": "T88 睡眠期間 血氧濃度小於 88% 的時間百分比 SpO2",
         
         // --- 原始設定 (單一精準指標) ---
-        "低氧負擔": "低氧負擔指數 HBI",
-        "HBI": "低氧負擔指數 HBI",
+        "低氧負擔": "低氧負擔指數 HBI Hypoxia Burden Index",
+        "HBI": "低氧負擔指數 HBI Hypoxia Burden Index",
         "RR": "呼吸頻率 RR Respiratory Rate",
         "呼吸頻率": "呼吸頻率 RR Respiratory Rate",
         "RHR": "靜息心率 RHR",
@@ -248,6 +254,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "HF": "HF 高頻功率 (0.15-0.4 Hz)，通常反映副交感神經活性",
         "LF/HF": "LF/HF 低、高頻功率之比值，通常反映自律神經活性平衡",
         "SDNN": "SDNN 相鄰正常心跳間距的標準差",
+        "rMSSD": "rMSSD 相鄰正常心跳間距差異平方和的均方根",
         "CBP": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "心血管壓力": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "說明書": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
@@ -260,9 +267,11 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       // 💡 優化：把字典的 key 依照「字串長度」由長到短排序
       // 確保「睡眠最低脈搏」會比「脈搏」優先被比對到
       const sortedKeys = Object.keys(aliasDictionary).sort((a, b) => b.length - a.length);
+      const finalQueryLower = finalQuery.toLowerCase(); // 先將使用者的查詢轉為小寫
 
       for (const key of sortedKeys) {
-        if (finalQuery.includes(key)) {
+        // 將字典的 key 也轉為小寫進行比對，解決大小寫不一致的盲點
+        if (finalQueryLower.includes(key.toLowerCase())) {
           finalQuery = aliasDictionary[key];
           break;
         }
@@ -271,39 +280,57 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       console.log(`[檢查] 準備呼叫 AnythingLLM，正規化後關鍵字: ${finalQuery}`);
       const ragPrompt = `請從知識庫中找出與「${finalQuery}」最相關的資訊。如果是健康指標，請說明定義與標準範圍；如果是 APP、裝置操作或報告判讀，請直接提供知識庫中的教學說明、對應連結與回覆規則。`;
 
-      // 🌟 [升級 B]：加入 Retry 機制 (最多重試 2 次，解決擁塞時有時無的問題)
-      const MAX_RETRIES = 2;
-      let attempt = 0;
       let success = false;
+      let attemptGlobal = 0;
 
-      while (attempt <= MAX_RETRIES && !success) {
-        try {
-          if (attempt > 0) console.log(`🔄 [Retry] AnythingLLM 第 ${attempt} 次重試...`);
-          
-          const ragRes = await fetch(`${anythingLlmUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ message: ragPrompt, mode: "query" })
-          });
-          
-          if (ragRes.ok) {
-            let ragData = await ragRes.json();
-            ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            console.log("📚【地端 AnythingLLM 知識庫回傳成功】");
-            success = true; // 成功就跳出迴圈
-          } else {
-            console.error(`💥【警告】AnythingLLM 狀態異常: ${ragRes.status}`);
-            if (attempt === MAX_RETRIES) throw new Error("超過最大重試次數");
+      // 🔄 多通道自動偵測與重試機制
+      for (const currentUrl of anythingLlmUrls) {
+        if (success) break;
+
+        const MAX_RETRIES = 1; // 每個通道嘗試次數縮減，避免整個 API 卡死
+        let attempt = 0;
+
+        while (attempt <= MAX_RETRIES && !success) {
+          try {
+            if (attempt > 0) console.log(`🔄 [Retry] AnythingLLM (${currentUrl}) 第 ${attempt} 次重試...`);
+            else console.log(`[檢查] 準備呼叫 AnythingLLM，當前測試通道: ${currentUrl}`);
+
+            // ⏱️ 加上 Timeout 斷路器 (10秒)，避免死通道造成 Vercel 逾時
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const ragRes = await fetch(`${currentUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${anythingLlmKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ message: ragPrompt, mode: "query" }),
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (ragRes.ok) {
+              let ragData = await ragRes.json();
+              ragContext = ragData.textResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+              console.log(`📚【地端 AnythingLLM 知識庫回傳成功】來源通道: ${currentUrl}`);
+              success = true;
+            } else {
+              console.error(`💥【警告】AnythingLLM (${currentUrl}) 狀態異常: ${ragRes.status}`);
+              if (attempt === MAX_RETRIES) throw new Error("超過最大重試次數");
+            }
+          } catch (e) { 
+            if (attempt === MAX_RETRIES) {
+              console.error(`💥 通道 ${currentUrl} 呼叫完全失敗，準備嘗試下一個 (如果有):`, e.message); 
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           }
-        } catch (e) { 
-          if (attempt === MAX_RETRIES) {
-            console.error("💥 地端 RAG 呼叫完全失敗 (已達重試上限):", e); 
-          } else {
-            // 停頓 1.5 秒後再重試，給本地端伺服器一點喘息空間
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
+          attempt++;
+          attemptGlobal++;
         }
-        attempt++;
+      }
+      
+      if (!success) {
+        console.error("💥 所有 AnythingLLM 通道皆呼叫失敗。");
       }
     }
 
