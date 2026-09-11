@@ -1,4 +1,4 @@
-// api/line-notify_03.js
+// api/line-notify_04.js
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
@@ -43,10 +43,13 @@ export default async function handler(req, res) {
       ];
       let msg = baseMessages[Math.floor(Math.random() * baseMessages.length)] + "\n\n";
       
-      // 👇 新增：如果 battery 和 light 都是 null，直接回傳預設問候與連結
+      // 👇 定義 Android 用戶提醒文字
+      const androidReminder = "\n\n📱 Android 用戶小提醒\n為了有更好的瀏覽體驗，請使用 Chrome 等瀏覽器開啟連結喔！";
+      
+      // 👇 新增：如果 battery 和 light 都是 null，直接回傳預設問候與連結 + Android 提醒
       if (battery === null && light === null) {
         msg += "💡 抽空看看自己的身體狀況吧👇\nhttps://ai-assistant-eight-puce.vercel.app/";
-        return msg;
+        return msg + androidReminder;
       }
 
       let warnings = [];
@@ -71,7 +74,9 @@ export default async function handler(req, res) {
       }
       
       msg += "\nhttps://ai-assistant-eight-puce.vercel.app/";
-      return msg;
+      
+      // 回傳最終訊息 + Android 提醒
+      return msg + androidReminder;
     };
 
     // 3. 分別發送 LINE 推播
