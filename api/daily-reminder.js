@@ -67,8 +67,7 @@ async function sendLineReminder(lineUserId) {
       to: lineUserId,
       messages: [{
         type: 'text',
-        text: `早安！提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/\n\n📱 Android 用戶小提醒
-為了有更好的瀏覽體驗，請使用 Chrome 等瀏覽器開啟連結喔！`
+        text: "早安！提醒你：今天還沒紀錄健康狀況喔 😊\n\n請登入填寫：\nhttps://ai-assistant-eight-puce.vercel.app/\n\n📱 Android 用戶小提醒\n為了有更好的瀏覽體驗，請使用 Chrome 等瀏覽器開啟連結喔！"
       }]
     })
   });
