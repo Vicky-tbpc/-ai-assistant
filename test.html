@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n097-6</title>
+    <title>Soosyn 健康夥伴 n097-7</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2052,8 +2052,28 @@ finalCapsules.push({
 
     const statusLight = raw?.light_status || '--';
 
-    // --- 5. 最終回傳物件 ---
-    return { 
+    // 準備要傳回地端的 5 項資料
+const priorityItem = needsAction ? weakest.name : '目前無特別需改善項目';
+const payload = {
+    serial: currentSerial,
+    record_date: current.record_date,
+    priorityItem: priorityItem,
+    actionText: actionText,
+    exerciseLevel: finalExerciseLevel,
+    dailyAction: dailyAction,
+    exerciseRec: exerciseRec
+};
+
+// 背景發送 API 將資料存入地端 Excel，這裡不加上 await 避免阻塞前端渲染速度
+fetch('/api/health?action=save_profile', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+}).catch(err => console.error("傳送儲存 Daily_Recommendations 發生錯誤:", err));
+
+return { 
         date: current.record_date.replace(/-/g, '/'), 
         battery: currentBattery, 
         light: statusLight, 
@@ -3437,6 +3457,8 @@ function appendSummaryCard(dateTitle, data) {
                 </div>
             </div>
             ${alertHtml}
+            <!-- 新版的動態分析與報告 -->
+            ${capsulesHtml}
             <!-- 四項穩定度區塊 (新增睡眠區塊展開功能) -->
             ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6", sleepExtraHtml)}
             ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
@@ -3447,8 +3469,7 @@ function appendSummaryCard(dateTitle, data) {
             ${rhrSectionHtml}
             <!-- 將睡眠心血管負荷區塊直接安插在 RHR 下方 -->
             ${riskSectionHtml}
-            <!-- 新版的動態分析與報告 -->
-            ${capsulesHtml}
+
             <div style="margin: 20px 0 5px 0;">
                 <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">
                     📄 開啟睡眠報告
