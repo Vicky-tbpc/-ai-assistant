@@ -3397,17 +3397,20 @@ function appendSummaryCard(dateTitle, data) {
     }
 
     // --- 動態生成分析膠囊 (Capsules) ---
-    let capsulesHtml = '';
-    if (data.capsules && data.capsules.length > 0) {
-        data.capsules.forEach(cap => {
-            // 依據 type 決定要用哪種樣式 (capsule-best 或 capsule-worst)
-            const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
-            capsulesHtml += `
-            <div class="analysis-capsule ${capsuleClass}">
-                <span style="flex: 1;">${cap.text}</span>
-            </div>`;
-        });
-    }
+let capsulesHtml = '';
+if (data.capsules && data.capsules.length > 0) {
+    capsulesHtml += '<div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px;">';
+    data.capsules.forEach(cap => {
+        // 依據 type 決定要用哪種樣式 (capsule-best 或 capsule-worst)
+        const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
+        capsulesHtml += `
+        <div class="analysis-capsule ${capsuleClass}">
+            <span style="flex: 1;">${cap.text}</span>
+        </div>`;
+    });
+    
+    capsulesHtml += '</div>'; // 記得把外層 div 關閉
+}
 
     // --- 給這張新卡片一個獨立的 ID ---
     const cardId = `summary-card-${Date.now()}`;
