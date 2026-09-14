@@ -1,4 +1,4 @@
-// export-logs_02
+// export-logs_03
 import * as XLSX from 'xlsx';
 
 export default async function handler(req, res) {
@@ -13,13 +13,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 2. 從 Supabase 抓取特定日期的對話紀錄 (增加 eq 過濾)
-    const apiUrl = `${supabaseUrl}/rest/v1/chat_logs?record_date=eq.${date}&select=*&order=created_at.asc`;
-    
-    const sbRes = await fetch(apiUrl, {
-      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
-    });
-    const allLogs = await sbRes.json();
+    let allLogs = [];
+    let offset = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    // 2. 利用迴圈與 offset 分批抓取特定日期的所有對話紀錄
+    while (hasMore) {
+      // 在網址後面加上 limit 與 offset 參數來做分頁
+      const apiUrl = `${supabaseUrl}/rest/v1/chat_logs?record_date=eq.${date}&select=*&order=created_at.asc&limit=${limit}&offset=${offset}`;
+      
+      const sbRes = await fetch(apiUrl, {
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
+      });
+      
+      const chunk = await sbRes.json();
+
+      if (chunk && chunk.length > 0) {
+        allLogs = allLogs.concat(chunk); // 將這批資料合併進總陣列
+        offset += limit; // 下次從下一批開始抓
+        
+        // 如果這批抓到的資料少於 1000 筆，代表已經是最後一批了
+        if (chunk.length < limit) {
+          hasMore = false; 
+        }
+      } else {
+        hasMore = false; // 沒抓到資料，結束迴圈
+      }
+    }
 
     if (!allLogs || allLogs.length === 0) {
       // 如果沒資料，回傳一段簡單的 Script 讓前端彈出警告並回上一頁
