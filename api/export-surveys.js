@@ -1,4 +1,4 @@
-// export-surveys.js 02
+// export-surveys.js 03
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
@@ -14,15 +14,36 @@ export default async function handler(req, res) {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     try {
-        // 1. 抓取問卷資料，優先依照 record_date 排序，確保日期越早的在越上面
-        const { data, error } = await supabase
-            .from('user_daily_surveys')
-            .select('serial_number, record_date, subjective_score, physical_abnormality, created_at')
-            .order('record_date', { ascending: true })
-            .order('created_at', { ascending: true }); 
+        // 1. 改用分頁迴圈抓取所有資料，突破 1000 筆限制
+        let allData = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (error) throw error;
-        if (!data || data.length === 0) {
+        while (hasMore) {
+            const { data, error } = await supabase
+                .from('user_daily_surveys')
+                .select('serial_number, record_date, subjective_score, physical_abnormality, created_at')
+                .order('record_date', { ascending: true })
+                .order('created_at', { ascending: true })
+                .range(page * pageSize, (page + 1) * pageSize - 1); // 每次抓取特定區間
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allData = allData.concat(data); // 把抓到的資料合併
+                page++;
+                
+                // 如果抓到的資料少於 1000 筆，代表已經抓到最後一頁了
+                if (data.length < pageSize) {
+                    hasMore = false; 
+                }
+            } else {
+                hasMore = false;
+            }
+        }
+
+        if (!allData || allData.length === 0) {
             return res.status(404).send('找不到任何問卷資料');
         }
 
