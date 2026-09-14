@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
         // 2. 依照 serial_number 將資料分組，順便把欄位改成中文表頭
         const groupedData = {};
-        data.forEach(row => {
+        allData.forEach(row => {
             const sn = row.serial_number || '未分類';
             if (!groupedData[sn]) {
                 groupedData[sn] = [];
