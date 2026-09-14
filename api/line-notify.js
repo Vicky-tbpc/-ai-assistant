@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       let warnings = [];
       // 恢復指數小於 60 (加入 battery !== null 防呆，避免 null 被轉成 0 而誤判)
       if (battery !== null && battery < 60) {
-        warnings.push(`🤒 今天的恢復指數為 ${battery}%，屬於恢復不足，建議放慢節奏，多休息喔！`);
+        warnings.push(`🤒 今天的恢復指數為 ${battery}，屬於恢復不足，建議放慢節奏，多休息喔！`);
       }
       
       // 發炎風險異常
