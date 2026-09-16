@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096-5</title>
+    <title>Soosyn 健康夥伴 n096-6</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2311,7 +2311,7 @@ function appendSummaryCard(dateTitle, data) {
 
     // --- 靜息心率 (RHR) 區塊判斷 ---
     let rhrSectionHtml = '';
-    if (raw && raw.RHR_raw != null) {
+    if (raw && raw.RHR_raw != null && raw.RHR_raw !== 'NA' && raw.RHR_raw !== 'N/A') {
         rhrSectionHtml = `
             <!-- 靜息心率 RHR 區塊 -->
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
