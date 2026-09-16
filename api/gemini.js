@@ -1,4 +1,4 @@
-// api/gemini.js 33
+// api/gemini.js 34
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -459,9 +459,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               const rhr = rawWake.RHR_raw;
               const tag = rawWake.Daily_Tag;
               const cvd = rawWake.CVD; // 新增讀取 CVD
-              const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}`;
-              const lightDisplay = (light === null || light === undefined || light === "無資料") ? "無資料" : light;
-              const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
+              const batteryDisplay = (battery === null || battery === undefined) ? "無資料" : `${battery}`;
+              const lightDisplay = (light === "NA") 
+                ? "有效訊號不足" 
+                : ((light === null || light === undefined || light === "無資料") ? "無資料" : light);
+              const rhrDisplay = (rhr === "NA") 
+                ? "有效訊號不足" 
+                : ((rhr === null || rhr === undefined) ? "無資料" : `${rhr}bpm`);
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               let cvdDisplay = "無資料";
               if (cvd === 0) cvdDisplay = "良好";
