@@ -1,4 +1,4 @@
-// api/gemini.js 34
+// api/gemini.js 35
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -615,17 +615,63 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     
     geminiHistory.push({ role: 'user', parts: [{ text: prompt }] });
 
-    let finalRes = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: geminiHistory
-      })
-    });
-    
-    let finalResult = await finalRes.json();
-    let finalText = finalResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "哎呀，我剛剛腦袋稍微打結了 😅。請再問我一次好嗎？";
+    // 🌟 在這裡先宣告 finalText，這樣後面的超連結替換和寫入資料庫才能抓到這個變數
+    let finalText = "";
+
+    try {
+      let finalRes = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: geminiHistory
+        })
+      });
+
+      const responseText = await finalRes.text();
+      console.log("🧠【Gemini Final HTTP Status】:", finalRes.status);
+      console.log("🧠【Gemini Final OK】:", finalRes.ok);
+
+      let finalResult;
+      try {
+        finalResult = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("❌ Gemini Final JSON 解析失敗:", parseError);
+        throw new Error(`Gemini 回傳非 JSON，HTTP ${finalRes.status}`);
+      }
+
+      if (!finalRes.ok) {
+        console.error("💥【Gemini Final API 錯誤】", finalRes.status, JSON.stringify(finalResult));
+        throw new Error(`Gemini Final API ${finalRes.status}: ${finalResult?.error?.message || "Unknown error"}`);
+      }
+
+      if (finalResult?.promptFeedback?.blockReason) {
+        console.error("🛑【Gemini Prompt 被阻擋】:", finalResult.promptFeedback.blockReason);
+        throw new Error(`Gemini Prompt blocked: ${finalResult.promptFeedback.blockReason}`);
+      }
+
+      if (!finalResult?.candidates?.length) {
+        console.error("⚠️【Gemini 沒有回傳 candidates】:", JSON.stringify(finalResult));
+        throw new Error("Gemini 沒有回傳任何 candidate");
+      }
+
+      const candidate = finalResult.candidates[0];
+      console.log("🧠【Gemini Finish Reason】:", candidate.finishReason);
+
+      finalText = candidate.content?.parts?.map(p => p.text || "").join("").trim();
+
+      if (!finalText) {
+        console.error("⚠️【Gemini Candidate 沒有文字】:", JSON.stringify(candidate));
+        throw new Error(`Gemini candidate 沒有文字，finishReason=${candidate.finishReason}`);
+      }
+
+    } catch (error) {
+      console.error("❌【Gemini Final 最終階段失敗】:", error);
+      // 如果 3 階段 Gemini 失敗，直接回傳忙碌訊息，結束執行
+      return res.status(500).json({
+        text: "目前 AI 回覆服務有點忙碌，請稍後再試一次。"
+      });
+    }
 
     // ==========================================
     // 🚀 全動態標籤真實網址還原區塊 (不論未來新增多少連結，行數永遠固定)
