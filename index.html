@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n096-6</title>
+    <title>Soosyn 健康夥伴 n096-7</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2350,7 +2350,7 @@ function appendSummaryCard(dateTitle, data) {
 
     // --- 新增：睡眠心血管負荷 區塊 ---
     let riskSectionHtml = '';
-    if (raw && raw.CVD != null) {
+    if (raw && raw.CVD != null && raw.CVD !== 'NA' && raw.CVD !== 'N/A') {
         const riskVal = raw.CVD;
         let riskText = '';
         let bar1 = '#e1e1e1', bar2 = '#e1e1e1', bar3 = '#e1e1e1', bar4 = '#e1e1e1';
@@ -2455,7 +2455,7 @@ function appendSummaryCard(dateTitle, data) {
 
         // --- 新增：本次綜合分析 區塊準備 ---
         let compAnalysisHtml = '';
-        if (raw && raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null) {
+        if (raw && raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null && raw.PPI_count !== 'NA' && raw.HBI_count !== 'NA' && raw.CBP_count !== 'NA') {
             
             // 產生前三項橫線 UI 的函數
             const getCompBarHtml = (title, val) => {
