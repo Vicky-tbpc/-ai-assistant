@@ -3148,7 +3148,7 @@ function appendSummaryCard(dateTitle, data) {
 
     // --- 靜息心率 (RHR) 區塊判斷 ---
     let rhrSectionHtml = '';
-    if (raw && raw.RHR_raw != null) {
+    if (raw && raw.RHR_raw != null && raw.RHR_raw !== 'NA' && raw.RHR_raw !== 'N/A') {
         rhrSectionHtml = `
             <!-- 靜息心率 RHR 區塊 -->
             <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
@@ -3187,7 +3187,7 @@ function appendSummaryCard(dateTitle, data) {
 
     // --- 新增：睡眠心血管負荷 區塊 ---
     let riskSectionHtml = '';
-    if (raw && raw.CVD != null) {
+    if (raw && raw.CVD != null && raw.CVD !== 'NA' && raw.CVD !== 'N/A') {
         const riskVal = raw.CVD;
         let riskText = '';
         let bar1 = '#e1e1e1', bar2 = '#e1e1e1', bar3 = '#e1e1e1', bar4 = '#e1e1e1';
@@ -3292,7 +3292,7 @@ function appendSummaryCard(dateTitle, data) {
 
         // --- 新增：本次綜合分析 區塊準備 ---
         let compAnalysisHtml = '';
-        if (raw && raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null) {
+        if (raw && raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null && raw.PPI_count !== 'NA' && raw.HBI_count !== 'NA' && raw.CBP_count !== 'NA') {
             
             // 產生前三項橫線 UI 的函數
             const getCompBarHtml = (title, val) => {
