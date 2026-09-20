@@ -570,7 +570,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         }
       }
     }
-// 2-4. 抓取個人專屬健康建議 (讀取 Excel 資料)
+    // 2-4. 抓取個人專屬健康建議 (讀取 Excel 資料 + Supabase 語氣規則)
     let recommendationContext = "目前沒有相關的健康建議。";
     if (intent.need_recommendation && intent.rec_date) {
       const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -581,18 +581,58 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         if (recRes.ok) {
           const recData = await recRes.json();
           if (recData.found) {
+            
+            // ==========================================
+            // 🌟 拿 exerciseLevel 去 Supabase 查專屬語意與安全提醒
+            // ==========================================
+            let aiSemantic = "";
+            let safetyReminder = "";
+            
+            if (recData.exerciseLevel) {
+              try {
+                // 依據 exercise_level 精準查詢
+                const rulesRes = await fetch(`${supabaseUrl}/rest/v1/exercise_level_rules?select=ai_semantic,safety_reminder&exercise_level=eq.${encodeURIComponent(recData.exerciseLevel)}`, {
+                  headers: { 
+                    'apikey': supabaseKey, 
+                    'Authorization': `Bearer ${supabaseKey}` 
+                  }
+                });
+                
+                if (rulesRes.ok) {
+                  const rulesData = await rulesRes.json();
+                  if (rulesData && rulesData.length > 0) {
+                    aiSemantic = rulesData[0].ai_semantic || "";
+                    safetyReminder = rulesData[0].safety_reminder || "";
+                  }
+                }
+              } catch (err) {
+                console.error("💥 查詢 Supabase exercise_level_rules 失敗:", err);
+              }
+            }
+
+            // ==========================================
+            // 🌟 組裝最終要給 AI 看的 Context
+            // ==========================================
             recommendationContext = `【${intent.rec_date} 個人專屬健康建議】\n` +
               `- 優先調整項目: ${recData.priorityItem}\n` +
               `- 調整行動建議: ${recData.actionText}\n` +
               `- 運動強度建議 (Level): ${recData.exerciseLevel}\n` +
               `- 日常活動建議: ${recData.dailyAction}\n` +
-              `- 具體運動建議: ${recData.exerciseRec}`;
+              `- 具體運動建議: ${recData.exerciseRec}\n`;
+
+            // 如果有從資料庫撈到語氣設定或提醒，就變成強制指令塞給 AI
+            if (aiSemantic || safetyReminder) {
+              recommendationContext += `\n【🎯 AI 專屬對話指引 (請嚴格遵守)】\n`;
+              if (aiSemantic) recommendationContext += `👉 對話語氣與切入點設定: ${aiSemantic}\n`;
+              if (safetyReminder) recommendationContext += `👉 必須包含的安全提醒: ${safetyReminder}\n`;
+            }
+
           } else {
             recommendationContext = `目前系統中找不到 ${intent.rec_date} 的專屬健康建議喔。`;
           }
         }
       } catch (e) {
-        console.error("💥 讀取健康建議失敗:", e);
+        console.error("💥 讀取健康建議與規則失敗:", e);
       }
     }
 
@@ -635,7 +675,9 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
 7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。
-8. 【解讀專屬建議】(新增)：若有提供【💡 個人專屬健康建議】，請將「優先調整項目」、「日常活動」與「運動建議」等生硬的資料，轉化為口語化、像朋友般關心的語氣向對方解釋，讓他知道今天具體該怎麼做。`;
+8. 【解讀專屬建議與情境扮演】(新增)：若有提供【💡 個人專屬健康建議】，請將生硬的資料轉化為口語化的解釋。
+   - ⚠️【極度重要】：若建議中包含【🎯 AI 專屬對話指引】，你必須完美扮演該指引中「👉 對話語氣與切入點設定」所要求的角色與語氣來解釋建議！
+   - ⚠️【安全第一】：同時，請務必用朋友般關心的口吻，自然地將「👉 必須包含的安全提醒」融入你的回覆中。`;
 
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
