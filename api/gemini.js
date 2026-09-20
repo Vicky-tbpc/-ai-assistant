@@ -697,6 +697,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ text: "大腦卡住了，再試試？ 😅" });
+    res.status(500).json({ text: "AI 回覆服務目前有點忙碌，請稍後再試一次。" });
   }
 }
