@@ -1,4 +1,4 @@
-// api/gemini.js 33
+// api/gemini.js 36
 import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req, res) {
@@ -153,6 +153,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    🛑 【意圖區隔與攔截】：
    - 若使用者詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告【計算進度或數量】的問題，嚴禁開啟報告，請務必將 need_pdf_report 設為 false！
    - 若使用者要求「昨晚的睡眠分析」、「幫我分析睡眠」，代表他需要你用文字【解讀數據】，而不是單純打開檔案！請務必將 need_pdf_report 設為 false，並確保 need_data 為 true！
+6. 【個人健康建議】(新增)：當使用者問到「我今天該做什麼運動」、「如何提升恢復指數」、「給我今天的健康建議」或要求「解讀建議」時，請將 need_recommendation 設為 true，並判斷需要哪一天的建議填入 rec_date (YYYY-MM-DD，預設為 ${local_date})。
 
 💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
@@ -162,7 +163,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 3. 上週/最近一週：${lastWeekStartStr} 到 ${yesterdayStr}
 
 請根據上述規則，輸出完全符合以下格式的 JSON：
-{"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string", "need_pdf_report": boolean, "pdf_date": "YYYY-MM-DD"}`;
+{"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string", "need_pdf_report": boolean, "pdf_date": "YYYY-MM-DD", "need_recommendation": boolean, "rec_date": "YYYY-MM-DD"}`;
 
     let intentRes = await fetch(geminiUrl, {
       method: "POST",
@@ -177,7 +178,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     });
 
     let intentData = await intentRes.json();
-    let intent = { need_data: false, need_external: false, need_knowledge: false };
+    let intent = { need_data: false, need_external: false, need_knowledge: false, need_recommendation: false };
     try {
       let intentText = intentData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       intentText = intentText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -459,9 +460,13 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               const rhr = rawWake.RHR_raw;
               const tag = rawWake.Daily_Tag;
               const cvd = rawWake.CVD; // 新增讀取 CVD
-              const batteryDisplay = (battery === null || battery === undefined) ? "資料不足" : `${battery}%`;
-              const lightDisplay = (light === null || light === undefined || light === "無資料") ? "無資料" : light;
-              const rhrDisplay = (rhr === null || rhr === undefined) ? "資料不足" : `${rhr}bpm`;
+              const batteryDisplay = (battery === null || battery === undefined) ? "無資料" : `${battery}`;
+              const lightDisplay = (light === "NA") 
+                ? "有效訊號不足" 
+                : ((light === null || light === undefined || light === "無資料") ? "無資料" : light);
+              const rhrDisplay = (rhr === "NA") 
+                ? "有效訊號不足" 
+                : ((rhr === null || rhr === undefined) ? "無資料" : `${rhr}bpm`);
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               let cvdDisplay = "無資料";
               if (cvd === 0) cvdDisplay = "良好";
@@ -565,6 +570,31 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         }
       }
     }
+// 2-4. 抓取個人專屬健康建議 (讀取 Excel 資料)
+    let recommendationContext = "目前沒有相關的健康建議。";
+    if (intent.need_recommendation && intent.rec_date) {
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const recApiUrl = `${protocol}://${req.headers['host']}/api/health?action=get_recommendation&serial=${serial_number}&date=${intent.rec_date}`;
+      
+      try {
+        const recRes = await fetch(recApiUrl);
+        if (recRes.ok) {
+          const recData = await recRes.json();
+          if (recData.found) {
+            recommendationContext = `【${intent.rec_date} 個人專屬健康建議】\n` +
+              `- 優先調整項目: ${recData.priorityItem}\n` +
+              `- 調整行動建議: ${recData.actionText}\n` +
+              `- 運動強度建議 (Level): ${recData.exerciseLevel}\n` +
+              `- 日常活動建議: ${recData.dailyAction}\n` +
+              `- 具體運動建議: ${recData.exerciseRec}`;
+          } else {
+            recommendationContext = `目前系統中找不到 ${intent.rec_date} 的專屬健康建議喔。`;
+          }
+        }
+      } catch (e) {
+        console.error("💥 讀取健康建議失敗:", e);
+      }
+    }
 
     // ==========================================
     // 第三階段：Gemini 2.5 Flash 超級大腦最終整合
@@ -589,6 +619,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    ${externalContext}
 4. 🔄 資料上傳狀態：
    ${uploadStatusContext}
+5. 💡 個人專屬健康建議 (從 Excel 讀取)：
+   ${recommendationContext}
 
 【對話與邏輯規則】
 1. 嚴禁使用敬稱，請一律用「你」稱呼對方（${nickname}）。語氣要像平輩朋友一樣自然，可加上適合的 emoji。
@@ -602,7 +634,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
-7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
+7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。
+8. 【解讀專屬建議】(新增)：若有提供【💡 個人專屬健康建議】，請將「優先調整項目」、「日常活動」與「運動建議」等生硬的資料，轉化為口語化、像朋友般關心的語氣向對方解釋，讓他知道今天具體該怎麼做。`;
 
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
@@ -611,17 +644,63 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     
     geminiHistory.push({ role: 'user', parts: [{ text: prompt }] });
 
-    let finalRes = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: geminiHistory
-      })
-    });
-    
-    let finalResult = await finalRes.json();
-    let finalText = finalResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "哎呀，我剛剛腦袋稍微打結了 😅。請再問我一次好嗎？";
+    // 🌟 在這裡先宣告 finalText，這樣後面的超連結替換和寫入資料庫才能抓到這個變數
+    let finalText = "";
+
+    try {
+      let finalRes = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: geminiHistory
+        })
+      });
+
+      const responseText = await finalRes.text();
+      console.log("🧠【Gemini Final HTTP Status】:", finalRes.status);
+      console.log("🧠【Gemini Final OK】:", finalRes.ok);
+
+      let finalResult;
+      try {
+        finalResult = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("❌ Gemini Final JSON 解析失敗:", parseError);
+        throw new Error(`Gemini 回傳非 JSON，HTTP ${finalRes.status}`);
+      }
+
+      if (!finalRes.ok) {
+        console.error("💥【Gemini Final API 錯誤】", finalRes.status, JSON.stringify(finalResult));
+        throw new Error(`Gemini Final API ${finalRes.status}: ${finalResult?.error?.message || "Unknown error"}`);
+      }
+
+      if (finalResult?.promptFeedback?.blockReason) {
+        console.error("🛑【Gemini Prompt 被阻擋】:", finalResult.promptFeedback.blockReason);
+        throw new Error(`Gemini Prompt blocked: ${finalResult.promptFeedback.blockReason}`);
+      }
+
+      if (!finalResult?.candidates?.length) {
+        console.error("⚠️【Gemini 沒有回傳 candidates】:", JSON.stringify(finalResult));
+        throw new Error("Gemini 沒有回傳任何 candidate");
+      }
+
+      const candidate = finalResult.candidates[0];
+      console.log("🧠【Gemini Finish Reason】:", candidate.finishReason);
+
+      finalText = candidate.content?.parts?.map(p => p.text || "").join("").trim();
+
+      if (!finalText) {
+        console.error("⚠️【Gemini Candidate 沒有文字】:", JSON.stringify(candidate));
+        throw new Error(`Gemini candidate 沒有文字，finishReason=${candidate.finishReason}`);
+      }
+
+    } catch (error) {
+      console.error("❌【Gemini Final 最終階段失敗】:", error);
+      // 如果 3 階段 Gemini 失敗，直接回傳忙碌訊息，結束執行
+      return res.status(500).json({
+        text: "目前 AI 回覆服務有點忙碌，請稍後再試一次。"
+      });
+    }
 
     // ==========================================
     // 🚀 全動態標籤真實網址還原區塊 (不論未來新增多少連結，行數永遠固定)
@@ -647,6 +726,6 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ text: "大腦卡住了，再試試？ 😅" });
+    res.status(500).json({ text: "AI 回覆服務目前有點忙碌，請稍後再試一次。" });
   }
 }
