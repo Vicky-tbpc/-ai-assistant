@@ -1,6 +1,7 @@
 // api/gemini.js 36
 import { waitUntil } from '@vercel/functions';
 
+export const maxDuration = 30;
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -288,7 +289,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       for (const currentUrl of anythingLlmUrls) {
         if (success) break;
 
-        const MAX_RETRIES = 1; // 每個通道嘗試次數縮減，避免整個 API 卡死
+        const MAX_RETRIES = 0; // 每個通道嘗試次數縮減，避免整個 API 卡死
         let attempt = 0;
 
         while (attempt <= MAX_RETRIES && !success) {
@@ -298,7 +299,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
             // ⏱️ 加上 Timeout 斷路器 (10秒)，避免死通道造成 Vercel 逾時
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
 
             const ragRes = await fetch(`${currentUrl}/api/v1/workspace/${anythingLlmSlug}/chat`, {
               method: "POST",
