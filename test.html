@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n097-7</title>
+    <title>Soosyn 健康夥伴 n097-8</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -3397,20 +3397,27 @@ function appendSummaryCard(dateTitle, data) {
     }
 
     // --- 動態生成分析膠囊 (Capsules) ---
-let capsulesHtml = '';
-if (data.capsules && data.capsules.length > 0) {
-    capsulesHtml += '<div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px;">';
-    data.capsules.forEach(cap => {
-        // 依據 type 決定要用哪種樣式 (capsule-best 或 capsule-worst)
+function renderCapsulesByType(capsules, type) {
+    if (!capsules || capsules.length === 0) return '';
+    
+    const targetCapsules = capsules.filter(cap => cap.type === type);
+    if (targetCapsules.length === 0) return '';
+
+    let html = '<div style="margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;">';
+    targetCapsules.forEach(cap => {
         const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
-        capsulesHtml += `
+        html += `
         <div class="analysis-capsule ${capsuleClass}">
             <span style="flex: 1;">${cap.text}</span>
         </div>`;
     });
-    
-    capsulesHtml += '</div>'; // 記得把外層 div 關閉
+    html += '</div>';
+    return html;
 }
+
+// 產出各自的 HTML 變數
+let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery');
+let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best');
 
     // --- 給這張新卡片一個獨立的 ID ---
     const cardId = `summary-card-${Date.now()}`;
@@ -3461,7 +3468,8 @@ if (data.capsules && data.capsules.length > 0) {
             </div>
             ${alertHtml}
             <!-- 新版的動態分析與報告 -->
-            ${capsulesHtml}
+            ${recoveryCapsulesHtml}
+            ${bestCapsulesHtml}
             <!-- 四項穩定度區塊 (新增睡眠區塊展開功能) -->
             ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6", sleepExtraHtml)}
             ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
@@ -3889,7 +3897,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini_02', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -4091,7 +4099,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini_02', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
