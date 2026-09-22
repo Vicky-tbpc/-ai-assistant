@@ -3397,13 +3397,14 @@ function appendSummaryCard(dateTitle, data) {
     }
 
     // --- 動態生成分析膠囊 (Capsules) ---
-function renderCapsulesByType(capsules, type) {
+function renderCapsulesByType(capsules, type, marginBottom = '8px') { // 預設改為 8px 縮小間距
     if (!capsules || capsules.length === 0) return '';
     
     const targetCapsules = capsules.filter(cap => cap.type === type);
     if (targetCapsules.length === 0) return '';
 
-    let html = '<div style="margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;">';
+    // 使用傳入的 marginBottom
+    let html = `<div style="margin-bottom: ${marginBottom}; display: flex; flex-direction: column; gap: 8px;">`;
     targetCapsules.forEach(cap => {
         const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
         html += `
@@ -3415,9 +3416,9 @@ function renderCapsulesByType(capsules, type) {
     return html;
 }
 
-// 產出各自的 HTML 變數
-let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery');
-let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best');
+// 產出 HTML：中間的 recoveryCapsulesHtml 間距縮小為 8px，最下方的 bestCapsulesHtml 保持 20px
+let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '8px');
+let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '20px');
 
     // --- 給這張新卡片一個獨立的 ID ---
     const cardId = `summary-card-${Date.now()}`;
