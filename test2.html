@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n097-8</title>
+    <title>Soosyn 健康夥伴 n098</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2958,7 +2958,23 @@ const formatTimeStr = (v) => {
 };
 
 // --- 主畫面卡片產生 ---
-function appendSummaryCard(dateTitle, data) {
+// 全域狀態管理，用來存放每張卡片的區塊資料與編輯狀態
+window.cardStates = window.cardStates || {};
+
+// 定義各區塊的名稱（給新增選單顯示用）
+const BLOCK_NAMES = {
+    block4: '恢復分析膠囊',
+    block5: '最佳分析膠囊',
+    block6: '睡眠穩定度',
+    block7: '心率變異(HRV)穩定度',
+    block8: '脈搏穩定度',
+    block9: '血氧穩定度',
+    block10: '靜息心率',
+    block11: '睡眠心血管負荷',
+    block12: '開啟睡眠報告按鈕'
+};
+
+async function appendSummaryCard(dateTitle, data, serialNumber) {
     const raw = data.raw_json;
     const history7 = data.history7 || [data];
     
@@ -3397,13 +3413,14 @@ function appendSummaryCard(dateTitle, data) {
     }
 
     // --- 動態生成分析膠囊 (Capsules) ---
-function renderCapsulesByType(capsules, type) {
+function renderCapsulesByType(capsules, type, marginBottom = '8px') { // 預設改為 8px 縮小間距
     if (!capsules || capsules.length === 0) return '';
     
     const targetCapsules = capsules.filter(cap => cap.type === type);
     if (targetCapsules.length === 0) return '';
 
-    let html = '<div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px;">';
+    // 使用傳入的 marginBottom
+    let html = `<div style="margin-bottom: ${marginBottom}; display: flex; flex-direction: column; gap: 8px;">`;
     targetCapsules.forEach(cap => {
         const capsuleClass = cap.type === 'worst' ? 'capsule-worst' : 'capsule-best';
         html += `
@@ -3415,80 +3432,239 @@ function renderCapsulesByType(capsules, type) {
     return html;
 }
 
-// 產出各自的 HTML 變數
-let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery');
-let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best');
+// 產出 HTML：中間的 recoveryCapsulesHtml 間距縮小為 8px，最下方的 bestCapsulesHtml 保持 20px
+let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '8px');
+let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '20px');
 
     // --- 給這張新卡片一個獨立的 ID ---
     const cardId = `summary-card-${Date.now()}`;
 
+    // 取得使用者個人化排版 (呼叫我們寫好的 Vercel API)
+    let currentLayout = ['block4', 'block5', 'block6', 'block7', 'block8', 'block9', 'block10', 'block11', 'block12'];
+    try {
+        const res = await fetch(`/api/layout?serial_number=${serialNumber}`);
+        if (res.ok) {
+            const result = await res.json();
+            if (result.layout) currentLayout = result.layout;
+        }
+    } catch (e) {
+        console.error('無法讀取排版設定', e);
+    }
+
+    // 將所有可編輯區塊存入全域狀態，方便後續重新渲染
+    window.cardStates[cardId] = {
+        serialNumber: serialNumber,
+        isEditMode: false,
+        layout: currentLayout,
+        showAddMenu: false, // 控制加號按鈕展開
+        blocks: {
+            block4: recoveryCapsulesHtml,
+            block5: bestCapsulesHtml,
+            block6: renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6", sleepExtraHtml),
+            block7: renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml),
+            block8: renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6", pulseExtraHtml),
+            block9: renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml),
+            block10: rhrSectionHtml,
+            block11: riskSectionHtml,
+            block12: `<div style="margin: 20px 0 5px 0;"><button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">📄 開啟睡眠報告</button></div>`
+        }
+    };
+
+    // 固定的 1~3 區塊
+    const fixedHtml = `
+        <!-- 右上角的編輯按鈕 -->
+        <div style="position: absolute; top: 15px; right: 15px; cursor: pointer; z-index: 20;" onclick="toggleEditMode('${cardId}')">
+            <img id="edit-icon-${cardId}" src="images/edit_icon.svg" style="width: 24px; height: 24px;" alt="編輯版面">
+        </div>
+
+        <!-- 區塊1: 標題列 -->
+        <div style="display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px; padding-right: 30px;">
+            <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
+            <span style="font-size: 1rem; color: #888; display: flex; align-items: center; gap: 6px; align-self: flex-end;">
+                發炎風險：<span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
+            </span>
+        </div>
+
+        <!-- 區塊2: 恢復指數 -->
+        <div style="margin-bottom: 25px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
+                    <img src="images/info_icon.svg" alt="說明" style="width: 18px; height: 18px; cursor: pointer;" 
+                         onclick="const info = document.getElementById('battery-info-${data.date}'); info.style.display = info.style.display === 'none' ? 'block' : 'none'; event.stopPropagation();">
+                </div>
+                ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
+            </div>
+            
+            <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
+                <span style="font-weight: bold; color: #333;">恢復指數</span>就像身體健康的「晴雨表」...
+            </div>
+
+            <div style="text-align: center; margin: 8px 0 8px 0; line-height: 1;">
+                <span style="font-size: 6rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
+            </div>
+            ${batteryStateHtml}
+            <div class="progress-bg" style="height: 10px; background: #e1e1e1; border-radius: 5px; margin-bottom: 8px;">
+                <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
+            </div>
+            ${pctHtml}
+            <div style="text-align: center; margin-top: 15px;">
+                <button onclick="startTrendFlow('battery', '📈 恢復指數')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
+            </div>
+        </div>
+
+        <!-- 區塊3: 健康提醒 -->
+        ${alertHtml}
+    `;
+
+    // 組合整張卡片
     const cardHtml = `
     <div class="msg-row ai-row" id="${cardId}">
-        <div class="summary-card">
-            
-            <div style="display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #f5f5f5; padding-bottom: 10px; margin-bottom: 15px;">
-                <span style="font-size: 1.1rem; color: #888; font-weight: bold;">📅 ${dateTitle} 健康摘要</span>
-                <span style="font-size: 1rem; color: #888; display: flex; align-items: center; gap: 6px; align-self: flex-end;">
-                    發炎風險：<span class="status-dot" style="background-color: ${lightDotColor}; margin: 0; width: 12px; height: 12px;"></span> ${statusLight}
-                </span>
-            </div>
-
-            <div style="margin-bottom: 25px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <!-- 將標題與 info 按鈕包在一起 -->
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-weight: bold; font-size: 1.1rem; color: #333;">恢復指數</span>
-                        <img src="images/info_icon.svg" alt="說明" style="width: 18px; height: 18px; cursor: pointer;" 
-                             onclick="const info = document.getElementById('battery-info-${data.date}'); info.style.display = info.style.display === 'none' ? 'block' : 'none'; event.stopPropagation();">
-                    </div>
-                    ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
-                </div>
-                
-                <!-- 新增：隱藏的說明區塊 -->
-                <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
-                    <span style="font-weight: bold; color: #333;">恢復指數</span>就像身體健康的「晴雨表」，依據睡眠品質評估睡眠期間的身體修復程度，反映身體恢復能力。<br><br>
-                    <span style="font-weight: bold; color: #333;">發炎風險</span>就像身體健康的「天氣警報」，依據生理指標變化評估身體可能處於發炎或其他生理壓力狀態的風險，並以綠、黃、紅燈呈現。<br><br>
-                    當晴雨表長期顯示不佳時，代表身體修復能力下降；若同時出現黃色或紅色警報，表示身體可能正承受較高的生理壓力，建議及早調整作息、增加休息並持續觀察身體狀況。
-                </div>
-
-                <div style="text-align: center; margin: 8px 0 8px 0; line-height: 1;">
-                    <span style="font-size: 6rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
-                </div>
-
-                <!-- 這是我們新加入的恢復區間區塊 -->
-                ${batteryStateHtml}
-
-                <div class="progress-bg" style="height: 10px; background: #e1e1e1; border-radius: 5px; margin-bottom: 8px;">
-                    <div class="progress-fill" style="width: ${data.battery}%; height: 100%; background: ${batteryColor}; border-radius: 5px;"></div>
-                </div>
-                ${pctHtml}
-                <div style="text-align: center; margin-top: 15px;">
-                    <button onclick="startTrendFlow('battery', '📈 恢復指數')" style="background-color: #edeae4; color: #5a5a5a; border: none; border-radius: 20px; padding: 8px 24px; font-size: 14px; cursor: pointer; font-weight: bold;">詳細圖表</button>
-                </div>
-            </div>
-            ${alertHtml}
-            <!-- 新版的動態分析與報告 -->
-            ${recoveryCapsulesHtml}
-            ${bestCapsulesHtml}
-            <!-- 四項穩定度區塊 (新增睡眠區塊展開功能) -->
-            ${renderBlock("睡眠穩定度", "sleep_stability.svg", sleepVal, getDiffText(sleepVal, avgSleep), getColor(sleepVal), "#faf9f6", sleepExtraHtml)}
-            ${renderBlock("心率變異 (HRV) 穩定度", "hrv_stability.svg", hrvVal, getDiffText(hrvVal, avgHrv), getColor(hrvVal), "#faf9f6", hrvExtraHtml)}
-            ${renderBlock("脈搏穩定度", "pulse_stability.svg", pulseVal, getDiffText(pulseVal, avgPulse), getColor(pulseVal), "#faf9f6", pulseExtraHtml)}
-            ${renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml)}
-
-            <!-- 替換為動態條件判斷的靜息心率 RHR 區塊 -->
-            ${rhrSectionHtml}
-            <!-- 將睡眠心血管負荷區塊直接安插在 RHR 下方 -->
-            ${riskSectionHtml}
-
-            <div style="margin: 20px 0 5px 0;">
-                <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">
-                    📄 開啟睡眠報告
-                </button>
-            </div>
-            
+        <div class="summary-card" style="position: relative;">
+            ${fixedHtml}
+            <!-- 這裡用來動態注入 4~12 區塊 -->
+            <div id="dynamic-blocks-${cardId}"></div>
         </div>
     </div>`;
+
+    document.getElementById('chat-history').innerHTML += cardHtml;
+
+    // 初始渲染動態區塊
+    renderDynamicBlocks(cardId);
+
+    setTimeout(() => {
+        const newCard = document.getElementById(cardId);
+        if (newCard) newCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+}
+
+// 渲染可編輯的區塊
+window.renderDynamicBlocks = function(cardId) {
+    const state = window.cardStates[cardId];
+    const container = document.getElementById(`dynamic-blocks-${cardId}`);
+    if (!container) return;
+
+    let html = '';
+    const visibleCount = state.layout.length;
+
+    state.layout.forEach((blockId, index) => {
+        const rawContent = state.blocks[blockId];
+        
+        if (state.isEditMode) {
+            // 編輯模式：加上外框與操作按鈕
+            html += `
+            <div style="position: relative; border: 2px dashed #ccc; padding: 10px; margin-bottom: 12px; border-radius: 8px; background: #fafafa;">
+                <!-- 右上角叉叉按鈕 -->
+                <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', ${index})" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                
+                <!-- 中間上下箭頭按鈕 -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 20px; z-index: 10; background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                    <img src="images/up_arrow.svg" onclick="moveBlock('${cardId}', ${index}, -1)" style="width: 24px; height: 24px; cursor: pointer; opacity: ${index === 0 ? 0.3 : 1}; pointer-events: ${index === 0 ? 'none' : 'auto'};">
+                    <img src="images/down_arrow.svg" onclick="moveBlock('${cardId}', ${index}, 1)" style="width: 24px; height: 24px; cursor: pointer; opacity: ${index === visibleCount - 1 ? 0.3 : 1}; pointer-events: ${index === visibleCount - 1 ? 'none' : 'auto'};">
+                </div>
+
+                <!-- 內容加上半透明遮罩 -->
+                <div style="opacity: 0.4; pointer-events: none; min-height: 50px;">
+                    ${rawContent || `<div style="text-align: center; color: #888; line-height: 50px;">(${BLOCK_NAMES[blockId]}：本次無資料)</div>`}
+                </div>
+            </div>`;
+        } else {
+            // 檢視模式：直接顯示內容
+            html += rawContent;
+        }
+    });
+
+    // 判斷是否需要顯示加號按鈕 (少於 9 個區塊，代表有隱藏的區塊)
+    if (state.isEditMode && visibleCount < 9) {
+        if (!state.showAddMenu) {
+            html += `
+            <div style="text-align: center; margin-top: 20px;">
+                <img src="images/add_icon.svg" onclick="toggleAddMenu('${cardId}')" style="width: 40px; height: 40px; cursor: pointer;">
+            </div>`;
+        } else {
+            // 列出所有被隱藏的區塊讓使用者加回來
+            const allBlocks = Object.keys(BLOCK_NAMES);
+            const hiddenBlocks = allBlocks.filter(id => !state.layout.includes(id));
+            
+            html += `<div style="margin-top: 15px; padding: 15px; background: #f0f4f8; border-radius: 12px; text-align: center;">
+                <div style="font-size: 14px; font-weight: bold; color: #555; margin-bottom: 10px;">請選擇要加回的區塊：</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">`;
+            
+            hiddenBlocks.forEach(id => {
+                html += `<button onclick="addBlock('${cardId}', '${id}')" style="background: white; border: 1px solid #ccc; padding: 6px 12px; border-radius: 20px; font-size: 13px; cursor: pointer; color: #333;">+ ${BLOCK_NAMES[id]}</button>`;
+            });
+
+            html += `</div>
+                <div style="margin-top: 10px; color: #888; font-size: 12px; cursor: pointer;" onclick="toggleAddMenu('${cardId}')">▲ 收合</div>
+            </div>`;
+        }
+    }
+
+    container.innerHTML = html;
+};
+
+// 切換編輯模式與儲存
+window.toggleEditMode = async function(cardId) {
+    const state = window.cardStates[cardId];
+    state.isEditMode = !state.isEditMode;
+    state.showAddMenu = false; // 關閉新增選單
+    
+    // 切換圖示
+    const editIcon = document.getElementById(`edit-icon-${cardId}`);
+    if (state.isEditMode) {
+        editIcon.src = 'images/check_icon.svg'; // 變成勾勾代表儲存
+    } else {
+        editIcon.src = 'images/edit_icon.svg';
+        
+        // 離開編輯模式時，呼叫 API 把新排版存到 Supabase
+        try {
+            await fetch('/api/layout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serial_number: state.serialNumber,
+                    layout: state.layout
+                })
+            });
+            console.log('排版已儲存');
+        } catch (e) {
+            console.error('儲存排版失敗', e);
+        }
+    }
+
+    renderDynamicBlocks(cardId);
+};
+
+// 刪除區塊
+window.removeBlock = function(cardId, index) {
+    window.cardStates[cardId].layout.splice(index, 1);
+    renderDynamicBlocks(cardId);
+};
+
+// 移動區塊 (direction: -1 向上, 1 向下)
+window.moveBlock = function(cardId, index, direction) {
+    const layout = window.cardStates[cardId].layout;
+    const targetIndex = index + direction;
+    
+    if (targetIndex >= 0 && targetIndex < layout.length) {
+        // 交換陣列元素位置
+        [layout[index], layout[targetIndex]] = [layout[targetIndex], layout[index]];
+        renderDynamicBlocks(cardId);
+    }
+};
+
+// 切換新增區塊的選單
+window.toggleAddMenu = function(cardId) {
+    window.cardStates[cardId].showAddMenu = !window.cardStates[cardId].showAddMenu;
+    renderDynamicBlocks(cardId);
+};
+
+// 加回區塊 (加到最下面)
+window.addBlock = function(cardId, blockId) {
+    window.cardStates[cardId].layout.push(blockId);
+    window.cardStates[cardId].showAddMenu = false;
+    renderDynamicBlocks(cardId);
+};
     
     document.getElementById('chat-history').innerHTML += cardHtml;
     
