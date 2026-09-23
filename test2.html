@@ -2974,7 +2974,7 @@ const BLOCK_NAMES = {
     block12: '開啟睡眠報告按鈕'
 };
 
-async function appendSummaryCard(dateTitle, data, serialNumber) {
+function appendSummaryCard(dateTitle, data, serialNumber) {
     const raw = data.raw_json;
     const history7 = data.history7 || [data];
     
