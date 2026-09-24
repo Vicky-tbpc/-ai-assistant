@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n098-1</title>
+    <title>Soosyn 健康夥伴 n098-2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2089,7 +2089,7 @@ async function showSummaryFlow(isFirstTime = false) {
     const todayStr = getLocalDateString();
     const data = await fetchSummaryData(todayStr);
     if (data) {
-        appendSummaryCard(data);
+        await appendSummaryCard(todayStr, data, currentSerial);
         // 無論是否為第一次登入，只要有當天數據就顯示隨機建議
         if (data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
@@ -2751,7 +2751,7 @@ async function processSummarySearch(d, displayDate) {
     if (data) {
         // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
         // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
-        appendSummaryCard(finalDisplayDate, data, currentSerial)
+        await appendSummaryCard(finalDisplayDate, data, currentSerial)
         
         // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
         const todayStr = getLocalDateString();
@@ -3589,8 +3589,10 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
             </div>
             
             <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
-                <span style="font-weight: bold; color: #333;">恢復指數</span>就像身體健康的「晴雨表」...
-            </div>
+                <span style="font-weight: bold; color: #333;">恢復指數</span>就像身體健康的「晴雨表」，依據睡眠品質評估睡眠期間的身體修復程度，反映身體恢復能力。<br><br>
+                    <span style="font-weight: bold; color: #333;">發炎風險</span>就像身體健康的「天氣警報」，依據生理指標變化評估身體可能處於發炎或其他生理壓力狀態的風險，並以綠、黃、紅燈呈現。<br><br>
+                    當晴雨表長期顯示不佳時，代表身體修復能力下降；若同時出現黃色或紅色警報，表示身體可能正承受較高的生理壓力，建議及早調整作息、增加休息並持續觀察身體狀況。
+                </div>
 
             <div style="text-align: center; margin: 8px 0 8px 0; line-height: 1;">
                 <span style="font-size: 6rem; font-weight: bold; color: ${batteryColor};">${batteryVal}</span>
@@ -3663,15 +3665,26 @@ async function handleAbnormalitySelection(choice) {
     document.getElementById('abnormality-options-container')?.remove();
     
     if (choice === '其他') {
-        isOtherAbnormality = true; // 標記接下來的輸入屬於其他
-        isWaitingForAbnormality = true; // 開啟等待輸入狀態
+        isOtherAbnormality = true; 
+        isWaitingForAbnormality = true; 
         await appendAiMessage("請直接在下方輸入你的症狀或不適。");
     } else {
-        // 直接選擇預設選項
         appendUserMessage(choice);
+
+        const tempTypingId = 'typing-loading-' + Date.now();
+        const tempLoadingHtml = `
+            <div class="msg-row ai-row" id="${tempTypingId}">
+                <div class="ai-bubble">
+                    <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                </div>
+            </div>`;
+        document.getElementById('chat-history').insertAdjacentHTML('beforeend', tempLoadingHtml);
+        scrollToBottom();
         await handleAbnormalityInput(choice);
+        document.getElementById(tempTypingId)?.remove();
+        appendUserMessage(choice);
     }
-}
+
 
 async function handleStatusSelection(text, score) {
     document.getElementById('status-options-container')?.remove();
@@ -3747,7 +3760,7 @@ async function handleAbnormalityInput(msg) {
         await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
 
         // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
-        appendSummaryCard(todayStr, data);
+        await appendSummaryCard(todayStr, data, currentSerial);
 
         // 顯示後續建議與導引
         if (data.flowSuggestion) {
