@@ -3746,10 +3746,10 @@ async function handleAbnormalityInput(msg) {
     if (hasYesterdayBatteryTST) {
         const data = await fetchSummaryData(preDateStr);
         if (data) {
-        appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
+        await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
 
         // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
-        appendSummaryCard(todayStr, data, currentSerial);
+        await appendSummaryCard(todayStr, data, currentSerial);
 
         // 顯示後續建議與導引
         if (data.flowSuggestion) {
