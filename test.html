@@ -2751,7 +2751,7 @@ async function processSummarySearch(d, displayDate) {
     if (data) {
         // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
         // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
-        appendSummaryCard(finalDisplayDate, data, currentSerial)
+        await appendSummaryCard(finalDisplayDate, data, currentSerial)
         
         // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
         const todayStr = getLocalDateString();
@@ -3746,7 +3746,7 @@ async function handleAbnormalityInput(msg) {
     if (hasYesterdayBatteryTST) {
         const data = await fetchSummaryData(preDateStr);
         if (data) {
-        await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
+        appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
 
         // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
         appendSummaryCard(todayStr, data, currentSerial);
