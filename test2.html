@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n098</title>
+    <title>Soosyn 健康夥伴 n098-1</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2089,7 +2089,7 @@ async function showSummaryFlow(isFirstTime = false) {
     const todayStr = getLocalDateString();
     const data = await fetchSummaryData(todayStr);
     if (data) {
-        appendSummaryCard(data);
+        appendSummaryCard(todayStr, data, currentSerialNumber);
         // 無論是否為第一次登入，只要有當天數據就顯示隨機建議
         if (data.flowSuggestion) {
             await new Promise(r => setTimeout(r, 1000));
@@ -2751,7 +2751,7 @@ async function processSummarySearch(d, displayDate) {
     if (data) {
         // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
         // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
-        appendSummaryCard(finalDisplayDate, data);
+        appendSummaryCard(finalDisplayDate, data, currentSerialNumber);
         
         // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
         const todayStr = getLocalDateString();
@@ -3538,21 +3538,35 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     // 取得使用者個人化排版
     let currentLayout = ['block4', 'block5', 'block6', 'block7', 'block8', 'block9', 'block10', 'block11', 'block12'];
     try {
-        const res = await fetch(`/api/layout?serial_number=${serialNumber}`);
-        if (res.ok) {
-            const result = await res.json();
-            if (result.layout) currentLayout = result.layout;
+        // 如果 serialNumber 是 undefined，這裡會變成打 API 去找字串 "undefined"，所以也要擋一下
+        if (serialNumber) {
+            const res = await fetch(`/api/layout?serial_number=${serialNumber}`);
+            if (res.ok) {
+                const result = await res.json();
+                if (result.layout) currentLayout = result.layout;
+            }
+        } else {
+            console.error('警告：在 GET 排版時，serialNumber 為空值！');
         }
     } catch (e) {
         console.error('無法讀取排版設定', e);
     }
 
-    // 存入全域狀態
+    // 嘗試從傳入的參數，或是 data 內層找序號來當備案，避免變數是 undefined
+    const finalSerialNumber = serialNumber || (data.raw_json && data.raw_json.ID) || ''; 
+    
+    if (!finalSerialNumber) {
+        alert('警告：未取得設備序號，將無法儲存版面設定！');
+    }
+
+    // 存入全域狀態[cite: 2]
     window.cardStates[cardId] = {
-        serialNumber: serialNumber,
+        serialNumber: finalSerialNumber, // 替換成有經過防呆的變數
         isEditMode: false,
         layout: currentLayout,
         showAddMenu: false,
+        blocks: { ... }
+    };
         blocks: {
             block4: recoveryCapsulesHtml,
             block5: bestCapsulesHtml,
@@ -3747,7 +3761,7 @@ async function handleAbnormalityInput(msg) {
         await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
 
         // 顯示圖卡 (這裡還是要傳 todayStr，確保畫面上卡片標題顯示為"今天")
-        appendSummaryCard(todayStr, data);
+        appendSummaryCard(todayStr, data, currentSerialNumber);
 
         // 顯示後續建議與導引
         if (data.flowSuggestion) {
