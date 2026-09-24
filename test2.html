@@ -3669,8 +3669,10 @@ async function handleAbnormalitySelection(choice) {
         isWaitingForAbnormality = true; 
         await appendAiMessage("請直接在下方輸入你的症狀或不適。");
     } else {
+        // 1. 顯示使用者點擊的選項
         appendUserMessage(choice);
 
+        // 2. 顯示三個點的等待動畫
         const tempTypingId = 'typing-loading-' + Date.now();
         const tempLoadingHtml = `
             <div class="msg-row ai-row" id="${tempTypingId}">
@@ -3680,10 +3682,16 @@ async function handleAbnormalitySelection(choice) {
             </div>`;
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', tempLoadingHtml);
         scrollToBottom();
+        
+        // 3. 處理背景 API 與資料庫寫入
         await handleAbnormalityInput(choice);
+        
+        // 4. 處理完畢，把三個點的動畫移除
         document.getElementById(tempTypingId)?.remove();
-        appendUserMessage(choice);
+        
+        // (這裡不要再加 appendUserMessage 了，不然對話框會重複出現選項喔！)
     }
+}
 
 
 async function handleStatusSelection(text, score) {
