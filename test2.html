@@ -3669,13 +3669,11 @@ async function handleAbnormalitySelection(choice) {
         isWaitingForAbnormality = true; 
         await appendAiMessage("請直接在下方輸入你的症狀或不適。");
     } else {
-        // 1. 顯示使用者點擊的選項
         appendUserMessage(choice);
 
-        // 2. 顯示三個點的等待動畫
-        const tempTypingId = 'typing-loading-' + Date.now();
+        // 1. 改用固定的 ID：temp-api-loading
         const tempLoadingHtml = `
-            <div class="msg-row ai-row" id="${tempTypingId}">
+            <div class="msg-row ai-row" id="temp-api-loading">
                 <div class="ai-bubble">
                     <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
                 </div>
@@ -3683,13 +3681,8 @@ async function handleAbnormalitySelection(choice) {
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', tempLoadingHtml);
         scrollToBottom();
         
-        // 3. 處理背景 API 與資料庫寫入
+        // 2. 進入處理資料 (不用在這裡 remove，我們交給裡面的函式在最佳時機點刪除)
         await handleAbnormalityInput(choice);
-        
-        // 4. 處理完畢，把三個點的動畫移除
-        document.getElementById(tempTypingId)?.remove();
-        
-        // (這裡不要再加 appendUserMessage 了，不然對話框會重複出現選項喔！)
     }
 }
 
@@ -3764,6 +3757,10 @@ async function handleAbnormalityInput(msg) {
     // ==========================================
     if (hasYesterdayBatteryTST) {
         const data = await fetchSummaryData(preDateStr);
+        
+        // 🌟 加入這行：API 跑完了，立刻把暫時動畫刪掉，讓 appendAiMessage 順暢接棒
+        document.getElementById('temp-api-loading')?.remove();
+        
         if (data) {
         await appendAiMessage("收到了！來看看今天的健康摘要吧！ ✨"); 
 
@@ -3786,6 +3783,8 @@ async function handleAbnormalityInput(msg) {
     
     // 1. 如果資料庫完全沒資料，或是只剩 1 筆(沒有前一天的歷史可以比較)
     if (allData.length <= 1) {
+        // 🌟 加入這行
+        document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
         
         const fallbackHtml = `
@@ -3859,6 +3858,8 @@ async function handleAbnormalityInput(msg) {
 
     // 4. 如果因為缺少數值算不出任何比較結果，直接顯示 fallback
     if (!worstMetric) {
+        // 🌟 加入這行
+        document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
         
         const fallbackHtml = `
@@ -3897,6 +3898,9 @@ async function handleAbnormalityInput(msg) {
             .limit(1)
             .maybeSingle();
 
+        // 🌟 加入這行：資料庫查完了，準備開口前刪除動畫
+        document.getElementById('temp-api-loading')?.remove();
+
         if (phraseData && phraseData.detailed_content) {
             // --- 修改這裡：先說一句話，然後推派小卡 ---
             await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
@@ -3912,6 +3916,8 @@ async function handleAbnormalityInput(msg) {
         }
     } catch (e) {
         console.error("讀取 phrase_library 失敗:", e);
+        // 🌟 catch 裡面也要加，避免出錯時泡泡卡在畫面上
+        document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
     }
 }
