@@ -3055,6 +3055,27 @@ window.renderDynamicBlocks = function(cardId) {
             delayOnTouchOnly: true,        
             forceFallback: true,           
             fallbackTolerance: 5,          
+            
+            onChoose: function (evt) {
+                // 長按滿 0.2 秒時觸發：加上漸變動畫、稍微放大、加深陰影、變白底
+                evt.item.style.transition = 'transform 0.15s ease, box-shadow 0.15s ease';
+                evt.item.style.transform = 'scale(1.03)';
+                evt.item.style.boxShadow = '0 12px 24px rgba(0,0,0,0.15)';
+                evt.item.style.backgroundColor = '#ffffff';
+                evt.item.style.zIndex = '100';
+            },
+            onStart: function (evt) {
+                // 真正開始拖曳時：清除 transition，避免干擾 Sortable 的順暢滑動
+                evt.item.style.transition = '';
+            },
+            onUnchoose: function (evt) {
+                // 放開手指或取消選取時：恢復原本的樣式
+                evt.item.style.transform = '';
+                evt.item.style.boxShadow = '';
+                evt.item.style.backgroundColor = '#fafafa'; // 恢復原本的灰底
+                evt.item.style.zIndex = '';
+            },
+
             onEnd: function (evt) {
                 // 放開後，掃描當前畫面的順序並更新資料
                 const newLayout = [];
