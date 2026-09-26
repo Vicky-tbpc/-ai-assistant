@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n098-2</title>
+    <title>Soosyn 健康夥伴 n098-3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -2977,7 +2977,72 @@ const BLOCK_NAMES = {
 // ----------------------------------------------------
 // 將可編輯區塊的控制函式提至最上方（確保 appendSummaryCard 呼叫時已存在）
 // ----------------------------------------------------
+// ----------------------------------------------------
+// 拖曳功能相關函式 (Drag and Drop)
+// ----------------------------------------------------
+window.handleDragStart = function(e, cardId, index) {
+    window.draggedCardId = cardId;
+    window.draggedIndex = index;
+    e.dataTransfer.effectAllowed = 'move';
+    // 稍微延遲改變透明度，讓瀏覽器能正確截圖作為拖曳時的殘影
+    setTimeout(() => {
+        if (e.target.style) e.target.style.opacity = '0.5';
+    }, 0);
+};
 
+window.handleDragOver = function(e) {
+    e.preventDefault(); // 必須呼叫，否則無法觸發 drop 事件
+    e.dataTransfer.dropEffect = 'move';
+};
+
+window.handleDragEnter = function(e) {
+    e.preventDefault();
+    const targetDiv = e.target.closest('.draggable-block');
+    if (targetDiv) {
+        // 進入目標區塊時，將邊框改為實線提示
+        targetDiv.style.borderColor = '#8699a3';
+        targetDiv.style.borderStyle = 'solid';
+    }
+};
+
+window.handleDragLeave = function(e) {
+    const targetDiv = e.target.closest('.draggable-block');
+    if (targetDiv && !targetDiv.contains(e.relatedTarget)) {
+        // 離開目標區塊時，恢復原本的虛線
+        targetDiv.style.borderColor = '#ccc';
+        targetDiv.style.borderStyle = 'dashed';
+    }
+};
+
+window.handleDrop = function(e, cardId, dropIndex) {
+    e.preventDefault();
+    const targetDiv = e.target.closest('.draggable-block');
+    if (targetDiv) {
+        targetDiv.style.borderColor = '#ccc';
+        targetDiv.style.borderStyle = 'dashed';
+    }
+    
+    // 如果是同一個卡片內的拖曳，且位置有改變
+    if (window.draggedCardId === cardId && window.draggedIndex !== dropIndex) {
+        const layout = window.cardStates[cardId].layout;
+        // 把拖曳的區塊拿出來
+        const movedItem = layout.splice(window.draggedIndex, 1)[0];
+        // 塞入新的目標位置
+        layout.splice(dropIndex, 0, movedItem);
+        
+        // 重新渲染畫面
+        renderDynamicBlocks(cardId);
+    }
+};
+
+window.handleDragEnd = function(e) {
+    if (e.target.style) e.target.style.opacity = '1';
+    // 確保所有區塊的邊框都恢復正常
+    document.querySelectorAll('.draggable-block').forEach(el => {
+        el.style.borderColor = '#ccc';
+        el.style.borderStyle = 'dashed';
+    });
+};
 // 渲染可編輯的區塊
 window.renderDynamicBlocks = function(cardId) {
     const state = window.cardStates[cardId];
@@ -2993,18 +3058,20 @@ window.renderDynamicBlocks = function(cardId) {
         const rawContent = state.blocks[blockId];
         
         if (state.isEditMode) {
-            // 編輯模式：加上外框與操作按鈕
+            // 編輯模式：加上外框與操作按鈕 (移除上下箭頭，加入拖曳事件)
             html += `
-            <div style="position: relative; border: 2px dashed #ccc; padding: 10px; margin-bottom: 12px; border-radius: 8px; background: #fafafa;">
+            <div class="draggable-block" draggable="true" 
+                 ondragstart="handleDragStart(event, '${cardId}', ${index})"
+                 ondragover="handleDragOver(event)"
+                 ondragenter="handleDragEnter(event)"
+                 ondragleave="handleDragLeave(event)"
+                 ondrop="handleDrop(event, '${cardId}', ${index})"
+                 ondragend="handleDragEnd(event)"
+                 style="position: relative; border: 2px dashed #ccc; padding: 10px; margin-bottom: 12px; border-radius: 8px; background: #fafafa; cursor: grab; user-select: none; -webkit-user-select: none;">
+                
                 <!-- 右上角叉叉按鈕 -->
                 <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', ${index})" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 
-                <!-- 中間上下箭頭按鈕 -->
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 20px; z-index: 10; background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                    <img src="images/up_arrow.svg" onclick="moveBlock('${cardId}', ${index}, -1)" style="width: 24px; height: 24px; cursor: pointer; opacity: ${index === 0 ? 0.3 : 1}; pointer-events: ${index === 0 ? 'none' : 'auto'};">
-                    <img src="images/down_arrow.svg" onclick="moveBlock('${cardId}', ${index}, 1)" style="width: 24px; height: 24px; cursor: pointer; opacity: ${index === visibleCount - 1 ? 0.3 : 1}; pointer-events: ${index === visibleCount - 1 ? 'none' : 'auto'};">
-                </div>
-
                 <!-- 內容加上半透明遮罩 -->
                 <div style="opacity: 0.4; pointer-events: none; min-height: 50px;">
                     ${rawContent || `<div style="text-align: center; color: #888; line-height: 50px;">(${BLOCK_NAMES[blockId]}：本次無資料)</div>`}
@@ -4053,7 +4120,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini_02', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -4255,7 +4322,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini_02', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
