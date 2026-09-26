@@ -2993,12 +2993,12 @@ window.renderDynamicBlocks = function(cardId) {
         const rawContent = state.blocks[blockId];
         
         if (state.isEditMode) {
-            // 編輯模式：改用 data-id 讓 SortableJS 辨識，並移除原生的 ondrag 事件
+            // 📝 關鍵修改 1：把 onclick="removeBlock" 的參數從 index 改為 blockId
             html += `
             <div class="draggable-block" data-id="${blockId}" style="position: relative; border: 2px dashed #ccc; padding: 10px; margin-bottom: 12px; border-radius: 8px; background: #fafafa; cursor: grab; user-select: none; -webkit-user-select: none;">
                 
                 <!-- 右上角叉叉按鈕 -->
-                <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', ${index})" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', '${blockId}')" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 
                 <!-- 內容加上半透明遮罩 -->
                 <div style="opacity: 0.4; pointer-events: none; min-height: 50px;">
@@ -3038,19 +3038,23 @@ window.renderDynamicBlocks = function(cardId) {
 
     container.innerHTML = html;
 
-    // ----- 新增：啟用 SortableJS 拖曳排序功能 -----
-    if (state.isEditMode && typeof Sortable !== 'undefined') {
-        new Sortable(container, {
-            animation: 150,                // 拖曳時的平滑動畫
-            draggable: ".draggable-block", // 限定只有這些區塊可以拖
-            delay: 200,                    // 手機長按 200 毫秒才觸發拖曳
-            delayOnTouchOnly: true,        // 電腦滑鼠不用等，手機觸控才需要長按
-            
-            // 👇 加上這兩行 👇
-            forceFallback: true,           // 強制使用 Sortable 的拖曳機制，避免被手機瀏覽器的預設滾動干擾
-            fallbackTolerance: 5,          // 容許長按時手指有 5px 的輕微晃動，才不會一晃動就取消拖曳變成滾動畫面
-            // 👆 加上這兩行 👆
+    // 📝 關鍵修改 2：每次重新渲染前，先銷毀舊的 Sortable 實例，避免重複綁定導致事件卡死
+    if (typeof Sortable !== 'undefined') {
+        const existingSortable = Sortable.get(container);
+        if (existingSortable) {
+            existingSortable.destroy();
+        }
+    }
 
+    // 啟用 SortableJS 拖曳排序功能
+    if (state.isEditMode && typeof Sortable !== 'undefined') {
+        Sortable.create(container, {
+            animation: 150,                
+            draggable: ".draggable-block", 
+            delay: 200,                    
+            delayOnTouchOnly: true,        
+            forceFallback: true,           
+            fallbackTolerance: 5,          
             onEnd: function (evt) {
                 // 放開後，掃描當前畫面的順序並更新資料
                 const newLayout = [];
@@ -3060,9 +3064,6 @@ window.renderDynamicBlocks = function(cardId) {
                 
                 // 更新全域狀態
                 window.cardStates[cardId].layout = newLayout;
-                
-                // 重新渲染，確保叉叉按鈕對應的 index 更新正確
-                renderDynamicBlocks(cardId);
             }
         });
     }
@@ -3102,12 +3103,16 @@ window.toggleEditMode = async function(cardId) {
 };
 
 // 刪除區塊
-window.removeBlock = function(cardId, index) {
-    window.cardStates[cardId].layout.splice(index, 1);
-    renderDynamicBlocks(cardId);
+window.removeBlock = function(cardId, blockId) {
+    const layout = window.cardStates[cardId].layout;
+    // 找出該區塊目前在陣列中的正確位置
+    const index = layout.indexOf(blockId);
+    
+    if (index > -1) {
+        layout.splice(index, 1);
+        renderDynamicBlocks(cardId); // 刪除後重新渲染畫面
+    }
 };
-
-
 
 // 切換新增區塊的選單
 window.toggleAddMenu = function(cardId) {
