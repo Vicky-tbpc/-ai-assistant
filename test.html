@@ -3067,6 +3067,39 @@ window.renderDynamicBlocks = function(cardId) {
         });
     }
 };
+// 切換編輯模式與儲存 (遺失的函式補回)
+window.toggleEditMode = async function(cardId) {
+    const state = window.cardStates[cardId];
+    if (!state) return;
+
+    state.isEditMode = !state.isEditMode;
+    state.showAddMenu = false; // 關閉新增選單
+    
+    // 切換圖示
+    const editIcon = document.getElementById(`edit-icon-${cardId}`);
+    if (state.isEditMode) {
+        if (editIcon) editIcon.src = 'images/check_icon.svg'; // 變成勾勾代表儲存
+    } else {
+        if (editIcon) editIcon.src = 'images/edit_icon.svg';
+        
+        // 離開編輯模式時，呼叫 API 把新排版存到 Supabase
+        try {
+            await fetch('/api/layout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    serial_number: state.serialNumber,
+                    layout: state.layout
+                })
+            });
+            console.log('排版已儲存');
+        } catch (e) {
+            console.error('儲存排版失敗', e);
+        }
+    }
+
+    renderDynamicBlocks(cardId);
+};
 
 // 刪除區塊
 window.removeBlock = function(cardId, index) {
@@ -3074,17 +3107,7 @@ window.removeBlock = function(cardId, index) {
     renderDynamicBlocks(cardId);
 };
 
-// 移動區塊 (direction: -1 向上, 1 向下)
-window.moveBlock = function(cardId, index, direction) {
-    const layout = window.cardStates[cardId].layout;
-    const targetIndex = index + direction;
-    
-    if (targetIndex >= 0 && targetIndex < layout.length) {
-        // 交換陣列元素位置
-        [layout[index], layout[targetIndex]] = [layout[targetIndex], layout[index]];
-        renderDynamicBlocks(cardId);
-    }
-};
+
 
 // 切換新增區塊的選單
 window.toggleAddMenu = function(cardId) {
