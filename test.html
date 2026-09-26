@@ -3042,9 +3042,15 @@ window.renderDynamicBlocks = function(cardId) {
     if (state.isEditMode && typeof Sortable !== 'undefined') {
         new Sortable(container, {
             animation: 150,                // 拖曳時的平滑動畫
-            draggable: ".draggable-block", // 限定只有這些區塊可以拖，不會誤拖到加號按鈕
-            delay: 200,                    // [關鍵] 手機長按 200 毫秒才觸發拖曳 (避免影響正常網頁上下捲動)
-            delayOnTouchOnly: true,        // [關鍵] 電腦滑鼠不用等，點了就能拖；手機觸控才需要長按
+            draggable: ".draggable-block", // 限定只有這些區塊可以拖
+            delay: 200,                    // 手機長按 200 毫秒才觸發拖曳
+            delayOnTouchOnly: true,        // 電腦滑鼠不用等，手機觸控才需要長按
+            
+            // 👇 加上這兩行 👇
+            forceFallback: true,           // 強制使用 Sortable 的拖曳機制，避免被手機瀏覽器的預設滾動干擾
+            fallbackTolerance: 5,          // 容許長按時手指有 5px 的輕微晃動，才不會一晃動就取消拖曳變成滾動畫面
+            // 👆 加上這兩行 👆
+
             onEnd: function (evt) {
                 // 放開後，掃描當前畫面的順序並更新資料
                 const newLayout = [];
