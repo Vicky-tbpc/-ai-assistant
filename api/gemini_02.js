@@ -1,4 +1,4 @@
-// api/gemini.js 36
+// api/gemini.js 37
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -24,7 +24,8 @@ export default async function handler(req, res) {
     
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+    const routerUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiApiKey}`;
+    const finalUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
 
     // ==========================================
     // 🚀 全動態超連結字典撈取 (消滅程式碼肥大，免重新部署)
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
 
 請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
 
-      let greetingRes = await fetch(geminiUrl, {
+      let greetingRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: greetingPrompt }] }] })
@@ -150,11 +151,11 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫，或是遇到「綠燈」、「黃燈」、「紅燈」、「發炎風險」、「恢復指數」等系統狀態詞彙時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！
    ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
 4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
-5. 【開啟睡眠報告】(新增)：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
+5. 【開啟睡眠報告】：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
    🛑 【意圖區隔與攔截】：
    - 若使用者詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告【計算進度或數量】的問題，嚴禁開啟報告，請務必將 need_pdf_report 設為 false！
    - 若使用者要求「昨晚的睡眠分析」、「幫我分析睡眠」，代表他需要你用文字【解讀數據】，而不是單純打開檔案！請務必將 need_pdf_report 設為 false，並確保 need_data 為 true！
-6. 【個人健康建議】(新增)：當使用者問到「我今天該做什麼運動」、「如何提升恢復指數」、「給我今天的健康建議」或要求「解讀建議」時，請將 need_recommendation 設為 true，並判斷需要哪一天的建議填入 rec_date (YYYY-MM-DD，預設為 ${local_date})。
+6. 【個人健康建議】：當使用者問到「我今天該做什麼運動」、「如何提升恢復指數」、「給我今天的健康建議」或要求「解讀建議」時，請將 need_recommendation 設為 true，並判斷需要哪一天的建議填入 rec_date (YYYY-MM-DD，預設為 ${local_date})。
 
 💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
@@ -166,7 +167,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 請根據上述規則，輸出完全符合以下格式的 JSON：
 {"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string", "need_pdf_report": boolean, "pdf_date": "YYYY-MM-DD", "need_recommendation": boolean, "rec_date": "YYYY-MM-DD"}`;
 
-    let intentRes = await fetch(geminiUrl, {
+    let intentRes = await fetch(routerUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
@@ -368,7 +369,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     if (intent.need_external && intent.external_query) {
       try {
         const extPrompt = `今天是 ${local_date} (${dayOfWeek})。請針對查詢主題：「${intent.external_query}」，利用聯網搜尋提供精簡關鍵的即時資訊或一般知識補充。字數150字內，不包含 JSON。`;
-        const extRes = await fetch(geminiUrl, {
+        const extRes = await fetch(finalUrl, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: extPrompt }] }], tools: [{ googleSearch: {} }] })
         });
@@ -692,7 +693,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     let finalText = "";
 
     try {
-      let finalRes = await fetch(geminiUrl, {
+      let finalRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -760,7 +761,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
       body: JSON.stringify({
         serial_number: serial_number, user_query: prompt, ai_response: finalText,
-        record_date: local_date, record_time: local_time, ai_model: 'Gemini-2.5-Flash-HybridRAG'
+        record_date: local_date, record_time: local_time, ai_model: 'Gemini-3.8-Flash-HybridRAG'
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
