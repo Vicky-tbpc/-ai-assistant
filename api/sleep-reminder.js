@@ -193,8 +193,8 @@ async function generateAiReminder(nickname, priorityItem, actionText) {
     throw new Error('Vercel 環境變數缺失 GEMINI_API_KEY');
   }
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
-
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
+  
   const userNickname = nickname || '朋友';
 
   const prompt = `【身份鎖定】
