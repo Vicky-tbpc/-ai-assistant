@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n098-3</title>
+    <title>Soosyn 健康夥伴 n098-4</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2995,7 +2995,7 @@ window.renderDynamicBlocks = function(cardId) {
         if (state.isEditMode) {
             // 📝 關鍵修改 1：把 onclick="removeBlock" 的參數從 index 改為 blockId
             html += `
-            <div class="draggable-block" data-id="${blockId}" style="position: relative; border: 2px dashed #ccc; padding: 10px; margin-bottom: 12px; border-radius: 8px; background: #fafafa; cursor: grab; user-select: none; -webkit-user-select: none;">
+            <div class="draggable-block" data-id="${blockId}" style="position: relative; border: 2px dashed #ccc; padding: 10px; border-radius: 8px; background: #fafafa; cursor: grab; user-select: none; -webkit-user-select: none;">
                 
                 <!-- 右上角叉叉按鈕 -->
                 <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', '${blockId}')" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -3288,7 +3288,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     posPct = Math.max(0, Math.min(100, posPct));
 
     const renderBlock = (title, iconName, val, diffText, color, bgColor, extraHtml = '') => `
-        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">
@@ -3352,7 +3352,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     let rhrSectionHtml = '';
     if (raw && raw.RHR_raw != null && raw.RHR_raw !== 'NA' && raw.RHR_raw !== 'N/A') {
         rhrSectionHtml = `
-            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <img src="images/rhr_icon.svg" style="width: 20px; height: 20px;" alt="靜息心率">
@@ -3519,7 +3519,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
         }
         
         riskSectionHtml = `
-            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="睡眠心血管負荷">
@@ -3568,8 +3568,8 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
         `;
     }
 
-    let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '8px');
-    let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '20px');
+    let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '0px');
+    let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '0px');
 
     const cardId = `summary-card-${Date.now()}`;
 
@@ -3600,7 +3600,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
             block9: renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml),
             block10: rhrSectionHtml,
             block11: riskSectionHtml,
-            block12: `<div style="margin: 20px 0 5px 0;"><button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">📄 開啟睡眠報告</button></div>`
+            block12: `<div style="margin: 5px 0 0 0;"><button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">📄 開啟睡眠報告</button></div>`
         }
     };
 
@@ -3652,7 +3652,8 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     <div class="msg-row ai-row" id="${cardId}">
         <div class="summary-card" style="position: relative;">
             ${fixedHtml}
-            <div id="dynamic-blocks-${cardId}"></div>
+            <!-- 加上 flex 與 gap 統一間距 -->
+            <div id="dynamic-blocks-${cardId}" style="display: flex; flex-direction: column; gap: 12px;"></div>
         </div>
     </div>`;
 
