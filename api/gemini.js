@@ -1,4 +1,4 @@
-// api/gemini.js 35
+// api/gemini.js 37
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -24,7 +24,8 @@ export default async function handler(req, res) {
     
     const { prompt, serial_number, history = [], local_date, local_time, action, metric_data } = req.body;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+    const routerUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiApiKey}`;
+    const finalUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
 
     // ==========================================
     // 🚀 全動態超連結字典撈取 (消滅程式碼肥大，免重新部署)
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
 
 請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
 
-      let greetingRes = await fetch(geminiUrl, {
+      let greetingRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: greetingPrompt }] }] })
@@ -150,10 +151,11 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    🛑 【強制攔截】：遇到「CBP」、「HRV」、「T88」、「ODI」、「ST-50」等英文縮寫，或是遇到「綠燈」、「黃燈」、「紅燈」、「發炎風險」、「恢復指數」等系統狀態詞彙時，一律視為『專屬醫療與生理指標』，強制將 need_knowledge 設為 true，並將 need_external 設為 false！
    ⚠️ 【極度重要】：knowledge_query 只能提取「最核心的專有名詞或操作主題」。(如：問「為何紅燈」轉為「紅燈」；問「低氧負擔是什麼」轉為「低氧負擔指數 HBI」)。絕對不可把「是什麼」、「為何」等疑問詞放進 query。
 4. 【外部即時資訊與廣泛知識】：若問題屬於天氣、環境，或是「不屬於Soosyn裝置且不在特定指標內的一般日常健康、營養疑問」，請將 need_external 設為 true，並提取查詢關鍵字為 external_query。
-5. 【開啟睡眠報告】(新增)：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
+5. 【開啟睡眠報告】：當使用者明確要求「看睡眠報告」、「開啟睡眠報告」、「我的睡眠報告」時，請將 need_pdf_report 設為 true，並從對話中判斷需要哪一天的報告填入 pdf_date (YYYY-MM-DD)。若未指明日期，預設使用昨天日期 (${yesterdayStr})。
    🛑 【意圖區隔與攔截】：
    - 若使用者詢問「還剩幾天的報告」、「需要收集多少報告才能拿到恢復指數」等關於報告【計算進度或數量】的問題，嚴禁開啟報告，請務必將 need_pdf_report 設為 false！
    - 若使用者要求「昨晚的睡眠分析」、「幫我分析睡眠」，代表他需要你用文字【解讀數據】，而不是單純打開檔案！請務必將 need_pdf_report 設為 false，並確保 need_data 為 true！
+6. 【個人健康建議】：當使用者問到「我今天該做什麼運動」、「如何提升恢復指數」、「給我今天的健康建議」或要求「解讀建議」時，請將 need_recommendation 設為 true，並判斷需要哪一天的建議填入 rec_date (YYYY-MM-DD，預設為 ${local_date})。
 
 💡 【超級鐵律：多軌並行】：need_data 與 need_knowledge 可以同時為 true！例如當使用者問「為什麼是紅燈？」，你必須同時將 need_data 設為 true (為了抓取近期數據找原因) 以及 need_knowledge 設為 true (為了去知識庫查紅燈的定義)。
 
@@ -163,9 +165,9 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 3. 上週/最近一週：${lastWeekStartStr} 到 ${yesterdayStr}
 
 請根據上述規則，輸出完全符合以下格式的 JSON：
-{"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string", "need_pdf_report": boolean, "pdf_date": "YYYY-MM-DD"}`;
+{"need_data": boolean, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "need_trend_chart": boolean, "trend_type": "string", "need_external": boolean, "external_query": "string", "need_knowledge": boolean, "knowledge_query": "string", "need_pdf_report": boolean, "pdf_date": "YYYY-MM-DD", "need_recommendation": boolean, "rec_date": "YYYY-MM-DD"}`;
 
-    let intentRes = await fetch(geminiUrl, {
+    let intentRes = await fetch(routerUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
@@ -178,7 +180,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     });
 
     let intentData = await intentRes.json();
-    let intent = { need_data: false, need_external: false, need_knowledge: false };
+    let intent = { need_data: false, need_external: false, need_knowledge: false, need_recommendation: false };
     try {
       let intentText = intentData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       intentText = intentText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -258,6 +260,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "rMSSD": "rMSSD 相鄰正常心跳間距差異平方和的均方根",
         "CBP": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "心血管壓力": "CBP 心血管壓力 血管系統的動態壓力狀態",
+        "有效率": "有效率",
         "說明書": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "Soosyn": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "APP": "APP 安裝教學",
@@ -367,7 +370,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     if (intent.need_external && intent.external_query) {
       try {
         const extPrompt = `今天是 ${local_date} (${dayOfWeek})。請針對查詢主題：「${intent.external_query}」，利用聯網搜尋提供精簡關鍵的即時資訊或一般知識補充。字數150字內，不包含 JSON。`;
-        const extRes = await fetch(geminiUrl, {
+        const extRes = await fetch(finalUrl, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: extPrompt }] }], tools: [{ googleSearch: {} }] })
         });
@@ -570,6 +573,71 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         }
       }
     }
+    // 2-4. 抓取個人專屬健康建議 (讀取 Excel 資料 + Supabase 語氣規則)
+    let recommendationContext = "目前沒有相關的健康建議。";
+    if (intent.need_recommendation && intent.rec_date) {
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const recApiUrl = `${protocol}://${req.headers['host']}/api/health?action=get_recommendation&serial=${serial_number}&date=${intent.rec_date}`;
+      
+      try {
+        const recRes = await fetch(recApiUrl);
+        if (recRes.ok) {
+          const recData = await recRes.json();
+          if (recData.found) {
+            
+            // ==========================================
+            // 🌟 拿 exerciseLevel 去 Supabase 查專屬語意與安全提醒
+            // ==========================================
+            let aiSemantic = "";
+            let safetyReminder = "";
+            
+            if (recData.exerciseLevel) {
+              try {
+                // 依據 exercise_level 精準查詢
+                const rulesRes = await fetch(`${supabaseUrl}/rest/v1/exercise_level_rules?select=ai_semantic,safety_reminder&exercise_level=eq.${encodeURIComponent(recData.exerciseLevel)}`, {
+                  headers: { 
+                    'apikey': supabaseKey, 
+                    'Authorization': `Bearer ${supabaseKey}` 
+                  }
+                });
+                
+                if (rulesRes.ok) {
+                  const rulesData = await rulesRes.json();
+                  if (rulesData && rulesData.length > 0) {
+                    aiSemantic = rulesData[0].ai_semantic || "";
+                    safetyReminder = rulesData[0].safety_reminder || "";
+                  }
+                }
+              } catch (err) {
+                console.error("💥 查詢 Supabase exercise_level_rules 失敗:", err);
+              }
+            }
+
+            // ==========================================
+            // 🌟 組裝最終要給 AI 看的 Context
+            // ==========================================
+            recommendationContext = `【${intent.rec_date} 個人專屬健康建議】\n` +
+              `- 優先調整項目: ${recData.priorityItem}\n` +
+              `- 調整行動建議: ${recData.actionText}\n` +
+              `- 運動強度建議 (Level): ${recData.exerciseLevel}\n` +
+              `- 日常活動建議: ${recData.dailyAction}\n` +
+              `- 具體運動建議: ${recData.exerciseRec}\n`;
+
+            // 如果有從資料庫撈到語氣設定或提醒，就變成強制指令塞給 AI
+            if (aiSemantic || safetyReminder) {
+              recommendationContext += `\n【🎯 AI 專屬對話指引 (請嚴格遵守)】\n`;
+              if (aiSemantic) recommendationContext += `👉 對話語氣與切入點設定: ${aiSemantic}\n`;
+              if (safetyReminder) recommendationContext += `👉 必須包含的安全提醒: ${safetyReminder}\n`;
+            }
+
+          } else {
+            recommendationContext = `目前系統中找不到 ${intent.rec_date} 的專屬健康建議喔。`;
+          }
+        }
+      } catch (e) {
+        console.error("💥 讀取健康建議與規則失敗:", e);
+      }
+    }
 
     // ==========================================
     // 第三階段：Gemini 2.5 Flash 超級大腦最終整合
@@ -594,6 +662,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    ${externalContext}
 4. 🔄 資料上傳狀態：
    ${uploadStatusContext}
+5. 💡 個人專屬健康建議 (從 Excel 讀取)：
+   ${recommendationContext}
 
 【對話與邏輯規則】
 1. 嚴禁使用敬稱，請一律用「你」稱呼對方（${nickname}）。語氣要像平輩朋友一樣自然，可加上適合的 emoji。
@@ -607,7 +677,11 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
    - 【禁止腦補】：嚴禁自行拼湊、臆測或發明任何帶有 http 或 https 的網址連結！也【絕對禁止】自行發明任何 %% 包裝的標籤。
 5. 將天氣/外部環境資訊跟他的睡眠/心率狀態進行關聯提醒。
 6. 針對問題直接回答，不要再說「歡迎回來」等開場白。
-7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。`;
+7. 【字數控制】：你自行生成的說明文字請盡量控制在 200 到 250 字左右（但不包含你要輸出的知識庫超連結與表格內容），保持精簡扼要。
+8. 【解讀專屬建議與情境扮演】：若有提供【💡 個人專屬健康建議】，請將生硬的資料轉化為口語化的解釋，並嚴格遵守以下限制：
+   - ⚠️【極度重要】：若建議中包含【🎯 AI 專屬對話指引】，你必須完美扮演該指引中「👉 對話語氣與切入點設定」所要求的角色與語氣來解釋建議！
+   - ⚠️【安全第一】：同時，請務必用朋友般關心的口吻，自然地將「👉 必須包含的安全提醒」融入你的回覆中。
+   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。`;
 
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
@@ -620,7 +694,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     let finalText = "";
 
     try {
-      let finalRes = await fetch(geminiUrl, {
+      let finalRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -688,7 +762,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
       body: JSON.stringify({
         serial_number: serial_number, user_query: prompt, ai_response: finalText,
-        record_date: local_date, record_time: local_time, ai_model: 'Gemini-2.5-Flash-HybridRAG'
+        record_date: local_date, record_time: local_time, ai_model: 'Gemini-3.8-Flash-HybridRAG'
       })
     }).catch(e => console.error("背景存檔錯誤:", e));
 
