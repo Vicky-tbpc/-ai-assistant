@@ -1,4 +1,4 @@
-// api/gemini.js 37
+// api/gemini.js 38
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -233,6 +233,12 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "綠燈": "動態發炎預警 發炎風險 靜息心率 RHR",
         "黃燈": "動態發炎預警 發炎風險 靜息心率 RHR",
         "紅燈": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "個人恢復指數區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
+        "個人恢復不足區間": "個人恢復指數區間 個人恢復不足區間 歷史恢復表現較低 自己過去比較",
+        "個人穩定恢復區間": "個人恢復指數區間 個人穩定恢復區間 歷史恢復表現中等 穩定恢復 自己過去比較",
+        "個人最佳恢復區間": "個人恢復指數區間 個人最佳恢復區間 歷史恢復表現較高 恢復表現較佳 自己過去比較",
+        "自己和自己比較": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 今天與過去比較 歷史恢復表現",
+        "今天跟以前比": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 今天與過去比較 自己和自己比較",
         
         // --- 睡眠低血氧時間比例 ---
         "T90": "T90 睡眠期間 血氧濃度小於 90% 的時間百分比 SpO2",
@@ -260,7 +266,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "rMSSD": "rMSSD 相鄰正常心跳間距差異平方和的均方根",
         "CBP": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "心血管壓力": "CBP 心血管壓力 血管系統的動態壓力狀態",
-        "有效率": "恢復指數 恢復建議 有效率",
+        "有效率": "恢復指數建議 恢復指數建議引擎 個人歷史案例 個人歷史有效方案 有效率 successRate successCount caseCount 成功案例 失敗案例 指標改善 恢復指數上升 同步提升 actionText 有效率約",
         "說明書": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "Soosyn": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "APP": "APP 安裝教學",
@@ -459,11 +465,18 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             if (wakeRow) {
               const rawWake = wakeRow.raw_json || {};
               const battery = rawWake.Personal_Battery_weighted_round;
+              const batteryState = rawWake.Personal_Battery_state; // 新增讀取 Personal_Battery_state
               const light = rawWake.light_status;
               const rhr = rawWake.RHR_raw;
               const tag = rawWake.Daily_Tag;
               const cvd = rawWake.CVD; // 新增讀取 CVD
               const batteryDisplay = (battery === null || battery === undefined) ? "無資料" : `${battery}`;
+              
+              let batteryStateDisplay = "資料不足";
+              if (batteryState === 0) batteryStateDisplay = "個人恢復不足區間";
+              else if (batteryState === 1) batteryStateDisplay = "個人穩定恢復區間";
+              else if (batteryState === 2) batteryStateDisplay = "個人最佳恢復區間";
+              
               const lightDisplay = (light === "NA") 
                 ? "有效訊號不足" 
                 : ((light === null || light === undefined || light === "無資料") ? "無資料" : light);
