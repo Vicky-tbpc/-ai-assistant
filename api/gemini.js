@@ -491,6 +491,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               else if (cvd === 3) cvdDisplay = "高";              
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
+              blockText += `   - 恢復區間: ${batteryStateDisplay}\n`; // 新增輸出恢復區間
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
               blockText += `   - 靜息心率: ${rhrDisplay}\n`;
               blockText += `   - 恢復狀態: ${tagDisplay}\n`;
