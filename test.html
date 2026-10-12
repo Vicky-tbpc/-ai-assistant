@@ -2916,10 +2916,10 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
     `;
 }
 
-// --- 修改：支援自訂按鈕文字的展開/收合容器 ---
+// --- 修改：支援自訂按鈕文字並正確切換收合狀態 ---
 function buildToggleWrapper(contentHtml, idPrefix, customOpenText = '▼ 查看原始數據') {
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-    const closeText = customOpenText.replace('▼ 查看原始數據', '▲ 收合原始數據');
+    const closeText = customOpenText.replace('▼', '▲');
     return `
         <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
             <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
@@ -2931,15 +2931,15 @@ function buildToggleWrapper(contentHtml, idPrefix, customOpenText = '▼ 查看�
     `;
 }
 
-// 對應的切換函式
+// 修正後的點擊切換函式：會依據目前狀態切換對應的開啟/收合文字
 function toggleCustomMiniChart(btn, containerId, openText, closeText) {
     const container = document.getElementById(containerId);
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
-        btn.innerText = closeText;
+        btn.innerText = closeText; // 展開時顯示「▲ 收合7日趨勢」
     } else {
         container.classList.add('hidden');
-        btn.innerText = openText;
+        btn.innerText = openText;  // 收合時顯示「▼ 查看7日趨勢」
     }
 }
 
