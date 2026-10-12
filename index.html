@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n098-4</title>
+    <title>Soosyn 健康夥伴 n099-1</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2791,14 +2791,14 @@ function showDateActions() {
 }
 
 // --- 新增：收合/展開迷你圖表功能 ---
-function toggleMiniChart(btn, containerId) {
+function toggleMiniChart(btn, containerId, customOpen = '▲ 收合原始數據', customClose = '▼ 查看原始數據') {
     const container = document.getElementById(containerId);
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
-        btn.innerText = '▲ 收合原始數據';
+        btn.innerText = customOpen;
     } else {
         container.classList.add('hidden');
-        btn.innerText = '▼ 查看原始數據';
+        btn.innerText = customClose;
     }
 }
 
@@ -2917,12 +2917,15 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
 }
 
 // --- 新增：將內容包覆於展開/收合容器 ---
-function buildToggleWrapper(contentHtml, idPrefix) {
+function buildToggleWrapper(contentHtml, idPrefix, customOpen, customClose) {
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const defaultClose = customClose || '▼ 查看原始數據';
+    const openArg = customOpen ? `, '${customOpen}'` : '';
+    const closeArg = customClose ? `, '${customClose}'` : '';
     return `
         <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
             <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
-                 onclick="toggleMiniChart(this, '${containerId}')">▼ 查看原始數據</div>
+               onclick="toggleMiniChart(this, '${containerId}'${openArg}${closeArg})">${defaultClose}</div>
             <div id="${containerId}" class="hidden" style="margin-top: 5px;">
                 ${contentHtml}
             </div>
@@ -3185,7 +3188,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const statusLight = data.light || '--';
     const lightDotColor = lightMap[statusLight] || '#888';
 
-    const dailyTag = raw && raw.Daily_Tag;
+    const dailyTag = (raw && raw.Daily_Tag) || '狀態平穩';
     const tagColor = dailyTag && (dailyTag.includes('混亂') || dailyTag.includes('極端') || dailyTag.includes('疲乏') || dailyTag.includes('最差') || dailyTag.includes('發炎')) ? '#ff8c73' : '#8699a3';
 
     const batteryVal = Math.round(data.battery);
@@ -3316,7 +3319,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const hrvExtraHtml = buildToggleWrapper(buildChartCard('rMSSD', 'rMSSD', history7, 'rmssd', '🌿 rMSSD', parseNum, format1Dec, 'ms'), 'hrv');
     const pulseExtraHtml = buildToggleWrapper(buildChartCard('睡眠最低脈搏', 'HR_min', history7, 'hrmin', '💓 睡眠最低脈搏', parseNum, formatRound, 'bpm'), 'pulse');
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
-    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr');
+    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
     let alertHtml = '';
     if (batteryVal < 60 || statusLight === '黃燈' || statusLight === '紅燈') {
@@ -3623,7 +3626,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
                     <img src="images/info_icon.svg" alt="說明" style="width: 18px; height: 18px; cursor: pointer;" 
                          onclick="const info = document.getElementById('battery-info-${data.date}'); info.style.display = info.style.display === 'none' ? 'block' : 'none'; event.stopPropagation();">
                 </div>
-                ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
+                <span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>
             </div>
             
             <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
