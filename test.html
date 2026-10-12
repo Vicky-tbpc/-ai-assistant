@@ -2919,7 +2919,7 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
 // --- 修改：支援自訂按鈕文字的展開/收合容器 ---
 function buildToggleWrapper(contentHtml, idPrefix, customOpenText = '▼ 查看原始數據') {
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-    const closeText = customOpenText.replace('▼', '▲');
+    const closeText = customOpenText.replace('▼ 查看原始數據', '▲ 收合原始數據');
     return `
         <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
             <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
