@@ -2916,18 +2916,31 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
     `;
 }
 
-// --- 新增：將內容包覆於展開/收合容器 ---
-function buildToggleWrapper(contentHtml, idPrefix) {
+// --- 修改：支援自訂按鈕文字的展開/收合容器 ---
+function buildToggleWrapper(contentHtml, idPrefix, customOpenText = '▼ 查看原始數據') {
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const closeText = customOpenText.replace('▼', '▲');
     return `
         <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
             <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
-                 onclick="toggleMiniChart(this, '${containerId}')">▼ 查看原始數據</div>
+                 onclick="toggleCustomMiniChart(this, '${containerId}', '${customOpenText}', '${closeText}')">${customOpenText}</div>
             <div id="${containerId}" class="hidden" style="margin-top: 5px;">
                 ${contentHtml}
             </div>
         </div>
     `;
+}
+
+// 對應的切換函式
+function toggleCustomMiniChart(btn, containerId, openText, closeText) {
+    const container = document.getElementById(containerId);
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        btn.innerText = closeText;
+    } else {
+        container.classList.add('hidden');
+        btn.innerText = openText;
+    }
 }
 
 // --- 資料解析與格式化工具 ---
@@ -3316,7 +3329,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const hrvExtraHtml = buildToggleWrapper(buildChartCard('rMSSD', 'rMSSD', history7, 'rmssd', '🌿 rMSSD', parseNum, format1Dec, 'ms'), 'hrv');
     const pulseExtraHtml = buildToggleWrapper(buildChartCard('睡眠最低脈搏', 'HR_min', history7, 'hrmin', '💓 睡眠最低脈搏', parseNum, formatRound, 'bpm'), 'pulse');
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
-    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr');
+    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▼ 查看7日趨勢');
 
     let alertHtml = '';
     if (batteryVal < 60 || statusLight === '黃燈' || statusLight === '紅燈') {
