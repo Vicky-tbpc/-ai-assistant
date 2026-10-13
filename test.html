@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n099-1</title>
+    <title>Soosyn 健康夥伴 n100</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2153,7 +2153,53 @@ async function appendTrendOptions() {
     document.getElementById('chat-history').innerHTML += html + '</div></div>';
     scrollToBottom();
 }
+async function requestTrendAiAnalysis(type, title, values, labels, days) {
+    appendUserMessage(`請幫我分析這 ${days} 天的【${title}】趨勢數據`);
+    
+    const loadingMsgId = `loading-${Date.now()}`;
+    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在分析 ${title} 趨勢數據，請稍候...</div></div>`;
+    document.getElementById('chat-history').innerHTML += loadingHtml;
+    scrollToBottom();
 
+    try {
+        const validDataPoints = labels.map((date, idx) => ({
+            date: date,
+            value: values[idx]
+        })).filter(d => d.value !== null && d.value !== undefined);
+
+        const response = await fetch('/api/gemini_02', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'trend_analysis',
+                prompt: `請幫我分析這 ${days} 天的 ${title} 趨勢數據，給出專業且好懂的健康分析與建議。`,
+                serial_number: currentSerial,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
+                metric_data: {
+                    type: title,
+                    metric: title,
+                    values: validDataPoints,
+                    days: days
+                }
+            })
+        });
+
+        document.getElementById(loadingMsgId)?.remove();
+
+        if (response.ok) {
+            const resData = await response.json();
+            const aiText = resData.text || `這是針對 ${title} 的分析結果。`;
+            appendAiMessage(aiText);
+        } else {
+            appendAiMessage(`分析服務目前有點忙碌，請稍後再試一次 😅`);
+        }
+    } catch (err) {
+        console.error("AI 分析請求錯誤:", err);
+        document.getElementById(loadingMsgId)?.remove();
+        appendAiMessage(`連線發生錯誤，請稍後再試 😅`);
+    }
+}
 async function startTrendFlow(type, name) {
     document.getElementById('trend-options-container')?.remove();
     appendUserMessage(name);
@@ -2513,11 +2559,12 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     // 建立結構
     container.innerHTML = `
         <div class="chart-info-header">
-            <div class="chart-title-row">
+            <div class="chart-title-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <span class="chart-title">${config.title}</span>
-                <span class="unit-text">${config.unit}</span>
+                <button class="ai-analysis-btn" onclick="requestTrendAiAnalysis('${type}', '${config.title}', ${JSON.stringify(dailyValues)}, ${JSON.stringify(labels)}, ${days})" style="background: #596b75; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s;">AI分析</button>
             </div>
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
+            ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: left; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
         </div>
         <div class="chart-wrapper"><canvas></canvas></div>
     `;
@@ -4095,7 +4142,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -4297,7 +4344,7 @@ async function getAIGreetingPayload(serial) {
 // --- 新增：呼叫後端專屬開場白 API ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
