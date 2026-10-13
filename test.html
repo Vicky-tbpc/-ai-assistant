@@ -2556,18 +2556,23 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const pointColors = allPointColors.slice(-days);
     const subjectiveValues = allSubjectiveValues.slice(-days);
 
-    // 建立結構
+    // 建立結構（移除 onclick，改用 class 識別）
     container.innerHTML = `
         <div class="chart-info-header">
             <div class="chart-title-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <span class="chart-title">${config.title}</span>
-                <button class="ai-analysis-btn" onclick="requestTrendAiAnalysis('${type}', '${config.title}', ${JSON.stringify(dailyValues)}, ${JSON.stringify(labels)}, ${days})" style="background: #596b75; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s;">AI分析</button>
+                <button class="ai-analysis-btn" style="background: #596b75; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s;">AI分析</button>
             </div>
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
             ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: left; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
         </div>
         <div class="chart-wrapper"><canvas></canvas></div>
     `;
+
+    // 透過 JS 事件監聽綁定，直接利用閉包傳遞 dailyValues 與 labels，徹底解決引號衝突
+    container.querySelector('.ai-analysis-btn').addEventListener('click', () => {
+        requestTrendAiAnalysis(type, config.title, dailyValues, labels, days);
+    });
 
     const ctx = container.querySelector('canvas').getContext('2d');
     
