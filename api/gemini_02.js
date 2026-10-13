@@ -1,4 +1,4 @@
-// api/gemini.js 37
+// api/gemini.js 39
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -115,7 +115,42 @@ export default async function handler(req, res) {
       const cleanGreeting = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
       return res.status(200).json({ text: cleanGreeting });
     }
+    // ==========================================
+    // 客製化趨勢圖表 AI 分析攔截區塊
+    // ==========================================
+    if (action === 'trend_analysis') {
+      const { metric_data } = req.body;
+      const metricName = metric_data?.metric || "健康指標";
+      const daysCount = metric_data?.days || 7;
+      const dataPointsStr = metric_data?.values ? metric_data.values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
 
+      const trendPrompt = `【身份鎖定】
+你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
+絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
+若被問到模型來源，請回答：「我是 Soosyn Health Companion 的 AI 健康夥伴，專門協助你解讀健康數據與提供健康管理建議。」
+你的名字：${ai_name}
+使用者暱稱：${nickname}
+
+使用者要求對「${metricName}」最近 ${daysCount} 天的趨勢數據進行專業分析。
+以下是數據明細：
+${dataPointsStr}
+
+【規則】
+1. 請以平輩朋友的語氣（使用「你」），給予專業、溫暖且具體的數據解讀與健康建議。
+2. 結構包含：趨勢觀察（是否有上升、下降或波動）、可能影響因素、以及具體的日常調整建議。
+3. 字數控制在 200 到 300 字左右，保持精簡扼要，段落分明。
+4. 絕對禁止使用敬稱，絕對禁止輸出 JSON 格式或程式碼標籤。`;
+
+      let trendRes = await fetch(finalUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: trendPrompt }] }] })
+      });
+      
+      let trendResult = await trendRes.json();
+      const cleanTrendText = trendResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `這 ${daysCount} 天的 ${metricName} 數據大致穩定，繼續保持日常作息唷！`;
+      return res.status(200).json({ text: cleanTrendText });
+    }
     // ==========================================
     // 第一階段：超級大腦 Gemini 進行意圖判斷 (Router)
     // ==========================================
@@ -233,6 +268,14 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "綠燈": "動態發炎預警 發炎風險 靜息心率 RHR",
         "黃燈": "動態發炎預警 發炎風險 靜息心率 RHR",
         "紅燈": "動態發炎預警 發炎風險 靜息心率 RHR",
+        "恢復指數區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
+        "恢復區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
+        "個人恢復指數區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
+        "個人恢復不足區間": "個人恢復指數區間 個人恢復不足區間 歷史恢復表現較低 自己過去比較",
+        "個人穩定恢復區間": "個人恢復指數區間 個人穩定恢復區間 歷史恢復表現中等 穩定恢復 自己過去比較",
+        "個人最佳恢復區間": "個人恢復指數區間 個人最佳恢復區間 歷史恢復表現較高 恢復表現較佳 自己過去比較",
+        "自己和自己比較": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 今天與過去比較 歷史恢復表現",
+        "今天跟以前比": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 今天與過去比較 自己和自己比較",
         
         // --- 睡眠低血氧時間比例 ---
         "T90": "T90 睡眠期間 血氧濃度小於 90% 的時間百分比 SpO2",
@@ -260,6 +303,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "rMSSD": "rMSSD 相鄰正常心跳間距差異平方和的均方根",
         "CBP": "CBP 心血管壓力 血管系統的動態壓力狀態",
         "心血管壓力": "CBP 心血管壓力 血管系統的動態壓力狀態",
+        "有效率": "恢復指數建議 恢復指數建議引擎 個人歷史案例 個人歷史有效方案 有效率 successRate successCount caseCount 成功案例 失敗案例 指標改善 恢復指數上升 同步提升 actionText 有效率約",
         "說明書": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "Soosyn": "Soosyn 服務系統 使用者指南 APP 安裝教學 硬體裝置說明書",
         "APP": "APP 安裝教學",
@@ -458,11 +502,18 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             if (wakeRow) {
               const rawWake = wakeRow.raw_json || {};
               const battery = rawWake.Personal_Battery_weighted_round;
+              const batteryState = rawWake.Personal_Battery_state; // 新增讀取 Personal_Battery_state
               const light = rawWake.light_status;
               const rhr = rawWake.RHR_raw;
               const tag = rawWake.Daily_Tag;
               const cvd = rawWake.CVD; // 新增讀取 CVD
               const batteryDisplay = (battery === null || battery === undefined) ? "無資料" : `${battery}`;
+              
+              let batteryStateDisplay = "資料不足";
+              if (batteryState === 0) batteryStateDisplay = "個人恢復不足區間";
+              else if (batteryState === 1) batteryStateDisplay = "個人穩定恢復區間";
+              else if (batteryState === 2) batteryStateDisplay = "個人最佳恢復區間";
+              
               const lightDisplay = (light === "NA") 
                 ? "有效訊號不足" 
                 : ((light === null || light === undefined || light === "無資料") ? "無資料" : light);
@@ -477,6 +528,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               else if (cvd === 3) cvdDisplay = "高";              
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
+              blockText += `   - 恢復區間: ${batteryStateDisplay}\n`; // 新增輸出恢復區間
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
               blockText += `   - 靜息心率: ${rhrDisplay}\n`;
               blockText += `   - 恢復狀態: ${tagDisplay}\n`;
