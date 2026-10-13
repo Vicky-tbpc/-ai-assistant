@@ -2153,7 +2153,7 @@ async function appendTrendOptions() {
     document.getElementById('chat-history').innerHTML += html + '</div></div>';
     scrollToBottom();
 }
-async function requestTrendAiAnalysis(type, title, values, labels, days) {
+async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     appendUserMessage(`請幫我分析這 ${days} 天的【${title}】趨勢數據`);
     
     const loadingMsgId = `loading-${Date.now()}`;
@@ -2162,12 +2162,9 @@ async function requestTrendAiAnalysis(type, title, values, labels, days) {
     scrollToBottom();
 
     try {
-        const validDataPoints = labels.map((date, idx) => ({
-            date: date,
-            value: values[idx]
-        })).filter(d => d.value !== null && d.value !== undefined);
+        const validDataPoints = formattedDataPoints.filter(d => d.value !== null && d.value !== undefined);
 
-        const response = await fetch('/api/gemini_02', {
+        const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2556,7 +2553,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const pointColors = allPointColors.slice(-days);
     const subjectiveValues = allSubjectiveValues.slice(-days);
 
-    // 建立結構（移除 onclick，改用 class 識別）
+    // 建立結構（不破壞 canvas，並加入 data 屬性紀錄當前資料，方便重複點擊與時間轉換）
     container.innerHTML = `
         <div class="chart-info-header">
             <div class="chart-title-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -2569,9 +2566,18 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         <div class="chart-wrapper"><canvas></canvas></div>
     `;
 
-    // 透過 JS 事件監聽綁定，直接利用閉包傳遞 dailyValues 與 labels，徹底解決引號衝突
+    // 透過 JS 事件監聽綁定，支援多次點擊且不會重置畫面
     container.querySelector('.ai-analysis-btn').addEventListener('click', () => {
-        requestTrendAiAnalysis(type, config.title, dailyValues, labels, days);
+        // 如果是入睡或醒來規律性，把數值轉成上午/下午 12 小時制再傳給 AI
+        let formattedValues = dailyValues.map((val, idx) => {
+            let v = val;
+            if ((type === 'start' || type === 'end') && v !== null && v !== undefined) {
+                v = formatMinutesToAmPm(v);
+            }
+            return { date: labels[idx], value: v };
+        });
+
+        requestTrendAiAnalysis(type, config.title, formattedValues, days);
     });
 
     const ctx = container.querySelector('canvas').getContext('2d');
