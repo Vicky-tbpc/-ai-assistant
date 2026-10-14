@@ -1,4 +1,4 @@
-// api/gemini.js 39
+// api/gemini.js 39-2
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -119,7 +119,7 @@ export default async function handler(req, res) {
     // 客製化趨勢圖表 AI 分析攔截區塊
     // ==========================================
     if (action === 'trend_analysis') {
-      const { metric_data } = req.body;
+      const { metric_data, history = [], prompt } = req.body; // 💡 接收前端傳來的 history
       const metricName = metric_data?.metric || "健康指標";
       const daysCount = metric_data?.days || 7;
       const dataPointsStr = metric_data?.values ? metric_data.values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
@@ -141,12 +141,18 @@ ${dataPointsStr}
 3. 字數控制在 200 到 300 字左右，保持精簡扼要，段落分明。
 4. 絕對禁止使用敬稱，絕對禁止輸出 JSON 格式或程式碼標籤。
 5. 【絕對禁止】：嚴禁任何開場白、問候語或自我介紹（例如「嗨 ${nickname}」、「我是 ${ai_name}」等），必須直接切入數據分析主題。
-6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要自行替它加上「%」或「分」等單位。`;
+6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要絕對替它加上「%」或「分」等單位。`;
+
+      // 💡 組合歷史對話與本次的趨勢分析提示詞
+      const contents = [
+          ...history.map(h => ({ role: h.role, parts: h.parts })),
+          { role: "user", parts: [{ text: trendPrompt }] }
+      ];
 
       let trendRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: trendPrompt }] }] })
+        body: JSON.stringify({ contents: contents }) // 帶入完整歷史對話
       });
       
       let trendResult = await trendRes.json();
