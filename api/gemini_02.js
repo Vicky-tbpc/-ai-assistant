@@ -1,4 +1,4 @@
-// api/gemini.js 39-2
+// api/gemini.js 39-3
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -119,10 +119,12 @@ export default async function handler(req, res) {
     // 客製化趨勢圖表 AI 分析攔截區塊
     // ==========================================
     if (action === 'trend_analysis') {
-      const { metric_data, history = [], prompt } = req.body; // 💡 接收前端傳來的 history
+      const { metric_data, history = [], serial_number, local_date, local_time } = req.body;
       const metricName = metric_data?.metric || "健康指標";
       const daysCount = metric_data?.days || 7;
       const dataPointsStr = metric_data?.values ? metric_data.values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
+
+      const userQueryText = `請幫我分析這 ${daysCount} 天的【${metricName}】趨勢數據`;
 
       const trendPrompt = `【身份鎖定】
 你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
@@ -141,9 +143,8 @@ ${dataPointsStr}
 3. 字數控制在 200 到 300 字左右，保持精簡扼要，段落分明。
 4. 絕對禁止使用敬稱，絕對禁止輸出 JSON 格式或程式碼標籤。
 5. 【絕對禁止】：嚴禁任何開場白、問候語或自我介紹（例如「嗨 ${nickname}」、「我是 ${ai_name}」等），必須直接切入數據分析主題。
-6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要絕對替它加上「%」或「分」等單位。`;
+6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要替它加上「%」或「分」等單位。`;
 
-      // 💡 組合歷史對話與本次的趨勢分析提示詞
       const contents = [
           ...history.map(h => ({ role: h.role, parts: h.parts })),
           { role: "user", parts: [{ text: trendPrompt }] }
@@ -152,11 +153,27 @@ ${dataPointsStr}
       let trendRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: contents }) // 帶入完整歷史對話
+        body: JSON.stringify({ contents: contents })
       });
       
       let trendResult = await trendRes.json();
       const cleanTrendText = trendResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `這 ${daysCount} 天的 ${metricName} 數據大致穩定，繼續保持日常作息唷！`;
+
+      const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          serial_number: serial_number, 
+          user_query: userQueryText, 
+          ai_response: cleanTrendText,
+          record_date: local_date || new Date().toLocaleDateString('en-CA'), 
+          record_time: local_time || new Date().toLocaleTimeString('zh-TW', { hour12: false }), 
+          ai_model: 'Gemini-3.8-Flash-HybridRAG'
+        })
+      }).catch(e => console.error("背景存檔錯誤:", e));
+
+      waitUntil(logTask);
+
       return res.status(200).json({ text: cleanTrendText });
     }
     // ==========================================
