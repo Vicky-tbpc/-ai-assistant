@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n100-2</title>
+    <title>Soosyn 健康夥伴 n100-3</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2199,7 +2199,8 @@ async function triggerTrendAiAnalysis(cardId, type) {
 }
 
 async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
-    appendUserMessage(`請幫我分析這 ${days} 天的【${title}】趨勢數據`);
+    const userPrompt = `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
+    appendUserMessage(userPrompt);
     
     const loadingMsgId = `loading-${Date.now()}`;
     const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在分析 ${title} 趨勢數據，請稍候...</div></div>`;
@@ -2232,6 +2233,12 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
         if (response.ok) {
             const resData = await response.json();
             const aiText = resData.text || `這是針對 ${title} 的分析結果。`;
+            
+            // 💡 關鍵：將這段由按鈕觸發的問答，手動同步進 chatHistory 記憶體中！
+            chatHistory.push({ role: "user", parts: [{ text: userPrompt }] });
+            chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20); // 維持 20 筆上限
+
             appendAiMessage(aiText);
         } else {
             appendAiMessage(`分析服務目前有點忙碌，請稍後再試一次 😅`);
