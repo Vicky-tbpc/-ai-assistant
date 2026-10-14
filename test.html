@@ -2596,7 +2596,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
                 <button class="ai-analysis-btn" onclick="triggerTrendAiAnalysis('${cardId}', '${type}')" style="background: #596b75; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s;">AI 分析</button>
             </div>
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
-            ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: left; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
+            ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: right; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
         </div>
         <div class="chart-wrapper"><canvas></canvas></div>
     `;
