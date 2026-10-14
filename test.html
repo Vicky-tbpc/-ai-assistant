@@ -2203,7 +2203,7 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     
     const loadingMsgId = `loading-${Date.now()}`;
     const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在分析 ${title} 趨勢數據，請稍候...</div></div>`;
-    document.getElementById('chat-history').innerHTML += loadingHtml;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
     scrollToBottom();
 
     try {
