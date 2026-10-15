@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n100-3</title>
+    <title>Soosyn 健康夥伴 n100-4</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2199,7 +2199,17 @@ async function triggerTrendAiAnalysis(cardId, type) {
 }
 
 async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
-    const userPrompt = `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
+    const validDataPoints = formattedDataPoints.filter(d => d.value !== null && d.value !== undefined);
+    
+    // 💡 取得第一筆與最後一筆的日期作為區間
+    const startDate = validDataPoints.length > 0 ? validDataPoints[0].date : '';
+    const endDate = validDataPoints.length > 0 ? validDataPoints[validDataPoints.length - 1].date : '';
+    
+    // 💡 組合新的日期區間提示詞
+    const userPrompt = startDate && endDate 
+        ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
+        : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
+
     appendUserMessage(userPrompt);
     
     const loadingMsgId = `loading-${Date.now()}`;
@@ -2208,14 +2218,12 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     scrollToBottom();
 
     try {
-        const validDataPoints = formattedDataPoints.filter(d => d.value !== null && d.value !== undefined);
-
         const response = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'trend_analysis',
-                prompt: `請幫我分析這 ${days} 天的 ${title} 趨勢數據，給出專業且好懂的健康分析與建議。`,
+                prompt: userPrompt,
                 serial_number: currentSerial,
                 local_date: new Date().toLocaleDateString('en-CA'),
                 local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
@@ -2224,7 +2232,8 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
                     metric: title,
                     values: validDataPoints,
                     days: days
-                }
+                },
+                history: chatHistory // 確保帶入歷史紀錄維持對話上下文
             })
         });
 
@@ -2234,10 +2243,9 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
             const resData = await response.json();
             const aiText = resData.text || `這是針對 ${title} 的分析結果。`;
             
-            // 💡 關鍵：將這段由按鈕觸發的問答，手動同步進 chatHistory 記憶體中！
             chatHistory.push({ role: "user", parts: [{ text: userPrompt }] });
             chatHistory.push({ role: "model", parts: [{ text: aiText }] });
-            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20); // 維持 20 筆上限
+            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
             appendAiMessage(aiText);
         } else {
