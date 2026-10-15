@@ -1,4 +1,4 @@
-// api/gemini.js 39-4
+// api/gemini.js 39-5
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -86,6 +86,10 @@ export default async function handler(req, res) {
     // 客製化 AI 開場白攔截區塊
     // ==========================================
     if (action === 'generate_greeting') {
+      const { metric_data, serial_number, local_date, local_time } = req.body;
+      const metricName = metric_data?.metric || "健康指標";
+      const metricStatus = metric_data?.status || "狀態";
+
       const greetingPrompt = `【身份鎖定】
 你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
 絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
@@ -96,9 +100,9 @@ export default async function handler(req, res) {
 請根據以下提示，生成一句專屬的開場白。
 【規則】
 1. 第一句請自然地打招呼，表達歡迎回來的心情。你可以稱呼對方的暱稱「${nickname}」，也可以帶入你自己的名字「${ai_name}」。例如：「歡迎回來 ${nickname}！我是 ${ai_name} 👋」。
-2. 接著請根據以下指標狀態給予一句${metric_data.type}：
-   - 指標：${metric_data.metric}
-   - 狀態：${metric_data.status}
+2. 接著請根據以下指標狀態給予一句${metric_data?.type || '健康提示'}：
+   - 指標：${metricName}
+   - 狀態：${metricStatus}
 3. 說明完後，最後加上一句引導詢問。
 4. 語氣要像平輩朋友一樣自然。
 5. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
@@ -113,6 +117,26 @@ export default async function handler(req, res) {
       
       let greetingResult = await greetingRes.json();
       const cleanGreeting = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
+
+      // 💡 定義開場白的虛擬 user_query（記錄是根據哪個狀態生成的自動開場白）
+      const userQueryText = `系統自動開場白 (${metricName}：${metricStatus})`;
+
+      // 💡 寫入 Supabase chat_logs
+      const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          serial_number: serial_number, 
+          user_query: userQueryText, 
+          ai_response: cleanGreeting,
+          record_date: local_date || new Date().toLocaleDateString('en-CA'), 
+          record_time: local_time || new Date().toLocaleTimeString('zh-TW', { hour12: false }), 
+          ai_model: 'Gemini-3.8-Flash-HybridRAG'
+        })
+      }).catch(e => console.error("背景存檔錯誤:", e));
+
+      waitUntil(logTask);
+
       return res.status(200).json({ text: cleanGreeting });
     }
     // ==========================================
