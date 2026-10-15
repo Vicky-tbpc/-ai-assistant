@@ -1,4 +1,4 @@
-// api/gemini.js 39-3
+// api/gemini.js 39-4
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -122,9 +122,17 @@ export default async function handler(req, res) {
       const { metric_data, history = [], serial_number, local_date, local_time } = req.body;
       const metricName = metric_data?.metric || "健康指標";
       const daysCount = metric_data?.days || 7;
-      const dataPointsStr = metric_data?.values ? metric_data.values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
+      const values = metric_data?.values || [];
+      const dataPointsStr = values.length > 0 ? values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
 
-      const userQueryText = `請幫我分析這 ${daysCount} 天的【${metricName}】趨勢數據`;
+      // 💡 取得起訖日期
+      const startDate = values.length > 0 ? values[0].date : '';
+      const endDate = values.length > 0 ? values[values.length - 1].date : '';
+
+      // 💡 組合要顯示與存檔的查詢文字
+      const userQueryText = startDate && endDate 
+          ? `請幫我分析${startDate}到${endDate}的【${metricName}】趨勢數據`
+          : `請幫我分析這 ${daysCount} 天的【${metricName}】趨勢數據`;
 
       const trendPrompt = `【身份鎖定】
 你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
@@ -133,7 +141,7 @@ export default async function handler(req, res) {
 你的名字：${ai_name}
 使用者暱稱：${nickname}
 
-使用者要求對「${metricName}」最近 ${daysCount} 天的趨勢數據進行專業分析。
+使用者要求對「${metricName}」${startDate && endDate ? `${startDate}到${endDate}` : `最近 ${daysCount} 天`}的趨勢數據進行專業分析。
 以下是數據明細：
 ${dataPointsStr}
 
@@ -164,7 +172,7 @@ ${dataPointsStr}
         headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify({
           serial_number: serial_number, 
-          user_query: userQueryText, 
+          user_query: userQueryText, // 這裡會正確存入「請幫我分析YYYY-MM-DD到YYYY-MM-DD的...」
           ai_response: cleanTrendText,
           record_date: local_date || new Date().toLocaleDateString('en-CA'), 
           record_time: local_time || new Date().toLocaleTimeString('zh-TW', { hour12: false }), 
