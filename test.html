@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n100-4</title>
+    <title>Soosyn 健康夥伴 n100-5</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -4373,7 +4373,9 @@ async function callGreetingAPI(name, aiName, aiData) {
             body: JSON.stringify({
                 serial_number: currentSerial,                
                 action: 'generate_greeting', // 透過此標記攔截
-                metric_data: aiData
+                metric_data: aiData,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false })
             })
         });
         const data = await res.json();
