@@ -1,4 +1,4 @@
-// api/gemini.js 40
+// api/gemini.js 40-2
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -822,7 +822,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
 【對話與邏輯規則】
 1. 嚴禁使用敬稱，請一律用「你」稱呼對方（${nickname}）。語氣要像平輩朋友一樣自然，可加上適合的 emoji。
-2. 絕對不可以輸出 JSON、程式碼標籤或 Markdown code block。
+2. 絕對不可以輸出 Markdown code block 標籤（如 ```json），必須直接輸出純 JSON 格式。
 3. 【因果邏輯分析】：當天早晨的「恢復指數」與「發炎風險」(隸屬 record_end) 是由「前一天晚上」的入睡生理數據 (隸屬 record_date，即 record_end 減去一天) 計算而來的。
    👉 舉例：若使用者問 record_end 2026-06-21 的恢復狀況，你必須提取並分析 record_date 2026-06-20 的「晚上入睡生理數據」來幫他找原因。
 4. 【地端為主，智能補充為輔】：
@@ -836,8 +836,19 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 8. 【解讀專屬建議與情境扮演】：若有提供【💡 個人專屬健康建議】，請將生硬的資料轉化為口語化的解釋，並嚴格遵守以下限制：
    - ⚠️【極度重要】：若建議中包含【🎯 AI 專屬對話指引】，你必須完美扮演該指引中「👉 對話語氣與切入點設定」所要求的角色與語氣來解釋建議！
    - ⚠️【安全第一】：同時，請務必用朋友般關心的口吻，自然地將「👉 必須包含的安全提醒」融入你的回覆中。
-   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。`;
+   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。
+9. 【延伸問題歸納】：請根據你這次給出的分析或回答內容，額外歸納 3 個或 4 個使用者有可能會想繼續追問的延伸性問題。
+10. 【按鈕字數嚴格限制】：延伸問題的文字（包含標點符號）絕對必須維持在 20 個字以內，簡短有力，適合當作互動按鈕。
 
+請務必回傳嚴格合法的 JSON 格式（直接輸出 JSON，絕對不要使用任何 markdown code block），格式如下：
+{
+  "text": "這裡放置你的回答內容...",
+  "follow_up_questions": [
+    "延伸問題一？",
+    "延伸問題二？",
+    "延伸問題三？"
+  ]
+}`;
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
       return { role: h.role === 'user' ? 'user' : 'model', parts: [{ text: textContent }] };
@@ -847,6 +858,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
     // 🌟 在這裡先宣告 finalText，這樣後面的超連結替換和寫入資料庫才能抓到這個變數
     let finalText = "";
+    let followUpQuestions = []; // 💡 新增用來接收延伸問題的變數
 
     try {
       let finalRes = await fetch(finalUrl, {
@@ -854,7 +866,12 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: geminiHistory
+          contents: geminiHistory,
+          // 💡 強制要求 Gemini 輸出標準 JSON 格式
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
         })
       });
 
@@ -862,17 +879,17 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       console.log("🧠【Gemini Final HTTP Status】:", finalRes.status);
       console.log("🧠【Gemini Final OK】:", finalRes.ok);
 
+      if (!finalRes.ok) {
+        console.error("💥【Gemini Final API 錯誤】", finalRes.status, responseText);
+        throw new Error(`Gemini Final API ${finalRes.status}`);
+      }
+
       let finalResult;
       try {
         finalResult = JSON.parse(responseText);
       } catch (parseError) {
         console.error("❌ Gemini Final JSON 解析失敗:", parseError);
         throw new Error(`Gemini 回傳非 JSON，HTTP ${finalRes.status}`);
-      }
-
-      if (!finalRes.ok) {
-        console.error("💥【Gemini Final API 錯誤】", finalRes.status, JSON.stringify(finalResult));
-        throw new Error(`Gemini Final API ${finalRes.status}: ${finalResult?.error?.message || "Unknown error"}`);
       }
 
       if (finalResult?.promptFeedback?.blockReason) {
@@ -888,7 +905,22 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const candidate = finalResult.candidates[0];
       console.log("🧠【Gemini Finish Reason】:", candidate.finishReason);
 
-      finalText = candidate.content?.parts?.map(p => p.text || "").join("").trim();
+      let rawText = candidate.content?.parts?.map(p => p.text || "").join("").trim();
+      
+      // 清理可能殘留的 markdown 標籤
+      rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      // 💡 解析 AI 回傳的 JSON 結構
+      let parsedData;
+      try {
+        parsedData = JSON.parse(rawText);
+        finalText = parsedData.text || "這是為你準備的回答。";
+        followUpQuestions = parsedData.follow_up_questions || [];
+      } catch (parseErr) {
+        console.warn("⚠️ AI 回傳非預期 JSON，降級為純文字解析");
+        finalText = rawText;
+        followUpQuestions = [];
+      }
 
       if (!finalText) {
         console.error("⚠️【Gemini Candidate 沒有文字】:", JSON.stringify(candidate));
@@ -902,6 +934,32 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         text: "目前 AI 回覆服務有點忙碌，請稍後再試一次。"
       });
     }
+
+    // ==========================================
+    // 🚀 全動態標籤真實網址還原區塊 (不論未來新增多少連結，行數永遠固定)
+    // ==========================================
+    linkRules.forEach(rule => {
+      // 建立動態正則表達式，全域替換該標籤
+      const regex = new RegExp(rule.tag, 'g');
+      finalText = finalText.replace(regex, rule.markdown_content);
+    });
+
+    const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+      method: 'POST',
+      headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        serial_number: serial_number, user_query: prompt, ai_response: finalText,
+        record_date: local_date, record_time: local_time, ai_model: 'Gemini-3.8-Flash-HybridRAG'
+      })
+    }).catch(e => console.error("背景存檔錯誤:", e));
+
+    waitUntil(logTask);
+
+    // 💡 最終回傳：同時包含文字與 3~4 個延伸問題按鈕清單
+    return res.status(200).json({ 
+      text: finalText,
+      follow_up_questions: followUpQuestions 
+    });
 
     // ==========================================
     // 🚀 全動態標籤真實網址還原區塊 (不論未來新增多少連結，行數永遠固定)
