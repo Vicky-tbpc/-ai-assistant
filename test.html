@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n100-5</title>
+    <title>Soosyn 健康夥伴 n101</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2197,7 +2197,44 @@ async function triggerTrendAiAnalysis(cardId, type) {
 
     requestTrendAiAnalysis(type, title, formattedValues, days);
 }
+// 💡 渲染 AI 延伸問題按鈕選單
+function appendAiFollowUpOptions(questions) {
+    if (!questions || questions.length === 0) return;
 
+    let html = '<div class="msg-row ai-row"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px; margin-top:8px;">';
+    
+    questions.forEach(q => {
+        // 點選按鈕後，自動將文字填入輸入框並送出，或直接觸發對話
+        html += `<button class="action-btn" onclick="sendQuickQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>`;
+    });
+
+    html += '</div></div>';
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
+}
+
+// 快速點選延伸按鈕的觸發函數
+function sendQuickQuestion(questionText) {
+    // 移除現有的延伸按鈕，避免重複點擊
+    document.querySelectorAll('.ai-row div[style*="flex-wrap"]').forEach(el => {
+        if (el.querySelector('.action-btn')) {
+            // 可以選擇保留或移除，這裡示範點擊後移除按鈕群組或淡化
+            el.style.opacity = "0.6";
+            el.querySelectorAll('button').forEach(b => b.disabled = true);
+        }
+    });
+
+    // 模擬使用者送出該問題
+    appendUserMessage(questionText);
+    
+    // 呼叫原本的 AI 對話發送函數 (假設你的前端傳送函數叫 sendToGemini 或 handleUserMessage)
+    // 請依據你前端實際的發送函數名稱進行調整：
+    if (typeof handleUserMessage === 'function') {
+        handleUserMessage(questionText);
+    } else if (typeof sendToGemini === 'function') {
+        sendToGemini(questionText);
+    }
+}
 async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     const validDataPoints = formattedDataPoints.filter(d => d.value !== null && d.value !== undefined);
     
@@ -2248,6 +2285,11 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
             if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
             appendAiMessage(aiText);
+
+            // 💡 新增：若後端有回傳延伸問題清單，則在畫面上渲染按鈕
+            if (resData.follow_up_questions && resData.follow_up_questions.length > 0) {
+                appendAiFollowUpOptions(resData.follow_up_questions);
+            }
         } else {
             appendAiMessage(`分析服務目前有點忙碌，請稍後再試一次 😅`);
         }
