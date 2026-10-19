@@ -1,4 +1,4 @@
-// api/gemini.js 39-5
+// api/gemini.js 40
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -149,15 +149,14 @@ export default async function handler(req, res) {
       const values = metric_data?.values || [];
       const dataPointsStr = values.length > 0 ? values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
 
-      // 💡 取得起訖日期
       const startDate = values.length > 0 ? values[0].date : '';
       const endDate = values.length > 0 ? values[values.length - 1].date : '';
 
-      // 💡 組合要顯示與存檔的查詢文字
       const userQueryText = startDate && endDate 
           ? `請幫我分析${startDate}到${endDate}的【${metricName}】趨勢數據`
           : `請幫我分析這 ${daysCount} 天的【${metricName}】趨勢數據`;
 
+      // 💡 調整 Prompt，要求 AI 同時回傳分析文字與 3~4 個延伸問題
       const trendPrompt = `【身份鎖定】
 你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
 絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
@@ -172,10 +171,22 @@ ${dataPointsStr}
 【規則】
 1. 請以平輩朋友的語氣（使用「你」），給予專業、溫暖且具體的數據解讀與健康建議。
 2. 結構包含：趨勢觀察（是否有上升、下降或波動）、可能影響因素、以及具體的日常調整建議。
-3. 字數控制在 200 到 300 字左右，保持精簡扼要，段落分明。
-4. 絕對禁止使用敬稱，絕對禁止輸出 JSON 格式或程式碼標籤。
-5. 【絕對禁止】：嚴禁任何開場白、問候語或自我介紹（例如「嗨 ${nickname}」、「我是 ${ai_name}」等），必須直接切入數據分析主題。
-6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要替它加上「%」或「分」等單位。`;
+3. 分析文字的字數控制在 200 到 300 字左右，保持精簡扼要，段落分明。
+4. 絕對禁止使用敬稱。
+5. 【絕對禁止】：嚴禁任何開場白、問候語或自我介紹，必須直接切入數據分析主題。
+6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要替它加上「%」或「分」等單位。
+7. 【延伸問題歸納】：請根據你這次給出的分析內容，額外歸納 3 個或 4 個使用者有可能會想繼續追問的延伸性問題（例如詢問改善方法、生活習慣影響、或與其他指標的關聯）。
+
+請務必回傳嚴格合法的 JSON 格式（不要包在 markdown code block 裡面，直接輸出 JSON），格式如下：
+{
+  "text": "這裡放置你的 200~300 字健康分析內容...",
+  "follow_up_questions": [
+    "延伸問題一？",
+    "延伸問題二？",
+    "延伸問題三？",
+    "延伸問題四？"
+  ]
+}`;
 
       const contents = [
           ...history.map(h => ({ role: h.role, parts: h.parts })),
@@ -185,18 +196,41 @@ ${dataPointsStr}
       let trendRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: contents })
+        body: JSON.stringify({ 
+          contents: contents,
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
+        })
       });
       
       let trendResult = await trendRes.json();
-      const cleanTrendText = trendResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `這 ${daysCount} 天的 ${metricName} 數據大致穩定，繼續保持日常作息唷！`;
+      let rawTrendResponse = trendResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+      
+      // 清理可能存在的 markdown 標籤
+      rawTrendResponse = rawTrendResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      let parsedTrendData;
+      try {
+        parsedTrendData = JSON.parse(rawTrendResponse);
+      } catch (e) {
+        console.error("❌ 趨勢分析 JSON 解析失敗，回退預設格式", e);
+        parsedTrendData = {
+          text: `這 ${daysCount} 天的 ${metricName} 數據大致穩定，繼續保持日常作息唷！`,
+          follow_up_questions: ["如何進一步提升這個數值？", "最近有什麼需要特別注意的嗎？", "這跟我的睡眠品質有關嗎？"]
+        };
+      }
+
+      const cleanTrendText = parsedTrendData.text || `這 ${daysCount} 天的 ${metricName} 數據大致穩定。`;
+      const followUpQuestions = parsedTrendData.follow_up_questions || [];
 
       const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
         method: 'POST',
         headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify({
           serial_number: serial_number, 
-          user_query: userQueryText, // 這裡會正確存入「請幫我分析YYYY-MM-DD到YYYY-MM-DD的...」
+          user_query: userQueryText, 
           ai_response: cleanTrendText,
           record_date: local_date || new Date().toLocaleDateString('en-CA'), 
           record_time: local_time || new Date().toLocaleTimeString('zh-TW', { hour12: false }), 
@@ -206,7 +240,11 @@ ${dataPointsStr}
 
       waitUntil(logTask);
 
-      return res.status(200).json({ text: cleanTrendText });
+      // 💡 同時將文字與 3~4 個按鈕問題回傳給前端
+      return res.status(200).json({ 
+        text: cleanTrendText, 
+        follow_up_questions: followUpQuestions 
+      });
     }
     // ==========================================
     // 第一階段：超級大腦 Gemini 進行意圖判斷 (Router)
