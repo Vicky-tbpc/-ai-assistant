@@ -2201,11 +2201,13 @@ async function triggerTrendAiAnalysis(cardId, type) {
 function appendAiFollowUpOptions(questions) {
     if (!questions || questions.length === 0) return;
 
-    let html = '<div class="msg-row ai-row"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px; margin-top:8px;">';
+    // 給整個按鈕容器一個獨一無二的 ID，方便點擊後精準移除
+    const containerId = `followup-container-${Date.now()}`;
+    let html = `<div class="msg-row ai-row" id="${containerId}"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px; margin-top:8px;">`;
     
     questions.forEach(q => {
-        // 點選按鈕後，自動將文字填入輸入框並送出，或直接觸發對話
-        html += `<button class="action-btn" onclick="sendQuickQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>`;
+        // 傳入 containerId 讓點擊後可以把這整組選單移除
+        html += `<button class="action-btn" onclick="sendQuickQuestion('${q.replace(/'/g, "\\'")}', '${containerId}')">${q}</button>`;
     });
 
     html += '</div></div>';
@@ -2214,25 +2216,61 @@ function appendAiFollowUpOptions(questions) {
 }
 
 // 快速點選延伸按鈕的觸發函數
-function sendQuickQuestion(questionText) {
-    // 移除現有的延伸按鈕，避免重複點擊
-    document.querySelectorAll('.ai-row div[style*="flex-wrap"]').forEach(el => {
-        if (el.querySelector('.action-btn')) {
-            // 可以選擇保留或移除，這裡示範點擊後移除按鈕群組或淡化
-            el.style.opacity = "0.6";
-            el.querySelectorAll('button').forEach(b => b.disabled = true);
-        }
-    });
+async function sendQuickQuestion(questionText, containerId) {
+    // 1. 點選後立刻將該組按鈕選單從畫面移除 (符合需求 2)
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.remove();
+    }
 
-    // 模擬使用者送出該問題
+    // 2. 在畫面上顯示使用者點選的問題泡泡
     appendUserMessage(questionText);
-    
-    // 呼叫原本的 AI 對話發送函數 (假設你的前端傳送函數叫 sendToGemini 或 handleUserMessage)
-    // 請依據你前端實際的發送函數名稱進行調整：
-    if (typeof handleUserMessage === 'function') {
-        handleUserMessage(questionText);
-    } else if (typeof sendToGemini === 'function') {
-        sendToGemini(questionText);
+
+    // 3. 顯示載入中的泡泡
+    const loadingMsgId = `loading-${Date.now()}`;
+    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在思考中，請稍候...</div></div>`;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
+    scrollToBottom();
+
+    try {
+        // 4. 將問題送給後端一般聊天 API (與一般輸入框對話走相同的 API)
+        const response = await fetch('/api/gemini_02', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: questionText,
+                serial_number: currentSerial,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
+                history: chatHistory
+            })
+        });
+
+        document.getElementById(loadingMsgId)?.remove();
+
+        if (response.ok) {
+            const resData = await response.json();
+            const aiText = resData.text || `收到你的問題囉！`;
+
+            // 更新對話上下文歷史
+            chatHistory.push({ role: "user", parts: [{ text: questionText }] });
+            chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+            // 5. 顯示 AI 回答泡泡 (符合需求 3)
+            appendAiMessage(aiText);
+
+            // 6. 如果一般對話 API 也有支援回傳延伸問題，也可以在這裡一併渲染 (或維持 trend_analysis 專用)
+            if (resData.follow_up_questions && resData.follow_up_questions.length > 0) {
+                appendAiFollowUpOptions(resData.follow_up_questions);
+            }
+        } else {
+            appendAiMessage(`回覆服務目前有點忙碌，請稍後再試一次 😅`);
+        }
+    } catch (err) {
+        console.error("快速對話請求錯誤:", err);
+        document.getElementById(loadingMsgId)?.remove();
+        appendAiMessage(`連線發生錯誤，請稍後再試 😅`);
     }
 }
 async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
