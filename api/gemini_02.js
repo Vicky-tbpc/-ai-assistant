@@ -1,4 +1,4 @@
-// api/gemini.js 40
+// api/gemini.js 40-2
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -836,7 +836,19 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 8. 【解讀專屬建議與情境扮演】：若有提供【💡 個人專屬健康建議】，請將生硬的資料轉化為口語化的解釋，並嚴格遵守以下限制：
    - ⚠️【極度重要】：若建議中包含【🎯 AI 專屬對話指引】，你必須完美扮演該指引中「👉 對話語氣與切入點設定」所要求的角色與語氣來解釋建議！
    - ⚠️【安全第一】：同時，請務必用朋友般關心的口吻，自然地將「👉 必須包含的安全提醒」融入你的回覆中。
-   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。`;
+   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。
+9. 【延伸問題歸納】：請根據你這次的回覆內容，額外歸納 3 個或 4 個使用者有可能會想繼續追問的延伸性問題。
+10. 【按鈕字數嚴格限制】：延伸問題的文字（包含標點符號）**絕對必須維持在 20 個字以內**，簡短有力，適合當作互動按鈕。
+
+請務必回傳嚴格合法的 JSON 格式（不要包在 markdown code block 裡面，直接輸出 JSON），格式如下：
+{
+  "text": "這裡放置你的回覆內容...",
+  "follow_up_questions": [
+    "按鈕文字1？",
+    "按鈕文字2？",
+    "按鈕文字3？"
+  ]
+}`;
 
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
@@ -848,13 +860,20 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     // 🌟 在這裡先宣告 finalText，這樣後面的超連結替換和寫入資料庫才能抓到這個變數
     let finalText = "";
 
+    let followUpQuestions = []; // 宣告變數供後續回傳使用
+
     try {
       let finalRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: geminiHistory
+          contents: geminiHistory,
+          // 💡 加入 generationConfig 強制輸出 JSON 格式
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
         })
       });
 
@@ -888,12 +907,29 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const candidate = finalResult.candidates[0];
       console.log("🧠【Gemini Finish Reason】:", candidate.finishReason);
 
-      finalText = candidate.content?.parts?.map(p => p.text || "").join("").trim();
+      let rawFinalResponse = candidate.content?.parts?.map(p => p.text || "").join("").trim() || "";
 
-      if (!finalText) {
+      if (!rawFinalResponse) {
         console.error("⚠️【Gemini Candidate 沒有文字】:", JSON.stringify(candidate));
         throw new Error(`Gemini candidate 沒有文字，finishReason=${candidate.finishReason}`);
       }
+
+      // 💡 清理可能存在的 markdown 標籤並解析 JSON
+      rawFinalResponse = rawFinalResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      let parsedFinalData;
+      try {
+        parsedFinalData = JSON.parse(rawFinalResponse);
+      } catch (e) {
+        console.error("❌ 一般對話 JSON 解析失敗，回退預設格式", e);
+        parsedFinalData = {
+          text: rawFinalResponse,
+          follow_up_questions: ["如何進一步改善？", "最近有什麼需要注意的嗎？", "這跟我的睡眠有關嗎？"]
+        };
+      }
+
+      finalText = parsedFinalData.text || "";
+      followUpQuestions = parsedFinalData.follow_up_questions || [];
 
     } catch (error) {
       console.error("❌【Gemini Final 最終階段失敗】:", error);
@@ -923,7 +959,10 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
     waitUntil(logTask);
 
-    return res.status(200).json({ text: finalText });
+    return res.status(200).json({ 
+      text: finalText, 
+      follow_up_questions: followUpQuestions 
+    });
 
   } catch (error) {
     console.error(error);
