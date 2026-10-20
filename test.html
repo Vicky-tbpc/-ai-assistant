@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101</title>
+    <title>Soosyn 健康夥伴 n101-2</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -4218,6 +4218,83 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 // --- 修正後的呼叫 Gemini API 函式 ---
 let chatHistory = [];
 
+// 💡 渲染 AI 延伸問題按鈕選單（對應需求 3）
+function appendAiFollowUpOptions(questions) {
+    if (!questions || questions.length === 0) return;
+
+    // 給整個按鈕容器一個獨一無二的 ID，方便點擊後精準移除
+    const containerId = `followup-container-${Date.now()}`;
+    let html = `<div class="msg-row ai-row" id="${containerId}"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px; margin-top:8px;">`;
+    
+    questions.forEach(q => {
+        // 傳入 containerId 讓點擊後可以把這整組選單移除
+        html += `<button class="action-btn" onclick="sendQuickQuestion('${q.replace(/'/g, "\\'")}', '${containerId}')">${q}</button>`;
+    });
+
+    html += '</div></div>';
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
+}
+
+// 快速點選延伸按鈕的觸發函數（對應需求 3）
+async function sendQuickQuestion(questionText, containerId) {
+    // 1. 點選後立刻將該組按鈕選單從畫面移除
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.remove();
+    }
+
+    // 2. 在畫面上顯示使用者點選的問題泡泡
+    appendUserMessage(questionText);
+
+    // 3. 顯示載入中的泡泡
+    const loadingMsgId = `loading-${Date.now()}`;
+    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在思考中，請稍候...</div></div>`;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
+    scrollToBottom();
+
+    try {
+        // 4. 將問題送給後端一般聊天 API
+        const response = await fetch('/api/gemini_02', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: questionText,
+                serial_number: currentSerial,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
+                history: chatHistory
+            })
+        });
+
+        document.getElementById(loadingMsgId)?.remove();
+
+        if (response.ok) {
+            const resData = await response.json();
+            const aiText = resData.text || `收到你的問題囉！`;
+
+            // 更新對話上下文歷史
+            chatHistory.push({ role: "user", parts: [{ text: questionText }] });
+            chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+            // 5. 顯示 AI 回答泡泡
+            appendAiMessage(aiText);
+
+            // 6. 如果後端有回傳後續的延伸問題，繼續渲染按鈕
+            if (resData.follow_up_questions && resData.follow_up_questions.length > 0) {
+                appendAiFollowUpOptions(resData.follow_up_questions);
+            }
+        } else {
+            appendAiMessage(`回覆服務目前有點忙碌，請稍後再試一次 😅`);
+        }
+    } catch (err) {
+        console.error("快速對話請求錯誤:", err);
+        document.getElementById(loadingMsgId)?.remove();
+        appendAiMessage(`連線發生錯誤，請稍後再試 😅`);
+    }
+}
+
 async function callGeminiAPI(prompt) {
     const typingId = 'typing-' + Date.now();
     const historyElem = document.getElementById('chat-history'); // 確保變數名稱統一
@@ -4264,18 +4341,16 @@ async function callGeminiAPI(prompt) {
         chatHistory.push({ role: "user", parts: [{ text: prompt }] });
         chatHistory.push({ role: "model", parts: [{ text: data.text }] });
 
-        // 限制紀錄長度 (例如只留最近 10 次對話)
+        // 限制紀錄長度
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
         // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
-        // 👇 判斷後端回傳的 action 來決定前端要做什麼動作
+        // 判斷後端回傳的 action
         if (data.action === 'open_pdf') {
-            // --- 👑 新增功能：先向地端 API 檢查該日期是否有資料 ---
             try {
-                // 準備查詢參數，限制只查目標日期這天
                 const params = new URLSearchParams({
                     serial: currentSerial,
                     start: data.date,
@@ -4286,37 +4361,34 @@ async function callGeminiAPI(prompt) {
                 if (!checkRes.ok) throw new Error("地端連線失敗");
                 
                 const checkData = await checkRes.json();
-                
-                // 確認回傳資料中有沒有包含這天的紀錄
                 const hasReport = checkData.find(r => r.record_date === data.date);
 
                 if (hasReport) {
-                    // 有找到報告：延遲一下再產生開啟 PDF 的按鈕
                     setTimeout(() => {
                         appendPdfButton(data.date); 
                     }, 500);
-                    // 讓程式繼續往下走，最後會回傳並印出原本的 data.text ("沒問題！...")
                 } else {
-                    // 沒找到報告：直接覆蓋掉 AI 原本的台詞，並提早 return！
-                    // 這樣就不會印出「沒問題！...」，也不會產生兩句對話了
                     return `幫你確認過了，**${data.date.replace(/-/g, '/')}** 這天沒有睡眠報告喔 😅，可能是還沒記錄到或尚未同步！`;
                 }
             } catch (err) {
                 console.error("檢查報告發生錯誤:", err);
-                // 發生錯誤：一樣覆蓋台詞並提早 return
                 return `哎呀，連線檢查 **${data.date.replace(/-/g, '/')}** 的報告時發生了一點問題，請確認一下地端伺服器有沒有正常開啟喔！ 🔌`;
             }
-            // --------------------------------------------------------
         } else if (data.action === 'show_trend_options') {
-            // 使用者沒說清楚，跳出選單
             setTimeout(() => {
                 appendTrendOptions();
             }, 500);
         } else if (data.action === 'show_specific_trend') {
-            // 使用者有明確指定，直接畫特定圖表 (預設顯示 7 天)
             setTimeout(() => {
                 renderTrendCard(data.trend_type, 7);
             }, 500);
+        }
+
+        // 💡 新增：若一般聊天對話回傳結果中包含 follow_up_questions，則在 AI 泡泡下方渲染按鈕選單
+        if (data.follow_up_questions && data.follow_up_questions.length > 0) {
+            setTimeout(() => {
+                appendAiFollowUpOptions(data.follow_up_questions);
+            }, 300);
         }
 
         return data.text;
