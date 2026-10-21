@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-3-2</title>
+    <title>Soosyn 健康夥伴 n101-4</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -625,6 +625,26 @@ function getRandomEndQuestion() {
         "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
 
+// 10個指定的延伸問題按鈕選項
+const RANDOM_QUESTION_POOL = [
+    "分析最近的睡眠狀況",
+    "近期的恢復指數變化",
+    "發炎風險是什麼？",
+    "HBI代表什麼？",
+    "我的N3深睡足夠嗎？",
+    "靜息心率的意義？",
+    "改善睡眠品質的方法",
+    "rMSSD心率變異度與健康的關係",
+    "恢復指數偏低的原因",
+    "最近的發炎風險分析"
+];
+
+// 從陣列中隨機抽樣指定數量（例如3個）不重複的項目
+function getRandomQuestions(arr, count = 3) {
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+}
+
 async function login() {
     const serial = document.getElementById('serial').value;
     const pw = document.getElementById('pw').value;
@@ -973,7 +993,12 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).limit(1).maybeSingle();
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細百科資料。`);
             await new Promise(r => setTimeout(r, 800));
-            await appendAiMessage(getRandomEndQuestion());
+            
+            // 💡 在這裡發送結語並附帶隨機 3 個按鈕
+            const endMsg = getRandomEndQuestion();
+            await appendAiMessage(endMsg);
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
             return;
         }
 
@@ -1034,8 +1059,11 @@ try {
 if (!targetData) {
     await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(getRandomEndQuestion());
-    return;
+    const endMsg = getRandomEndQuestion();
+            await appendAiMessage(endMsg);
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
+            return;
 }
 
         const raw = targetData.raw_json;
@@ -1088,7 +1116,12 @@ if (!targetData) {
 
         await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
-        await appendAiMessage(getRandomEndQuestion());
+        
+        // 💡 這裡將原本的結語擴充為「隨機罐頭結語 + 3個隨機延伸問題按鈕」
+        const endMsg = getRandomEndQuestion();
+        await appendAiMessage(endMsg);
+        const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+        appendAiFollowUpOptions(selectedQuestions);
 
     } catch (err) {
         console.error("Query Error:", err);
@@ -2913,7 +2946,6 @@ async function processSummarySearch(d, displayDate) {
     
     if (data) {
         // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
-        // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
         await appendSummaryCard(finalDisplayDate, data, currentSerial)
         
         // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
@@ -2923,9 +2955,17 @@ async function processSummarySearch(d, displayDate) {
             await appendAiMessage(data.flowSuggestion); 
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
+            
+            // 💡 在這裡隨機挑選 3 個按鈕並顯示
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
         } else {
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
+            
+            // 💡 在這裡隨機挑選 3 個按鈕並顯示
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
         }
     } else {
         // 如果沒資料，提示時也使用顯示日期比較不容易讓使用者困惑
