@@ -825,10 +825,12 @@ userNickname = name;      // 存入全域變數
                 await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 await new Promise(r => setTimeout(r, 600));
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+                const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+                appendAiFollowUpOptions(selectedQuestions);
             }
         }
-    } // 👈 補上這個：結束 if (!aiName) 的 else 區塊
-} // 👈 補上這個：結束 initApp 函式
+    }
+}
  
 // 1. 日期判斷工具
 function getTargetDate(msg) {
