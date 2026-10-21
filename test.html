@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-4</title>
+    <title>Soosyn 健康夥伴 n101-5</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2262,9 +2262,70 @@ function appendAiFollowUpOptions(questions) {
     scrollToBottom();
 }
 
-// 快速點選延伸按鈕的觸發函數
+// --- 1. 檢查與處理 Gemini 授權流程 ---
+async function handleGeminiTransfer(userInput) {
+    try {
+        // 查詢 Supabase 資料庫是否已經有同意紀錄
+        const { data: permission, error } = await _supabase
+            .from('user_ai_permissions')
+            .select('is_agreed')
+            .eq('serial_number', currentSerial)
+            .maybeSingle();
+
+        if (permission && permission.is_agreed) {
+            // A. 如果已經同意過，回傳 true 讓後續程式碼繼續執行 API 請求
+            return true;
+        } else {
+            // B. 如果沒紀錄或未同意，顯示詢問介面，並回傳 false 攔截請求
+            appendAiMessage("請問您是否同意啟用 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
+            
+            // 動態產生同意/不同意按鈕
+            const chatHistory = document.getElementById('chat-history');
+            const btnContainerId = 'consent-btns-' + Date.now();
+            const btnHtml = `
+                <div class="msg-row ai-row" id="${btnContainerId}">
+                    <div style="margin-left: 45px; display: flex; gap: 10px; margin-top: 8px;">
+                        <button onclick="saveConsent('${userInput.replace(/'/g, "\\'")}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#a79d8c; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">不同意</button>
+                    </div>
+                </div>
+            `;
+            chatHistory.insertAdjacentHTML('beforeend', btnHtml);
+            scrollToBottom();
+            return false;
+        }
+    } catch (err) {
+        console.error("Consent check error:", err);
+        return false;
+    }
+}
+
+// --- 2. 儲存同意結果並執行原始問題 ---
+async function saveConsent(originalPrompt, agreed, btnId) {
+    // 移除按鈕避免重複點擊
+    const btnElem = document.getElementById(btnId);
+    if (btnElem) btnElem.remove();
+
+    if (agreed) {
+        // 寫入 Supabase user_ai_permissions 表
+        await _supabase.from('user_ai_permissions').upsert({
+            serial_number: currentSerial,
+            is_agreed: true,
+            agreed_at: new Date()
+        });
+
+        appendAiMessage("感謝您的同意，正在為您分析...");
+        
+        // 使用者同意授權後，自動觸發原本要詢問的問題 (沒有傳 containerId，因為按鈕剛才已經被移除)
+        executeQuickQuestion(originalPrompt);
+    } else {
+        appendAiMessage("好的，我將不會使用 AI 處理此問題。");
+    }
+}
+
+// 快速點選延伸按鈕的觸發入口（加入授權檢查）
 async function sendQuickQuestion(questionText, containerId) {
-    // 1. 點選後立刻將該組按鈕選單從畫面移除 (符合需求 2)
+    // 1. 點選後立刻將該組按鈕選單從畫面移除
     const container = document.getElementById(containerId);
     if (container) {
         container.remove();
@@ -2273,14 +2334,25 @@ async function sendQuickQuestion(questionText, containerId) {
     // 2. 在畫面上顯示使用者點選的問題泡泡
     appendUserMessage(questionText);
 
-    // 3. 顯示載入中的泡泡
+    // 3. 檢查授權狀態
+    const hasPermission = await handleGeminiTransfer(questionText);
+    
+    // 4. 若已獲得授權，直接執行 AI 思考與請求
+    if (hasPermission) {
+        await executeQuickQuestion(questionText);
+    }
+}
+
+// 實際發送給 Gemini API 的執行函式
+async function executeQuickQuestion(questionText) {
+    // 顯示載入中的泡泡
     const loadingMsgId = `loading-${Date.now()}`;
     const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在思考中，請稍候...</div></div>`;
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
     scrollToBottom();
 
     try {
-        // 4. 將問題送給後端一般聊天 API (與一般輸入框對話走相同的 API)
+        // 將問題送給後端一般聊天 API
         const response = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2304,10 +2376,10 @@ async function sendQuickQuestion(questionText, containerId) {
             chatHistory.push({ role: "model", parts: [{ text: aiText }] });
             if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
-            // 5. 顯示 AI 回答泡泡 (符合需求 3)
+            // 顯示 AI 回答泡泡
             appendAiMessage(aiText);
 
-            // 6. 如果一般對話 API 也有支援回傳延伸問題，也可以在這裡一併渲染 (或維持 trend_analysis 專用)
+            // 如果後端有回傳延伸問題按鈕，一併渲染
             if (resData.follow_up_questions && resData.follow_up_questions.length > 0) {
                 appendAiFollowUpOptions(resData.follow_up_questions);
             }
