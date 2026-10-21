@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-5</title>
+    <title>Soosyn 健康夥伴 n101-6</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2222,7 +2222,7 @@ async function appendTrendOptions() {
     scrollToBottom();
 }
 
-// 供內聯 onclick 呼叫的 AI 分析觸發函數（不受 innerHTML 重新渲染影響）
+// 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
 async function triggerTrendAiAnalysis(cardId, type) {
     const storeKey = `${cardId}_${type}`;
     const dataObj = window._trendDataStore?.[storeKey];
@@ -2233,7 +2233,6 @@ async function triggerTrendAiAnalysis(cardId, type) {
 
     const { title, dailyValues, labels, days } = dataObj;
     
-    // 如果是入睡或醒來規律性，把數值轉成上午/下午 12 小時制再傳給 AI
     let formattedValues = dailyValues.map((val, idx) => {
         let v = val;
         if ((type === 'start' || type === 'end') && v !== null && v !== undefined) {
@@ -2242,8 +2241,23 @@ async function triggerTrendAiAnalysis(cardId, type) {
         return { date: labels[idx], value: v };
     });
 
-    requestTrendAiAnalysis(type, title, formattedValues, days);
+    const validDataPoints = formattedValues.filter(d => d.value !== null && d.value !== undefined);
+    const startDate = validDataPoints.length > 0 ? validDataPoints[0].date : '';
+    const endDate = validDataPoints.length > 0 ? validDataPoints[validDataPoints.length - 1].date : '';
+    
+    const userPrompt = startDate && endDate 
+        ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
+        : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
+
+    // 1. 檢查 AI 使用授權
+    const hasPermission = await handleGeminiTransfer(userPrompt);
+
+    // 2. 如果已授權，直接執行原本的 AI 分析函式
+    if (hasPermission) {
+        requestTrendAiAnalysis(type, title, formattedValues, days);
+    }
 }
+
 // 💡 渲染 AI 延伸問題按鈕選單
 function appendAiFollowUpOptions(questions) {
     if (!questions || questions.length === 0) return;
@@ -2301,6 +2315,7 @@ async function handleGeminiTransfer(userInput) {
 }
 
 // --- 2. 儲存同意結果並執行原始問題 ---
+// --- 2. 儲存同意結果並執行 ---
 async function saveConsent(originalPrompt, agreed, btnId) {
     // 移除按鈕避免重複點擊
     const btnElem = document.getElementById(btnId);
@@ -2316,8 +2331,15 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 
         appendAiMessage("感謝您的同意，正在為您分析...");
         
-        // 使用者同意授權後，自動觸發原本要詢問的問題 (沒有傳 containerId，因為按鈕剛才已經被移除)
-        executeQuickQuestion(originalPrompt);
+        // 判斷是「趨勢圖 AI 分析」還是「快速問答」
+        if (originalPrompt.includes("趨勢數據")) {
+            const activeCard = document.querySelector('.trend-card');
+            if (activeCard) {
+                triggerTrendAiAnalysis(activeCard.id, activeCard.dataset.type);
+            }
+        } else {
+            executeQuickQuestion(originalPrompt);
+        }
     } else {
         appendAiMessage("好的，我將不會使用 AI 處理此問題。");
     }
