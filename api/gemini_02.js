@@ -1,4 +1,4 @@
-// api/gemini.js 40-2
+// api/gemini.js 40-3
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -106,19 +106,52 @@ export default async function handler(req, res) {
 3. 說明完後，最後加上一句引導詢問。
 4. 語氣要像平輩朋友一樣自然。
 5. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
+6. 【延伸問題歸納】：請根據你這次生成的開場白內容，額外歸納 3 個使用者有可能會想繼續追問或了解的延伸性問題。
+7. 【按鈕字數嚴格限制】：延伸問題的文字（包含標點符號）**絕對必須維持在 20 個字以內**，簡短有力，適合當作互動按鈕。
 
-請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
+請務必回傳嚴格合法的 JSON 格式（不要包在 markdown code block 裡面，直接輸出 JSON），格式如下：
+{
+  "text": "這裡放置你的開場白內容...",
+  "follow_up_questions": [
+    "按鈕文字1？",
+    "按鈕文字2？",
+    "按鈕文字3？"
+  ]
+}`;
 
       let greetingRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: greetingPrompt }] }] })
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: greetingPrompt }] }],
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
+        })
       });
       
       let greetingResult = await greetingRes.json();
-      const cleanGreeting = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
+      let rawGreetingResponse = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+      
+      // 清理可能存在的 markdown 標籤
+      rawGreetingResponse = rawGreetingResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-      // 💡 定義開場白的虛擬 user_query（記錄是根據哪個狀態生成的自動開場白）
+      let parsedGreetingData;
+      try {
+        parsedGreetingData = JSON.parse(rawGreetingResponse);
+      } catch (e) {
+        console.error("❌ 開場白 JSON 解析失敗，回退預設格式", e);
+        parsedGreetingData = {
+          text: `歡迎回來 ${nickname}！我是 ${ai_name} 👋 今天想了解哪些健康數據呢？`,
+          follow_up_questions: ["幫我看一下昨天的睡眠報告", "最近的恢復指數表現如何？", "給我今天的健康建議"]
+        };
+      }
+
+      const cleanGreeting = parsedGreetingData.text || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
+      const greetingFollowUps = parsedGreetingData.follow_up_questions || [];
+
+      // 💡 定義開場白的虛擬 user_query
       const userQueryText = `系統自動開場白 (${metricName}：${metricStatus})`;
 
       // 💡 寫入 Supabase chat_logs
@@ -137,7 +170,11 @@ export default async function handler(req, res) {
 
       waitUntil(logTask);
 
-      return res.status(200).json({ text: cleanGreeting });
+      // 💡 同時將開場白文字與按鈕陣列回傳給前端
+      return res.status(200).json({ 
+        text: cleanGreeting,
+        follow_up_questions: greetingFollowUps
+      });
     }
     // ==========================================
     // 客製化趨勢圖表 AI 分析攔截區塊
