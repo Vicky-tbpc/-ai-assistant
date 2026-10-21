@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-2</title>
+    <title>Soosyn 健康夥伴 n101-3</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -778,13 +778,25 @@ userNickname = name;      // 存入全域變數
                     `);
                     scrollToBottom();
 
-                    // 呼叫專屬的 AI 開場白 API
-                    const greeting = await callGreetingAPI(name, aiName, aiData);
+                    // 呼叫專屬的 AI 開場白 API (取得包含文字與按鈕的物件)
+                    const greetingData = await callGreetingAPI(name, aiName, aiData);
                     
                     document.getElementById(typingId)?.remove();
-                    await appendAiMessage(greeting);
+                    
+                    // 1. 顯示 AI 開場白文字泡泡
+                    await appendAiMessage(greetingData.text);
+                    
+                    // 2. 💡 渲染 3 個延伸問題按鈕選單在開場白下方
+                    if (greetingData.follow_up_questions && greetingData.follow_up_questions.length > 0) {
+                        setTimeout(() => {
+                            appendAiFollowUpOptions(greetingData.follow_up_questions);
+                        }, 300);
+                    }
+
                     usedAIGreeting = true;
-chatHistory.push({ role: "model", parts: [{ text: greeting }] });
+                    
+                    // 3. 將開場白寫入 chatHistory 歷史紀錄
+                    chatHistory.push({ role: "model", parts: [{ text: greetingData.text }] });
                 }
             }
 
@@ -4516,7 +4528,7 @@ async function getAIGreetingPayload(serial) {
     }
 }
 
-// --- 新增：呼叫後端專屬開場白 API ---
+// --- 修改：呼叫後端專屬開場白 API (支援延伸問題按鈕) ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
         const res = await fetch('/api/gemini_02', {
@@ -4531,10 +4543,14 @@ async function callGreetingAPI(name, aiName, aiData) {
             })
         });
         const data = await res.json();
-        return data.text;
+        // 💡 直接回傳整個 data 物件（包含 text 與 follow_up_questions）
+        return data;
     } catch (err) {
         console.error("Greeting API Error:", err);
-        return `歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋\n健康是一點一滴累積的！想查看哪個資訊呢？`; 
+        return { 
+            text: `歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋\n健康是一點一滴累積的！想查看哪個資訊呢？`,
+            follow_up_questions: ["幫我看一下昨天的睡眠報告", "最近的恢復指數表現如何？", "給我今天的健康建議"]
+        }; 
     }
 }
 
