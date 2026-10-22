@@ -2149,6 +2149,54 @@ async function showSummaryFlow(isFirstTime = false) {
 }
 
 // --- 趨勢圖專用函數庫 ---
+
+// 全域 MutationObserver：監控 #chat-history 變動，若趨勢圖表因聊天室訊息新增而被清空，自動重新渲染圖表
+if (!window._trendObserver) {
+    window._trendObserver = new MutationObserver((mutations) => {
+        // 💡 檢查這次的 DOM 變動是不是我們自己新增的對話、授權按鈕或載入泡泡
+        // 如果是，直接跳過，不要觸發圖表重繪，避免造成白畫面！
+        let shouldSkip = false;
+        for (let mutation of mutations) {
+            for (let node of mutation.addedNodes) {
+                if (node.nodeType === 1) { // 元素節點
+                    // 如果新增的是訊息列、同意按鈕容器、或載入中泡泡，就忽略
+                    if (node.classList?.contains('msg-row') || 
+                        node.id?.includes('consent-btns') || 
+                        node.id?.includes('loading')) {
+                        shouldSkip = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldSkip) break;
+        }
+        if (shouldSkip) return;
+
+        const cards = document.querySelectorAll('.trend-card');
+        cards.forEach(card => {
+            const cardId = card.id;
+            const days = parseInt(card.dataset.days || 7, 10);
+            const offset = parseInt(card.dataset.offset || 0, 10);
+            const type = card.dataset.type;
+            
+            const contentDiv = card.querySelector('.trend-content');
+            if (contentDiv && (!contentDiv.querySelector('canvas') || !contentDiv.querySelector('canvas').dataset.rendered)) {
+                if (type && cardId) {
+                    updateTrend(cardId, type, days, offset);
+                }
+            }
+        });
+    });
+
+    const checkAndObserveChat = setInterval(() => {
+        const chatHistory = document.getElementById('chat-history');
+        if (chatHistory) {
+            window._trendObserver.observe(chatHistory, { childList: true, subtree: true });
+            clearInterval(checkAndObserveChat);
+        }
+    }, 500);
+}
+
 async function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
@@ -2220,13 +2268,16 @@ async function triggerTrendAiAnalysis(cardId, type) {
         ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
         : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
 
-    // 1. 檢查 AI 使用授權
-    const hasPermission = await handleGeminiTransfer(userPrompt, cardId, type);
+    // 💡 用 setTimeout 隔離執行緒，避免點擊瞬間的 DOM 插入引發畫布清除
+    setTimeout(async () => {
+        // 1. 檢查 AI 使用授權
+        const hasPermission = await handleGeminiTransfer(userPrompt, cardId, type);
 
-    // 2. 如果已授權，直接執行原本的 AI 分析函式
-    if (hasPermission) {
-        requestTrendAiAnalysis(type, title, formattedValues, days);
-    }
+        // 2. 如果已授權，直接執行原本的 AI 分析函式
+        if (hasPermission) {
+            requestTrendAiAnalysis(type, title, formattedValues, days);
+        }
+    }, 50);
 }
 
 // 💡 渲染 AI 延伸問題按鈕選單
@@ -2802,7 +2853,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
             ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: right; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
         </div>
-        <div class="chart-wrapper"><canvas></canvas></div>
+        <div class="chart-wrapper" style="position: relative; height: 220px; width: 100%;"><canvas></canvas></div>
     `;
 
     const canvasEl = container.querySelector('canvas');
