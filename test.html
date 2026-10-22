@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-7</title>
+    <title>Soosyn 健康夥伴 n101-6</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -630,11 +630,11 @@ const RANDOM_QUESTION_POOL = [
     "分析最近的睡眠狀況",
     "近期的恢復指數變化",
     "發炎風險是什麼？",
-    "HBI 代表什麼？",
-    "我的 N3 深睡足夠嗎？",
+    "HBI代表什麼？",
+    "我的N3深睡足夠嗎？",
     "靜息心率的意義？",
     "改善睡眠品質的方法",
-    "rMSSD 心率變異度與健康的關係",
+    "rMSSD心率變異度與健康的關係",
     "恢復指數偏低的原因",
     "最近的發炎風險分析"
 ];
@@ -2150,6 +2150,34 @@ async function showSummaryFlow(isFirstTime = false) {
 
 // --- 趨勢圖專用函數庫 ---
 
+// 全域 MutationObserver：監控 #chat-history 變動，若趨勢圖表因聊天室訊息新增而被清空，自動重新渲染圖表
+if (!window._trendObserver) {
+    window._trendObserver = new MutationObserver(() => {
+        const cards = document.querySelectorAll('.trend-card');
+        cards.forEach(card => {
+            const cardId = card.id;
+            const days = parseInt(card.dataset.days || 7, 10);
+            const offset = parseInt(card.dataset.offset || 0, 10);
+            const type = card.dataset.type;
+            
+            const contentDiv = card.querySelector('.trend-content');
+            if (contentDiv && (!contentDiv.querySelector('canvas') || !contentDiv.querySelector('canvas').dataset.rendered)) {
+                if (type && cardId) {
+                    updateTrend(cardId, type, days, offset);
+                }
+            }
+        });
+    });
+
+    const checkAndObserveChat = setInterval(() => {
+        const chatHistory = document.getElementById('chat-history');
+        if (chatHistory) {
+            window._trendObserver.observe(chatHistory, { childList: true, subtree: true });
+            clearInterval(checkAndObserveChat);
+        }
+    }, 500);
+}
+
 async function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
@@ -2221,16 +2249,13 @@ async function triggerTrendAiAnalysis(cardId, type) {
         ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
         : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
 
-    // 💡 用 setTimeout 隔離執行緒，避免點擊瞬間的 DOM 插入引發畫布清除
-    setTimeout(async () => {
-        // 1. 檢查 AI 使用授權
-        const hasPermission = await handleGeminiTransfer(userPrompt, cardId, type);
+    // 1. 檢查 AI 使用授權
+    const hasPermission = await handleGeminiTransfer(userPrompt);
 
-        // 2. 如果已授權，直接執行原本的 AI 分析函式
-        if (hasPermission) {
-            requestTrendAiAnalysis(type, title, formattedValues, days);
-        }
-    }, 50);
+    // 2. 如果已授權，直接執行原本的 AI 分析函式
+    if (hasPermission) {
+        requestTrendAiAnalysis(type, title, formattedValues, days);
+    }
 }
 
 // 💡 渲染 AI 延伸問題按鈕選單
@@ -2252,7 +2277,7 @@ function appendAiFollowUpOptions(questions) {
 }
 
 // --- 1. 檢查與處理 Gemini 授權流程 ---
-async function handleGeminiTransfer(userInput, cardId, type) {
+async function handleGeminiTransfer(userInput) {
     try {
         // 查詢 Supabase 資料庫是否已經有同意紀錄
         const { data: permission, error } = await _supabase
@@ -2268,14 +2293,14 @@ async function handleGeminiTransfer(userInput, cardId, type) {
             // B. 如果沒紀錄或未同意，顯示詢問介面，並回傳 false 攔截請求
             appendAiMessage("請問您是否同意啟用 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
             
-            // 動態產生同意/不同意按鈕，並把 cardId 與 type 帶入以便同意後續跳轉
+            // 動態產生同意/不同意按鈕
             const chatHistory = document.getElementById('chat-history');
             const btnContainerId = 'consent-btns-' + Date.now();
             const btnHtml = `
                 <div class="msg-row ai-row" id="${btnContainerId}">
                     <div style="margin-left: 45px; display: flex; gap: 10px; margin-top: 8px;">
-                        <button onclick="saveConsent('${userInput.replace(/'/g, "\\'")}', true, '${btnContainerId}', '${cardId}', '${type}')" style="background:#8699a3; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">同意並查詢</button>
-                        <button onclick="saveConsent('', false, '${btnContainerId}', '', '')" style="background:#a79d8c; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">不同意</button>
+                        <button onclick="saveConsent('${userInput.replace(/'/g, "\\'")}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#a79d8c; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">不同意</button>
                     </div>
                 </div>
             `;
@@ -2289,8 +2314,9 @@ async function handleGeminiTransfer(userInput, cardId, type) {
     }
 }
 
+// --- 2. 儲存同意結果並執行原始問題 ---
 // --- 2. 儲存同意結果並執行 ---
-async function saveConsent(originalPrompt, agreed, btnId, cardId, type) {
+async function saveConsent(originalPrompt, agreed, btnId) {
     // 移除按鈕避免重複點擊
     const btnElem = document.getElementById(btnId);
     if (btnElem) btnElem.remove();
@@ -2306,13 +2332,15 @@ async function saveConsent(originalPrompt, agreed, btnId, cardId, type) {
         appendAiMessage("感謝您的同意，正在為您分析...");
         
         // 判斷是「趨勢圖 AI 分析」還是「快速問答」
-        if (originalPrompt.includes("趨勢數據") && cardId && type) {
-            triggerTrendAiAnalysis(cardId, type);
+        if (originalPrompt.includes("趨勢數據")) {
+            const activeCard = document.querySelector('.trend-card');
+            if (activeCard) {
+                triggerTrendAiAnalysis(activeCard.id, activeCard.dataset.type);
+            }
         } else {
             executeQuickQuestion(originalPrompt);
         }
     } else {
-        // 💡 不同意時：只顯示訊息，不對圖表 DOM 進行任何更動，圖表會完美保持原樣
         appendAiMessage("好的，我將不會使用 AI 處理此問題。");
     }
 }
@@ -2806,7 +2834,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
             ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: right; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
         </div>
-        <div class="chart-wrapper" style="position: relative; height: 220px; width: 100%;"><canvas></canvas></div>
+        <div class="chart-wrapper"><canvas></canvas></div>
     `;
 
     const canvasEl = container.querySelector('canvas');
