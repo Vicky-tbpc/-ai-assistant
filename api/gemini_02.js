@@ -666,7 +666,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               if (cvd === 0) cvdDisplay = "良好";
               else if (cvd === 1) cvdDisplay = "一般";
               else if (cvd === 2) cvdDisplay = "偏高";
-              else if (cvd === 3) cvdDisplay = "高";              
+              else if (cvd === 3) cvdDisplay = "高";
+              blockText += `   - 起床時間: ${sleepEnd}\n`;              
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 恢復區間: ${batteryStateDisplay}\n`; // 新增輸出恢復區間
@@ -708,7 +709,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
               blockText += `🛏️ 【當天晚上入睡生理數據 (record_date: ${targetDate})】：\n`;
               blockText += `   - 入睡時間: ${sleepStart}\n`;
-              blockText += `   - 起床時間: ${sleepEnd}\n`;
+              
               blockText += `   - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分\n`;
               blockText += `   - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分\n`;
               
