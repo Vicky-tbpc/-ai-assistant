@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-6</title>
+    <title>Soosyn 健康夥伴 n102-2</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2223,7 +2223,6 @@ async function appendTrendOptions() {
 }
 
 // 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
-// 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
 async function triggerTrendAiAnalysis(cardId, type) {
     const storeKey = `${cardId}_${type}`;
     const dataObj = window._trendDataStore?.[storeKey];
@@ -2739,8 +2738,30 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     }[type];
 
     const allLabels = rawData.map(d => {
+        const raw = d.raw_json || {};
+        if (type === 'end') {
+            const endVal = raw.record_end;
+            if (endVal) {
+                const datePart = endVal.split(' ')[0];
+                const parts = datePart.split(/[-/]/);
+                if (parts.length >= 3) {
+                    return `${parts[1]}/${parts[2].substring(0, 2)}`;
+                }
+            }
+        }
+        if (type === 'start') {
+            const startVal = raw.record_start;
+            if (startVal) {
+                const datePart = startVal.split(' ')[0];
+                const parts = datePart.split(/[-/]/);
+                if (parts.length >= 3) {
+                    return `${parts[1]}/${parts[2].substring(0, 2)}`;
+                }
+            }
+        }
+
         let displayDate = d.record_date;
-        if (type === 'battery' || type === 'rhr' || type === 'end') {
+        if (type === 'battery' || type === 'rhr') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             displayDate = dateObj.toLocaleDateString('en-CA');
@@ -3161,7 +3182,7 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
         }
     });
 
-    // 日期 X 軸 (抓取 record_end)
+    // 日期 X 軸
     const formatAxisDate = (d) => {
         if (!d) return '';
         const datePart = d.split(' ')[0];
@@ -3184,8 +3205,22 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
         return d;
     };
     
-    const firstDate = formatAxisDate(hist[0].record_end || hist[0].record_date || '');
-    const lastDate = formatAxisDate(hist[hist.length - 1].record_end || hist[hist.length - 1].record_date || '');
+    // 根據欄位決定日期來源
+    const getAxisDateStr = (h) => {
+        const raw = h.raw_json || {};
+        let d = '';
+        if (field === 'record_start') {
+            d = raw.record_start !== undefined ? raw.record_start : (h.record_start || h.record_date || '');
+        } else if (field === 'record_end') {
+            d = raw.record_end !== undefined ? raw.record_end : (h.record_end || h.record_date || '');
+        } else {
+            d = h.record_end || h.record_date || '';
+        }
+        return formatAxisDate(d);
+    };
+
+    const firstDate = getAxisDateStr(hist[0]);
+    const lastDate = getAxisDateStr(hist[hist.length - 1]);
     
     svgHtml += `<text x="20" y="${height - 2}" font-size="14" fill="#999" text-anchor="middle">${firstDate}</text>`;
     if (hist.length > 1) {
