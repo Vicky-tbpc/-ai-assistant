@@ -2150,53 +2150,6 @@ async function showSummaryFlow(isFirstTime = false) {
 
 // --- 趨勢圖專用函數庫 ---
 
-// 全域 MutationObserver：監控 #chat-history 變動，若趨勢圖表因聊天室訊息新增而被清空，自動重新渲染圖表
-if (!window._trendObserver) {
-    window._trendObserver = new MutationObserver((mutations) => {
-        // 💡 檢查這次的 DOM 變動是不是我們自己新增的對話、授權按鈕或載入泡泡
-        // 如果是，直接跳過，不要觸發圖表重繪，避免造成白畫面！
-        let shouldSkip = false;
-        for (let mutation of mutations) {
-            for (let node of mutation.addedNodes) {
-                if (node.nodeType === 1) { // 元素節點
-                    // 如果新增的是訊息列、同意按鈕容器、或載入中泡泡，就忽略
-                    if (node.classList?.contains('msg-row') || 
-                        node.id?.includes('consent-btns') || 
-                        node.id?.includes('loading')) {
-                        shouldSkip = true;
-                        break;
-                    }
-                }
-            }
-            if (shouldSkip) break;
-        }
-        if (shouldSkip) return;
-
-        const cards = document.querySelectorAll('.trend-card');
-        cards.forEach(card => {
-            const cardId = card.id;
-            const days = parseInt(card.dataset.days || 7, 10);
-            const offset = parseInt(card.dataset.offset || 0, 10);
-            const type = card.dataset.type;
-            
-            const contentDiv = card.querySelector('.trend-content');
-            if (contentDiv && (!contentDiv.querySelector('canvas') || !contentDiv.querySelector('canvas').dataset.rendered)) {
-                if (type && cardId) {
-                    updateTrend(cardId, type, days, offset);
-                }
-            }
-        });
-    });
-
-    const checkAndObserveChat = setInterval(() => {
-        const chatHistory = document.getElementById('chat-history');
-        if (chatHistory) {
-            window._trendObserver.observe(chatHistory, { childList: true, subtree: true });
-            clearInterval(checkAndObserveChat);
-        }
-    }, 500);
-}
-
 async function appendTrendOptions() {
     const options = [
         { name: "📊 完整圖表", type: "all" },
