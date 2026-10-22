@@ -486,7 +486,7 @@
         <main id="main-area"><div id="chat-history"></div></main>
         <div class="footer-input">
             <div class="input-box">
-                <textarea id="user-input" placeholder="說點什麼..." rows="1"></textarea>
+                <textarea id="user-input" placeholder="問問 Soosyn AI" rows="1"></textarea>
                 <button class="send-btn" onclick="sendMessage()">▲</button>
             </div>
         <!-- 這裡加上警語 -->
@@ -630,11 +630,11 @@ const RANDOM_QUESTION_POOL = [
     "分析最近的睡眠狀況",
     "近期的恢復指數變化",
     "發炎風險是什麼？",
-    "HBI代表什麼？",
-    "我的N3深睡足夠嗎？",
+    "HBI 代表什麼？",
+    "我的 N3 深睡足夠嗎？",
     "靜息心率的意義？",
     "改善睡眠品質的方法",
-    "rMSSD心率變異度與健康的關係",
+    "rMSSD 心率變異度與健康的關係",
     "恢復指數偏低的原因",
     "最近的發炎風險分析"
 ];
@@ -2372,7 +2372,12 @@ async function sendQuickQuestion(questionText, containerId) {
 async function executeQuickQuestion(questionText) {
     // 顯示載入中的泡泡
     const loadingMsgId = `loading-${Date.now()}`;
-    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在思考中，請稍候...</div></div>`;
+    const loadingHtml = `
+        <div class="msg-row ai-row" id="${loadingMsgId}">
+            <div class="ai-bubble">
+                <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+            </div>
+        </div>`;
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
     scrollToBottom();
 
@@ -2432,7 +2437,12 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     appendUserMessage(userPrompt);
     
     const loadingMsgId = `loading-${Date.now()}`;
-    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在分析 ${title} 趨勢數據，請稍候...</div></div>`;
+    const loadingHtml = `
+        <div class="msg-row ai-row" id="${loadingMsgId}">
+            <div class="ai-bubble">
+                <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+            </div>
+        </div>`;
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
     scrollToBottom();
 
@@ -4379,7 +4389,6 @@ async function callGeminiAPI(prompt) {
             <div class="msg-row ai-row" id="${typingId}">
                 <div class="ai-bubble">
                     <div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-                    <small style="color: #888; display: block; margin-top: 5px;">正在分析你的健康數據...</small>
                 </div>
             </div>
         `);
