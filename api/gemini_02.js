@@ -1,4 +1,4 @@
-// api/gemini.js 40-3
+// api/gemini.js 40-4
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -681,6 +681,22 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             // 組合夜晚數據
             if (sleepRow) {
               const rawSleep = sleepRow.raw_json || {};
+
+              // 轉換 12 小時制時間的輔助函式
+              const formatTimeTo12h = (timeStr) => {
+              if (!timeStr) return "無資料";
+              const d = new Date(timeStr.replace(' ', 'T'));
+              if (isNaN(d.getTime())) return timeStr;
+              let h = d.getHours();
+              const m = String(d.getMinutes()).padStart(2, '0');
+              const period = h >= 12 ? '下午' : '上午';
+              h = h % 12 || 12;
+              return `${period} ${h}:${m}`;
+            };
+
+              const sleepStart = formatTimeTo12h(rawSleep.record_start);
+              const sleepEnd = formatTimeTo12h(rawSleep.record_end);
+
               const tst = rawSleep.TST_min || 0;
               const trt = rawSleep.TRT_min || 0;
               const n3Min = rawSleep.N3_min || 0;
@@ -691,6 +707,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               const remTime = `${Math.floor(remMin / 60)}時${remMin % 60}分`;
 
               blockText += `🛏️ 【當天晚上入睡生理數據 (record_date: ${targetDate})】：\n`;
+              blockText += `   - 入睡時間: ${sleepStart}\n`;
+              blockText += `   - 起床時間: ${sleepEnd}\n`;
               blockText += `   - 總睡眠時間: ${Math.floor(tst / 60)}時${tst % 60}分\n`;
               blockText += `   - 總紀錄時間: ${Math.floor(trt / 60)}時${trt % 60}分\n`;
               
