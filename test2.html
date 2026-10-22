@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-1</title>
+    <title>Soosyn 健康夥伴 n102-2</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2738,8 +2738,30 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     }[type];
 
     const allLabels = rawData.map(d => {
+        const raw = d.raw_json || {};
+        if (type === 'end') {
+            const endVal = raw.record_end;
+            if (endVal) {
+                const datePart = endVal.split(' ')[0];
+                const parts = datePart.split(/[-/]/);
+                if (parts.length >= 3) {
+                    return `${parts[1]}/${parts[2].substring(0, 2)}`;
+                }
+            }
+        }
+        if (type === 'start') {
+            const startVal = raw.record_start;
+            if (startVal) {
+                const datePart = startVal.split(' ')[0];
+                const parts = datePart.split(/[-/]/);
+                if (parts.length >= 3) {
+                    return `${parts[1]}/${parts[2].substring(0, 2)}`;
+                }
+            }
+        }
+
         let displayDate = d.record_date;
-        if (type === 'battery' || type === 'rhr' || type === 'end') {
+        if (type === 'battery' || type === 'rhr') {
             let dateObj = new Date(d.record_date + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
             displayDate = dateObj.toLocaleDateString('en-CA');
