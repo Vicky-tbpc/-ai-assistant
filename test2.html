@@ -3183,17 +3183,22 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
         return d;
     };
     
-    // 依據欄位讀取對應的 raw_json 日期資料
-    const getDateVal = (h) => {
-        const dateField = (field === 'record_start') ? 'record_start' : 'record_end';
-        return (h.raw_json && h.raw_json[dateField] !== undefined) ? h.raw_json[dateField]
-             : (h[dateField] !== undefined) ? h[dateField]
-             : (h.raw_json && h.raw_json.record_end !== undefined) ? h.raw_json.record_end
-             : h.record_end || h.record_date || '';
+    // 根據欄位決定日期來源
+    const getAxisDateStr = (h) => {
+        const raw = h.raw_json || {};
+        let d = '';
+        if (field === 'record_start') {
+            d = raw.record_start !== undefined ? raw.record_start : (h.record_start || h.record_date || '');
+        } else if (field === 'record_end') {
+            d = raw.record_end !== undefined ? raw.record_end : (h.record_end || h.record_date || '');
+        } else {
+            d = h.record_end || h.record_date || '';
+        }
+        return formatAxisDate(d);
     };
 
-    const firstDate = formatAxisDate(getDateVal(hist[0]));
-    const lastDate = formatAxisDate(getDateVal(hist[hist.length - 1]));
+    const firstDate = getAxisDateStr(hist[0]);
+    const lastDate = getAxisDateStr(hist[hist.length - 1]);
     
     svgHtml += `<text x="20" y="${height - 2}" font-size="14" fill="#999" text-anchor="middle">${firstDate}</text>`;
     if (hist.length > 1) {
