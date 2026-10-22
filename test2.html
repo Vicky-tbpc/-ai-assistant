@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n098-2</title>
+    <title>Soosyn 健康夥伴 n101-5</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -624,6 +625,26 @@ function getRandomEndQuestion() {
         "🌟 維持健康的好習慣很重要！讓我們一起穩定前進吧！想查看哪個資訊呢？"
     ];
 
+// 10個指定的延伸問題按鈕選項
+const RANDOM_QUESTION_POOL = [
+    "分析最近的睡眠狀況",
+    "近期的恢復指數變化",
+    "發炎風險是什麼？",
+    "HBI代表什麼？",
+    "我的N3深睡足夠嗎？",
+    "靜息心率的意義？",
+    "改善睡眠品質的方法",
+    "rMSSD心率變異度與健康的關係",
+    "恢復指數偏低的原因",
+    "最近的發炎風險分析"
+];
+
+// 從陣列中隨機抽樣指定數量（例如3個）不重複的項目
+function getRandomQuestions(arr, count = 3) {
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+}
+
 async function login() {
     const serial = document.getElementById('serial').value;
     const pw = document.getElementById('pw').value;
@@ -777,13 +798,25 @@ userNickname = name;      // 存入全域變數
                     `);
                     scrollToBottom();
 
-                    // 呼叫專屬的 AI 開場白 API
-                    const greeting = await callGreetingAPI(name, aiName, aiData);
+                    // 呼叫專屬的 AI 開場白 API (取得包含文字與按鈕的物件)
+                    const greetingData = await callGreetingAPI(name, aiName, aiData);
                     
                     document.getElementById(typingId)?.remove();
-                    await appendAiMessage(greeting);
+                    
+                    // 1. 顯示 AI 開場白文字泡泡
+                    await appendAiMessage(greetingData.text);
+                    
+                    // 2. 💡 渲染 3 個延伸問題按鈕選單在開場白下方
+                    if (greetingData.follow_up_questions && greetingData.follow_up_questions.length > 0) {
+                        setTimeout(() => {
+                            appendAiFollowUpOptions(greetingData.follow_up_questions);
+                        }, 300);
+                    }
+
                     usedAIGreeting = true;
-chatHistory.push({ role: "model", parts: [{ text: greeting }] });
+                    
+                    // 3. 將開場白寫入 chatHistory 歷史紀錄
+                    chatHistory.push({ role: "model", parts: [{ text: greetingData.text }] });
                 }
             }
 
@@ -792,10 +825,12 @@ chatHistory.push({ role: "model", parts: [{ text: greeting }] });
                 await appendAiMessage(`歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋`);
                 await new Promise(r => setTimeout(r, 600));
                 await appendAiMessage(CTA_PHRASES[Math.floor(Math.random() * CTA_PHRASES.length)]);
+                const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+                appendAiFollowUpOptions(selectedQuestions);
             }
         }
-    } // 👈 補上這個：結束 if (!aiName) 的 else 區塊
-} // 👈 補上這個：結束 initApp 函式
+    }
+}
  
 // 1. 日期判斷工具
 function getTargetDate(msg) {
@@ -960,7 +995,12 @@ async function processHealthKeyword(config, targetDateStr, isDefinitionQuery) {
             const { data } = await _supabase.from('phrase_library').select('detailed_content').eq('title', config.fallbackTitle).limit(1).maybeSingle();
             await appendAiMessage(data?.detailed_content || `目前沒有關於 ${config.fallbackTitle} 的詳細百科資料。`);
             await new Promise(r => setTimeout(r, 800));
-            await appendAiMessage(getRandomEndQuestion());
+            
+            // 💡 在這裡發送結語並附帶隨機 3 個按鈕
+            const endMsg = getRandomEndQuestion();
+            await appendAiMessage(endMsg);
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
             return;
         }
 
@@ -1021,8 +1061,11 @@ try {
 if (!targetData) {
     await appendAiMessage("這天沒數據喔~ 😅 可能是沒有上傳，或資料尚未同步完成。 ☁️");
     await new Promise(r => setTimeout(r, 800));
-    await appendAiMessage(getRandomEndQuestion());
-    return;
+    const endMsg = getRandomEndQuestion();
+            await appendAiMessage(endMsg);
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
+            return;
 }
 
         const raw = targetData.raw_json;
@@ -1075,7 +1118,12 @@ if (!targetData) {
 
         await appendAiMessage(finalContent);
         await new Promise(r => setTimeout(r, 800));
-        await appendAiMessage(getRandomEndQuestion());
+        
+        // 💡 這裡將原本的結語擴充為「隨機罐頭結語 + 3個隨機延伸問題按鈕」
+        const endMsg = getRandomEndQuestion();
+        await appendAiMessage(endMsg);
+        const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+        appendAiFollowUpOptions(selectedQuestions);
 
     } catch (err) {
         console.error("Query Error:", err);
@@ -2102,8 +2150,35 @@ async function showSummaryFlow(isFirstTime = false) {
 
 // --- 趨勢圖專用函數庫 ---
 
+// 全域 MutationObserver：監控 #chat-history 變動，若趨勢圖表因聊天室訊息新增而被清空，自動重新渲染圖表
+if (!window._trendObserver) {
+    window._trendObserver = new MutationObserver(() => {
+        const cards = document.querySelectorAll('.trend-card');
+        cards.forEach(card => {
+            const cardId = card.id;
+            const days = parseInt(card.dataset.days || 7, 10);
+            const offset = parseInt(card.dataset.offset || 0, 10);
+            const type = card.dataset.type;
+            
+            const contentDiv = card.querySelector('.trend-content');
+            if (contentDiv && (!contentDiv.querySelector('canvas') || !contentDiv.querySelector('canvas').dataset.rendered)) {
+                if (type && cardId) {
+                    updateTrend(cardId, type, days, offset);
+                }
+            }
+        });
+    });
+
+    const checkAndObserveChat = setInterval(() => {
+        const chatHistory = document.getElementById('chat-history');
+        if (chatHistory) {
+            window._trendObserver.observe(chatHistory, { childList: true, subtree: true });
+            clearInterval(checkAndObserveChat);
+        }
+    }, 500);
+}
+
 async function appendTrendOptions() {
-    // 加上 field 屬性，方便我們比對資料欄位
     const options = [
         { name: "📊 完整圖表", type: "all" },
         { name: "📈 恢復指數", type: "battery", field: "Personal_Battery_weighted_round" },
@@ -2121,18 +2196,13 @@ async function appendTrendOptions() {
     let html = '<div class="msg-row ai-row" id="trend-options-container"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px;">';
 
     try {
-        // 先抓取一次使用者的全量數據
         const queryParams = new URLSearchParams({ serial: currentSerial }).toString();
         const response = await fetch(`/api/health?${queryParams}`);
         
         if (response.ok) {
             const healthData = await response.json();
-            
-            // 過濾選項：只保留「完整圖表」或「該欄位至少有一筆有效數值」的按鈕
             const validOptions = options.filter(opt => {
                 if (opt.type === 'all') return true;
-                
-                // 檢查是否至少有一天有資料
                 return healthData.some(d => {
                     const val = d.raw_json?.[opt.field];
                     return val !== null && val !== undefined && val !== '';
@@ -2141,7 +2211,6 @@ async function appendTrendOptions() {
 
             validOptions.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
         } else {
-            // 如果連線失敗就 fallback 全顯示
             options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
         }
     } catch (err) {
@@ -2149,23 +2218,258 @@ async function appendTrendOptions() {
         options.forEach(opt => html += `<button class="action-btn" onclick="startTrendFlow('${opt.type}', '${opt.name}')">${opt.name}</button>`);
     }
 
-    document.getElementById('chat-history').innerHTML += html + '</div></div>';
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html + '</div></div>');
     scrollToBottom();
+}
+
+// 供內聯 onclick 呼叫的 AI 分析觸發函數（不受 innerHTML 重新渲染影響）
+async function triggerTrendAiAnalysis(cardId, type) {
+    const storeKey = `${cardId}_${type}`;
+    const dataObj = window._trendDataStore?.[storeKey];
+    if (!dataObj) {
+        console.error("找不到圖表數據紀錄");
+        return;
+    }
+
+    const { title, dailyValues, labels, days } = dataObj;
+    
+    // 如果是入睡或醒來規律性，把數值轉成上午/下午 12 小時制再傳給 AI
+    let formattedValues = dailyValues.map((val, idx) => {
+        let v = val;
+        if ((type === 'start' || type === 'end') && v !== null && v !== undefined) {
+            v = formatMinutesToAmPm(v);
+        }
+        return { date: labels[idx], value: v };
+    });
+
+    requestTrendAiAnalysis(type, title, formattedValues, days);
+}
+// 💡 渲染 AI 延伸問題按鈕選單
+function appendAiFollowUpOptions(questions) {
+    if (!questions || questions.length === 0) return;
+
+    // 給整個按鈕容器一個獨一無二的 ID，方便點擊後精準移除
+    const containerId = `followup-container-${Date.now()}`;
+    let html = `<div class="msg-row ai-row" id="${containerId}"><div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; max-width:400px; margin-top:8px;">`;
+    
+    questions.forEach(q => {
+        // 傳入 containerId 讓點擊後可以把這整組選單移除
+        html += `<button class="action-btn" onclick="sendQuickQuestion('${q.replace(/'/g, "\\'")}', '${containerId}')">${q}</button>`;
+    });
+
+    html += '</div></div>';
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
+}
+
+// --- 1. 檢查與處理 Gemini 授權流程 ---
+async function handleGeminiTransfer(userInput) {
+    try {
+        // 查詢 Supabase 資料庫是否已經有同意紀錄
+        const { data: permission, error } = await _supabase
+            .from('user_ai_permissions')
+            .select('is_agreed')
+            .eq('serial_number', currentSerial)
+            .maybeSingle();
+
+        if (permission && permission.is_agreed) {
+            // A. 如果已經同意過，回傳 true 讓後續程式碼繼續執行 API 請求
+            return true;
+        } else {
+            // B. 如果沒紀錄或未同意，顯示詢問介面，並回傳 false 攔截請求
+            appendAiMessage("請問您是否同意啟用 Soosyn AI 搜尋網路或資料庫來回答您的問題？(此操作會將您的健康資訊傳送至 AI 處理)");
+            
+            // 動態產生同意/不同意按鈕
+            const chatHistory = document.getElementById('chat-history');
+            const btnContainerId = 'consent-btns-' + Date.now();
+            const btnHtml = `
+                <div class="msg-row ai-row" id="${btnContainerId}">
+                    <div style="margin-left: 45px; display: flex; gap: 10px; margin-top: 8px;">
+                        <button onclick="saveConsent('${userInput.replace(/'/g, "\\'")}', true, '${btnContainerId}')" style="background:#8699a3; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">同意並查詢</button>
+                        <button onclick="saveConsent('', false, '${btnContainerId}')" style="background:#a79d8c; color:white; border:none; font-size: 14px; padding:10px 18px; border-radius:10px; cursor:pointer;">不同意</button>
+                    </div>
+                </div>
+            `;
+            chatHistory.insertAdjacentHTML('beforeend', btnHtml);
+            scrollToBottom();
+            return false;
+        }
+    } catch (err) {
+        console.error("Consent check error:", err);
+        return false;
+    }
+}
+
+// --- 2. 儲存同意結果並執行原始問題 ---
+async function saveConsent(originalPrompt, agreed, btnId) {
+    // 移除按鈕避免重複點擊
+    const btnElem = document.getElementById(btnId);
+    if (btnElem) btnElem.remove();
+
+    if (agreed) {
+        // 寫入 Supabase user_ai_permissions 表
+        await _supabase.from('user_ai_permissions').upsert({
+            serial_number: currentSerial,
+            is_agreed: true,
+            agreed_at: new Date()
+        });
+
+        appendAiMessage("感謝您的同意，正在為您分析...");
+        
+        // 使用者同意授權後，自動觸發原本要詢問的問題 (沒有傳 containerId，因為按鈕剛才已經被移除)
+        executeQuickQuestion(originalPrompt);
+    } else {
+        appendAiMessage("好的，我將不會使用 AI 處理此問題。");
+    }
+}
+
+// 快速點選延伸按鈕的觸發入口（加入授權檢查）
+async function sendQuickQuestion(questionText, containerId) {
+    // 1. 點選後立刻將該組按鈕選單從畫面移除
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.remove();
+    }
+
+    // 2. 在畫面上顯示使用者點選的問題泡泡
+    appendUserMessage(questionText);
+
+    // 3. 檢查授權狀態
+    const hasPermission = await handleGeminiTransfer(questionText);
+    
+    // 4. 若已獲得授權，直接執行 AI 思考與請求
+    if (hasPermission) {
+        await executeQuickQuestion(questionText);
+    }
+}
+
+// 實際發送給 Gemini API 的執行函式
+async function executeQuickQuestion(questionText) {
+    // 顯示載入中的泡泡
+    const loadingMsgId = `loading-${Date.now()}`;
+    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在思考中，請稍候...</div></div>`;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
+    scrollToBottom();
+
+    try {
+        // 將問題送給後端一般聊天 API
+        const response = await fetch('/api/gemini_02', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: questionText,
+                serial_number: currentSerial,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
+                history: chatHistory
+            })
+        });
+
+        document.getElementById(loadingMsgId)?.remove();
+
+        if (response.ok) {
+            const resData = await response.json();
+            const aiText = resData.text || `收到你的問題囉！`;
+
+            // 更新對話上下文歷史
+            chatHistory.push({ role: "user", parts: [{ text: questionText }] });
+            chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+            // 顯示 AI 回答泡泡
+            appendAiMessage(aiText);
+
+            // 如果後端有回傳延伸問題按鈕，一併渲染
+            if (resData.follow_up_questions && resData.follow_up_questions.length > 0) {
+                appendAiFollowUpOptions(resData.follow_up_questions);
+            }
+        } else {
+            appendAiMessage(`回覆服務目前有點忙碌，請稍後再試一次 😅`);
+        }
+    } catch (err) {
+        console.error("快速對話請求錯誤:", err);
+        document.getElementById(loadingMsgId)?.remove();
+        appendAiMessage(`連線發生錯誤，請稍後再試 😅`);
+    }
+}
+async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
+    const validDataPoints = formattedDataPoints.filter(d => d.value !== null && d.value !== undefined);
+    
+    // 💡 取得第一筆與最後一筆的日期作為區間
+    const startDate = validDataPoints.length > 0 ? validDataPoints[0].date : '';
+    const endDate = validDataPoints.length > 0 ? validDataPoints[validDataPoints.length - 1].date : '';
+    
+    // 💡 組合新的日期區間提示詞
+    const userPrompt = startDate && endDate 
+        ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
+        : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
+
+    appendUserMessage(userPrompt);
+    
+    const loadingMsgId = `loading-${Date.now()}`;
+    const loadingHtml = `<div class="msg-row ai-row" id="${loadingMsgId}"><div class="ai-bubble">正在分析 ${title} 趨勢數據，請稍候...</div></div>`;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', loadingHtml);
+    scrollToBottom();
+
+    try {
+        const response = await fetch('/api/gemini_02', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'trend_analysis',
+                prompt: userPrompt,
+                serial_number: currentSerial,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
+                metric_data: {
+                    type: title,
+                    metric: title,
+                    values: validDataPoints,
+                    days: days
+                },
+                history: chatHistory // 確保帶入歷史紀錄維持對話上下文
+            })
+        });
+
+        document.getElementById(loadingMsgId)?.remove();
+
+        if (response.ok) {
+            const resData = await response.json();
+            const aiText = resData.text || `這是針對 ${title} 的分析結果。`;
+            
+            chatHistory.push({ role: "user", parts: [{ text: userPrompt }] });
+            chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+            if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+            appendAiMessage(aiText);
+
+            // 💡 新增：若後端有回傳延伸問題清單，則在畫面上渲染按鈕
+            if (resData.follow_up_questions && resData.follow_up_questions.length > 0) {
+                appendAiFollowUpOptions(resData.follow_up_questions);
+            }
+        } else {
+            appendAiMessage(`分析服務目前有點忙碌，請稍後再試一次 😅`);
+        }
+    } catch (err) {
+        console.error("AI 分析請求錯誤:", err);
+        document.getElementById(loadingMsgId)?.remove();
+        appendAiMessage(`連線發生錯誤，請稍後再試 😅`);
+    }
 }
 
 async function startTrendFlow(type, name) {
     document.getElementById('trend-options-container')?.remove();
     appendUserMessage(name);
     await appendAiMessage(`正在準備你的 ${name}...`);
-    renderTrendCard(type, 7); // 預設顯示 7 日
+    renderTrendCard(type, 7);
 }
 
 async function renderTrendCard(type, days) {
     const cardId = `trend-${Date.now()}`;
     const html = `
         <div class="msg-row ai-row">
-            <!-- 加上 data-days 與 data-offset 讓 DOM 記住狀態 -->
-            <div class="trend-card" id="${cardId}" data-days="${days}" data-offset="0">
+            <!-- 加上 data-days, data-offset, data-type 讓 DOM 記住狀態 -->
+            <div class="trend-card" id="${cardId}" data-days="${days}" data-offset="0" data-type="${type}">
                 <div class="trend-header">
                     <span class="chart-title">📈 趨勢分析</span>
                     <div class="trend-nav">
@@ -2174,7 +2478,6 @@ async function renderTrendCard(type, days) {
                         <button class="nav-btn ${days===30?'active':''}" onclick="setTrendDays('${cardId}', '${type}', 30)">30日</button>
                     </div>
                 </div>
-                <!-- 新增：日期分頁區塊 -->
                 <div class="trend-date-nav" style="display:flex; justify-content:center; align-items:center; gap:10px; margin: 10px 0; color: #596b75; font-size: 14px;">
                     <button class="nav-arrow" onclick="changeTrendPage('${cardId}', '${type}', 'prev')" style="cursor:pointer; background:none; border:none; font-size:16px; padding:0 10px;">◀</button>
                     <span id="${cardId}-date-range" style="font-weight:bold; min-width:180px; text-align:center;">讀取中...</span>
@@ -2183,38 +2486,38 @@ async function renderTrendCard(type, days) {
                 <div class="trend-content"></div>
             </div>
         </div>`;
-    document.getElementById('chat-history').innerHTML += html;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
-    updateTrend(cardId, type, days, 0); // 傳入初始 offset 為 0
+    updateTrend(cardId, type, days, 0);
 }
 
-// 點選 7日、14日、30日 時，保留目前的結束日期 (不重置 offset)
 function setTrendDays(cardId, type, days) {
     const card = document.getElementById(cardId);
     card.dataset.days = days;    
-    // 讀取目前的 offset，如果沒有就預設為 0
     const currentOffset = parseInt(card.dataset.offset || 0, 10);    
     updateTrend(cardId, type, days, currentOffset);
 }
 
-// 點選 ◀ 或 ▶ 進行分頁切換
 function changeTrendPage(cardId, type, direction) {
     const card = document.getElementById(cardId);
     const days = parseInt(card.dataset.days, 10);
     let offset = parseInt(card.dataset.offset, 10);
 
     if (direction === 'prev') {
-        offset += days; // 往回看更舊的資料
+        offset += days;
     } else if (direction === 'next') {
-        offset -= days; // 往未來看較新的資料
+        offset -= days;
         if (offset < 0) offset = 0;
     }
 
     card.dataset.offset = offset;
     updateTrend(cardId, type, days, offset);
 }
+
 async function updateTrend(cardId, type, days, offset = 0) {
     const card = document.getElementById(cardId);
+    if (!card) return;
+    
     card.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.remove('active');
         if(b.innerText.includes(days)) b.classList.add('active');
@@ -2232,7 +2535,6 @@ async function updateTrend(cardId, type, days, offset = 0) {
         filteredJsonData = await response.json();
         const totalDaysToFetch = days + 6; 
 
-        // 1. 切片取得資料
         healthData = filteredJsonData
             .sort((a, b) => new Date(b.record_date) - new Date(a.record_date))
             .slice(offset, offset + totalDaysToFetch) 
@@ -2241,15 +2543,14 @@ async function updateTrend(cardId, type, days, offset = 0) {
                 raw_json: item.raw_json
             }));
 
-        // 【滿足第 2 點】：如果抓出來的資料筆數不夠 (代表到底了)，往前把缺的日期補齊為空資料
         while (healthData.length < totalDaysToFetch) {
-            if (healthData.length === 0) break; // 完全沒資料防呆
+            if (healthData.length === 0) break;
             const oldestItem = healthData[healthData.length - 1];
             let d = new Date(oldestItem.record_date + 'T00:00:00');
-            d.setDate(d.getDate() - 1); // 往前推一天
+            d.setDate(d.getDate() - 1);
             healthData.push({
                 record_date: d.toLocaleDateString('en-CA'),
-                raw_json: {} // 塞空物件，這樣畫圖抓欄位就會是 undefined -> 轉成 null
+                raw_json: {}
             });
         }
 
@@ -2268,20 +2569,16 @@ async function updateTrend(cardId, type, days, offset = 0) {
 
     const sortedData = [...healthData].reverse();
 
-    // ================= 處理上方導覽列的日期顯示 =================
-    const displayData = sortedData.slice(-days); // 取出實際繪圖的那幾天
+    const displayData = sortedData.slice(-days);
     if (displayData.length > 0) {
         let startD = new Date(displayData[0].record_date + 'T00:00:00');
         let endD = new Date(displayData[displayData.length - 1].record_date + 'T00:00:00');
 
-        // 【滿足第 3 點 & 第 4 點的建議】：如果「單獨看」需要 +1 的圖表，上方文字才 +1
-        // 如果是 type === 'all'，這裡就不會進去，維持原始測量日期！
         if (type === 'battery' || type === 'rhr' || type === 'end') {
             startD.setDate(startD.getDate() + 1);
             endD.setDate(endD.getDate() + 1);
         }
 
-        // 格式化為 YYYY/MM/DD
         const formatD = (d) => {
             const yyyy = d.getFullYear();
             const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -2289,32 +2586,31 @@ async function updateTrend(cardId, type, days, offset = 0) {
             return `${yyyy}/${mm}/${dd}`;
         };
 
-        document.getElementById(`${cardId}-date-range`).innerText = `${formatD(startD)}-${formatD(endD)}`;
+        const rangeSpan = document.getElementById(`${cardId}-date-range`);
+        if (rangeSpan) rangeSpan.innerText = `${formatD(startD)}-${formatD(endD)}`;
     }
 
-    // 控制 ◀ 與 ▶ 按鈕在到達極限時反灰不可點
     const prevBtn = card.querySelector('.trend-date-nav button:first-child');
     const nextBtn = card.querySelector('.trend-date-nav button:last-child');
     
-    // 如果再往前看，超過總資料量代表沒舊資料了
-    if (offset + days >= filteredJsonData.length) {
-        prevBtn.style.opacity = "0.3";
-        prevBtn.style.pointerEvents = "none";
-    } else {
-        prevBtn.style.opacity = "1";
-        prevBtn.style.pointerEvents = "auto";
+    if (prevBtn && nextBtn) {
+        if (offset + days >= filteredJsonData.length) {
+            prevBtn.style.opacity = "0.3";
+            prevBtn.style.pointerEvents = "none";
+        } else {
+            prevBtn.style.opacity = "1";
+            prevBtn.style.pointerEvents = "auto";
+        }
+        
+        if (offset === 0) {
+            nextBtn.style.opacity = "0.3";
+            nextBtn.style.pointerEvents = "none";
+        } else {
+            nextBtn.style.opacity = "1";
+            nextBtn.style.pointerEvents = "auto";
+        }
     }
-    
-    if (offset === 0) {
-        nextBtn.style.opacity = "0.3";
-        nextBtn.style.pointerEvents = "none";
-    } else {
-        nextBtn.style.opacity = "1";
-        nextBtn.style.pointerEvents = "auto";
-    }
-    // =================================================================
 
-    // --- 【關鍵：準備體感數據要對齊的日期範圍】 ---
     const originalDates = sortedData.map(d => d.record_date);
     const shiftedDates = originalDates.map(dStr => {
         let d = new Date(dStr + 'T00:00:00');
@@ -2322,15 +2618,12 @@ async function updateTrend(cardId, type, days, offset = 0) {
         return d.toLocaleDateString('en-CA');
     });
     const queryDateRange = [...new Set([...originalDates, ...shiftedDates])];
-    // ------------------------------------------
 
-    // 2. 抓取個人感受數據 (使用擴大後的日期範圍)
     const [feedbackRes, surveyRes] = await Promise.all([
         _supabase.from('daily_feedback').select('record_date, raw_json').eq('serial_number', currentSerial).in('record_date', queryDateRange),
         _supabase.from('user_daily_surveys').select('record_date, subjective_score').eq('serial_number', currentSerial).in('record_date', queryDateRange)
     ]);
 
-    // 3. 建立體感數據地圖 (這部分邏輯不變)
     const subjectiveMap = {};
     if (surveyRes.data) {
         surveyRes.data.forEach(d => { subjectiveMap[d.record_date] = d.subjective_score; });
@@ -2343,6 +2636,7 @@ async function updateTrend(cardId, type, days, offset = 0) {
     }
 
     const container = card.querySelector('.trend-content');
+    if (!container) return;
     container.innerHTML = ''; 
     const typesToRender = type === 'all' ? ['battery', 'tst', 'n3', 'start', 'end', 'wake', 'rmssd', 'hrmin', 'hbi', 'rhr'] : [type];
     
@@ -2353,15 +2647,13 @@ async function updateTrend(cardId, type, days, offset = 0) {
         drawSingleChart(chartBox, t, sortedData, subjectiveMap, days);
     }
     
-    // 👇 迴圈結束後加這段：如果所有圖表都被除掉了，給個溫馨提示
     if (container.children.length === 0) {
         container.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">此期間暫無圖表數據 😅</div>';
     }
 }
-// --- 處理時間字串與分鐘數的轉換 ---
+
 function parseTimeToMinutes(dateStr, type) {
     if (!dateStr) return 0;
-    // 預期格式 "YYYY-MM-DD HH:mm:ss"
     const parts = dateStr.split(' ');
     if (parts.length !== 2) return 0;
     
@@ -2370,7 +2662,6 @@ function parseTimeToMinutes(dateStr, type) {
     let m = parseInt(timeParts[1], 10);
     let totalMins = h * 60 + m;
 
-    // 針對「入睡時間」，如果是凌晨 (00:00~11:59)，加上 24 小時確保圖表連續性
     if (type === 'start' && h < 12) {
         totalMins += 1440; 
     }
@@ -2381,7 +2672,6 @@ function formatMinutesToAmPm(totalMins) {
     if (isNaN(totalMins) || totalMins === null) return "";
     let m = Math.round(totalMins);
     
-    // 如果大於等於 24 小時，扣除 24 小時來計算顯示時間
     if (m >= 1440) m -= 1440;
     if (m < 0) m += 1440;
 
@@ -2389,7 +2679,6 @@ function formatMinutesToAmPm(totalMins) {
     let mins = m % 60;
     let period = h >= 12 ? "下午" : "上午";
 
-    // 轉為 12 小時制
     let displayH = h % 12;
     if (displayH === 0) displayH = 12;
 
@@ -2398,6 +2687,9 @@ function formatMinutesToAmPm(totalMins) {
 }
 
 function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
+    const cardEl = container.closest('.trend-card');
+    const cardId = cardEl ? cardEl.id : '';
+
     const config = {
         battery: { title: "恢復指數", unit: "", field: "Personal_Battery_weighted_round", color: "#596b75", abnormalLabel: "當日數值低於個人平均" },
         tst: { title: "總睡眠時間", unit: "", field: "TST_min", color: "#596b75", abnormalLabel: "低於個人平均/參考標準" },
@@ -2411,7 +2703,6 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         rhr: { title: "靜息心率 (RHR)", unit: "單位：bpm", field: "RHR_raw", color: "#596b75", abnormalLabel: "高於個人平均範圍" }
     }[type];
 
-    // 1. 先動態決定「所有緩衝區資料」的日期標籤與體感數據
     const allLabels = rawData.map(d => {
         let displayDate = d.record_date;
         if (type === 'battery' || type === 'rhr' || type === 'end') {
@@ -2433,10 +2724,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     });
 
-    // --- 【修正點 1：全部加上 all 前綴，並過濾掉沒有數據的空值保留為 null】 ---
     const allDailyValues = rawData.map(d => {
         const rawVal = d.raw_json[config.field];
-        // 遇到空值不再轉成 0，直接回傳 null
         if (rawVal === null || rawVal === undefined || rawVal === '') {
             return null;
         }
@@ -2450,10 +2739,8 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const allLowerBounds = []; 
     const allUpperBounds = [];
 
-    // 計算平均值邏輯（只計算有數值的天數）
     allDailyValues.forEach((val, i) => {
         const start = Math.max(0, i - 6);
-        // 過濾掉 null 的數據再來算平均
         const chunk = allDailyValues.slice(start, i + 1).filter(v => v !== null);
         
         if (chunk.length === 0) {
@@ -2476,7 +2763,7 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     });
 
     const allPointColors = allDailyValues.map((v, i) => {
-        if (v === null) return config.color; // null 點不會畫，隨便給過
+        if (v === null) return config.color;
         const ma = allMovingAvgs[i];
         if (ma === null) return config.color;
 
@@ -2492,11 +2779,9 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         return config.color;
     });
 
-    // --- 【核心步驟：算完滾動平均後，切出最後要顯示的 days 天數】 ---
     const labels = allLabels.slice(-days);
     const dailyValues = allDailyValues.slice(-days);
     
-    // 👇 新增檢查：這段期間的數值如果全部都是 null，直接把容器刪掉並結束繪圖
     const hasAnyValidData = dailyValues.some(v => v !== null);
     if (!hasAnyValidData) {
         container.remove();
@@ -2509,21 +2794,31 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
     const pointColors = allPointColors.slice(-days);
     const subjectiveValues = allSubjectiveValues.slice(-days);
 
-    // 建立結構
+    // 將資料暫存至全域 store 供 AI 分析按鈕隨時讀取
+    window._trendDataStore = window._trendDataStore || {};
+    window._trendDataStore[`${cardId}_${type}`] = {
+        title: config.title,
+        dailyValues: dailyValues,
+        labels: labels,
+        days: days
+    };
+
     container.innerHTML = `
         <div class="chart-info-header">
-            <div class="chart-title-row">
+            <div class="chart-title-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <span class="chart-title">${config.title}</span>
-                <span class="unit-text">${config.unit}</span>
+                <button class="ai-analysis-btn" onclick="triggerTrendAiAnalysis('${cardId}', '${type}')" style="background: #596b75; color: white; border: none; border-radius: 9999px; padding: 4px 12px; font-size: 12px; cursor: pointer; transition: background 0.2s;">AI 分析</button>
             </div>
             <div class="chart-legend">${renderLegend(type, config.abnormalLabel)}</div>
+            ${config.unit && config.unit.trim() !== '' ? `<div class="unit-text-row" style="text-align: right; margin-top: 4px; font-size: 12px; color: #888;">${config.unit}</div>` : ''}
         </div>
         <div class="chart-wrapper"><canvas></canvas></div>
     `;
 
-    const ctx = container.querySelector('canvas').getContext('2d');
+    const canvasEl = container.querySelector('canvas');
+    canvasEl.dataset.rendered = "true";
+    const ctx = canvasEl.getContext('2d');
     
-    // N3 背景色區塊插件
     const n3BackgroundPlugin = {
         id: 'n3Background',
         beforeDraw: (chart) => {
@@ -2538,7 +2833,6 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     };
 
-    // tst 背景色區塊插件
     const tstBackgroundPlugin = {
         id: 'tstBackground',
         beforeDraw: (chart) => {
@@ -2567,7 +2861,6 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         }
     ];
 
-    // 如果是恢復指數，新增一條「個人感受」曲線
     if (type === 'battery') {
         datasets.push({
             label: '體感數值',
@@ -2583,13 +2876,11 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         });
     }
 
-    // --- 【修正點 2：這裡的範圍區間必須用 dailyValues 去 map，長度才跟 lowerBounds 對得起來】 ---
     const isRangeType = (type === 'rmssd' || type === 'hrmin' || type === 'rhr' || type === 'start' || type === 'end');
     if (isRangeType) {
         datasets.push({
             label: '7日平均範圍',
             type: 'bar',
-            // 若下限是 null 就給 null，不要給 [null, null]
             data: dailyValues.map((_, i) => lowerBounds[i] === null ? null : [lowerBounds[i], upperBounds[i]]),
             backgroundColor: '#c1cdd3',
             barPercentage: 0.5
@@ -2598,13 +2889,13 @@ function drawSingleChart(container, type, rawData, subjectiveMap = {}, days) {
         datasets.push({
             label: '7日平均',
             type: 'bar',
-            data: movingAvgs, // 裡面已經是數值或 null 了，安全
+            data: movingAvgs,
             backgroundColor: '#c1cdd3',
             barPercentage: 0.5
         });
     }
 
-new Chart(ctx, {
+    new Chart(ctx, {
         plugins: [n3BackgroundPlugin, tstBackgroundPlugin],
         data: { labels, datasets },
         options: {
@@ -2613,25 +2904,21 @@ new Chart(ctx, {
             layout: { padding: { right: 10 } }, 
             plugins: { 
                 legend: { display: false },
-                // 👇 替換這個 tooltip 區塊
                 tooltip: {
-                    mode: 'index',      // 讓同一天的資料合併在一個提示框顯示
-                    intersect: false,   // 滑鼠不用精準對準圓點也能觸發
+                    mode: 'index',
+                    intersect: false,
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
                             
-                            // 👇 關鍵修改：如果是範圍長條圖 (資料是 [下限, 上限] 的陣列)
                             if (context.dataset.type === 'bar' && Array.isArray(context.raw)) {
                                 let low = context.raw[0];
                                 let high = context.raw[1];
 
-                                // 👇 針對 rMSSD 顯示到小數點第一位，其他維持整數
                                 if (type === 'rmssd') {
                                     low = low.toFixed(1);
                                     high = high.toFixed(1);
                                 } else if (type === 'start' || type === 'end') {
-                                    // 👇 修改 5：範圍工具提示轉換為時間格式
                                     return `${label}: ${formatMinutesToAmPm(low)} ~ ${formatMinutesToAmPm(high)}`;
                                 } else {
                                     low = Math.round(low);
@@ -2640,7 +2927,6 @@ new Chart(ctx, {
                                 return `${label}: ${low} ~ ${high}`;
                             }
 
-                            // 👇 處理一般的單一數值 (當日數值、一般平均)
                             let val = context.parsed.y;
                             
                             if (type === 'tst') {
@@ -2650,7 +2936,6 @@ new Chart(ctx, {
                             }
                             
                             if (type === 'start' || type === 'end') {
-                                // 👇 修改 6：單點工具提示轉換為時間格式
                                 return `${label}: ${formatMinutesToAmPm(val)}`;
                             }
                             
@@ -2661,42 +2946,29 @@ new Chart(ctx, {
             },
             scales: {
                y: { 
-                    // 維持原本的寬度 45
                     afterFit: (scale) => { scale.width = 45; }, 
-                    
                     beginAtZero: !(type === 'start' || type === 'end'),
-                    
-                    // 透過 afterDataLimits 攔截 Chart.js 算好的資料範圍，並向外擴充正負 1 小時 (60 分鐘)
                     afterDataLimits: (scale) => {
                         if (type === 'start' || type === 'end') {
                             scale.min = scale.min - 60;
                             scale.max = scale.max + 60;
                         }
                     },
-
                     grid: { color: '#f2f2f2' },
                     ticks: { 
                         font: { size: 11 }, 
                         color: '#888',
-                        
                         stepSize: (type === 'tst' || type === 'start' || type === 'end') ? 60 : undefined, 
-                        
                         callback: function(value) {
                             if (type === 'start' || type === 'end') {
                                 let timeStr = formatMinutesToAmPm(value);
-                                
-                                // 取出前兩個字 (上午/下午)，以及後面的時間 (10:00)
                                 let ampm = timeStr.substring(0, 2);
                                 let time = timeStr.substring(2).trim();
-                                
-                                // 回傳陣列 [ "上午", "10:00" ]，Chart.js 就會自動折成兩行
                                 return [ampm, time];
                             }
-                            
                             if (type === 'tst') {
                                 return (value / 60) + '小時';
                             }
-                            
                             return value;
                         }
                     }
@@ -2717,8 +2989,6 @@ function renderLegend(type, abnormalLabel) {
         <div class="legend-row"><div class="bar-sample" style="background:#c1cdd3"></div> 7日平均${isRange?'範圍':''}</div>
     `;
 
-
-// 恢復指數特有圖例
     if (type === 'battery') {
         html += `<div class="legend-row"><div class="dot-sample" style="background:#a79d8c; border-radius:0; height:2px; width:12px; margin-top:5px"></div> 體感數值</div>`;
     }
@@ -2750,7 +3020,6 @@ async function processSummarySearch(d, displayDate) {
     
     if (data) {
         // 3. 呼叫卡片時，記得把要顯示的日期也傳進去 (建議修改 appendSummaryCard 接收日期)
-        // 如果你的 appendSummaryCard 原本只接收 data，建議改成接收 (finalDisplayDate, data)
         await appendSummaryCard(finalDisplayDate, data, currentSerial)
         
         // 4. 判斷是否為「今天」的摘要：這裡要用使用者詢問的 finalDisplayDate 來判斷
@@ -2760,9 +3029,17 @@ async function processSummarySearch(d, displayDate) {
             await appendAiMessage(data.flowSuggestion); 
             await new Promise(r => setTimeout(r, 800));
             await appendAiMessage(getRandomEndQuestion());
+            
+            // 💡 在這裡隨機挑選 3 個按鈕並顯示
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
         } else {
             await new Promise(r => setTimeout(r, 600));
             await appendAiMessage(getRandomEndQuestion());
+            
+            // 💡 在這裡隨機挑選 3 個按鈕並顯示
+            const selectedQuestions = getRandomQuestions(RANDOM_QUESTION_POOL, 3);
+            appendAiFollowUpOptions(selectedQuestions);
         }
     } else {
         // 如果沒資料，提示時也使用顯示日期比較不容易讓使用者困惑
@@ -2785,19 +3062,19 @@ function showDateActions() {
             </div>
         </div>`;
 
-    document.getElementById('chat-history').innerHTML += html;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 }
 
 // --- 新增：收合/展開迷你圖表功能 ---
-function toggleMiniChart(btn, containerId) {
+function toggleMiniChart(btn, containerId, customOpen = '▲ 收合原始數據', customClose = '▼ 查看原始數據') {
     const container = document.getElementById(containerId);
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
-        btn.innerText = '▲ 收合原始數據';
+        btn.innerText = customOpen;
     } else {
         container.classList.add('hidden');
-        btn.innerText = '▼ 查看原始數據';
+        btn.innerText = customClose;
     }
 }
 
@@ -2916,12 +3193,15 @@ function buildChartCard(title, field, history, chartTypeStr, chartTitleStr, pars
 }
 
 // --- 新增：將內容包覆於展開/收合容器 ---
-function buildToggleWrapper(contentHtml, idPrefix) {
+function buildToggleWrapper(contentHtml, idPrefix, customOpen, customClose) {
     const containerId = `${idPrefix}-container-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const defaultClose = customClose || '▼ 查看原始數據';
+    const openArg = customOpen ? `, '${customOpen}'` : '';
+    const closeArg = customClose ? `, '${customClose}'` : '';
     return `
         <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
             <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
-                 onclick="toggleMiniChart(this, '${containerId}')">▼ 查看原始數據</div>
+               onclick="toggleMiniChart(this, '${containerId}'${openArg}${closeArg})">${defaultClose}</div>
             <div id="${containerId}" class="hidden" style="margin-top: 5px;">
                 ${contentHtml}
             </div>
@@ -2977,7 +3257,6 @@ const BLOCK_NAMES = {
 // ----------------------------------------------------
 // 將可編輯區塊的控制函式提至最上方（確保 appendSummaryCard 呼叫時已存在）
 // ----------------------------------------------------
-
 // 渲染可編輯的區塊
 window.renderDynamicBlocks = function(cardId) {
     const state = window.cardStates[cardId];
@@ -2993,18 +3272,13 @@ window.renderDynamicBlocks = function(cardId) {
         const rawContent = state.blocks[blockId];
         
         if (state.isEditMode) {
-            // 編輯模式：加上外框與操作按鈕
+            // 📝 關鍵修改 1：把 onclick="removeBlock" 的參數從 index 改為 blockId
             html += `
-            <div style="position: relative; border: 2px dashed #ccc; padding: 10px; margin-bottom: 12px; border-radius: 8px; background: #fafafa;">
-                <!-- 右上角叉叉按鈕 -->
-                <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', ${index})" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="draggable-block" data-id="${blockId}" style="position: relative; border: 2px dashed #ccc; padding: 10px; border-radius: 8px; background: #fafafa; cursor: grab; user-select: none; -webkit-user-select: none;">
                 
-                <!-- 中間上下箭頭按鈕 -->
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 20px; z-index: 10; background: rgba(255,255,255,0.9); padding: 8px 15px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                    <img src="images/up_arrow.svg" onclick="moveBlock('${cardId}', ${index}, -1)" style="width: 24px; height: 24px; cursor: pointer; opacity: ${index === 0 ? 0.3 : 1}; pointer-events: ${index === 0 ? 'none' : 'auto'};">
-                    <img src="images/down_arrow.svg" onclick="moveBlock('${cardId}', ${index}, 1)" style="width: 24px; height: 24px; cursor: pointer; opacity: ${index === visibleCount - 1 ? 0.3 : 1}; pointer-events: ${index === visibleCount - 1 ? 'none' : 'auto'};">
-                </div>
-
+                <!-- 右上角叉叉按鈕 -->
+                <img src="images/close_icon.svg" onclick="removeBlock('${cardId}', '${blockId}')" style="position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; cursor: pointer; z-index: 10; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                
                 <!-- 內容加上半透明遮罩 -->
                 <div style="opacity: 0.4; pointer-events: none; min-height: 50px;">
                     ${rawContent || `<div style="text-align: center; color: #888; line-height: 50px;">(${BLOCK_NAMES[blockId]}：本次無資料)</div>`}
@@ -3024,7 +3298,6 @@ window.renderDynamicBlocks = function(cardId) {
                 <img src="images/add_icon.svg" onclick="toggleAddMenu('${cardId}')" style="width: 40px; height: 40px; cursor: pointer;">
             </div>`;
         } else {
-            // 列出所有被隱藏的區塊讓使用者加回來
             const allBlocks = Object.keys(BLOCK_NAMES);
             const hiddenBlocks = allBlocks.filter(id => !state.layout.includes(id));
             
@@ -3043,9 +3316,59 @@ window.renderDynamicBlocks = function(cardId) {
     }
 
     container.innerHTML = html;
-};
 
-// 切換編輯模式與儲存
+    // 📝 關鍵修改 2：每次重新渲染前，先銷毀舊的 Sortable 實例，避免重複綁定導致事件卡死
+    if (typeof Sortable !== 'undefined') {
+        const existingSortable = Sortable.get(container);
+        if (existingSortable) {
+            existingSortable.destroy();
+        }
+    }
+
+    // 啟用 SortableJS 拖曳排序功能
+    if (state.isEditMode && typeof Sortable !== 'undefined') {
+        Sortable.create(container, {
+            animation: 150,                
+            draggable: ".draggable-block", 
+            delay: 200,                    
+            delayOnTouchOnly: true,        
+            forceFallback: true,           
+            fallbackTolerance: 5,          
+            
+            onChoose: function (evt) {
+                // 長按滿 0.2 秒時觸發：加上漸變動畫、稍微放大、加深陰影、變白底
+                evt.item.style.transition = 'transform 0.15s ease, box-shadow 0.15s ease';
+                evt.item.style.transform = 'scale(1.03)';
+                evt.item.style.boxShadow = '0 12px 24px rgba(0,0,0,0.15)';
+                evt.item.style.backgroundColor = '#ffffff';
+                evt.item.style.zIndex = '100';
+            },
+            onStart: function (evt) {
+                // 真正開始拖曳時：清除 transition，避免干擾 Sortable 的順暢滑動
+                evt.item.style.transition = '';
+            },
+            onUnchoose: function (evt) {
+                // 放開手指或取消選取時：恢復原本的樣式
+                evt.item.style.transform = '';
+                evt.item.style.boxShadow = '';
+                evt.item.style.backgroundColor = '#fafafa'; // 恢復原本的灰底
+                evt.item.style.zIndex = '';
+            },
+
+            onEnd: function (evt) {
+                // 放開後，掃描當前畫面的順序並更新資料
+                const newLayout = [];
+                container.querySelectorAll('.draggable-block').forEach(el => {
+                    newLayout.push(el.getAttribute('data-id'));
+                });
+                
+                // 更新全域狀態
+                window.cardStates[cardId].layout = newLayout;
+            }
+        });
+    }
+};
+// 切換編輯模式與儲存 (遺失的函式補回)
 window.toggleEditMode = async function(cardId) {
     const state = window.cardStates[cardId];
     if (!state) return;
@@ -3080,20 +3403,14 @@ window.toggleEditMode = async function(cardId) {
 };
 
 // 刪除區塊
-window.removeBlock = function(cardId, index) {
-    window.cardStates[cardId].layout.splice(index, 1);
-    renderDynamicBlocks(cardId);
-};
-
-// 移動區塊 (direction: -1 向上, 1 向下)
-window.moveBlock = function(cardId, index, direction) {
+window.removeBlock = function(cardId, blockId) {
     const layout = window.cardStates[cardId].layout;
-    const targetIndex = index + direction;
+    // 找出該區塊目前在陣列中的正確位置
+    const index = layout.indexOf(blockId);
     
-    if (targetIndex >= 0 && targetIndex < layout.length) {
-        // 交換陣列元素位置
-        [layout[index], layout[targetIndex]] = [layout[targetIndex], layout[index]];
-        renderDynamicBlocks(cardId);
+    if (index > -1) {
+        layout.splice(index, 1);
+        renderDynamicBlocks(cardId); // 刪除後重新渲染畫面
     }
 };
 
@@ -3147,7 +3464,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const statusLight = data.light || '--';
     const lightDotColor = lightMap[statusLight] || '#888';
 
-    const dailyTag = raw && raw.Daily_Tag;
+    const dailyTag = (raw && raw.Daily_Tag) || '狀態平穩';
     const tagColor = dailyTag && (dailyTag.includes('混亂') || dailyTag.includes('極端') || dailyTag.includes('疲乏') || dailyTag.includes('最差') || dailyTag.includes('發炎')) ? '#ff8c73' : '#8699a3';
 
     const batteryVal = Math.round(data.battery);
@@ -3250,7 +3567,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     posPct = Math.max(0, Math.min(100, posPct));
 
     const renderBlock = (title, iconName, val, diffText, color, bgColor, extraHtml = '') => `
-        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+        <div style="background-color: ${bgColor}; border-radius: 12px; padding: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <img src="images/${iconName}" style="width: 20px; height: 20px;" alt="${title}">
@@ -3278,7 +3595,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const hrvExtraHtml = buildToggleWrapper(buildChartCard('rMSSD', 'rMSSD', history7, 'rmssd', '🌿 rMSSD', parseNum, format1Dec, 'ms'), 'hrv');
     const pulseExtraHtml = buildToggleWrapper(buildChartCard('睡眠最低脈搏', 'HR_min', history7, 'hrmin', '💓 睡眠最低脈搏', parseNum, formatRound, 'bpm'), 'pulse');
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
-    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr');
+    const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
     let alertHtml = '';
     if (batteryVal < 60 || statusLight === '黃燈' || statusLight === '紅燈') {
@@ -3314,7 +3631,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     let rhrSectionHtml = '';
     if (raw && raw.RHR_raw != null && raw.RHR_raw !== 'NA' && raw.RHR_raw !== 'N/A') {
         rhrSectionHtml = `
-            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <img src="images/rhr_icon.svg" style="width: 20px; height: 20px;" alt="靜息心率">
@@ -3481,7 +3798,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
         }
         
         riskSectionHtml = `
-            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="睡眠心血管負荷">
@@ -3530,8 +3847,8 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
         `;
     }
 
-    let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '8px');
-    let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '20px');
+    let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '0px');
+    let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '0px');
 
     const cardId = `summary-card-${Date.now()}`;
 
@@ -3562,7 +3879,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
             block9: renderBlock("血氧穩定度", "o2_stability.svg", o2Val, getDiffText(o2Val, avgO2), getColor(o2Val), "#faf9f6", o2ExtraHtml),
             block10: rhrSectionHtml,
             block11: riskSectionHtml,
-            block12: `<div style="margin: 20px 0 5px 0;"><button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">📄 開啟睡眠報告</button></div>`
+            block12: `<div style="margin: 5px 0 0 0;"><button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${data.date}');">📄 開啟睡眠報告</button></div>`
         }
     };
 
@@ -3585,7 +3902,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
                     <img src="images/info_icon.svg" alt="說明" style="width: 18px; height: 18px; cursor: pointer;" 
                          onclick="const info = document.getElementById('battery-info-${data.date}'); info.style.display = info.style.display === 'none' ? 'block' : 'none'; event.stopPropagation();">
                 </div>
-                ${dailyTag ? `<span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>` : ''}
+                <span class="daily-tag-pill" style="background-color: ${tagColor}; font-size: 14px; padding: 4px 10px;">${dailyTag}</span>
             </div>
             
             <div id="battery-info-${data.date}" style="display: none; background-color: #f8fcfc; border: 1px solid #e1e1e1; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 14px; color: #5a5a5a; line-height: 1.6; text-align: left;">
@@ -3614,7 +3931,8 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     <div class="msg-row ai-row" id="${cardId}">
         <div class="summary-card" style="position: relative;">
             ${fixedHtml}
-            <div id="dynamic-blocks-${cardId}"></div>
+            <!-- 加上 flex 與 gap 統一間距 -->
+            <div id="dynamic-blocks-${cardId}" style="display: flex; flex-direction: column; gap: 12px;"></div>
         </div>
     </div>`;
 
@@ -3636,7 +3954,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
         options.forEach(opt => html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleStatusSelection('${opt.text}', ${opt.val})">${opt.text}</button>`);
-        document.getElementById('chat-history').innerHTML += html + '</div></div>'; scrollToBottom();
+        document.getElementById('chat-history').insertAdjacentHTML('beforeend', html + '</div></div>'); scrollToBottom();
     }
 
 function appendAbnormalityOptions() {
@@ -3656,7 +3974,7 @@ function appendAbnormalityOptions() {
         html += `<button class="primary-btn" style="background:white; color:#555; border:1px solid #ddd; text-align:left; font-size:14px;" onclick="handleAbnormalitySelection('${opt.val}')">${opt.text}</button>`;
     });
     
-    document.getElementById('chat-history').innerHTML += html + '</div></div>';
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html + '</div></div>');
     scrollToBottom();
 }
 
@@ -3925,7 +4243,7 @@ async function handleAbnormalityInput(msg) {
     function closeZoom() { document.getElementById('zoom-overlay').classList.add('hidden'); }
     async function appendAiMessage(text) { 
     const history = document.getElementById('chat-history'), typingId = 'typing-' + Date.now(); 
-    history.innerHTML += `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`; 
+    history.insertAdjacentHTML('beforeend', `<div class="msg-row ai-row" id="${typingId}"><div class="ai-bubble"><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`); 
     scrollToBottom(); 
     await new Promise(r => setTimeout(r, 800)); 
     
@@ -3945,7 +4263,7 @@ async function handleAbnormalityInput(msg) {
     }
     scrollToBottom(); 
 }
-    function appendUserMessage(msg) { document.getElementById('chat-history').innerHTML += `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`; scrollToBottom(); }
+    function appendUserMessage(msg) { document.getElementById('chat-history').insertAdjacentHTML('beforeend', `<div class="msg-row user-row"><div class="user-bubble">${msg}</div></div>`); scrollToBottom(); }
     function scrollToBottom() { const m = document.getElementById('main-area'); m.scrollTop = m.scrollHeight; }
     function toggleDropdown() { document.getElementById('settings-menu').classList.toggle('hidden'); }
     function logout() { location.reload(); }
@@ -4053,7 +4371,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -4072,18 +4390,16 @@ async function callGeminiAPI(prompt) {
         chatHistory.push({ role: "user", parts: [{ text: prompt }] });
         chatHistory.push({ role: "model", parts: [{ text: data.text }] });
 
-        // 限制紀錄長度 (例如只留最近 10 次對話)
+        // 限制紀錄長度
         if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
         // 3. 移除動畫
         const typingElem = document.getElementById(typingId);
         if (typingElem) typingElem.remove();
 
-        // 👇 判斷後端回傳的 action 來決定前端要做什麼動作
+        // 判斷後端回傳的 action
         if (data.action === 'open_pdf') {
-            // --- 👑 新增功能：先向地端 API 檢查該日期是否有資料 ---
             try {
-                // 準備查詢參數，限制只查目標日期這天
                 const params = new URLSearchParams({
                     serial: currentSerial,
                     start: data.date,
@@ -4094,37 +4410,34 @@ async function callGeminiAPI(prompt) {
                 if (!checkRes.ok) throw new Error("地端連線失敗");
                 
                 const checkData = await checkRes.json();
-                
-                // 確認回傳資料中有沒有包含這天的紀錄
                 const hasReport = checkData.find(r => r.record_date === data.date);
 
                 if (hasReport) {
-                    // 有找到報告：延遲一下再產生開啟 PDF 的按鈕
                     setTimeout(() => {
                         appendPdfButton(data.date); 
                     }, 500);
-                    // 讓程式繼續往下走，最後會回傳並印出原本的 data.text ("沒問題！...")
                 } else {
-                    // 沒找到報告：直接覆蓋掉 AI 原本的台詞，並提早 return！
-                    // 這樣就不會印出「沒問題！...」，也不會產生兩句對話了
                     return `幫你確認過了，**${data.date.replace(/-/g, '/')}** 這天沒有睡眠報告喔 😅，可能是還沒記錄到或尚未同步！`;
                 }
             } catch (err) {
                 console.error("檢查報告發生錯誤:", err);
-                // 發生錯誤：一樣覆蓋台詞並提早 return
                 return `哎呀，連線檢查 **${data.date.replace(/-/g, '/')}** 的報告時發生了一點問題，請確認一下地端伺服器有沒有正常開啟喔！ 🔌`;
             }
-            // --------------------------------------------------------
         } else if (data.action === 'show_trend_options') {
-            // 使用者沒說清楚，跳出選單
             setTimeout(() => {
                 appendTrendOptions();
             }, 500);
         } else if (data.action === 'show_specific_trend') {
-            // 使用者有明確指定，直接畫特定圖表 (預設顯示 7 天)
             setTimeout(() => {
                 renderTrendCard(data.trend_type, 7);
             }, 500);
+        }
+
+        // 💡 新增：若一般聊天對話回傳結果中包含 follow_up_questions，則在 AI 泡泡下方渲染按鈕選單
+        if (data.follow_up_questions && data.follow_up_questions.length > 0) {
+            setTimeout(() => {
+                appendAiFollowUpOptions(data.follow_up_questions);
+            }, 300);
         }
 
         return data.text;
@@ -4252,23 +4565,29 @@ async function getAIGreetingPayload(serial) {
     }
 }
 
-// --- 新增：呼叫後端專屬開場白 API ---
+// --- 修改：呼叫後端專屬開場白 API (支援延伸問題按鈕) ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 serial_number: currentSerial,                
                 action: 'generate_greeting', // 透過此標記攔截
-                metric_data: aiData
+                metric_data: aiData,
+                local_date: new Date().toLocaleDateString('en-CA'),
+                local_time: new Date().toLocaleTimeString('zh-TW', { hour12: false })
             })
         });
         const data = await res.json();
-        return data.text;
+        // 💡 直接回傳整個 data 物件（包含 text 與 follow_up_questions）
+        return data;
     } catch (err) {
         console.error("Greeting API Error:", err);
-        return `歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋\n健康是一點一滴累積的！想查看哪個資訊呢？`; 
+        return { 
+            text: `歡迎回來 ${name}，我是你的健康夥伴 ${aiName}。 👋\n健康是一點一滴累積的！想查看哪個資訊呢？`,
+            follow_up_questions: ["幫我看一下昨天的睡眠報告", "最近的恢復指數表現如何？", "給我今天的健康建議"]
+        }; 
     }
 }
 
