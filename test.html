@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n101-6</title>
+    <title>Soosyn 健康夥伴 n101-7</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2222,8 +2222,13 @@ async function appendTrendOptions() {
     scrollToBottom();
 }
 
-// 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
-// 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
+// 1. 確保 appendUserMessage 使用 insertAdjacentHTML，避免整個聊天室被 innerHTML 覆寫而清空圖表
+function appendUserMessage(text) {
+    const html = `<div class="msg-row user-row"><div class="user-bubble">${text}</div></div>`;
+    document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
+    scrollToBottom();
+}
+// 2. 保持您的流程：先印出提問文字 --> 出現授權畫面
 async function triggerTrendAiAnalysis(cardId, type) {
     const storeKey = `${cardId}_${type}`;
     const dataObj = window._trendDataStore?.[storeKey];
@@ -2250,13 +2255,13 @@ async function triggerTrendAiAnalysis(cardId, type) {
         ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
         : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
 
-    // 💡 讓使用者點擊時立刻將這段提示詞印在前端畫面上
+    // 保持流程：先在畫面上印出使用者的提問文字
     appendUserMessage(userPrompt);
 
-    // 1. 檢查 AI 使用授權
+    // 檢查 AI 使用授權（若未授權會跳出授權按鈕，且不會影響上方的趨勢圖表）
     const hasPermission = await handleGeminiTransfer(userPrompt);
 
-    // 2. 如果已授權，直接執行原本的 AI 分析函式
+    // 如果已授權，直接執行 API 分析
     if (hasPermission) {
         requestTrendAiAnalysis(type, title, formattedValues, days);
     }
@@ -2320,12 +2325,10 @@ async function handleGeminiTransfer(userInput) {
 
 // --- 2. 儲存同意結果並執行原始問題 ---
 async function saveConsent(originalPrompt, agreed, btnId) {
-    // 移除按鈕避免重複點擊
     const btnElem = document.getElementById(btnId);
     if (btnElem) btnElem.remove();
 
     if (agreed) {
-        // 寫入 Supabase user_ai_permissions 表
         await _supabase.from('user_ai_permissions').upsert({
             serial_number: currentSerial,
             is_agreed: true,
@@ -2334,13 +2337,18 @@ async function saveConsent(originalPrompt, agreed, btnId) {
 
         appendAiMessage("感謝您的同意，正在為您分析...");
         
-        // 判斷是「趨勢圖 AI 分析」還是「快速問答」
         if (originalPrompt.includes("趨勢數據")) {
             const activeCard = document.querySelector('.trend-card');
             if (activeCard) {
-                triggerTrendAiAnalysis(activeCard.id, activeCard.dataset.type);
+                const storeKey = `${activeCard.id}_${activeCard.dataset.type}`;
+                const dataObj = window._trendDataStore?.[storeKey];
+                if (dataObj) {
+                    let formattedValues = dataObj.dailyValues.map((val, idx) => ({ date: dataObj.labels[idx], value: val }));
+                    requestTrendAiAnalysis(activeCard.dataset.type, dataObj.title, formattedValues, dataObj.days);
+                }
             }
         } else {
+            appendUserMessage(originalPrompt);
             executeQuickQuestion(originalPrompt);
         }
     } else {
