@@ -2223,6 +2223,7 @@ async function appendTrendOptions() {
 }
 
 // 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
+// 供內聯 onclick 呼叫的 AI 分析觸發函數（加入授權檢查）
 async function triggerTrendAiAnalysis(cardId, type) {
     const storeKey = `${cardId}_${type}`;
     const dataObj = window._trendDataStore?.[storeKey];
@@ -2232,7 +2233,7 @@ async function triggerTrendAiAnalysis(cardId, type) {
     }
 
     const { title, dailyValues, labels, days } = dataObj;
-    
+
     let formattedValues = dailyValues.map((val, idx) => {
         let v = val;
         if ((type === 'start' || type === 'end') && v !== null && v !== undefined) {
@@ -2244,10 +2245,13 @@ async function triggerTrendAiAnalysis(cardId, type) {
     const validDataPoints = formattedValues.filter(d => d.value !== null && d.value !== undefined);
     const startDate = validDataPoints.length > 0 ? validDataPoints[0].date : '';
     const endDate = validDataPoints.length > 0 ? validDataPoints[validDataPoints.length - 1].date : '';
-    
+
     const userPrompt = startDate && endDate 
         ? `請幫我分析${startDate}到${endDate}的【${title}】趨勢數據`
         : `請幫我分析這 ${days} 天的【${title}】趨勢數據`;
+
+    // 💡 讓使用者點擊時立刻將這段提示詞印在前端畫面上
+    appendUserMessage(userPrompt);
 
     // 1. 檢查 AI 使用授權
     const hasPermission = await handleGeminiTransfer(userPrompt);
@@ -2315,7 +2319,6 @@ async function handleGeminiTransfer(userInput) {
 }
 
 // --- 2. 儲存同意結果並執行原始問題 ---
-// --- 2. 儲存同意結果並執行 ---
 async function saveConsent(originalPrompt, agreed, btnId) {
     // 移除按鈕避免重複點擊
     const btnElem = document.getElementById(btnId);
