@@ -4206,6 +4206,10 @@ async function handleAbnormalityInput(msg) {
     if (allData.length === 0) {
         document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        
+        // 🌟 改用 appendAiFollowUpOptions 渲染過濾後的隨機按鈕
+        const randomQuestions = getRandomFilteredQuestions(3);
+        appendAiFollowUpOptions(randomQuestions);
         return;
     }
 
@@ -4340,15 +4344,15 @@ async function handleAbnormalityInput(msg) {
             await new Promise(r => setTimeout(r, 1000));
             await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
             
-            // 🌟 整合修改點 A：這裡也產生排除恢復與發炎的按鈕
+            // 🌟 改用 appendAiFollowUpOptions 渲染過濾後的隨機按鈕
             const randomQuestions = getRandomFilteredQuestions(3);
-            appendDynamicOptions(randomQuestions);
+            appendAiFollowUpOptions(randomQuestions);
         } else {
             await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
             
-            // 🌟 整合修改點 B (else)：產生按鈕
+            // 🌟 改用 appendAiFollowUpOptions 渲染過濾後的隨機按鈕
             const randomQuestions = getRandomFilteredQuestions(3);
-            appendDynamicOptions(randomQuestions);
+            appendAiFollowUpOptions(randomQuestions);
         }
     } catch (e) {
         console.error("讀取 phrase_library 失敗:", e);
@@ -4356,9 +4360,9 @@ async function handleAbnormalityInput(msg) {
         document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
         
-        // 🌟 整合修改點 B (catch)：產生按鈕
+        // 🌟 改用 appendAiFollowUpOptions 渲染過濾後的隨機按鈕
         const randomQuestions = getRandomFilteredQuestions(3);
-        appendDynamicOptions(randomQuestions);
+        appendAiFollowUpOptions(randomQuestions);
     }
 }
     function zoomChart(el) { document.getElementById('zoom-container').innerHTML = el.innerHTML; document.getElementById('zoom-overlay').classList.remove('hidden'); }
