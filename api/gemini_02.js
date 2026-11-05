@@ -1,4 +1,4 @@
-// api/gemini.js 40-4
+// api/gemini.js 41
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -340,8 +340,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       body: JSON.stringify({ 
         contents: [{ parts: [{ text: routerPrompt }] }],
         generationConfig: { 
-          responseMimeType: "application/json",
-          temperature: 0 // 🛑 絕對防錯：強制溫度為 0，確保意圖解析與關鍵字提取 100% 穩定
+          responseMimeType: "application/json"
         }
       })
     });
