@@ -1,4 +1,4 @@
-// api/gemini.js 40-4
+// api/gemini.js 41
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -341,7 +341,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         contents: [{ parts: [{ text: routerPrompt }] }],
         generationConfig: { 
           responseMimeType: "application/json",
-          temperature: 0 // 🛑 絕對防錯：強制溫度為 0，確保意圖解析與關鍵字提取 100% 穩定
+          thinking_level: "medium" // 💡 依據新規範調整，以確保意圖解析與結構化輸出的品質
         }
       })
     });
@@ -668,10 +668,10 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               else if (batteryState === 2) batteryStateDisplay = "個人最佳恢復區間";
               
               const lightDisplay = (light === "NA") 
-                ? "有效訊號不足" 
+                ? "有效數據不足" 
                 : ((light === null || light === undefined || light === "無資料") ? "無資料" : light);
               const rhrDisplay = (rhr === "NA") 
-                ? "有效訊號不足" 
+                ? "有效數據不足" 
                 : ((rhr === null || rhr === undefined) ? "無資料" : `${rhr}bpm`);
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               let cvdDisplay = "無資料";
@@ -685,8 +685,8 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               const recordEnd12h = format12Hour(rawWake.record_end);              
               
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
-              blockText += `    - 入睡時間: ${recordStart12h}\n`;
-              blockText += `    - 醒來時間: ${recordEnd12h}\n`;
+              blockText += `   - 入睡時間: ${recordStart12h}\n`;
+              blockText += `   - 醒來時間: ${recordEnd12h}\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 恢復區間: ${batteryStateDisplay}\n`; // 新增輸出恢復區間
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
