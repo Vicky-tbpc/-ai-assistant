@@ -1,4 +1,4 @@
-// api/gemini.js 38
+// api/gemini.js 41
 import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 30;
@@ -86,6 +86,10 @@ export default async function handler(req, res) {
     // 客製化 AI 開場白攔截區塊
     // ==========================================
     if (action === 'generate_greeting') {
+      const { metric_data, serial_number, local_date, local_time } = req.body;
+      const metricName = metric_data?.metric || "健康指標";
+      const metricStatus = metric_data?.status || "狀態";
+
       const greetingPrompt = `【身份鎖定】
 你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
 絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
@@ -96,26 +100,189 @@ export default async function handler(req, res) {
 請根據以下提示，生成一句專屬的開場白。
 【規則】
 1. 第一句請自然地打招呼，表達歡迎回來的心情。你可以稱呼對方的暱稱「${nickname}」，也可以帶入你自己的名字「${ai_name}」。例如：「歡迎回來 ${nickname}！我是 ${ai_name} 👋」。
-2. 接著請根據以下指標狀態給予一句${metric_data.type}：
-   - 指標：${metric_data.metric}
-   - 狀態：${metric_data.status}
+2. 接著請根據以下指標狀態給予一句${metric_data?.type || '健康提示'}：
+   - 指標：${metricName}
+   - 狀態：${metricStatus}
 3. 說明完後，最後加上一句引導詢問。
 4. 語氣要像平輩朋友一樣自然。
 5. 【絕對禁止】：嚴格禁止使用敬稱，請全部使用「你」。
+6. 【延伸問題歸納】：請根據你這次生成的開場白內容，額外歸納 3 個使用者有可能會想繼續追問或了解的延伸性問題。
+7. 【按鈕字數嚴格限制】：延伸問題的文字（包含標點符號）**絕對必須維持在 20 個字以內**，簡短有力，適合當作互動按鈕。
 
-請直接輸出對話文字，不要包含額外的解釋或 JSON 格式。`;
+請務必回傳嚴格合法的 JSON 格式（不要包在 markdown code block 裡面，直接輸出 JSON），格式如下：
+{
+  "text": "這裡放置你的開場白內容...",
+  "follow_up_questions": [
+    "按鈕文字1？",
+    "按鈕文字2？",
+    "按鈕文字3？"
+  ]
+}`;
 
       let greetingRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: greetingPrompt }] }] })
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: greetingPrompt }] }],
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
+        })
       });
       
       let greetingResult = await greetingRes.json();
-      const cleanGreeting = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
-      return res.status(200).json({ text: cleanGreeting });
-    }
+      let rawGreetingResponse = greetingResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+      
+      // 清理可能存在的 markdown 標籤
+      rawGreetingResponse = rawGreetingResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
 
+      let parsedGreetingData;
+      try {
+        parsedGreetingData = JSON.parse(rawGreetingResponse);
+      } catch (e) {
+        console.error("❌ 開場白 JSON 解析失敗，回退預設格式", e);
+        parsedGreetingData = {
+          text: `歡迎回來 ${nickname}！我是 ${ai_name} 👋 今天想了解哪些健康數據呢？`,
+          follow_up_questions: ["幫我看一下昨天的睡眠報告", "最近的恢復指數表現如何？", "給我今天的健康建議"]
+        };
+      }
+
+      const cleanGreeting = parsedGreetingData.text || `歡迎回來 ${nickname}！今天想了解哪些健康數據呢？`;
+      const greetingFollowUps = parsedGreetingData.follow_up_questions || [];
+
+      // 💡 定義開場白的虛擬 user_query
+      const userQueryText = `系統自動開場白 (${metricName}：${metricStatus})`;
+
+      // 💡 寫入 Supabase chat_logs
+      const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          serial_number: serial_number, 
+          user_query: userQueryText, 
+          ai_response: cleanGreeting,
+          record_date: local_date || new Date().toLocaleDateString('en-CA'), 
+          record_time: local_time || new Date().toLocaleTimeString('zh-TW', { hour12: false }), 
+          ai_model: 'Gemini-3.8-Flash-HybridRAG'
+        })
+      }).catch(e => console.error("背景存檔錯誤:", e));
+
+      waitUntil(logTask);
+
+      // 💡 同時將開場白文字與按鈕陣列回傳給前端
+      return res.status(200).json({ 
+        text: cleanGreeting,
+        follow_up_questions: greetingFollowUps
+      });
+    }
+    // ==========================================
+    // 客製化趨勢圖表 AI 分析攔截區塊
+    // ==========================================
+    if (action === 'trend_analysis') {
+      const { metric_data, history = [], serial_number, local_date, local_time } = req.body;
+      const metricName = metric_data?.metric || "健康指標";
+      const daysCount = metric_data?.days || 7;
+      const values = metric_data?.values || [];
+      const dataPointsStr = values.length > 0 ? values.map(v => `- 日期 ${v.date}: 數值 ${v.value}`).join('\n') : "無具體數值";
+
+      const startDate = values.length > 0 ? values[0].date : '';
+      const endDate = values.length > 0 ? values[values.length - 1].date : '';
+
+      const userQueryText = startDate && endDate 
+          ? `請幫我分析${startDate}到${endDate}的【${metricName}】趨勢數據`
+          : `請幫我分析這 ${daysCount} 天的【${metricName}】趨勢數據`;
+
+      // 💡 調整 Prompt，要求 AI 同時回傳分析文字與 3~4 個延伸問題
+      const trendPrompt = `【身份鎖定】
+你永遠是 Soosyn Health Companion 的 AI 健康夥伴。
+絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方AI。
+若被問到模型來源，請回答：「我是 Soosyn Health Companion 的 AI 健康夥伴，專門協助你解讀健康數據與提供健康管理建議。」
+你的名字：${ai_name}
+使用者暱稱：${nickname}
+
+使用者要求對「${metricName}」${startDate && endDate ? `${startDate}到${endDate}` : `最近 ${daysCount} 天`}的趨勢數據進行專業分析。
+以下是數據明細：
+${dataPointsStr}
+
+【規則】
+1. 請以平輩朋友的語氣（使用「你」），給予專業、溫暖且具體的數據解讀與健康建議。
+2. 結構包含：趨勢觀察（是否有上升、下降或波動）、可能影響因素、以及具體的日常調整建議。
+3. 分析文字的字數控制在 200 到 300 字左右，保持精簡扼要，段落分明。
+4. 絕對禁止使用敬稱。
+5. 【絕對禁止】：嚴禁任何開場白、問候語或自我介紹，必須直接切入數據分析主題。
+6. 【單位注意】：若分析的指標為「恢復指數」，其本身沒有單位，請絕對不要替它加上「%」或「分」等單位。
+7. 【延伸問題歸納】：請根據你這次給出的分析內容，額外歸納 3 個或 4 個使用者有可能會想繼續追問的延伸性問題。
+8. 【按鈕字數嚴格限制】：延伸問題的文字（包含標點符號）**絕對必須維持在 20 個字以內**，簡短有力，適合當作互動按鈕。
+
+請務必回傳嚴格合法的 JSON 格式（不要包在 markdown code block 裡面，直接輸出 JSON），格式如下：
+{
+  "text": "這裡放置你的 200~300 字健康分析內容...",
+  "follow_up_questions": [
+    "按鈕文字1？",
+    "按鈕文字2？",
+    "按鈕文字3？"
+  ]
+}`;
+
+      const contents = [
+          ...history.map(h => ({ role: h.role, parts: h.parts })),
+          { role: "user", parts: [{ text: trendPrompt }] }
+      ];
+
+      let trendRes = await fetch(finalUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          contents: contents,
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
+        })
+      });
+      
+      let trendResult = await trendRes.json();
+      let rawTrendResponse = trendResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+      
+      // 清理可能存在的 markdown 標籤
+      rawTrendResponse = rawTrendResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      let parsedTrendData;
+      try {
+        parsedTrendData = JSON.parse(rawTrendResponse);
+      } catch (e) {
+        console.error("❌ 趨勢分析 JSON 解析失敗，回退預設格式", e);
+        parsedTrendData = {
+          text: `這 ${daysCount} 天的 ${metricName} 數據大致穩定，繼續保持日常作息唷！`,
+          follow_up_questions: ["如何進一步提升這個數值？", "最近有什麼需要特別注意的嗎？", "這跟我的睡眠品質有關嗎？"]
+        };
+      }
+
+      const cleanTrendText = parsedTrendData.text || `這 ${daysCount} 天的 ${metricName} 數據大致穩定。`;
+      const followUpQuestions = parsedTrendData.follow_up_questions || [];
+
+      const logTask = fetch(`${supabaseUrl}/rest/v1/chat_logs`, {
+        method: 'POST',
+        headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          serial_number: serial_number, 
+          user_query: userQueryText, 
+          ai_response: cleanTrendText,
+          record_date: local_date || new Date().toLocaleDateString('en-CA'), 
+          record_time: local_time || new Date().toLocaleTimeString('zh-TW', { hour12: false }), 
+          ai_model: 'Gemini-3.8-Flash-HybridRAG'
+        })
+      }).catch(e => console.error("背景存檔錯誤:", e));
+
+      waitUntil(logTask);
+
+      // 💡 同時將文字與 3~4 個按鈕問題回傳給前端
+      return res.status(200).json({ 
+        text: cleanTrendText, 
+        follow_up_questions: followUpQuestions 
+      });
+    }
     // ==========================================
     // 第一階段：超級大腦 Gemini 進行意圖判斷 (Router)
     // ==========================================
@@ -173,8 +340,7 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       body: JSON.stringify({ 
         contents: [{ parts: [{ text: routerPrompt }] }],
         generationConfig: { 
-          responseMimeType: "application/json",
-          temperature: 0 // 🛑 絕對防錯：強制溫度為 0，確保意圖解析與關鍵字提取 100% 穩定
+          responseMimeType: "application/json"
         }
       })
     });
@@ -236,11 +402,20 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
         "恢復指數區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
         "恢復區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
         "個人恢復指數區間": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 自己的歷史恢復表現 自己和自己比較",
-        "個人恢復不足區間": "個人恢復指數區間 個人恢復不足區間 歷史恢復表現較低 自己過去比較",
-        "個人穩定恢復區間": "個人恢復指數區間 個人穩定恢復區間 歷史恢復表現中等 穩定恢復 自己過去比較",
-        "個人最佳恢復區間": "個人恢復指數區間 個人最佳恢復區間 歷史恢復表現較高 恢復表現較佳 自己過去比較",
+        "恢復不足區間": "個人恢復指數區間 個人恢復不足區間 歷史恢復表現較低 自己過去比較",
+        "穩定恢復區間": "個人恢復指數區間 個人穩定恢復區間 歷史恢復表現中等 穩定恢復 自己過去比較",
+        "最佳恢復區間": "個人恢復指數區間 個人最佳恢復區間 歷史恢復表現較高 恢復表現較佳 自己過去比較",
         "自己和自己比較": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 今天與過去比較 歷史恢復表現",
         "今天跟以前比": "個人恢復指數區間 個人恢復區間 個人歷史恢復指數 今天與過去比較 自己和自己比較",
+
+        "睡眠結構": "睡眠結構 總睡眠時間 TST 淺睡期 N1 N2 深睡期 N3 快速動眼期 REM 標準參考範圍",
+        "深睡": "深睡期 N3 標準參考範圍 睡眠結構",
+        "N3": "深睡期 N3 標準參考範圍 睡眠結構",
+        "淺睡": "淺睡期 N1 N2 標準參考範圍 睡眠結構",
+        "N1": "淺睡期 N1 N2 標準參考範圍 睡眠結構",
+        "N2": "淺睡期 N1 N2 標準參考範圍 睡眠結構",
+        "快速動眼": "快速動眼期 REM 標準參考範圍 睡眠結構",
+        "REM": "快速動眼期 REM 標準參考範圍 睡眠結構",
         
         // --- 睡眠低血氧時間比例 ---
         "T90": "T90 睡眠期間 血氧濃度小於 90% 的時間百分比 SpO2",
@@ -451,6 +626,18 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
             current.setDate(current.getDate() + 1);
           }
 
+          // 輔助函式：將 "YYYY-MM-DD HH:mm:ss" 轉為 12 小時制（上午/下午）
+          const format12Hour = (dateTimeStr) => {
+          if (!dateTimeStr) return "無資料";
+          const parts = dateTimeStr.split(' ');
+          if (parts.length < 2) return dateTimeStr;
+          const [h, m] = parts[1].split(':');
+          let hour = parseInt(h, 10);
+          const period = hour >= 12 ? '下午' : '上午';
+          hour = hour % 12 || 12;
+          return `${period} ${String(hour).padStart(2, '0')}:${m}`;
+        };
+
           // 2. 依照「日曆日期」重組文字，消滅 AI 的日期混淆
           const contextBlocks = dateArray.map(targetDate => {
             const targetDateObj = parseDate(targetDate);
@@ -480,10 +667,10 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               else if (batteryState === 2) batteryStateDisplay = "個人最佳恢復區間";
               
               const lightDisplay = (light === "NA") 
-                ? "有效訊號不足" 
+                ? "有效數據不足" 
                 : ((light === null || light === undefined || light === "無資料") ? "無資料" : light);
               const rhrDisplay = (rhr === "NA") 
-                ? "有效訊號不足" 
+                ? "有效數據不足" 
                 : ((rhr === null || rhr === undefined) ? "無資料" : `${rhr}bpm`);
               const tagDisplay = (tag === null || tag === undefined || tag === "狀態平穩") ? "狀態平穩" : tag;
               let cvdDisplay = "無資料";
@@ -491,7 +678,14 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
               else if (cvd === 1) cvdDisplay = "一般";
               else if (cvd === 2) cvdDisplay = "偏高";
               else if (cvd === 3) cvdDisplay = "高";              
+
+              // 轉換 record_start（入睡時間）與 record_end（醒來時間）為 12 小時制
+              const recordStart12h = format12Hour(rawWake.record_start);
+              const recordEnd12h = format12Hour(rawWake.record_end);              
+              
               blockText += `☀️ 【當天早晨醒來結算報告 (record_end: ${targetDate})】：\n`;
+              blockText += `   - 入睡時間: ${recordStart12h}\n`;
+              blockText += `   - 醒來時間: ${recordEnd12h}\n`;
               blockText += `   - 恢復指數: ${batteryDisplay}\n`;
               blockText += `   - 恢復區間: ${batteryStateDisplay}\n`; // 新增輸出恢復區間
               blockText += `   - 發炎風險: ${lightDisplay}\n`;
@@ -697,7 +891,19 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 8. 【解讀專屬建議與情境扮演】：若有提供【💡 個人專屬健康建議】，請將生硬的資料轉化為口語化的解釋，並嚴格遵守以下限制：
    - ⚠️【極度重要】：若建議中包含【🎯 AI 專屬對話指引】，你必須完美扮演該指引中「👉 對話語氣與切入點設定」所要求的角色與語氣來解釋建議！
    - ⚠️【安全第一】：同時，請務必用朋友般關心的口吻，自然地將「👉 必須包含的安全提醒」融入你的回覆中。
-   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。`;
+   - ⚠️【數據與名詞忠誠】：數據、單位與關鍵名詞絕對忠於原文。完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。
+9. 【延伸問題歸納】：請根據你這次的回覆內容，額外歸納 3 個或 4 個使用者有可能會想繼續追問的延伸性問題。
+10. 【按鈕字數嚴格限制】：延伸問題的文字（包含標點符號）**絕對必須維持在 20 個字以內**，簡短有力，適合當作互動按鈕。
+
+請務必回傳嚴格合法的 JSON 格式（不要包在 markdown code block 裡面，直接輸出 JSON），格式如下：
+{
+  "text": "這裡放置你的回覆內容...",
+  "follow_up_questions": [
+    "按鈕文字1？",
+    "按鈕文字2？",
+    "按鈕文字3？"
+  ]
+}`;
 
     let geminiHistory = history.map(h => {
       const textContent = h.content || (h.parts && h.parts[0] && h.parts[0].text) || '';
@@ -709,13 +915,20 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
     // 🌟 在這裡先宣告 finalText，這樣後面的超連結替換和寫入資料庫才能抓到這個變數
     let finalText = "";
 
+    let followUpQuestions = []; // 宣告變數供後續回傳使用
+
     try {
       let finalRes = await fetch(finalUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: geminiHistory
+          contents: geminiHistory,
+          // 💡 加入 generationConfig 強制輸出 JSON 格式
+          generationConfig: { 
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
         })
       });
 
@@ -749,12 +962,29 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
       const candidate = finalResult.candidates[0];
       console.log("🧠【Gemini Finish Reason】:", candidate.finishReason);
 
-      finalText = candidate.content?.parts?.map(p => p.text || "").join("").trim();
+      let rawFinalResponse = candidate.content?.parts?.map(p => p.text || "").join("").trim() || "";
 
-      if (!finalText) {
+      if (!rawFinalResponse) {
         console.error("⚠️【Gemini Candidate 沒有文字】:", JSON.stringify(candidate));
         throw new Error(`Gemini candidate 沒有文字，finishReason=${candidate.finishReason}`);
       }
+
+      // 💡 清理可能存在的 markdown 標籤並解析 JSON
+      rawFinalResponse = rawFinalResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      let parsedFinalData;
+      try {
+        parsedFinalData = JSON.parse(rawFinalResponse);
+      } catch (e) {
+        console.error("❌ 一般對話 JSON 解析失敗，回退預設格式", e);
+        parsedFinalData = {
+          text: rawFinalResponse,
+          follow_up_questions: ["如何進一步改善？", "最近有什麼需要注意的嗎？", "這跟我的睡眠有關嗎？"]
+        };
+      }
+
+      finalText = parsedFinalData.text || "";
+      followUpQuestions = parsedFinalData.follow_up_questions || [];
 
     } catch (error) {
       console.error("❌【Gemini Final 最終階段失敗】:", error);
@@ -784,7 +1014,10 @@ const routerPrompt = `今天是 ${local_date} (${dayOfWeek})。
 
     waitUntil(logTask);
 
-    return res.status(200).json({ text: finalText });
+    return res.status(200).json({ 
+      text: finalText, 
+      follow_up_questions: followUpQuestions 
+    });
 
   } catch (error) {
     console.error(error);
