@@ -3910,7 +3910,6 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '0px');
     let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '0px');
 
-    const cardId = `summary-card-${Date.now()}`;
 
     // 取得使用者個人化排版
     let currentLayout = ['block4', 'block5', 'block6', 'block7', 'block8', 'block9', 'block10', 'block11', 'block12'];
