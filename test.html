@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-4</title>
+    <title>Soosyn 健康夥伴 n103-1</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -3674,36 +3674,19 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
     const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
-    let alertHtml = '';
-    if (batteryVal < 60 || statusLight === '黃燈' || statusLight === '紅燈') {
-        let alertText = '';
-        
-        if (batteryVal >= 60 && statusLight === '紅燈') {
-            alertText = `恢復指數 ${batteryVal}，發炎風險紅燈。<br>睡眠提供了良好的身體修復，但生理狀態顯示身體可能處於較高的發炎風險。建議維持充足睡眠與適當休息，並留意近期身體狀況是否出現變化。`;
-        } else if (batteryVal >= 60 && statusLight === '黃燈') {
-            alertText = `恢復指數 ${batteryVal}，發炎風險黃燈。<br>睡眠修復狀況良好，但生理狀態顯示身體可能已有輕微壓力累積。建議持續維持規律作息與良好睡眠，協助身體恢復平衡。`;
-        } else if (batteryVal < 60 && statusLight === '綠燈') {
-            alertText = `恢復指數 ${batteryVal}，發炎風險綠燈。<br>睡眠修復不足，但目前生理狀態仍維持穩定。建議改善睡眠時間與品質，維持身體正常的修復能力。`;
-        } else if (batteryVal < 60 && statusLight === '黃燈') {
-            alertText = `恢復指數 ${batteryVal}，發炎風險黃燈。<br>睡眠修復不足，且生理狀態顯示身體可能已有壓力累積。建議增加休息、提升睡眠品質，協助身體恢復正常修復狀態。`;
-        } else if (batteryVal < 60 && statusLight === '紅燈') {
-            alertText = `恢復指數 ${batteryVal}，發炎風險紅燈。<br>睡眠修復不足，且生理狀態顯示身體可能處於較高的發炎風險。建議優先安排充分休息、改善睡眠品質，並持續留意身體狀況；如有持續不適，建議諮詢醫療專業人員。`;
-        }
-
-        if (alertText !== '') {
-            alertHtml = `
-                <div style="background-color: #fffdf8; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb400; box-shadow: 0 1px 5px rgba(0,0,0,0.05);">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                        <span style="font-size: 1.2rem;">🔔</span>
-                        <span style="font-weight: bold; color: #d97706;">健康提醒</span>
-                    </div>
-                    <div style="font-size: 14px; color: #5a5a5a; line-height: 1.6;">
-                        ${alertText}
-                    </div>
-                </div>
-            `;
-        }
-    }
+    // 修改1 & 修改2：固定顯示 Alert 區塊，並準備非同步填入 4 個段落
+    const cardId = `summary-card-${Date.now()}`;
+    const alertHtml = `
+        <div style="background-color: #fffdf8; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb400; box-shadow: 0 1px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span style="font-size: 1.2rem;">🔔</span>
+                <span style="font-weight: bold; color: #d97706;">健康摘要分析</span>
+            </div>
+            <div id="alert-content-${cardId}" style="font-size: 14px; color: #5a5a5a; line-height: 1.6; display: flex; flex-direction: column; gap: 12px;">
+                資料載入中...
+            </div>
+        </div>
+    `;
 
     let rhrSectionHtml = '';
     if (raw && raw.RHR_raw != null && raw.RHR_raw !== 'NA' && raw.RHR_raw !== 'N/A') {
@@ -4026,7 +4009,129 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
         }
     }, 100);
 }
+// ----------------------------------------------------
+// 新增：非同步載入 Alert 區塊 4 個段落與 Supabase 查表
+// ----------------------------------------------------
+async function loadAlertBlockData(cardId, raw, data) {
+    const container = document.getElementById(`alert-content-${cardId}`);
+    if (!container) return;
 
+    try {
+        // 1. 取得各項數值
+        const riVal = (raw && raw.Personal_Battery_weighted_round != null) ? Number(raw.Personal_Battery_weighted_round) : Math.round(data.battery);
+        const tagVal = (raw && raw.Daily_Tag !== undefined) ? raw.Daily_Tag : null;
+        const lightVal = (raw && raw.light_status !== undefined) ? raw.light_status : (data.light || null);
+
+        // 2. 對應段落 A (恢復指數) 的 phrase_library key
+        let riKey = 'ri_01';
+        if (riVal >= 95) riKey = 'ri_04';
+        else if (riVal >= 80) riKey = 'ri_03';
+        else if (riVal >= 60) riKey = 'ri_02';
+
+        // 3. 對應段落 B (恢復狀態) 的 phrase_library key
+        let tagKey = 'dailytag_01';
+        let tagDisplay = '狀態平穩';
+        if (tagVal != null && tagVal !== 'null' && tagVal !== 'undefined') {
+            tagDisplay = tagVal;
+            const tagMap = {
+                '黃金修復': 'dailytag_02',
+                '標準修復': 'dailytag_03',
+                '精神負荷': 'dailytag_04',
+                '高身心壓力': 'dailytag_05',
+                '過度疲憊': 'dailytag_06',
+                '修復不足': 'dailytag_07',
+                '極度疲乏日': 'dailytag_08',
+                '睡眠結構混亂': 'dailytag_09',
+                '極端負荷': 'dailytag_10',
+                '最差睡眠結構': 'dailytag_11',
+                '過度訓練/發炎': 'dailytag_12'
+            };
+            tagKey = tagMap[tagVal] || 'dailytag_01';
+        }
+
+        // 4. 對應段落 C (發炎風險) 的 phrase_library key
+        let lightKey = 'light_05';
+        let lightDisplay = '暫無發炎風險判讀';
+        if (lightVal === 'NA') {
+            lightDisplay = '暫不提供發炎風險判讀';
+            lightKey = 'light_04';
+        } else if (lightVal == null || lightVal === 'null' || lightVal === 'undefined') {
+            lightDisplay = '暫無發炎風險判讀';
+            lightKey = 'light_05';
+        } else {
+            lightDisplay = lightVal;
+            if (lightVal === '綠燈') lightKey = 'light_01';
+            else if (lightVal === '黃燈') lightKey = 'light_02';
+            else if (lightVal === '紅燈') lightKey = 'light_03';
+        }
+
+        // 批次查詢 phrase_library
+        const { data: phraseData } = await supabase
+            .from('phrase_library')
+            .select('title, detailed_content')
+            .in('title', [riKey, tagKey, lightKey]);
+
+        const phraseMap = {};
+        if (phraseData) {
+            phraseData.forEach(row => {
+                phraseMap[row.title] = row.detailed_content || '';
+            });
+        }
+
+        const contentA = phraseMap[riKey] || '';
+        const contentB = phraseMap[tagKey] || '';
+        const contentC = phraseMap[lightKey] || '';
+
+        // 5. 段落 D：查詢 priority_focus_lookup 表格並進行比對（忽略大小寫與 null 差異）
+        let contentD = '';
+        const { data: focusData } = await supabase
+            .from('priority_focus_lookup')
+            .select('*');
+
+        if (focusData) {
+            const matchedRow = focusData.find(row => {
+                const batCond = String(row.personal_battery_weighted_round || row.Personal_Battery_weighted_round || '').trim();
+                let batMatch = false;
+                if (batCond.startsWith('<60')) batMatch = riVal < 60;
+                else if (batCond.startsWith('>=60')) batMatch = riVal >= 60;
+                else if (batCond.startsWith('<')) batMatch = riVal < parseFloat(batCond.substring(1));
+                else if (batCond.startsWith('>=')) batMatch = riVal >= parseFloat(batCond.substring(2));
+                else if (batCond.startsWith('<=')) batMatch = riVal <= parseFloat(batCond.substring(2));
+                else if (batCond.startsWith('>')) batMatch = riVal > parseFloat(batCond.substring(1));
+                else if (!batCond || batCond === '*') batMatch = true;
+                else batMatch = parseFloat(batCond) === riVal;
+
+                const tagCond = row.daily_tag || row.Daily_Tag;
+                const isTagNull = (tagVal == null || String(tagVal).toLowerCase() === 'null' || String(tagVal).toLowerCase() === 'undefined' || tagVal === '');
+                const isCondNull = (tagCond == null || String(tagCond).trim() === '' || ['NULL', 'NULL/UNDEFINED', 'UNDEFINED'].includes(String(tagCond).toUpperCase()));
+                const tagMatch = isCondNull ? isTagNull : (!isTagNull && String(tagCond).trim().toLowerCase() === String(tagVal).trim().toLowerCase());
+
+                const lightCond = row.light_status || row.Light_Status;
+                const isLightNull = (lightVal == null || String(lightVal).toLowerCase() === 'null' || String(lightVal).toLowerCase() === 'undefined' || lightVal === '');
+                const isLightCondNull = (lightCond == null || String(lightCond).trim() === '' || ['NULL', 'NULL/UNDEFINED', 'UNDEFINED'].includes(String(lightCond).toUpperCase()));
+                const lightMatch = isLightCondNull ? isLightNull : (!isLightNull && String(lightCond).trim().toLowerCase() === String(lightVal).trim().toLowerCase());
+
+                return batMatch && tagMatch && lightMatch;
+            });
+
+            if (matchedRow) {
+                contentD = matchedRow.content || matchedRow.detailed_content || '';
+            }
+        }
+
+        // 6. 組合 4 個段落並更新 DOM
+        container.innerHTML = `
+            <div><strong>恢復指數：${riVal}</strong><br>${contentA}</div>
+            <div><strong>恢復狀態：${tagDisplay}</strong><br>${contentB}</div>
+            <div><strong>發炎風險：${lightDisplay}</strong><br>${contentC}</div>
+            <div><strong>整體解讀</strong><br>${contentD}</div>
+        `;
+
+    } catch (err) {
+        console.error('載入健康摘要分析失敗:', err);
+        container.innerHTML = `<div style="color: #ff8c73;">無法載入健康摘要分析資料</div>`;
+    }
+}
     function appendStatusOptions() {
         const options = [{text:"① 像是沒睡一樣，頭昏，只想賴床", val:50}, {text:"② 睡了，但還是覺得很累", val:60}, {text:"③ 與平常無異，沒特別好，也不算差", val:75}, {text:"④ 醒來就覺得不錯，腦袋清楚", val:85}, {text:"⑤ 精神飽滿，對今天有期待感", val:95}];
         let html = '<div class="msg-row ai-row" id="status-options-container"><div style="display:flex; flex-direction:column; gap:8px; width:100%; max-width:260px;">';
