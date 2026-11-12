@@ -4065,7 +4065,7 @@ async function loadAlertBlockData(cardId, raw, data) {
         }
 
         // 批次查詢 phrase_library
-        const { data: phraseData } = await supabase
+        const { data: phraseData } = await _supabase
             .from('phrase_library')
             .select('title, detailed_content')
             .in('title', [riKey, tagKey, lightKey]);
@@ -4083,7 +4083,7 @@ async function loadAlertBlockData(cardId, raw, data) {
 
         // 5. 段落 D：查詢 priority_focus_lookup 表格並進行比對（忽略大小寫與 null 差異）
         let contentD = '';
-        const { data: focusData } = await supabase
+        const { data: focusData } = await _supabase
             .from('priority_focus_lookup')
             .select('*');
 
