@@ -3812,12 +3812,12 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
                 containerEl.outerHTML = finalAlertHtml;
             }
         } catch (e) {
-            console.error('載入健康提醒與查表發生錯誤:', e);
-            const containerEl = document.getElementById(`alert-content-container-${cardId}`);
-            if (containerEl) {
-                containerEl.innerHTML = '載入健康提醒失敗，請稍後再試。';
-            }
+        console.error('載入健康提醒與查表發生錯誤:', e);
+        const containerEl = document.getElementById(`alert-content-container-${cardId}`);
+        if (containerEl) {
+            containerEl.innerHTML = `<div style="color: #dc0000; font-size: 13px;">⚠️ 載入失敗: ${e.message}</div>`;
         }
+    }
     })();
 
     let rhrSectionHtml = '';
