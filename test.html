@@ -3529,7 +3529,6 @@ function renderCapsulesByType(capsules, type, marginBottom = '8px') {
 async function appendSummaryCard(dateTitle, data, serialNumber) {
     const raw = data.raw_json;
     const history7 = data.history7 || [data];
-    const cardId = `summary-card-${Date.now()}`;
     
     const getColor = (val) => {
         if (val >= 95) return "#596b75";
@@ -3675,150 +3674,42 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
     const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
-    let alertHtml = `<div id="alert-content-container-${cardId}">讀取中...</div>`;
+    // 1. 根據 batteryVal（Personal_Battery_weighted_round）決定要讀取的 title 代碼
+let riCode = 'ri_01';
+if (batteryVal >= 95) {
+    riCode = 'ri_04';
+} else if (batteryVal >= 80) {
+    riCode = 'ri_03';
+} else if (batteryVal >= 60) {
+    riCode = 'ri_02';
+} else {
+    riCode = 'ri_01';
+}
 
-    // 於背景非同步撈取與組裝內容
-    (async () => {
-        try {
-            const rawWeightedRound = raw ? raw.Personal_Battery_weighted_round : undefined;
-            const rawDailyTag = raw ? raw.Daily_Tag : undefined;
-            const rawLightStatus = raw ? raw.light_status : undefined;
+// 2. 從 Supabase 的 phrase_library 表讀取對應的 detailed_content
+let detailText = '';
+const { data, error } = await _supabase
+    .from('phrase_library')
+    .select('detailed_content')
+    .eq('title', riCode)
+    .single();
 
-            // 1. 段落 A 恢復指數相關參數與查詢
-            let riTitleKey = 'ri_01';
-            if (rawWeightedRound >= 95) riTitleKey = 'ri_04';
-            else if (rawWeightedRound >= 80) riTitleKey = 'ri_03';
-            else if (rawWeightedRound >= 60) riTitleKey = 'ri_02';
+if (!error && data) {
+    detailText = data.detailed_content;
+}
 
-            const displayScore = rawWeightedRound !== undefined && rawWeightedRound !== null ? rawWeightedRound : '--';
-
-            // 2. 段落 B 恢復狀態相關參數與查詢
-            let dtTitleKey = 'dailytag_01';
-            let displayTagText = '狀態平穩';
-            if (rawDailyTag !== undefined && rawDailyTag !== null && rawDailyTag !== '') {
-                displayTagText = rawDailyTag;
-                const tagMap = {
-                    '黃金修復': 'dailytag_02',
-                    '標準修復': 'dailytag_03',
-                    '精神負荷': 'dailytag_04',
-                    '高身心壓力': 'dailytag_05',
-                    '過度疲憊': 'dailytag_06',
-                    '修復不足': 'dailytag_07',
-                    '極度疲乏日': 'dailytag_08',
-                    '睡眠結構混亂': 'dailytag_09',
-                    '極端負荷': 'dailytag_10',
-                    '最差睡眠結構': 'dailytag_11',
-                    '過度訓練/發炎': 'dailytag_12'
-                };
-                if (tagMap[rawDailyTag]) {
-                    dtTitleKey = tagMap[rawDailyTag];
-                }
-            }
-
-            // 3. 段落 C 發炎風險相關參數與查詢
-            let lightTitleKey = 'light_05';
-            let displayLightText = statusLight;
-            if (rawLightStatus === 'NA') {
-                lightTitleKey = 'light_04';
-                displayLightText = '暫不提供發炎風險判讀';
-            } else if (rawLightStatus === null || rawLightStatus === undefined) {
-                lightTitleKey = 'light_05';
-                displayLightText = '暫無發炎風險判讀';
-            } else if (rawLightStatus === '綠燈') {
-                lightTitleKey = 'light_01';
-            } else if (rawLightStatus === '黃燈') {
-                lightTitleKey = 'light_02';
-            } else if (rawLightStatus === '紅燈') {
-                lightTitleKey = 'light_03';
-            }
-
-            // 批次查詢 phrase_library
-            const { data: phraseData, error: phraseErr } = await _supabase
-                .from('phrase_library')
-                .select('title, detailed_content')
-                .in('title', [riTitleKey, dtTitleKey, lightTitleKey]);
-
-            const phraseMap = {};
-            if (!phraseErr && phraseData) {
-                phraseData.forEach(item => {
-                    phraseMap[item.title] = item.detailed_content;
-                });
-            }
-
-            const paragraphAContent = phraseMap[riTitleKey] || '';
-            const paragraphBContent = phraseMap[dtTitleKey] || '';
-            const paragraphCContent = phraseMap[lightTitleKey] || '';
-
-            // 4. 段落 D 整體解讀：比對 priority_focus_lookup table
-            // 轉換判定條件對應字串格式
-            const batteryCondStr = (rawWeightedRound >= 60) ? '>=60' : '<60';
-            const tagCondStr = (rawDailyTag !== undefined && rawDailyTag !== null && rawDailyTag !== '') ? rawDailyTag : 'NULL/undefined';
-            const lightCondStr = (rawLightStatus !== undefined && rawLightStatus !== null) ? rawLightStatus : 'NULL/undefined';
-
-            // 撈取 priority_focus_lookup 資料表比對 (忽略大小寫)
-            const { data: focusData, error: focusErr } = await _supabase
-                .from('priority_focus_lookup')
-                .select('result, content');
-
-            let paragraphDContent = '暫無對應的整體解讀';
-            if (!focusErr && focusData) {
-                const matched = focusData.find(item => {
-                    if (!item.result) return false;
-                    // 將字串依逗號與空白拆解比對或直接進行正規化比對
-                    const dbParts = item.result.split(',').map(s => s.trim().toLowerCase());
-                    const targetParts = [batteryCondStr, String(tagCondStr), String(lightCondStr)].map(s => s.trim().toLowerCase());
-                    
-                    return dbParts.length === 3 && 
-                           dbParts[0] === targetParts[0] && 
-                           dbParts[1] === targetParts[1] && 
-                           dbParts[2] === targetParts[2];
-                });
-
-                if (matched && matched.content) {
-                    paragraphDContent = matched.content;
-                }
-            }
-
-            // 組合 4 個段落的 HTML
-            const finalAlertHtml = `
-                <div style="background-color: #fffdf8; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb400; box-shadow: 0 1px 5px rgba(0,0,0,0.05);">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                        <span style="font-size: 1.2rem;">🔔</span>
-                        <span style="font-weight: bold; color: #d97706; font-size: 1.1rem;">健康提醒與綜合解析</span>
-                    </div>
-                    <div style="font-size: 14px; color: #5a5a5a; line-height: 1.6; display: flex; flex-direction: column; gap: 14px;">
-                        <div>
-                            <strong>恢復指數：${displayScore}</strong><br>
-                            ${paragraphAContent}
-                        </div>
-                        <div>
-                            <strong>恢復狀態：${displayTagText}</strong><br>
-                            ${paragraphBContent}
-                        </div>
-                        <div>
-                            <strong>發炎風險：${displayLightText}</strong><br>
-                            ${paragraphCContent}
-                        </div>
-                        <div>
-                            <strong>整體解讀</strong><br>
-                            ${paragraphDContent}
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const containerEl = document.getElementById(`alert-content-container-${cardId}`);
-            if (containerEl) {
-                containerEl.outerHTML = finalAlertHtml;
-            }
-        } catch (e) {
-        console.error('載入健康提醒與查表發生錯誤:', e);
-        const containerEl = document.getElementById(`alert-content-container-${cardId}`);
-        if (containerEl) {
-            containerEl.innerHTML = `<div style="color: #dc0000; font-size: 13px;">⚠️ 載入失敗: ${e.message}</div>`;
-        }
-    }
-    })();
+// 3. 建立 insightHtml，不設條件限制固定顯示，並將標題改為粗體的「恢復指數：XX」
+let insightHtml = `
+    <div style="background-color: #fffdf8; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb400; box-shadow: 0 1px 5px rgba(0,0,0,0.05);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="font-size: 1.2rem;">🔔</span>
+            <span style="font-weight: bold; color: #d97706;">恢復指數：${batteryVal}</span>
+        </div>
+        <div style="font-size: 14px; color: #5a5a5a; line-height: 1.6;">
+            ${detailText}
+        </div>
+    </div>
+`;
 
     let rhrSectionHtml = '';
     if (raw && raw.RHR_raw != null && raw.RHR_raw !== 'NA' && raw.RHR_raw !== 'N/A') {
@@ -4042,6 +3933,8 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     let recoveryCapsulesHtml = renderCapsulesByType(data.capsules, 'recovery', '0px');
     let bestCapsulesHtml = renderCapsulesByType(data.capsules, 'best', '0px');
 
+    const cardId = `summary-card-${Date.now()}`;
+
     // 取得使用者個人化排版
     let currentLayout = ['block4', 'block5', 'block6', 'block7', 'block8', 'block9', 'block10', 'block11', 'block12'];
     try {
@@ -4114,7 +4007,7 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
             </div>
         </div>
 
-        ${alertHtml}
+        ${insightHtml}
     `;
 
     const cardHtml = `
