@@ -3742,20 +3742,23 @@ if (lightStatus === 'NA') {
 // 4. 決定電池分數區間鍵 (<60 或 >=60)
 let batteryKey = batteryVal < 60 ? '<60' : '>=60';
 
-// 組合 priority_focus_lookup 的查詢 key (格式例如: result/<60, NULL/undefined, 綠燈)
+// 組合 priority_focus_lookup 的查詢 key (格式例如: result/>=60, NULL/undefined, 綠燈)
 let lookupResultKey = `result/${batteryKey}, ${rawTagKey}, ${rawLightKey}`;
 
-// 5. 同時從 Supabase 讀取資料 (phrase_library 的 3 筆 + priority_focus_lookup 的 1 筆)
+// 方便你在 F12 檢查組出來的 key 對不對
+console.log("Supabase Lookup Key:", lookupResultKey);
+
+// 5. 同時從 Supabase 讀取資料 (使用 maybeSingle 避免找不到資料時報 406 錯誤)
 const [
     { data: riData },
     { data: tagData },
     { data: lightData },
     { data: focusData }
 ] = await Promise.all([
-    _supabase.from('phrase_library').select('detailed_content').eq('title', riCode).single(),
-    _supabase.from('phrase_library').select('detailed_content').eq('title', tagCode).single(),
-    _supabase.from('phrase_library').select('detailed_content').eq('title', lightCode).single(),
-    _supabase.from('priority_focus_lookup').select('content').eq('result', lookupResultKey).single()
+    _supabase.from('phrase_library').select('detailed_content').eq('title', riCode).maybeSingle(),
+    _supabase.from('phrase_library').select('detailed_content').eq('title', tagCode).maybeSingle(),
+    _supabase.from('phrase_library').select('detailed_content').eq('title', lightCode).maybeSingle(),
+    _supabase.from('priority_focus_lookup').select('content').eq('result', lookupResultKey).maybeSingle()
 ]);
 
 let detailText1 = riData ? riData.detailed_content : '';
