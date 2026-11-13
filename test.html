@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n103-1</title>
+    <title>Soosyn 健康夥伴 n103-2</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2074,6 +2074,8 @@ if (needsAction) {
 }
 
 // 6. 將恢復指數建議新增至膠囊列表 注意：recType 為後端判斷用分類，不直接顯示給使用者。前端只顯示「恢復指數優先調整項目」。
+const recoveryContentHtml = `<div>${actionText}</div>`;
+
 finalCapsules.push({
     type: 'recovery',
     text: `
@@ -2083,27 +2085,32 @@ finalCapsules.push({
                 ${needsAction ? weakest.name : '目前無特別需改善項目'}
             </strong>
         </div>
-        <div>
-            ${actionText}
-        </div>
+        ${buildToggleWrapper(recoveryContentHtml, 'recovery', '▲ 收合完整建議', '▼ 查看完整建議')}
     `
 });
 
-    // --- 4. 組合最終的 Capsules (原有的日常/運動建議) ---
-    finalCapsules.push({ 
-        type: 'best',  
-        text: `
-            <div style="margin-bottom: 8px;">
-                <strong>💡 日常活動建議</strong><br>
-                ${dailyAction}
-            </div>
-            <div>
-                <strong>🏃‍♂️ 運動建議</strong><br>
-                ${exerciseRec}<br>
-                <span style="display:inline-block; margin-top:4px; font-size:0.8em; color:#ff8c73;">運動若出現胸部不適或呼吸困難，請停止活動。</span>
-            </div>
-        ` 
-    });
+// --- 2. 日常活動與運動建議 (加入展開/收合) ---
+const bestContentHtml = `
+    <div style="margin-bottom: 8px;">
+        <strong>💡 日常活動建議</strong><br>
+        ${dailyAction}
+    </div>
+    <div>
+        <strong>🏃♂️ 運動建議</strong><br>
+        ${exerciseRec}<br>
+        <span style="display:inline-block; margin-top:4px; font-size:0.8em; color:#ff8c73;">運動若出現胸部不適或呼吸困難，請停止活動。</span>
+    </div>
+`;
+
+finalCapsules.push({ 
+    type: 'best',   
+    text: `
+        <div style="margin-bottom: 8px;">
+            <strong>💡 日常活動與運動建議</strong>
+        </div>
+        ${buildToggleWrapper(bestContentHtml, 'best', '▲ 收合完整建議', '▼ 查看完整建議')}
+    `
+});
 
     const statusLight = raw?.light_status || '--';
 
