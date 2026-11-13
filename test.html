@@ -3742,13 +3742,13 @@ if (lightStatus === 'NA') {
 // 4. 決定電池分數區間鍵 (<60 或 >=60)
 let batteryKey = batteryVal < 60 ? '<60' : '>=60';
 
-// 組合 priority_focus_lookup 的查詢 key (格式例如: result/>=60, NULL/undefined, 綠燈)
-let lookupResultKey = `result/${batteryKey}, ${rawTagKey}, ${rawLightKey}`;
+// 移除前面的 "result/"，只保留資料庫實際存放的格式 (例如: ">=60, NULL/undefined, 綠燈")
+let lookupResultKey = `${batteryKey}, ${rawTagKey}, ${rawLightKey}`;
 
-// 方便你在 F12 檢查組出來的 key 對不對
+// 檢查 F12 印出來的 key 是否變為: ">=60, NULL/undefined, 綠燈"
 console.log("Supabase Lookup Key:", lookupResultKey);
 
-// 5. 同時從 Supabase 讀取資料 (使用 maybeSingle 避免找不到資料時報 406 錯誤)
+// 5. 同時從 Supabase 讀取資料 (使用 maybeSingle 避免找不到資料報錯)
 const [
     { data: riData },
     { data: tagData },
