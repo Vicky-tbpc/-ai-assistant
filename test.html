@@ -3687,15 +3687,15 @@ if (batteryVal >= 95) {
 }
 
 // 2. 從 Supabase 的 phrase_library 表讀取對應的 detailed_content
-let detailText = '';
-const { data, error } = await _supabase
+const { data: phraseData, error } = await _supabase
     .from('phrase_library')
     .select('detailed_content')
     .eq('title', riCode)
     .single();
 
-if (!error && data) {
-    detailText = data.detailed_content;
+let detailText = '';
+if (!error && phraseData) {
+    detailText = phraseData.detailed_content;
 }
 
 // 3. 建立 insightHtml，不設條件限制固定顯示，並將標題改為粗體的「恢復指數：XX」
