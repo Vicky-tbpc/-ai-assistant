@@ -82,7 +82,7 @@
         .progress-bg { width: 100%; height: 10px; background: #e1e1e1; border-radius: 5px; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 1s ease-in-out; border-radius: 5px; }
         .analysis-capsule { display: flex; align-items: center; padding: 12px 15px; border-radius: 16px; margin-top: 10px; font-size: 1rem; line-height: 1.5; }
-        .capsule-best { background-color: #f5f5f5; color: #4a5a61; border: 1px solid #e0eff1; }
+        .capsule-best { background-color: #f5f5f5; color: #4a5a61; border: 1px solid #d8dfe3; }
         .capsule-worst { background-color: #fff6f4; color: #6e524d; border: 1px solid #ffe8e3; }
         .capsule-icon { font-size: 1.2rem; margin-right: 10px; flex-shrink: 0; }
         .radar-svg { width: 100%; height: auto; }
@@ -3674,8 +3674,9 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
     const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
-    // 0. 從 raw 中安全取得 Daily_Tag
+    // 0. 從 raw 中安全取得 Daily_Tag 與 light_status
 let Daily_Tag = (raw && raw.Daily_Tag) ? raw.Daily_Tag : null;
+let lightStatus = (raw && raw.light_status !== undefined) ? raw.light_status : (data?.light_status || null);
 
 // 1. 決定恢復指數的 title 代碼 (ri_01 ~ ri_04)
 let riCode = 'ri_01';
@@ -3715,16 +3716,43 @@ if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined' && Daily_Tag 
     }
 }
 
-// 3. 同時從 Supabase 的 phrase_library 表讀取兩筆資料
-const [{ data: riData }, { data: tagData }] = await Promise.all([
+// 3. 決定 light_status 的 title 代碼與顯示文字
+let lightCode = 'light_05';
+let displayLight = '暫無發炎風險判讀';
+
+if (lightStatus === 'NA') {
+    displayLight = '暫不提供發炎風險判讀';
+    lightCode = 'light_04';
+} else if (lightStatus === '綠燈') {
+    displayLight = lightStatus;
+    lightCode = 'light_01';
+} else if (lightStatus === '黃燈') {
+    displayLight = lightStatus;
+    lightCode = 'light_02';
+} else if (lightStatus === '紅燈') {
+    displayLight = lightStatus;
+    lightCode = 'light_03';
+} else if (lightStatus === null || lightStatus === undefined || lightStatus === 'NULL' || lightStatus === 'undefined') {
+    displayLight = '暫無發炎風險判讀';
+    lightCode = 'light_05';
+} else {
+    // 預設其他未知情況
+    displayLight = lightStatus;
+    lightCode = 'light_05';
+}
+
+// 4. 同時從 Supabase 的 phrase_library 表讀取三筆資料 (riCode, tagCode, lightCode)
+const [{ data: riData }, { data: tagData }, { data: lightData }] = await Promise.all([
     _supabase.from('phrase_library').select('detailed_content').eq('title', riCode).single(),
-    _supabase.from('phrase_library').select('detailed_content').eq('title', tagCode).single()
+    _supabase.from('phrase_library').select('detailed_content').eq('title', tagCode).single(),
+    _supabase.from('phrase_library').select('detailed_content').eq('title', lightCode).single()
 ]);
 
 let detailText1 = riData ? riData.detailed_content : '';
 let detailText2 = tagData ? tagData.detailed_content : '';
+let detailText3 = lightData ? lightData.detailed_content : '';
 
-// 4. 建立 insightHtml
+// 5. 建立 insightHtml（包含恢復指數、恢復狀態、發炎風險三個區塊）
 let insightHtml = `
     <div style="margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px;">
         <div class="analysis-capsule capsule-best" style="display: flex; flex-direction: column; align-items: stretch; gap: 12px;">
@@ -3733,7 +3761,7 @@ let insightHtml = `
                 <div style="margin-bottom: 8px;">
                     <strong>📈 恢復指數：${batteryVal}</strong>
                 </div>
-                <div style="font-size: 14px; line-height: 1.6; color: inherit;">
+                <div style="line-height: 1.6; color: inherit;">
                     ${detailText1}
                 </div>
             </div>
@@ -3743,10 +3771,22 @@ let insightHtml = `
             <!-- 恢復狀態區塊 -->
             <div>
                 <div style="margin-bottom: 8px;">
-                    <strong>📌 恢復狀態：${displayTag}</strong>
+                    <strong>🔄 恢復狀態：${displayTag}</strong>
                 </div>
-                <div style="font-size: 14px; line-height: 1.6; color: inherit;">
+                <div style="line-height: 1.6; color: inherit;">
                     ${detailText2}
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 0;">
+
+            <!-- 發炎風險區塊 (新增) -->
+            <div>
+                <div style="margin-bottom: 8px;">
+                    <strong>🔔 發炎風險：${displayLight}</strong>
+                </div>
+                <div style="line-height: 1.6; color: inherit;">
+                    ${detailText3}
                 </div>
             </div>
         </div>
