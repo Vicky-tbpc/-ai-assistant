@@ -3693,9 +3693,11 @@ if (batteryVal >= 95) {
 // 2. 決定 Daily_Tag 的 title 代碼與顯示文字
 let tagCode = 'dailytag_01';
 let displayTag = '狀態平穩';
+let rawTagKey = 'NULL/undefined'; // 用於 priority_focus_lookup 的鍵
 
 if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined' && Daily_Tag !== 'null') {
     displayTag = Daily_Tag;
+    rawTagKey = Daily_Tag;
     
     const tagMap = {
         '黃金修復': 'dailytag_02',
@@ -3719,40 +3721,49 @@ if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined' && Daily_Tag 
 // 3. 決定 light_status 的 title 代碼與顯示文字
 let lightCode = 'light_05';
 let displayLight = '暫無發炎風險判讀';
+let rawLightKey = 'NULL/undefined'; // 用於 priority_focus_lookup 的鍵
 
 if (lightStatus === 'NA') {
     displayLight = '暫不提供發炎風險判讀';
     lightCode = 'light_04';
-} else if (lightStatus === '綠燈') {
+    rawLightKey = 'NA';
+} else if (lightStatus === '綠燈' || lightStatus === '黃燈' || lightStatus === '紅燈') {
     displayLight = lightStatus;
-    lightCode = 'light_01';
-} else if (lightStatus === '黃燈') {
-    displayLight = lightStatus;
-    lightCode = 'light_02';
-} else if (lightStatus === '紅燈') {
-    displayLight = lightStatus;
-    lightCode = 'light_03';
-} else if (lightStatus === null || lightStatus === undefined || lightStatus === 'NULL' || lightStatus === 'undefined') {
+    rawLightKey = lightStatus;
+    if (lightStatus === '綠燈') lightCode = 'light_01';
+    if (lightStatus === '黃燈') lightCode = 'light_02';
+    if (lightStatus === '紅燈') lightCode = 'light_03';
+} else {
     displayLight = '暫無發炎風險判讀';
     lightCode = 'light_05';
-} else {
-    // 預設其他未知情況
-    displayLight = lightStatus;
-    lightCode = 'light_05';
+    rawLightKey = 'NULL/undefined';
 }
 
-// 4. 同時從 Supabase 的 phrase_library 表讀取三筆資料 (riCode, tagCode, lightCode)
-const [{ data: riData }, { data: tagData }, { data: lightData }] = await Promise.all([
+// 4. 決定電池分數區間鍵 (<60 或 >=60)
+let batteryKey = batteryVal < 60 ? '<60' : '>=60';
+
+// 組合 priority_focus_lookup 的查詢 key (格式例如: result/<60, NULL/undefined, 綠燈)
+let lookupResultKey = `result/${batteryKey}, ${rawTagKey}, ${rawLightKey}`;
+
+// 5. 同時從 Supabase 讀取資料 (phrase_library 的 3 筆 + priority_focus_lookup 的 1 筆)
+const [
+    { data: riData },
+    { data: tagData },
+    { data: lightData },
+    { data: focusData }
+] = await Promise.all([
     _supabase.from('phrase_library').select('detailed_content').eq('title', riCode).single(),
     _supabase.from('phrase_library').select('detailed_content').eq('title', tagCode).single(),
-    _supabase.from('phrase_library').select('detailed_content').eq('title', lightCode).single()
+    _supabase.from('phrase_library').select('detailed_content').eq('title', lightCode).single(),
+    _supabase.from('priority_focus_lookup').select('content').eq('result', lookupResultKey).single()
 ]);
 
 let detailText1 = riData ? riData.detailed_content : '';
 let detailText2 = tagData ? tagData.detailed_content : '';
 let detailText3 = lightData ? lightData.detailed_content : '';
+let focusContent = focusData ? focusData.content : '目前尚無此狀態的綜合解讀內容。';
 
-// 5. 建立 insightHtml（包含恢復指數、恢復狀態、發炎風險三個區塊）
+// 6. 建立 insightHtml（包含恢復指數、恢復狀態、發炎風險、整體解讀四個區塊）
 let insightHtml = `
     <div style="margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px;">
         <div class="analysis-capsule capsule-best" style="display: flex; flex-direction: column; align-items: stretch; gap: 12px;">
@@ -3780,13 +3791,25 @@ let insightHtml = `
 
             <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 0;">
 
-            <!-- 發炎風險區塊 (新增) -->
+            <!-- 發炎風險區塊 -->
             <div>
                 <div style="margin-bottom: 8px;">
                     <strong>🔔 發炎風險：${displayLight}</strong>
                 </div>
                 <div style="line-height: 1.6; color: inherit;">
                     ${detailText3}
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 0;">
+
+            <!-- 整體解讀區塊 (新增) -->
+            <div>
+                <div style="margin-bottom: 8px;">
+                    <strong>📋 整體解讀</strong>
+                </div>
+                <div style="line-height: 1.6; color: inherit;">
+                    ${focusContent}
                 </div>
             </div>
         </div>
