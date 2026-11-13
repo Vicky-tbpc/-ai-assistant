@@ -3698,15 +3698,18 @@ if (!error && phraseData) {
     detailText = phraseData.detailed_content;
 }
 
-// 3. 建立 insightHtml，不設條件限制固定顯示，並將標題改為粗體的「恢復指數：XX」
+// 3. 建立 insightHtml，改用與上方相同的 .analysis-capsule 結構與類別（這裡以 capsule-best 或自定義黃色系為主）
 let insightHtml = `
-    <div style="background-color: #fffdf8; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb400; box-shadow: 0 1px 5px rgba(0,0,0,0.05);">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 1.2rem;">🔔</span>
-            <span style="font-weight: bold; color: #d97706;">恢復指數：${batteryVal}</span>
-        </div>
-        <div style="font-size: 14px; color: #5a5a5a; line-height: 1.6;">
-            ${detailText}
+    <div style="margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px;">
+        <div class="analysis-capsule capsule-best" style="display: flex; flex-direction: column; align-items: stretch;">
+            <div style="margin-bottom: 8px;">
+                <strong>
+                    恢復指數：${batteryVal}
+                </strong>
+            </div>
+            <div style="font-size: 14px; line-height: 1.6; color: inherit;">
+                ${detailText}
+            </div>
         </div>
     </div>
 `;
