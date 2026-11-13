@@ -3674,7 +3674,10 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
     const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
-    // 1. 決定恢復指數的 title 代碼 (ri_01 ~ ri_04)
+    // 0. 從 raw 中安全取得 Daily_Tag
+let Daily_Tag = (raw && raw.Daily_Tag) ? raw.Daily_Tag : null;
+
+// 1. 決定恢復指數的 title 代碼 (ri_01 ~ ri_04)
 let riCode = 'ri_01';
 if (batteryVal >= 95) {
     riCode = 'ri_04';
@@ -3690,10 +3693,9 @@ if (batteryVal >= 95) {
 let tagCode = 'dailytag_01';
 let displayTag = '狀態平穩';
 
-if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined') {
+if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined' && Daily_Tag !== 'null') {
     displayTag = Daily_Tag;
     
-    // 根據你的對應規則指定 code
     const tagMap = {
         '黃金修復': 'dailytag_02',
         '標準修復': 'dailytag_03',
@@ -3713,7 +3715,7 @@ if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined') {
     }
 }
 
-// 3. 同時從 Supabase 的 phrase_library 表讀取兩筆資料 (riCode 與 tagCode)
+// 3. 同時從 Supabase 的 phrase_library 表讀取兩筆資料
 const [{ data: riData }, { data: tagData }] = await Promise.all([
     _supabase.from('phrase_library').select('detailed_content').eq('title', riCode).single(),
     _supabase.from('phrase_library').select('detailed_content').eq('title', tagCode).single()
@@ -3722,7 +3724,7 @@ const [{ data: riData }, { data: tagData }] = await Promise.all([
 let detailText1 = riData ? riData.detailed_content : '';
 let detailText2 = tagData ? tagData.detailed_content : '';
 
-// 4. 建立 insightHtml（恢復指數在上方，恢復狀態在下方新增）
+// 4. 建立 insightHtml
 let insightHtml = `
     <div style="margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px;">
         <div class="analysis-capsule capsule-best" style="display: flex; flex-direction: column; align-items: stretch; gap: 12px;">
@@ -3738,7 +3740,7 @@ let insightHtml = `
             
             <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 0;">
 
-            <!-- 恢復狀態區塊 (新增) -->
+            <!-- 恢復狀態區塊 -->
             <div>
                 <div style="margin-bottom: 8px;">
                     <strong>📌 恢復狀態：${displayTag}</strong>
