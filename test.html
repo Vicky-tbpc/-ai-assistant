@@ -2118,7 +2118,7 @@ finalCapsules.push({
 
     const statusLight = raw?.light_status || '--';
 
-    // --- 準備要傳回地端的資料 ---
+    // 準備要傳回地端的 5 項資料
 const priorityItem = needsAction ? weakest.name : '目前無特別需改善項目';
 const payload = {
     serial: currentSerial,
@@ -2127,11 +2127,10 @@ const payload = {
     actionText: actionText,
     exerciseLevel: finalExerciseLevel,
     dailyAction: dailyAction,
-    exerciseRec: exerciseRec,
-    focusContent: focusContent  // 👈 新增這行，把整體解讀內容傳進去
+    exerciseRec: exerciseRec
 };
 
-// 背景發送 API 將資料存入地端 Excel
+// 背景發送 API 將資料存入地端 Excel，這裡不加上 await 避免阻塞前端渲染速度
 fetch('/api/health?action=save_profile', {
     method: 'POST',
     headers: {
@@ -3777,6 +3776,23 @@ let detailText1 = riData ? riData.detailed_content : '';
 let detailText2 = tagData ? tagData.detailed_content : '';
 let detailText3 = lightData ? lightData.detailed_content : '';
 let focusContent = focusData ? focusData.content : '目前尚無此狀態的綜合解讀內容。';
+// ==========================================
+    // 💡 [新增] 在此處將 focusContent 背景儲存至地端 Excel
+    // ==========================================
+    const focusPayload = {
+        serial: serialNumber,
+        record_date: data.date,          // 或是對應的日期欄位
+        focusContent: focusContent
+    };
+
+    fetch('/api/health?action=save_focus_content', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(focusPayload)
+    }).catch(err => console.error("傳送儲存 focusContent 發生錯誤:", err));
+    // ==========================================
 
 // 6. 建立 insightHtml（包含恢復指數、恢復狀態、發炎風險、整體解讀四個區塊）
 let insightHtml = `
