@@ -1,4 +1,4 @@
-// sleep-reminder_09_AI睡前提醒
+// sleep-reminder_10_AI睡前提醒加入focus
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
       throw new Error(`地端 API 回傳錯誤 (${lastStatus}): ${lastErrorText}`);
     }
 
-    // 預先拉取健康資料 (供方案二 Fallback 使用)
+    // 預先拉取健康資料 (供方案三 Fallback 使用)
     let healthData = [];
     try {
       const params = new URLSearchParams();
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
       });
       healthData = await response.json();
     } catch (err) {
-      console.warn("預抓地端健康數據失敗 (若執行方案二將受影響):", err.message);
+      console.warn("預抓地端健康數據失敗 (若執行方案三將受影響):", err.message);
     }
 
     const metrics = ['Battery_TST_min_A', 'Battery_N3_pct_A', 'Battery_rMSSD_A', 'Battery_HBI_A', 'Battery_HR_min_A'];
@@ -85,9 +85,8 @@ export default async function handler(req, res) {
         let finalMessage = null;
         let schemeUsed = "";
 
-        // =========================================================
-        // 🚀【方案一】：優先讀取地端 Excel + 啟動 Gemini AI 生成建議
-        // =========================================================
+        // 讀取地端 Excel 建議資料 (供方案一與方案二共用)
+        let recData = null;
         try {
           const recPath = `/api/get-recommendation?serial=${encodeURIComponent(user.serial_number)}&date=${todayStr}`;
           const recResponse = await fetchFromTunnels(recPath, {
@@ -98,26 +97,56 @@ export default async function handler(req, res) {
           });
 
           if (recResponse.ok) {
-            const recData = await recResponse.json();
-            if (recData && recData.found && (recData.priorityItem || recData.actionText)) {
-              // 呼叫 Gemini AI 整理生成訊息
-              finalMessage = await generateAiReminder(user.nickname, recData.priorityItem, recData.actionText);
-              schemeUsed = "Scheme 1 (AI Excel)";
-            }
+            recData = await recResponse.json();
           }
-        } catch (scheme1Err) {
-          console.log(`[使用者 ${user.serial_number}] 方案一檢查未通過 (${scheme1Err.message})，自動切換至方案二。`);
+        } catch (fetchRecErr) {
+          console.log(`[使用者 ${user.serial_number}] 無法讀取地端 Excel 建議 (${fetchRecErr.message})，將直接降級至方案三。`);
         }
 
         // =========================================================
-        // 🔄【方案二】：降級（Fallback）使用 Supabase 詞庫
+        // 🚀【方案一】：優先讀取 focusContent 整體解讀 + 啟動 Gemini AI
+        // =========================================================
+        if (recData && recData.found) {
+          const focusText = (recData.focusContent || "").trim();
+          
+          // 條件：focusContent 必須有內容，且不可為「建議優先關心「恢復指數」」
+          if (focusText && focusText !== '建議優先關心「恢復指數」') {
+            try {
+              finalMessage = await generateFocusAiReminder(user.nickname, focusText);
+              schemeUsed = "Scheme 1 (AI Excel Focus)";
+            } catch (aiErr) {
+              console.error(`[使用者 ${user.serial_number}] 方案一 AI 生成失敗:`, aiErr.message);
+            }
+          } else {
+            console.log(`[使用者 ${user.serial_number}] 方案一條件未滿足 (focusContent 為空或觸發跳轉條件)，切換至方案二。`);
+          }
+        }
+
+        // =========================================================
+        // 🌟【方案二】：讀取恢復指數調整建議 (priorityItem / actionText) + Gemini AI
+        // =========================================================
+        if (!finalMessage && recData && recData.found) {
+          if (recData.priorityItem || recData.actionText) {
+            try {
+              finalMessage = await generateAiReminder(user.nickname, recData.priorityItem, recData.actionText);
+              schemeUsed = "Scheme 2 (AI Excel Recovery)";
+            } catch (aiErr) {
+              console.error(`[使用者 ${user.serial_number}] 方案二 AI 生成失敗:`, aiErr.message);
+            }
+          } else {
+            console.log(`[使用者 ${user.serial_number}] 方案二條件未滿足 (無恢復指數調整建議)，切換至方案三。`);
+          }
+        }
+
+        // =========================================================
+        // 🔄【方案三】：降級（Fallback）使用 Supabase 詞庫
         // =========================================================
         if (!finalMessage) {
           const userYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === yesterday);
           const userBeforeYesterday = healthData.find(d => d.serial_number === user.serial_number && d.record_date === dayBeforeYesterday);
 
           if (!userYesterday || !userYesterday.raw_json) {
-            return { serial: user.serial_number, status: "Skipped", reason: "昨天(最新)沒資料 (方案一無 Excel 且方案二無數據)" };
+            return { serial: user.serial_number, status: "Skipped", reason: "昨天(最新)沒資料 (方案一、二無可用 Excel 且方案三無數據)" };
           }
 
           const isAllNull = metrics.every(m => userYesterday.raw_json[m] == null);
@@ -155,11 +184,11 @@ export default async function handler(req, res) {
             .in('logic_key', logicKeys);
 
           if (!phrases || phrases.length === 0) {
-            return { serial: user.serial_number, status: "Error", reason: "方案二找不到對應詞句" };
+            return { serial: user.serial_number, status: "Error", reason: "方案三找不到對應詞句" };
           }
 
           finalMessage = phrases[Math.floor(Math.random() * phrases.length)].detailed_content;
-          schemeUsed = "Scheme 2 (Supabase Phrase)";
+          schemeUsed = "Scheme 3 (Supabase Phrase)";
         }
 
         // 發送 LINE 訊息
@@ -185,38 +214,36 @@ export default async function handler(req, res) {
 }
 
 // ==========================================
-// 🤖 方案一：呼叫 Gemini AI 生成睡前提醒
+// 🚀 方案一：呼叫 Gemini AI 依據 focusContent 生成溫暖有變化的睡前提醒
 // ==========================================
-async function generateAiReminder(nickname, priorityItem, actionText) {
+async function generateFocusAiReminder(nickname, focusContent) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     throw new Error('Vercel 環境變數缺失 GEMINI_API_KEY');
   }
 
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
-  
-  const userNickname = nickname || '朋友';
 
   const prompt = `【身份鎖定】
 絕對禁止自稱任何名稱（嚴禁出現「Soosyn」、「Soosyn 看到」、「我是 Soosyn」等任何品牌或 AI 自稱，請直接給予建議）。
 絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方 AI。
 使用者暱稱：${nickname || '朋友'}
 
-請根據以下今天對應的健康恢復建議內容，為使用者生成一段溫馨、簡短的睡前提醒與建議：
-- 恢復指數優先調整項目：${priorityItem || '無'}
-- 建議行動 (actionText)：${actionText || '無'}
+請根據以下今天對應的「當天整體健康解讀摘要 (Focus)」，為使用者生成一段溫馨、像貼心老朋友般且每次句型都要有新意的睡前提醒：
+- 當天整體解讀摘要：${focusContent}
 
-【寫作規則】
-1. 語氣要像平輩朋友一樣自然親切，可適當加入合適的 emoji。
-2. 絕對禁止使用敬稱「您」，請全部使用「你」。
-3. 訊息發送時間為晚上 8:25~9:24 之間，嚴禁使用「夜深了」、「深夜」等不符合時間點的描述。
-4. 問候與道別時請直接說「晚安」，絕對禁止使用「晚上好」。
-5. 內容包含睡前關心、提醒優先調整項目以及具體的行動建議。
-6. 數據、單位與關鍵名詞絕對忠於原文：
+【寫作與多樣性規則】
+1. 【拒絕死板，拒絕千篇一律】：請每次都變換不同的開場白與敘述結構（例如：可以從今天身體的回饋聊起、或者直接分享一個今晚就能做的小改變），絕對不要每次都用相同的模板起頭。
+2. 語氣要像平輩朋友一樣自然親切、溫暖陪伴，可適當加入合適的 emoji。
+3. 絕對禁止使用敬稱「您」，請全部使用「你」。
+4. 訊息發送時間為晚上 8:25~9:24 之間，嚴禁使用「夜深了」、「深夜」等不符合時間點的描述。
+5. 問候與道別時請直接說「晚安」，絕對禁止使用「晚上好」。
+6. 內容包含睡前關心，並將上述整體解讀摘要的核心重點與行動建議，用口語、柔和的方式轉達給使用者，不要像在唸生硬的報告。
+7. 數據、單位與關鍵名詞絕對忠於原文：
    - 完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。
    - 若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。
-7. 字數請控制在 100 到 150 字以內，保持精簡扼要，方便在 LINE 上閱讀。
-8. 請直接輸出準備發送的訊息文字，不要包含任何額外的解釋、JSON 或 Markdown 程式碼區塊標籤。`;
+8. 字數請控制在 100 到 150 字以內，保持精簡扼要，方便在 LINE 上閱讀。
+9. 請直接輸出準備發送的訊息文字，不要包含任何額外的解釋、JSON 或 Markdown 程式碼區塊標籤。`;
 
   const response = await fetch(geminiUrl, {
     method: 'POST',
@@ -240,7 +267,62 @@ async function generateAiReminder(nickname, priorityItem, actionText) {
   return generatedText;
 }
 
-// 根據指標與睡眠分鐘數，回傳對應的 logic_key 陣列 (方案二)
+// ==========================================
+// 🌟 方案二：呼叫 Gemini AI 依據恢復指數建議生成溫暖有變化的睡前提醒
+// ==========================================
+async function generateAiReminder(nickname, priorityItem, actionText) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    throw new Error('Vercel 環境變數缺失 GEMINI_API_KEY');
+  }
+
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
+
+  const prompt = `【身份鎖定】
+絕對禁止自稱任何名稱（嚴禁出現「Soosyn」、「Soosyn 看到」、「我是 Soosyn」等任何品牌或 AI 自稱，請直接給予建議）。
+絕對禁止自稱：Google AI、Gemini、大型語言模型、第三方 AI。
+使用者暱稱：${nickname || '朋友'}
+
+請根據以下今天對應的健康恢復建議內容，為使用者生成一段溫馨、像貼心老朋友般且每次句型都要有新意的睡前提醒與建議：
+- 恢復指數優先調整項目：${priorityItem || '無'}
+- 建議行動 (actionText)：${actionText || '無'}
+
+【寫作與多樣性規則】
+1. 【拒絕死板，拒絕千篇一律】：請每次都變換不同的開場白與敘述結構（例如：這次可以聊聊歷史數據帶給我們的巧思，下次可以從放鬆小動作切入），絕對不要每次都用相同的模板起頭。
+2. 語氣要像平輩朋友一樣自然親切、溫暖陪伴，可適當加入合適的 emoji。
+3. 絕對禁止使用敬稱「您」，請全部使用「你」。
+4. 訊息發送時間為晚上 8:25~9:24 之間，嚴禁使用「夜深了」、「深夜」等不符合時間點的描述。
+5. 問候與道別時請直接說「晚安」，絕對禁止使用「晚上好」。
+6. 內容包含睡前關心、提醒優先調整項目以及具體的行動建議。請把歷史數據（如幾次經驗、有效率等）自然地織入對話中，像是在跟朋友分享經驗，而不是在唸數據表。
+7. 數據、單位與關鍵名詞絕對忠於原文：
+   - 完全依照提供的數值與單位，絕對不可自行增刪單位（例如：若原文為「10.7」，不可擅自加上「%」；原文為「64%」，則保留「64%」）。
+   - 若原文提到「有效率約 XX%」（代表成功機率），必須完整保留「有效率」三個字，絕對不可以刪減或竄改為「效率有 XX%」。
+8. 字數請控制在 100 到 150 字以內，保持精簡扼要，方便在 LINE 上閱讀。
+9. 請直接輸出準備發送的訊息文字，不要包含任何額外的解釋、JSON 或 Markdown 程式碼區塊標籤。`;
+
+  const response = await fetch(geminiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API 請求失敗 (${response.status})`);
+  }
+
+  const result = await response.json();
+  const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+  if (!generatedText) {
+    throw new Error('Gemini API 未回傳有效文字');
+  }
+
+  return generatedText;
+}
+
+// 根據指標與睡眠分鐘數，回傳對應的 logic_key 陣列 (方案三)
 function getLogicKeys(metric, tstMin) {
   let base = '';
   switch (metric) {
