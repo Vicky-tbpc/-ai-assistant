@@ -2400,7 +2400,7 @@ async function executeQuickQuestion(questionText) {
 
     try {
         // 將問題送給後端一般聊天 API
-        const response = await fetch('/api/gemini', {
+        const response = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2464,7 +2464,7 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     scrollToBottom();
 
     try {
-        const response = await fetch('/api/gemini', {
+        const response = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4612,7 +4612,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -4809,7 +4809,7 @@ async function getAIGreetingPayload(serial) {
 // --- 修改：呼叫後端專屬開場白 API (支援延伸問題按鈕) ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini', {
+        const res = await fetch('/api/gemini_02', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
