@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n103-3</title>
+    <title>Soosyn 健康夥伴 n103-4</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -3685,9 +3685,12 @@ async function appendSummaryCard(dateTitle, data, serialNumber) {
     const o2ExtraHtml = buildToggleWrapper(buildChartCard('HBI 低氧負擔指數', 'HBI', history7, 'hbi', '🫁 HBI 低氧負擔指數', parseNum, format1Dec, '%min/h'), 'o2');
     const rhrExtraHtml = buildToggleWrapper(buildChartCard('7日趨勢', 'RHR_raw', history7, 'rhr', '❤️ 靜息心率 (RHR)', parseNum, formatRound, 'bpm', true, true), 'rhr', '▲ 收合7日趨勢', '▼ 查看7日趨勢');
 
-    // 0. 從 raw 中安全取得 Daily_Tag 與 light_status
+// 0. 從 raw 中安全取得 Daily_Tag、light_status 與 Personal_Battery_weighted_round
 let Daily_Tag = (raw && raw.Daily_Tag) ? raw.Daily_Tag : null;
 let lightStatus = (raw && raw.light_status !== undefined) ? raw.light_status : (data?.light_status || null);
+let weightedBattery = (raw && raw.Personal_Battery_weighted_round !== undefined && raw.Personal_Battery_weighted_round !== null && raw.Personal_Battery_weighted_round !== '')
+    ? Number(raw.Personal_Battery_weighted_round)
+    : NaN;
 
 // 1. 決定恢復指數的 title 代碼 (ri_01 ~ ri_04)
 let riCode = 'ri_01';
@@ -3709,7 +3712,7 @@ let rawTagKey = 'NULL/undefined'; // 用於 priority_focus_lookup 的鍵
 if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined' && Daily_Tag !== 'null') {
     displayTag = Daily_Tag;
     rawTagKey = Daily_Tag;
-    
+
     const tagMap = {
         '黃金修復': 'dailytag_02',
         '標準修復': 'dailytag_03',
@@ -3723,7 +3726,7 @@ if (Daily_Tag && Daily_Tag !== 'NULL' && Daily_Tag !== 'undefined' && Daily_Tag 
         '最差睡眠結構': 'dailytag_11',
         '過度訓練/發炎': 'dailytag_12'
     };
-    
+
     if (tagMap[Daily_Tag]) {
         tagCode = tagMap[Daily_Tag];
     }
@@ -3776,23 +3779,41 @@ let detailText1 = riData ? riData.detailed_content : '';
 let detailText2 = tagData ? tagData.detailed_content : '';
 let detailText3 = lightData ? lightData.detailed_content : '';
 let focusContent = focusData ? focusData.content : '目前尚無此狀態的綜合解讀內容。';
-// ==========================================
-    // 💡 [新增] 在此處將 focusContent 背景儲存至地端 Excel
-    // ==========================================
-    const focusPayload = {
-        serial: serialNumber,
-        record_date: data.date,          // 或是對應的日期欄位
-        focusContent: focusContent
-    };
 
-    fetch('/api/health?action=save_focus_content', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(focusPayload)
-    }).catch(err => console.error("傳送儲存 focusContent 發生錯誤:", err));
-    // ==========================================
+// 針對指定 3 種 lookupResultKey，額外比對 raw.Personal_Battery_weighted_round 是否在 [60, 90)
+const targetLookupKeys = new Set([
+    '>=60, NULL/undefined, 綠燈',
+    '>=60, 標準修復, 綠燈',
+    '>=60, 黃金修復, 綠燈'
+]);
+
+if (
+    focusData &&
+    targetLookupKeys.has(lookupResultKey) &&
+    Number.isFinite(weightedBattery) &&
+    weightedBattery >= 60 &&
+    weightedBattery < 90
+) {
+    focusContent = `${focusContent}可參考「恢復指數調整建議」進一步提升睡眠修復力。`;
+}
+
+// ==========================================
+// 💡 [新增] 在此處將 focusContent 背景儲存至地端 Excel
+// ==========================================
+const focusPayload = {
+    serial: serialNumber,
+    record_date: data.date,          // 或是對應的日期欄位
+    focusContent: focusContent
+};
+
+fetch('/api/health?action=save_focus_content', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(focusPayload)
+}).catch(err => console.error("傳送儲存 focusContent 發生錯誤:", err));
+// ==========================================
 
 // 6. 建立 insightHtml（包含恢復指數、恢復狀態、發炎風險、整體解讀四個區塊）
 let insightHtml = `
