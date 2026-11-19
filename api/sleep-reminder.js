@@ -1,4 +1,4 @@
-// sleep-reminder_10_AI睡前提醒加入focus
+// sleep-reminder_10-1_AI睡前提醒加入focus
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -109,8 +109,8 @@ export default async function handler(req, res) {
         if (recData && recData.found) {
           const focusText = (recData.focusContent || "").trim();
           
-          // 條件：focusContent 必須有內容，且不可為「建議優先關心「恢復指數」」
-          if (focusText && focusText !== '建議優先關心「恢復指數」') {
+          // 條件：focusContent 必須有內容，且不可包含「參考「恢復指數調整建議」」
+          if (focusText && !focusText.includes('參考「恢復指數調整建議」')) {
             try {
               finalMessage = await generateFocusAiReminder(user.nickname, focusText);
               schemeUsed = "Scheme 1 (AI Excel Focus)";
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
               console.error(`[使用者 ${user.serial_number}] 方案一 AI 生成失敗:`, aiErr.message);
             }
           } else {
-            console.log(`[使用者 ${user.serial_number}] 方案一條件未滿足 (focusContent 為空或觸發跳轉條件)，切換至方案二。`);
+            console.log(`[使用者 ${user.serial_number}] 方案一條件未滿足 (focusContent 為空或包含跳轉關鍵字)，切換至方案二。`);
           }
         }
 
