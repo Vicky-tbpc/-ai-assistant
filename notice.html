@@ -88,6 +88,7 @@
 
         .notice-header {
             display: flex;
+            justify-content: center;
             align-items: center;
             gap: 10px;
             border-bottom: 1px solid #f5f5f5;
@@ -118,7 +119,6 @@
         .time-box {
             background-color: #faf9f6;
             border: 1px solid #ece8e0;
-            
             border-radius: 12px;
             padding: 14px 16px;
             margin-bottom: 16px;
@@ -183,44 +183,10 @@
         .notice-footer-note {
             border-top: 1px dashed #eeeeee;
             padding-top: 14px;
-            margin-bottom: 18px;
+            margin-bottom: 0;
             font-size: 0.92rem;
             color: var(--text-muted);
             text-align: center;
-        }
-
-        .action-row {
-            display: flex;
-            justify-content: center;
-        }
-
-        .primary-btn {
-            width: 100%;
-            padding: 12px 18px;
-            border-radius: 20px;
-            border: none;
-            background: var(--tbp-blue);
-            color: #ffffff;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.98rem;
-            transition: background-color 0.2s ease, transform 0.15s ease;
-        }
-
-        .primary-btn:hover {
-            background: var(--tbp-dark-blue);
-        }
-
-        .primary-btn:active {
-            transform: scale(0.99);
-        }
-
-        .disclaimer-text {
-            font-size: 12px;
-            color: #999999;
-            padding: 0 20px 18px 20px;
-            text-align: center;
-            letter-spacing: 0.5px;
         }
 
         @keyframes fadeIn {
@@ -245,7 +211,6 @@
         <main>
             <section class="notice-card" aria-labelledby="notice-heading">
                 <div class="notice-header">
-                   
                     <h1 id="notice-heading" class="notice-title">因配合停電作業，系統將於以下期間暫停服務</h1>
                 </div>
 
