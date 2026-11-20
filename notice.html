@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>系統服務暫停通知 - Soosyn Health Companion</title>
+    <style>
+        :root {
+            --tbp-blue: #8699a3;
+            --tbp-dark-blue: #596b75;
+            --tbp-light-blue: #e6f0f9;
+            --bg-color: #f5f1eb;
+            --text-dark: #333333;
+            --text-muted: #666666;
+            --accent-red: #ff8c73;
+            --card-bg: #ffffff;
+            --border-light: #eeeeee;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            width: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            font-family: "PingFang TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+
+        .page-wrapper {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo-text {
+            font-weight: bold;
+            color: var(--tbp-blue);
+            font-size: 1.1rem;
+            letter-spacing: 0.3px;
+        }
+
+        .header-badge {
+            font-size: 0.8rem;
+            color: var(--tbp-dark-blue);
+            background-color: var(--tbp-light-blue);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px 16px;
+        }
+
+        .notice-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 480px;
+            padding: 24px 22px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            animation: fadeIn 0.35s ease;
+        }
+
+        .notice-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #f5f5f5;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+        }
+
+        .notice-icon {
+            font-size: 1.4rem;
+            line-height: 1;
+        }
+
+        .notice-title {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-dark);
+        }
+
+        .notice-intro {
+            margin: 0 0 18px 0;
+            font-size: 0.98rem;
+            color: var(--text-dark);
+        }
+
+        .time-box {
+            background-color: #faf9f6;
+            border: 1px solid #ece8e0;
+            border-left: 4px solid var(--tbp-blue);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+
+        .time-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: bold;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .time-value {
+            font-size: 1.02rem;
+            font-weight: bold;
+            color: var(--tbp-dark-blue);
+        }
+
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .analysis-capsule {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px 15px;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .capsule-warn {
+            background-color: #fff6f4;
+            color: #6e524d;
+            border: 1px solid #ffe8e3;
+        }
+
+        .capsule-ok {
+            background-color: #f0f8f9;
+            color: #4a5a61;
+            border: 1px solid #e0eff1;
+        }
+
+        .capsule-icon {
+            font-size: 1.15rem;
+            margin-right: 10px;
+            flex-shrink: 0;
+            line-height: 1.45;
+        }
+
+        .capsule-content strong {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .notice-footer-note {
+            border-top: 1px dashed #eeeeee;
+            padding-top: 14px;
+            margin-bottom: 18px;
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .action-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        .primary-btn {
+            width: 100%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            border: none;
+            background: var(--tbp-blue);
+            color: #ffffff;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.98rem;
+            transition: background-color 0.2s ease, transform 0.15s ease;
+        }
+
+        .primary-btn:hover {
+            background: var(--tbp-dark-blue);
+        }
+
+        .primary-btn:active {
+            transform: scale(0.99);
+        }
+
+        .disclaimer-text {
+            font-size: 12px;
+            color: #999999;
+            padding: 0 20px 18px 20px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header>
+            <div class="logo-text">Soosyn Health Companion</div>
+            <span class="header-badge">系統公告</span>
+        </header>
+
+        <main>
+            <section class="notice-card" aria-labelledby="notice-heading">
+                <div class="notice-header">
+                    <span class="notice-icon" aria-hidden="true">🔔</span>
+                    <h1 id="notice-heading" class="notice-title">系統服務暫停通知</h1>
+                </div>
+
+                <p class="notice-intro">
+                    因配合停電作業，系統將於以下期間暫停服務：
+                </p>
+
+                <div class="time-box">
+                    <div class="time-label">
+                        <span aria-hidden="true">📅</span>
+                        <span>暫停時間</span>
+                    </div>
+                    <div class="time-value">2026/11/20（五）17:00 至 2026/11/23（一）09:00</div>
+                </div>
+
+                <div class="status-list">
+                    <div class="analysis-capsule capsule-warn">
+                        <span class="capsule-icon" aria-hidden="true">⚠️</span>
+                        <div class="capsule-content">
+                            <strong>Soosyn Health Companion 網站將暫停服務</strong>
+                            停機期間網頁端暫時無法使用，恢復運作後即可正常存取。
+                        </div>
+                    </div>
+
+                    <div class="analysis-capsule capsule-ok">
+                        <span class="capsule-icon" aria-hidden="true">✅</span>
+                        <div class="capsule-content">
+                            <strong>ST-50 手環及 Soosyn Care APP 可正常使用</strong>
+                            資料上傳功能不受本次停機影響。
+                        </div>
+                    </div>
+                </div>
+
+                <p class="notice-footer-note">
+                    造成不便，敬請見諒，感謝您的理解與支持！🙏
+                </p>
+
+                <div class="action-row">
+                    <button type="button" class="primary-btn" onclick="window.history.length > 1 ? window.history.back() : window.scrollTo({ top: 0, behavior: 'smooth' })">
+                        我知道了
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <div class="disclaimer-text">
+            AI 回覆僅供參考，無法取代專業醫療建議；健康數據皆於地端保存處理，隱私安全有保障。
+        </div>
+    </div>
+</body>
+</html>
