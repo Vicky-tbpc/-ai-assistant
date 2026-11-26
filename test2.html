@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-4</title>
+    <title>Soosyn 健康夥伴 n102-5</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -650,32 +650,6 @@ function getRandomFilteredQuestions(count = 3) {
     const filtered = RANDOM_QUESTION_POOL.filter(q => !q.includes('恢復') && !q.includes('發炎'));
     const shuffled = [...filtered].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
-}
-
-// 渲染動態選項按鈕到聊天室
-function appendDynamicOptions(questions) {
-    document.getElementById('dynamic-options-container')?.remove();
-
-    const buttonsHtml = questions.map(q => 
-        `<button onclick="handleDynamicOptionClick('${q}')" style="background-color: #fefefe; border: 1px solid #a79d8c; color: #596b75; padding: 6px 12px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.backgroundColor='#f0f2f5'" onmouseout="this.style.backgroundColor='#fefefe'">${q}</button>`
-    ).join('');
-
-    const containerHtml = `
-        <div class="ai-message-wrapper" id="dynamic-options-container">
-            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; max-width: 85%;">
-                ${buttonsHtml}
-            </div>
-        </div>`;
-    
-    document.getElementById('chat-history').insertAdjacentHTML('beforeend', containerHtml);
-    scrollToBottom();
-}
-
-// 點擊動態按鈕後的行為
-async function handleDynamicOptionClick(choice) {
-    document.getElementById('dynamic-options-container')?.remove();
-    appendUserMessage(choice);
-    // 這裡可以接續你原本處理使用者點選問題的邏輯（例如送出查詢或觸發對應動作）
 }
 
 async function login() {
@@ -2415,7 +2389,7 @@ async function executeQuickQuestion(questionText) {
 
     try {
         // 將問題送給後端一般聊天 API
-        const response = await fetch('/api/gemini_02', {
+        const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2479,7 +2453,7 @@ async function requestTrendAiAnalysis(type, title, formattedDataPoints, days) {
     scrollToBottom();
 
     try {
-        const response = await fetch('/api/gemini_02', {
+        const response = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4338,7 +4312,7 @@ async function handleAbnormalityInput(msg) {
             await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
             
             // 👇 呼叫簡易小卡 function (傳入第四個參數 hasYesterdayTRT 決定小卡內按鈕是否顯示)
-            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, preDateStr, hasYesterdayTRT);
+            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, preDateStr, hasYesterdayTRT, allData);
             
             // 小卡出現後，再給一個引導
             await new Promise(r => setTimeout(r, 1000));
@@ -4496,7 +4470,7 @@ async function callGeminiAPI(prompt) {
     const targetDateStr = getTargetDate(prompt); 
 
     try {
-        const res = await fetch('/api/gemini_02', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -4693,7 +4667,7 @@ async function getAIGreetingPayload(serial) {
 // --- 修改：呼叫後端專屬開場白 API (支援延伸問題按鈕) ---
 async function callGreetingAPI(name, aiName, aiData) {
     try {
-        const res = await fetch('/api/gemini_02', {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4716,7 +4690,7 @@ async function callGreetingAPI(name, aiName, aiData) {
     }
 }
 
-function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false) {
+function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false, allData = []) {
     const config = {
         'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#a79d8c' },
         'N3_pct': { icon: '💤', label: '深睡期 (N3)', color: '#a79d8c' },
@@ -4726,6 +4700,210 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     };
 
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#a79d8c' };
+
+    // 從 allData 取得對應 recordDate 的 raw_json 與最近 7 筆歷史資料
+    const history = Array.isArray(allData) ? allData : [];
+    const targetRecord = history.find(d => d.record_date === recordDate) || history[0] || null;
+    const raw = targetRecord?.raw_json || null;
+    const targetIdx = targetRecord ? history.findIndex(d => d === targetRecord) : 0;
+    const history7 = targetIdx >= 0 ? history.slice(targetIdx, targetIdx + 7) : history.slice(0, 7);
+
+    // 睡眠心血管負荷（CVD）區塊
+    let riskSectionHtml = '';
+    if (raw && raw.CVD != null && raw.CVD !== 'NA' && raw.CVD !== 'N/A') {
+        const riskVal = Number(raw.CVD);
+        let riskText = '';
+        let bar1 = '#e1e1e1', bar2 = '#e1e1e1', bar3 = '#e1e1e1', bar4 = '#e1e1e1';
+
+        if (riskVal === 0) { riskText = '良好'; bar1 = '#596b75'; }
+        else if (riskVal === 1) { riskText = '一般'; bar2 = '#8699a3'; }
+        else if (riskVal === 2) { riskText = '偏高'; bar3 = '#a79d8c'; }
+        else if (riskVal === 3) { riskText = '高'; bar4 = '#ff8c73'; }
+
+        let c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+        history7.forEach(h => {
+            const v = (h.raw_json && h.raw_json.CVD !== undefined && h.raw_json.CVD !== null)
+                ? Number(h.raw_json.CVD)
+                : null;
+            if (v === 0) c0++;
+            else if (v === 1) c1++;
+            else if (v === 2) c2++;
+            else if (v === 3) c3++;
+        });
+
+        const formatRiskAxisDatePlus1 = (d) => {
+            if (!d) return '';
+            const parts = String(d).split(' ')[0].split(/[-/]/);
+            if (parts.length >= 3) {
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const day = parseInt(parts[2].substring(0, 2), 10);
+                const dateObj = new Date(year, month, day);
+                if (isNaN(dateObj.getTime())) return d;
+                dateObj.setDate(dateObj.getDate() + 1);
+                const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const dd = String(dateObj.getDate()).padStart(2, '0');
+                return `${mm}/${dd}`;
+            }
+            return d;
+        };
+
+        const histRev = [...history7].reverse();
+        const riskChartData = histRev.map(h =>
+            (h.raw_json && h.raw_json.CVD !== undefined && h.raw_json.CVD !== null && h.raw_json.CVD !== 'NA' && h.raw_json.CVD !== 'N/A')
+                ? Number(h.raw_json.CVD)
+                : null
+        );
+
+        const getRiskY = (v) => {
+            if (v === 3) return 20;
+            if (v === 2) return 40;
+            if (v === 1) return 60;
+            if (v === 0) return 80;
+            return 80;
+        };
+        const getRiskLineColor = (v) => {
+            if (v === 3) return '#ff8c73';
+            if (v === 2) return '#a79d8c';
+            if (v === 1) return '#8699a3';
+            if (v === 0) return '#596b75';
+            return '#000';
+        };
+
+        const drawWidth = 300;
+        const startX = 60;
+        const endX = drawWidth - 20;
+        const xStep = riskChartData.length > 1 ? (endX - startX) / (riskChartData.length - 1) : 0;
+
+        let riskSvg = `<svg viewBox="0 0 ${drawWidth} 110" style="width: 100%; height: 110px; overflow: visible; margin-top: 10px; background-color: white; border-radius: 8px;">`;
+        riskSvg += `<text x="30" y="20" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">高</text>`;
+        riskSvg += `<text x="30" y="40" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">偏高</text>`;
+        riskSvg += `<text x="30" y="60" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">一般</text>`;
+        riskSvg += `<text x="30" y="80" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">良好</text>`;
+
+        riskChartData.forEach((val, i) => {
+            if (val !== null) {
+                let cx = startX + i * xStep;
+                if (riskChartData.length === 1) cx = startX + (endX - startX) / 2;
+                const cy = getRiskY(val);
+                const ccolor = getRiskLineColor(val);
+                riskSvg += `<line x1="${cx - 8}" y1="${cy}" x2="${cx + 8}" y2="${cy}" stroke="${ccolor}" stroke-width="4" stroke-linecap="round" />`;
+            }
+        });
+
+        const firstRiskDate = histRev.length > 0
+            ? formatRiskAxisDatePlus1(histRev[0].record_end || histRev[0].record_date || '')
+            : '';
+        const lastRiskDate = histRev.length > 0
+            ? formatRiskAxisDatePlus1(histRev[histRev.length - 1].record_end || histRev[histRev.length - 1].record_date || '')
+            : '';
+
+        if (firstRiskDate) {
+            riskSvg += `<text x="${startX}" y="105" font-size="12" fill="#999" text-anchor="middle">${firstRiskDate}</text>`;
+        }
+        if (riskChartData.length > 1 && lastRiskDate) {
+            riskSvg += `<text x="${endX}" y="105" font-size="12" fill="#999" text-anchor="middle">${lastRiskDate}</text>`;
+        }
+        riskSvg += `</svg>`;
+
+        const toggleId = `risk-chart-container-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        let compAnalysisHtml = '';
+        if (
+            raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null &&
+            raw.PPI_count !== 'NA' && raw.HBI_count !== 'NA' && raw.CBP_count !== 'NA'
+        ) {
+            const getCompBarHtml = (title, val) => {
+                const roundedVal = Math.round(Number(val));
+                const colors = ['#e1e1e1', '#e1e1e1', '#e1e1e1', '#e1e1e1'];
+
+                if (roundedVal >= 0 && roundedVal <= 24) colors[0] = '#596b75';
+                else if (roundedVal >= 25 && roundedVal <= 49) colors[1] = '#8699a3';
+                else if (roundedVal >= 50 && roundedVal <= 74) colors[2] = '#a79d8c';
+                else if (roundedVal >= 75 && roundedVal <= 100) colors[3] = '#ff8c73';
+
+                return `
+                    <div style="margin-top: 12px;">
+                        <div style="font-size: 14px; font-weight: bold; color: #5a5a5a;">${title}</div>
+                        <div style="display: flex; gap: 4px; height: 6px; width: 100%; margin-top: 12px;">
+                            <div style="flex: 1; background-color: ${colors[0]}; border-radius: 3px;"></div>
+                            <div style="flex: 1; background-color: ${colors[1]}; border-radius: 3px;"></div>
+                            <div style="flex: 1; background-color: ${colors[2]}; border-radius: 3px;"></div>
+                            <div style="flex: 1; background-color: ${colors[3]}; border-radius: 3px;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 4px; text-align: center;">
+                            <div style="flex: 1;">良好</div>
+                            <div style="flex: 1;">一般</div>
+                            <div style="flex: 1;">需留意</div>
+                            <div style="flex: 1;">不佳</div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            const item1 = getCompBarHtml('脈搏間隔穩定度', raw.PPI_count);
+            const item2 = getCompBarHtml('低氧區穩定度', raw.HBI_count);
+            const item3 = getCompBarHtml('心血管壓力穩定度', raw.CBP_count);
+
+            compAnalysisHtml = `
+                <div style="margin-top: 20px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 15px;">
+                    <div style="font-size: 15px; font-weight: bold; color: #333; text-align: center;">本次綜合分析</div>
+                    ${item1}
+                    ${item2}
+                    ${item3}
+                </div>
+            `;
+        }
+
+        riskSectionHtml = `
+            <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="睡眠心血管負荷">
+                        <span style="font-weight: bold; color: #333;">睡眠心血管負荷</span>
+                    </div>
+                    <span style="font-size: 1.8rem; font-weight: bold; color: #596b75;">
+                        ${riskText}
+                    </span>
+                </div>
+
+                <div style="display: flex; gap: 4px; height: 6px; width: 100%;">
+                    <div style="flex: 1; background-color: ${bar1}; border-radius: 3px;"></div>
+                    <div style="flex: 1; background-color: ${bar2}; border-radius: 3px;"></div>
+                    <div style="flex: 1; background-color: ${bar3}; border-radius: 3px;"></div>
+                    <div style="flex: 1; background-color: ${bar4}; border-radius: 3px;"></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-top: 5px; text-align: center;">
+                    <div style="flex: 1;">良好</div>
+                    <div style="flex: 1;">一般</div>
+                    <div style="flex: 1;">偏高</div>
+                    <div style="flex: 1;">高</div>
+                </div>
+
+                <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
+                    <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
+                         onclick="const c = document.getElementById('${toggleId}'); if(c.classList.contains('hidden')){c.classList.remove('hidden'); this.innerText='▲ 收合7日趨勢';}else{c.classList.add('hidden'); this.innerText='▼ 查看7日趨勢';}">▼ 查看7日趨勢</div>
+                    
+                    <div id="${toggleId}" class="hidden" style="margin-top: 5px;">
+                        <div style="background: white; border-radius: 12px; padding: 15px; margin-top: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+                            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+                                <div style="font-size: 15px; color: #5a5a5a; font-weight: bold;">7日趨勢</div>
+                                <div style="font-size: 11px; color: #888; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#596b75;"></div>良好: ${c0}</div>
+                                    <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#8699a3;"></div>一般: ${c1}</div>
+                                    <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#a79d8c;"></div>偏高: ${c2}</div>
+                                    <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#ff8c73;"></div>高: ${c3}</div>
+                                </div>
+                            </div>
+                            ${riskSvg}
+                        </div>
+                    </div>
+                </div>
+                ${compAnalysisHtml}
+            </div>
+        `;
+    }
 
     // 根據 showSleepReport 決定是否顯示睡眠報告按鈕區塊
     const reportButtonHtml = showSleepReport ? `
@@ -4748,6 +4926,8 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
                         ${detailedContent}
                     </div>
                 </div>
+
+                ${riskSectionHtml}
                 
                 ${reportButtonHtml}
             </div>
