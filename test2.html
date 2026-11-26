@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-6</title>
+    <title>Soosyn 健康夥伴 n102-7</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -5255,12 +5255,30 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
         if (phraseData && phraseData.detailed_content) {
             // 先說一句話，然後推派小卡
             await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
+            
+            // 呼叫簡易小卡 (傳入 hasTRT 決定按鈕是否顯示，allData 渲染 CVD 區塊)
             appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, targetPreDateStr, hasTRT, allData);
+            
+            // 小卡出現後，再給一個引導
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
+            
+            // 使用 getRandomFilteredQuestions 過濾掉「恢復」與「發炎」後渲染按鈕
+            const randomQuestions = getRandomFilteredQuestions(3);
+            appendAiFollowUpOptions(randomQuestions);
+        } else {
+            await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+            
+            const randomQuestions = getRandomFilteredQuestions(3);
+            appendAiFollowUpOptions(randomQuestions);
         }
     } catch (e) {
-        console.error("Supabase 查詢錯誤：", e);
+        console.error("讀取 phrase_library 失敗:", e);
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        
+        const randomQuestions = getRandomFilteredQuestions(3);
+        appendAiFollowUpOptions(randomQuestions);
     }
-}
 </script>
 </body>
 </html>
