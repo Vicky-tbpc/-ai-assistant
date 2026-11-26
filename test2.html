@@ -4141,7 +4141,7 @@ async function handleAbnormalityInput(msg) {
     // 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
     const reportButtonHtml = hasYesterdayTRT ? `
         <div style="text-align: right;">
-            <button onclick="openSleepReport('${preDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+            <button onclick="openSleepReport('${preDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                 📄 開啟睡眠報告
             </button>
         </div>` : '';
@@ -5153,7 +5153,7 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
     // 👇 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
     const reportButtonHtml = hasTRT ? `
         <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                 📄 開啟睡眠報告
             </button>
         </div>` : '';
