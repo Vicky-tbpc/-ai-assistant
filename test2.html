@@ -4920,17 +4920,19 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#a79d8c' };
     const riskSectionHtml = buildCvdRiskSectionHtml(recordDate, allData);
 
+    // 1. 按鈕改為置中對齊 (text-align: center)
     const reportButtonHtml = showSleepReport ? `
-        <div style="text-align: right; border-top: 1px dashed #e0e0e0; padding-top: 10px;">
-            <button onclick="openSleepReport('${recordDate}')" style="background-color: ${style.color}; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button onclick="openSleepReport('${recordDate}')" style="background-color: ${style.color}; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                 📄 開啟睡眠報告
             </button>
         </div>` : '';
 
+    // 2. 移除 border-left 直條邊框，改為與 .summary-card 一致的 border: 1px solid #eee
     const html = `
         <div class="ai-message-wrapper" style="width: 100%;">
-            <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border-left: 5px solid ${style.color}; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
-                <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between;">
+            <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: bold; font-size: 1.1em;">睡眠分析</span>
                     <span style="font-size: 0.9em; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
                 </div>
@@ -5150,8 +5152,8 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
 
     // 👇 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
     const reportButtonHtml = hasTRT ? `
-        <div style="text-align: right;">
-            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                 📄 開啟睡眠報告
             </button>
         </div>` : '';
@@ -5214,15 +5216,15 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
         const cvdSectionHtml = buildCvdRiskSectionHtml(targetPreDateStr, allData);
 
         const fallbackHtml = `
-    <div class="ai-message-wrapper" style="width: 100%;">
-        <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border-left: 5px solid #a79d8c; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
-            <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                🛌 睡眠紀錄
+        <div class="ai-message-wrapper" style="width: 100%;">
+            <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
+                    🛌 睡眠紀錄
+                </div>
+                ${cvdSectionHtml}
+                ${reportButtonHtml}
             </div>
-            ${cvdSectionHtml}
-            ${reportButtonHtml}
-        </div>
-    </div>`;
+        </div>`;
 
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
         scrollToBottom();
