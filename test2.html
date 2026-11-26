@@ -4785,14 +4785,13 @@ function buildCvdRiskSectionHtml(recordDate, allData = []) {
     riskSvg += `<text x="30" y="80" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">良好</text>`;
 
     riskChartData.forEach((val, i) => {
-        if (val !== null) {
-            let cx = startX + i * xStep;
-            if (riskChartData.length === 1) cx = startX + (endX - startX) / 2;
-            const cy = getRiskY(val);
-            const ccolor = getRiskLineColor(val);
-            riskSvg += `<line x1="${cx - 8}" y1="${cy}" x2="${cx + 8}" y2="${cy}" stroke="${ccolor}" stroke-width="4" stroke-linecap="round" />`;
-        }
-    });
+            if (val !== null) {
+                const cx = startX + i * xStep;
+                const cy = getRiskY(val);
+                const ccolor = getRiskLineColor(val);
+                riskSvg += `<line x1="${cx - 8}" y1="${cy}" x2="${cx + 8}" y2="${cy}" stroke="${ccolor}" stroke-width="4" stroke-linecap="round" />`;
+            }
+        });
 
     const firstRiskDate = histRev.length > 0
         ? formatRiskAxisDatePlus1(histRev[0].record_end || histRev[0].record_date || '')
@@ -4923,7 +4922,7 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     // 1. 按鈕改為置中對齊 (text-align: center)
     const reportButtonHtml = showSleepReport ? `
         <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-            <button onclick="openSleepReport('${recordDate}')" style="background-color: ${style.color}; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+            <button onclick="openSleepReport('${recordDate}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                 📄 開啟睡眠報告
             </button>
         </div>` : '';
