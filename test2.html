@@ -4908,7 +4908,7 @@ function buildCvdRiskSectionHtml(recordDate, allData = []) {
     `;
 }
 
-function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false) {
+function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false, allData = []) {
     const config = {
         'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#a79d8c' },
         'N3_pct': { icon: '💤', label: '深睡期 (N3)', color: '#a79d8c' },
@@ -4918,8 +4918,8 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     };
 
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#a79d8c' };
+    const riskSectionHtml = buildCvdRiskSectionHtml(recordDate, allData);
 
-    // 根據 showSleepReport 決定是否顯示睡眠報告按鈕區塊
     const reportButtonHtml = showSleepReport ? `
         <div style="text-align: right; border-top: 1px dashed #e0e0e0; padding-top: 10px;">
             <button onclick="openSleepReport('${recordDate}')" style="background-color: ${style.color}; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
@@ -4940,11 +4940,13 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
                         ${detailedContent}
                     </div>
                 </div>
+
+                ${riskSectionHtml}
                 
                 ${reportButtonHtml}
             </div>
         </div>`;
-    
+
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 }
