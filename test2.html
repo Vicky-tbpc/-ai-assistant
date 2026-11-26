@@ -4928,8 +4928,8 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
         </div>` : '';
 
     const html = `
-        <div class="ai-message-wrapper">
-            <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid ${style.color}; background-color: #ffffff;">
+        <div class="ai-message-wrapper" style="width: 100%;">
+            <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border-left: 5px solid ${style.color}; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                 <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between;">
                     <span style="font-weight: bold; font-size: 1.1em;">睡眠分析</span>
                     <span style="font-size: 0.9em; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
@@ -4946,7 +4946,7 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
                 ${reportButtonHtml}
             </div>
         </div>`;
-
+    
     document.getElementById('chat-history').insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 }
@@ -5214,15 +5214,15 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
         const cvdSectionHtml = buildCvdRiskSectionHtml(targetPreDateStr, allData);
 
         const fallbackHtml = `
-            <div class="ai-message-wrapper">
-                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
-                    <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                        🛌 睡眠紀錄
-                    </div>
-                    ${cvdSectionHtml}
-                    ${reportButtonHtml}
-                </div>
-            </div>`;
+    <div class="ai-message-wrapper" style="width: 100%;">
+        <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border-left: 5px solid #a79d8c; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
+            <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
+                🛌 睡眠紀錄
+            </div>
+            ${cvdSectionHtml}
+            ${reportButtonHtml}
+        </div>
+    </div>`;
 
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
         scrollToBottom();
