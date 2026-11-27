@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-9</title>
+    <title>Soosyn 健康夥伴 n102-10</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -4192,11 +4192,6 @@ async function handleAbnormalityInput(msg) {
 
         const cvdSectionHtml = buildCvdRiskSectionHtml(preDateStr, allData);
 
-        const centeredReportBtnHtml = hasYesterdayTRT ? `
-        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${preDateStr}');">📄 開啟睡眠報告</button>
-        </div>` : '';
-
         const fallbackHtml = `
             <div class="ai-message-wrapper" style="width: 100%;">
                 <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
@@ -4281,12 +4276,6 @@ async function handleAbnormalityInput(msg) {
 
         // 取得 CVD 區塊（注意這裡日期變數是 preDateStr）
         const cvdSectionHtml = buildCvdRiskSectionHtml(preDateStr, allData);
-
-        // 睡眠報告按鈕置中樣式（若前面 reportButtonHtml 還沒改成置中，可直接用這段）
-        const centeredReportBtnHtml = hasYesterdayTRT ? `
-        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${preDateStr}');">📄 開啟睡眠報告</button>
-        </div>` : '';
 
         const fallbackHtml = `
             <div class="ai-message-wrapper" style="width: 100%;">
