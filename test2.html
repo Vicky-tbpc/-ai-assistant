@@ -4955,10 +4955,12 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     const html = `
         <div class="ai-message-wrapper" style="width: 100%;">
             <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
-                <div style="font-weight: bold; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-    <span style="font-weight: bold; font-size: 1.1em;">📅 ${getPlusOneDateStr(recordDate)} 睡眠分析</span>
-    <span style="font-size: 0.85em; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
-</div>
+                <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 6px;">
+                    📅 ${getPlusOneDateStr(recordDate)} 睡眠分析
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <span style="display: inline-block; font-size: 0.85em; font-weight: bold; color: #666; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
+                </div>
                 <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
                     <div style="font-size: 24px; margin-right: 12px;">${style.icon}</div>
                     <div style="font-size: 0.95em; line-height: 1.4; color: #333;">
