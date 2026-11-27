@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-4</title>
+    <title>Soosyn 健康夥伴 n102-10</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -4139,11 +4139,9 @@ async function handleAbnormalityInput(msg) {
     const hasYesterdayTRT = yesterdayData?.raw_json?.TRT_min !== undefined && yesterdayData?.raw_json?.TRT_min !== null;
 
     // 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
-    const reportButtonHtml = hasYesterdayTRT ? `
-        <div style="text-align: right;">
-            <button onclick="openSleepReport('${preDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                📄 開啟睡眠報告
-            </button>
+    const centeredReportBtnHtml = hasYesterdayTRT ? `
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${preDateStr}');">📄 開啟睡眠報告</button>
         </div>` : '';
 
 
@@ -4189,22 +4187,31 @@ async function handleAbnormalityInput(msg) {
 
     // 1.2 如果資料庫只有 1 筆 (沒有前一天的歷史可以比較)
     if (allData.length === 1) {
-        // 🌟 加入這行
         document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
-        
+
+        const cvdSectionHtml = buildCvdRiskSectionHtml(preDateStr, allData);
+
         const fallbackHtml = `
-            <div class="ai-message-wrapper">
-                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
+            <div class="ai-message-wrapper" style="width: 100%;">
+                <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                     <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                        🛌 睡眠紀錄
+                        📅 ${getPlusOneDateStr(preDateStr)} 睡眠分析
                     </div>
-                    ${reportButtonHtml}
+                    ${cvdSectionHtml}
+                    ${centeredReportBtnHtml}
                 </div>
             </div>`;
         
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
         scrollToBottom();
+
+        await new Promise(r => setTimeout(r, 1000));
+        await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
+
+        const randomQuestions = getRandomFilteredQuestions(3);
+        appendAiFollowUpOptions(randomQuestions);
+
         return;
     }
 
@@ -4264,22 +4271,33 @@ async function handleAbnormalityInput(msg) {
 
     // 4. 如果因為缺少數值算不出任何比較結果，直接顯示 fallback
     if (!worstMetric) {
-        // 🌟 加入這行
         document.getElementById('temp-api-loading')?.remove();
         await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
-        
+
+        // 取得 CVD 區塊（注意這裡日期變數是 preDateStr）
+        const cvdSectionHtml = buildCvdRiskSectionHtml(preDateStr, allData);
+
         const fallbackHtml = `
-            <div class="ai-message-wrapper">
-                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
+            <div class="ai-message-wrapper" style="width: 100%;">
+                <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                     <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                        🛌 睡眠紀錄
+                        📅 ${getPlusOneDateStr(preDateStr)} 睡眠分析
                     </div>
-                    ${reportButtonHtml}
+                    ${cvdSectionHtml}
+                    ${centeredReportBtnHtml}
                 </div>
             </div>`;
         
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
         scrollToBottom();
+
+        // 卡片出現後，加上引導語與過濾後的 3 個隨機延伸問題按鈕
+        await new Promise(r => setTimeout(r, 1000));
+        await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
+
+        const randomQuestions = getRandomFilteredQuestions(3);
+        appendAiFollowUpOptions(randomQuestions);
+
         return;
     }
 
@@ -4312,7 +4330,7 @@ async function handleAbnormalityInput(msg) {
             await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
             
             // 👇 呼叫簡易小卡 function (傳入第四個參數 hasYesterdayTRT 決定小卡內按鈕是否顯示)
-            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, preDateStr, hasYesterdayTRT);
+            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, preDateStr, hasYesterdayTRT, allData);
             
             // 小卡出現後，再給一個引導
             await new Promise(r => setTimeout(r, 1000));
@@ -4690,7 +4708,232 @@ async function callGreetingAPI(name, aiName, aiData) {
     }
 }
 
-function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false) {
+function getPlusOneDateStr(baseDateStr) {
+    if (!baseDateStr) return '';
+    const dateObj = new Date(String(baseDateStr).replace(/-/g, '/'));
+    if (isNaN(dateObj.getTime())) return baseDateStr;
+    dateObj.setDate(dateObj.getDate() + 1);
+    return dateObj.toLocaleDateString('en-CA'); // 輸出 YYYY-MM-DD 格式
+}
+
+function buildCvdRiskSectionHtml(recordDate, allData = []) {
+    const history = Array.isArray(allData) ? allData : [];
+    const targetRecord = history.find(d => d.record_date === recordDate) || history[0] || null;
+    const raw = targetRecord?.raw_json || null;
+
+    // 沒有 CVD 資料就不顯示整個區塊
+    if (!raw || raw.CVD === undefined || raw.CVD === null || raw.CVD === '' || raw.CVD === 'NA' || raw.CVD === 'N/A') {
+        return '';
+    }
+
+    const riskVal = Number(raw.CVD);
+    if (isNaN(riskVal)) {
+        return '';
+    }
+
+    let riskText = '';
+    let bar1 = '#e1e1e1', bar2 = '#e1e1e1', bar3 = '#e1e1e1', bar4 = '#e1e1e1';
+
+    if (riskVal === 0) { riskText = '良好'; bar1 = '#596b75'; }
+    else if (riskVal === 1) { riskText = '一般'; bar2 = '#8699a3'; }
+    else if (riskVal === 2) { riskText = '偏高'; bar3 = '#a79d8c'; }
+    else if (riskVal === 3) { riskText = '高'; bar4 = '#ff8c73'; }
+    else {
+        return '';
+    }
+
+    const targetIdx = targetRecord ? history.findIndex(d => d === targetRecord) : 0;
+    const history7 = targetIdx >= 0 ? history.slice(targetIdx, targetIdx + 7) : history.slice(0, 7);
+
+    let c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+    history7.forEach(h => {
+        const vRaw = h.raw_json ? h.raw_json.CVD : null;
+        const v = (vRaw !== undefined && vRaw !== null && vRaw !== '' && vRaw !== 'NA' && vRaw !== 'N/A')
+            ? Number(vRaw)
+            : null;
+        if (v === 0) c0++;
+        else if (v === 1) c1++;
+        else if (v === 2) c2++;
+        else if (v === 3) c3++;
+    });
+
+    const formatRiskAxisDatePlus1 = (d) => {
+        if (!d) return '';
+        const parts = String(d).split(' ')[0].split(/[-/]/);
+        if (parts.length >= 3) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2].substring(0, 2), 10);
+            const dateObj = new Date(year, month, day);
+            if (isNaN(dateObj.getTime())) return d;
+            dateObj.setDate(dateObj.getDate() + 1);
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            return `${mm}/${dd}`;
+        }
+        return d;
+    };
+
+    const histRev = [...history7].reverse();
+    const riskChartData = histRev.map(h => {
+        const vRaw = h.raw_json ? h.raw_json.CVD : null;
+        if (vRaw === undefined || vRaw === null || vRaw === '' || vRaw === 'NA' || vRaw === 'N/A') {
+            return null;
+        }
+        const num = Number(vRaw);
+        return isNaN(num) ? null : num;
+    });
+
+    const getRiskY = (v) => {
+        if (v === 3) return 20;
+        if (v === 2) return 40;
+        if (v === 1) return 60;
+        if (v === 0) return 80;
+        return 80;
+    };
+    const getRiskLineColor = (v) => {
+        if (v === 3) return '#ff8c73';
+        if (v === 2) return '#a79d8c';
+        if (v === 1) return '#8699a3';
+        if (v === 0) return '#596b75';
+        return '#000';
+    };
+
+    const drawWidth = 300;
+    const startX = 60;
+    const endX = drawWidth - 20;
+    const xStep = riskChartData.length > 1 ? (endX - startX) / (riskChartData.length - 1) : 0;
+
+    let riskSvg = `<svg viewBox="0 0 ${drawWidth} 110" style="width: 100%; height: 110px; overflow: visible; margin-top: 10px; background-color: white; border-radius: 8px;">`;
+    riskSvg += `<text x="30" y="20" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">高</text>`;
+    riskSvg += `<text x="30" y="40" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">偏高</text>`;
+    riskSvg += `<text x="30" y="60" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">一般</text>`;
+    riskSvg += `<text x="30" y="80" font-size="12" fill="#888" text-anchor="end" dominant-baseline="middle">良好</text>`;
+
+    riskChartData.forEach((val, i) => {
+            if (val !== null) {
+                const cx = startX + i * xStep;
+                const cy = getRiskY(val);
+                const ccolor = getRiskLineColor(val);
+                riskSvg += `<line x1="${cx - 8}" y1="${cy}" x2="${cx + 8}" y2="${cy}" stroke="${ccolor}" stroke-width="4" stroke-linecap="round" />`;
+            }
+        });
+
+    const firstRiskDate = histRev.length > 0
+        ? formatRiskAxisDatePlus1(histRev[0].record_end || histRev[0].record_date || '')
+        : '';
+    const lastRiskDate = histRev.length > 0
+        ? formatRiskAxisDatePlus1(histRev[histRev.length - 1].record_end || histRev[histRev.length - 1].record_date || '')
+        : '';
+
+    if (firstRiskDate) {
+        riskSvg += `<text x="${startX}" y="105" font-size="12" fill="#999" text-anchor="middle">${firstRiskDate}</text>`;
+    }
+    if (riskChartData.length > 1 && lastRiskDate) {
+        riskSvg += `<text x="${endX}" y="105" font-size="12" fill="#999" text-anchor="middle">${lastRiskDate}</text>`;
+    }
+    riskSvg += `</svg>`;
+
+    const toggleId = `risk-chart-container-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    let compAnalysisHtml = '';
+    if (
+        raw.PPI_count != null && raw.HBI_count != null && raw.CBP_count != null &&
+        raw.PPI_count !== 'NA' && raw.HBI_count !== 'NA' && raw.CBP_count !== 'NA'
+    ) {
+        const getCompBarHtml = (title, val) => {
+            const roundedVal = Math.round(Number(val));
+            const colors = ['#e1e1e1', '#e1e1e1', '#e1e1e1', '#e1e1e1'];
+
+            if (roundedVal >= 0 && roundedVal <= 24) colors[0] = '#596b75';
+            else if (roundedVal >= 25 && roundedVal <= 49) colors[1] = '#8699a3';
+            else if (roundedVal >= 50 && roundedVal <= 74) colors[2] = '#a79d8c';
+            else if (roundedVal >= 75 && roundedVal <= 100) colors[3] = '#ff8c73';
+
+            return `
+                <div style="margin-top: 12px;">
+                    <div style="font-size: 14px; font-weight: bold; color: #5a5a5a;">${title}</div>
+                    <div style="display: flex; gap: 4px; height: 6px; width: 100%; margin-top: 12px;">
+                        <div style="flex: 1; background-color: ${colors[0]}; border-radius: 3px;"></div>
+                        <div style="flex: 1; background-color: ${colors[1]}; border-radius: 3px;"></div>
+                        <div style="flex: 1; background-color: ${colors[2]}; border-radius: 3px;"></div>
+                        <div style="flex: 1; background-color: ${colors[3]}; border-radius: 3px;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 4px; text-align: center;">
+                        <div style="flex: 1;">良好</div>
+                        <div style="flex: 1;">一般</div>
+                        <div style="flex: 1;">需留意</div>
+                        <div style="flex: 1;">不佳</div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const item1 = getCompBarHtml('脈搏間隔穩定度', raw.PPI_count);
+        const item2 = getCompBarHtml('低氧區穩定度', raw.HBI_count);
+        const item3 = getCompBarHtml('心血管壓力穩定度', raw.CBP_count);
+
+        compAnalysisHtml = `
+            <div style="margin-top: 20px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 15px;">
+                <div style="font-size: 15px; font-weight: bold; color: #333; text-align: center;">本次綜合分析</div>
+                ${item1}
+                ${item2}
+                ${item3}
+            </div>
+        `;
+    }
+
+    return `
+        <div style="background-color: #f8fcfc; border-radius: 12px; padding: 15px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <img src="images/risk_h.svg" style="width: 20px; height: 20px;" alt="睡眠心血管負荷">
+                    <span style="font-weight: bold; color: #333;">睡眠心血管負荷</span>
+                </div>
+                <span style="font-size: 1.8rem; font-weight: bold; color: #596b75;">
+                    ${riskText}
+                </span>
+            </div>
+
+            <div style="display: flex; gap: 4px; height: 6px; width: 100%;">
+                <div style="flex: 1; background-color: ${bar1}; border-radius: 3px;"></div>
+                <div style="flex: 1; background-color: ${bar2}; border-radius: 3px;"></div>
+                <div style="flex: 1; background-color: ${bar3}; border-radius: 3px;"></div>
+                <div style="flex: 1; background-color: ${bar4}; border-radius: 3px;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-top: 5px; text-align: center;">
+                <div style="flex: 1;">良好</div>
+                <div style="flex: 1;">一般</div>
+                <div style="flex: 1;">偏高</div>
+                <div style="flex: 1;">高</div>
+            </div>
+
+            <div style="margin-top: 15px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px;" onclick="event.stopPropagation();">
+                <div style="text-align: center; color: #8699a3; font-size: 13px; cursor: pointer; padding: 5px 0;" 
+                     onclick="const c = document.getElementById('${toggleId}'); if(c.classList.contains('hidden')){c.classList.remove('hidden'); this.innerText='▲ 收合7日趨勢';}else{c.classList.add('hidden'); this.innerText='▼ 查看7日趨勢';}">▼ 查看7日趨勢</div>
+                
+                <div id="${toggleId}" class="hidden" style="margin-top: 5px;">
+                    <div style="background: white; border-radius: 12px; padding: 15px; margin-top: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+                        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+                            <div style="font-size: 15px; color: #5a5a5a; font-weight: bold;">7日趨勢</div>
+                            <div style="font-size: 11px; color: #888; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#596b75;"></div>良好: ${c0}</div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#8699a3;"></div>一般: ${c1}</div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#a79d8c;"></div>偏高: ${c2}</div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="flex-shrink: 0; width:8px; height:8px; border-radius:50%; background-color:#ff8c73;"></div>高: ${c3}</div>
+                            </div>
+                        </div>
+                        ${riskSvg}
+                    </div>
+                </div>
+            </div>
+            ${compAnalysisHtml}
+        </div>
+    `;
+}
+
+function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSleepReport = false, allData = []) {
     const config = {
         'TST_min': { icon: '🛌', label: '總睡眠時間', color: '#a79d8c' },
         'N3_pct': { icon: '💤', label: '深睡期 (N3)', color: '#a79d8c' },
@@ -4700,21 +4943,23 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     };
 
     const style = config[metricName] || { icon: '📊', label: '健康指標', color: '#a79d8c' };
+    const riskSectionHtml = buildCvdRiskSectionHtml(recordDate, allData);
 
-    // 根據 showSleepReport 決定是否顯示睡眠報告按鈕區塊
+    // 1. 按鈕改為置中對齊 (text-align: center)
     const reportButtonHtml = showSleepReport ? `
-        <div style="text-align: right; border-top: 1px dashed #e0e0e0; padding-top: 10px;">
-            <button onclick="openSleepReport('${recordDate}')" style="background-color: ${style.color}; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                📄 開啟睡眠報告
-            </button>
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${recordDate}');">📄 開啟睡眠報告</button>
         </div>` : '';
 
+    // 2. 移除 border-left 直條邊框，改為與 .summary-card 一致的 border: 1px solid #eee
     const html = `
-        <div class="ai-message-wrapper">
-            <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid ${style.color}; background-color: #ffffff;">
-                <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between;">
-                    <span style="font-weight: bold; font-size: 1.1em;">睡眠分析</span>
-                    <span style="font-size: 0.9em; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
+        <div class="ai-message-wrapper" style="width: 100%;">
+            <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 6px;">
+                    📅 ${getPlusOneDateStr(recordDate)} 睡眠分析
+                </div>
+                <div style="text-align: right; margin-bottom: 10px;">
+                    <span style="display: inline-block; font-size: 0.85em; font-weight: bold; color: #666; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
                 </div>
                 <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
                     <div style="font-size: 24px; margin-right: 12px;">${style.icon}</div>
@@ -4722,6 +4967,8 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
                         ${detailedContent}
                     </div>
                 </div>
+
+                ${riskSectionHtml}
                 
                 ${reportButtonHtml}
             </div>
@@ -4930,10 +5177,8 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
 
     // 👇 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
     const reportButtonHtml = hasTRT ? `
-        <div style="text-align: right;">
-            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                📄 開啟睡眠報告
-            </button>
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${targetPreDateStr}');">📄 開啟睡眠報告</button>
         </div>` : '';
 
     // 2. 決定比較基準：有3天歷史就算平均，沒有3天就只抓前一天
@@ -4989,23 +5234,31 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
 
     // 4. 如果因為缺少數值算不出任何比較結果 (例如第一天使用，沒有歷史數據)
     if (!worstMetric) {
-        // 給一句適合第一天使用的專屬對話
         await appendAiMessage("收到了！😊 你可以直接點選下方按鈕查看完整的睡眠報告喔！");
-        
-        // 直接推派一張帶有 PDF 按鈕的簡化版卡片 (加入 reportButtonHtml 判斷)
+
+        const cvdSectionHtml = buildCvdRiskSectionHtml(targetPreDateStr, allData);
+
         const fallbackHtml = `
-            <div class="ai-message-wrapper">
-                <div class="ai-message" style="max-width: 85%; padding: 15px; border-radius: 18px; border-left: 5px solid #a79d8c; background-color: #ffffff;">
-                    <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                        🛌 睡眠紀錄
+        <div class="ai-message-wrapper" style="width: 100%;">
+            <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
+                        📅 ${getPlusOneDateStr(targetPreDateStr)} 睡眠分析
                     </div>
-                    ${reportButtonHtml}
-                </div>
-            </div>`;
-        
+                ${cvdSectionHtml}
+                ${reportButtonHtml}
+            </div>
+        </div>`;
+
         document.getElementById('chat-history').insertAdjacentHTML('beforeend', fallbackHtml);
         scrollToBottom();
-        
+
+        // 卡片出現後，加上引導語與過濾後的 3 個隨機延伸問題按鈕
+        await new Promise(r => setTimeout(r, 1000));
+        await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
+
+        const randomQuestions = getRandomFilteredQuestions(3);
+        appendAiFollowUpOptions(randomQuestions);
+
         return;
     }
 
@@ -5033,11 +5286,29 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
         if (phraseData && phraseData.detailed_content) {
             // 先說一句話，然後推派小卡
             await appendAiMessage(`收到了！😊 幫你分析了一下數據：`);
-            // 👇 修改這裡：把 hasTRT 當作第四個參數傳進去
-            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, targetPreDateStr, hasTRT);
+            
+            // 呼叫簡易小卡 (傳入 hasTRT 決定按鈕是否顯示，allData 渲染 CVD 區塊)
+            appendSimpleSummaryCard(worstMetric, phraseData.detailed_content, targetPreDateStr, hasTRT, allData);
+            
+            // 小卡出現後，再給一個引導
+            await new Promise(r => setTimeout(r, 1000));
+            await appendAiMessage("目前還沒有恢復指數的分析，但上面的觀察也很有參考價值。現在想了解哪一部分呢？");
+            
+            // 使用 getRandomFilteredQuestions 過濾掉「恢復」與「發炎」後渲染按鈕
+            const randomQuestions = getRandomFilteredQuestions(3);
+            appendAiFollowUpOptions(randomQuestions);
+        } else {
+            await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+            
+            const randomQuestions = getRandomFilteredQuestions(3);
+            appendAiFollowUpOptions(randomQuestions);
         }
     } catch (e) {
-        console.error("Supabase 查詢錯誤：", e);
+        console.error("讀取 phrase_library 失敗:", e);
+        await appendAiMessage("收到了！😊 現在想從哪個部分開始了解呢？");
+        
+        const randomQuestions = getRandomFilteredQuestions(3);
+        appendAiFollowUpOptions(randomQuestions);
     }
 }
 </script>
