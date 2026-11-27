@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-7</title>
+    <title>Soosyn 健康夥伴 n102-8</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -4196,7 +4196,7 @@ async function handleAbnormalityInput(msg) {
 
         const centeredReportBtnHtml = hasYesterdayTRT ? `
             <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-                <button onclick="openSleepReport('${preDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                <button onclick="openSleepReport('${preDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                     📄 開啟睡眠報告
                 </button>
             </div>` : '';
@@ -4205,7 +4205,7 @@ async function handleAbnormalityInput(msg) {
             <div class="ai-message-wrapper" style="width: 100%;">
                 <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                     <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                        🛌 睡眠紀錄
+                        📅 ${preDateStr} 睡眠分析
                     </div>
                     ${cvdSectionHtml}
                     ${centeredReportBtnHtml}
@@ -4289,7 +4289,7 @@ async function handleAbnormalityInput(msg) {
         // 睡眠報告按鈕置中樣式（若前面 reportButtonHtml 還沒改成置中，可直接用這段）
         const centeredReportBtnHtml = hasYesterdayTRT ? `
             <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-                <button onclick="openSleepReport('${preDateStr}')" style="background-color: #a79d8c; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                <button onclick="openSleepReport('${preDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
                     📄 開啟睡眠報告
                 </button>
             </div>` : '';
@@ -4298,7 +4298,7 @@ async function handleAbnormalityInput(msg) {
             <div class="ai-message-wrapper" style="width: 100%;">
                 <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                     <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                        🛌 睡眠紀錄
+                        📅 ${preDateStr} 睡眠分析
                     </div>
                     ${cvdSectionHtml}
                     ${centeredReportBtnHtml}
@@ -4967,7 +4967,7 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
         <div class="ai-message-wrapper" style="width: 100%;">
             <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                 <div style="font-weight: bold; font-size: 0.9em; color: #666; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; font-size: 1.1em;">睡眠分析</span>
+                    <span style="font-weight: bold; font-size: 1.1em;">📅 ${recordDate} 睡眠分析</span>
                     <span style="font-size: 0.9em; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap;">${style.label}</span>
                 </div>
                 <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
@@ -5253,8 +5253,8 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
         <div class="ai-message-wrapper" style="width: 100%;">
             <div class="ai-message" style="width: 95%; max-width: 450px; margin: 15px auto; padding: 20px; border-radius: 16px; border: 1px solid #eee; background-color: #ffffff; box-shadow: 0 10px 20px rgba(0,0,0,0.05); box-sizing: border-box;">
                 <div style="font-weight: bold; font-size: 1.1em; color: #666; margin-bottom: 12px;">
-                    🛌 睡眠紀錄
-                </div>
+                        📅 ${targetPreDateStr} 睡眠分析
+                    </div>
                 ${cvdSectionHtml}
                 ${reportButtonHtml}
             </div>
