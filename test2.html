@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Soosyn 健康夥伴 n102-8</title>
+    <title>Soosyn 健康夥伴 n102-9</title>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -4139,11 +4139,9 @@ async function handleAbnormalityInput(msg) {
     const hasYesterdayTRT = yesterdayData?.raw_json?.TRT_min !== undefined && yesterdayData?.raw_json?.TRT_min !== null;
 
     // 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
-    const reportButtonHtml = hasYesterdayTRT ? `
-        <div style="text-align: right;">
-            <button onclick="openSleepReport('${preDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 6px 14px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                📄 開啟睡眠報告
-            </button>
+    const centeredReportBtnHtml = hasYesterdayTRT ? `
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${preDateStr}');">📄 開啟睡眠報告</button>
         </div>` : '';
 
 
@@ -4195,11 +4193,9 @@ async function handleAbnormalityInput(msg) {
         const cvdSectionHtml = buildCvdRiskSectionHtml(preDateStr, allData);
 
         const centeredReportBtnHtml = hasYesterdayTRT ? `
-            <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-                <button onclick="openSleepReport('${preDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                    📄 開啟睡眠報告
-                </button>
-            </div>` : '';
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${preDateStr}');">📄 開啟睡眠報告</button>
+        </div>` : '';
 
         const fallbackHtml = `
             <div class="ai-message-wrapper" style="width: 100%;">
@@ -4288,11 +4284,9 @@ async function handleAbnormalityInput(msg) {
 
         // 睡眠報告按鈕置中樣式（若前面 reportButtonHtml 還沒改成置中，可直接用這段）
         const centeredReportBtnHtml = hasYesterdayTRT ? `
-            <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-                <button onclick="openSleepReport('${preDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                    📄 開啟睡眠報告
-                </button>
-            </div>` : '';
+        <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${preDateStr}');">📄 開啟睡眠報告</button>
+        </div>` : '';
 
         const fallbackHtml = `
             <div class="ai-message-wrapper" style="width: 100%;">
@@ -4965,9 +4959,7 @@ function appendSimpleSummaryCard(metricName, detailedContent, recordDate, showSl
     // 1. 按鈕改為置中對齊 (text-align: center)
     const reportButtonHtml = showSleepReport ? `
         <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-            <button onclick="openSleepReport('${recordDate}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                📄 開啟睡眠報告
-            </button>
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${recordDate}');">📄 開啟睡眠報告</button>
         </div>` : '';
 
     // 2. 移除 border-left 直條邊框，改為與 .summary-card 一致的 border: 1px solid #eee
@@ -5195,9 +5187,7 @@ async function processSleepAnalysisByDate(targetPreDateStr) {
     // 👇 根據是否有 TRT_min 決定是否顯示睡眠報告按鈕
     const reportButtonHtml = hasTRT ? `
         <div style="text-align: center; border-top: 1px dashed #e0e0e0; padding-top: 12px; margin-top: 12px;">
-            <button onclick="openSleepReport('${targetPreDateStr}')" style="background-color: var(--tbp-blue); color: white; border: none; padding: 8px 20px; border-radius: 20px; font-size: 0.85em; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                📄 開啟睡眠報告
-            </button>
+            <button class="primary-btn" style="background-color: var(--tbp-blue); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; border-radius: 20px;" onclick="event.stopPropagation(); openSleepReport('${targetPreDateStr}');">📄 開啟睡眠報告</button>
         </div>` : '';
 
     // 2. 決定比較基準：有3天歷史就算平均，沒有3天就只抓前一天
